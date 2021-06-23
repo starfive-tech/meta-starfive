@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<manifest>
+  <remote name="openembedded" fetch="git://github.com/openembedded/" />
+  <remote name="riscv" fetch="git://github.com/riscv/" />
+  <default remote="openembedded" revision="master" />
+  <remote name="starfive" fetch="git://github.com/thloh85-starfivetech/" />
+
+  <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="master" />
+  <project name="openembedded-core" remote="openembedded" path="openembedded-core" revision="master" />
+  <project name="bitbake" remote="openembedded" path="openembedded-core/bitbake" revision="master" />
+  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="master" />
+  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="master" />
+
+</manifest>
+
