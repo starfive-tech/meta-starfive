@@ -1,0 +1,40 @@
+From 5c044362b7f047ac873cbe281304adf7b07648df Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 27 Jan 2021 11:35:42 +0800
+Subject: [PATCH 59/60] Do not install riscv_vector.h and riscv_vector_itr.h
+
+---
+ gcc/config.gcc                                   | 2 +-
+ gcc/testsuite/gcc.target/riscv/rvv/riscv-rvv.exp | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 6f2d54b11bc..2021c5d7247 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -526,7 +526,7 @@ pru-*-*)
+ riscv*)
+ 	cpu_type=riscv
+ 	extra_objs="riscv-builtins.o riscv-c.o riscv-sr.o riscv-shorten-memrefs.o"
+-	extra_headers="riscv_vector.h riscv_vector_itr.h rvintrin.h"
++	extra_headers="rvintrin.h"
+ 	d_target_objs="riscv-d.o"
+ 	;;
+ rs6000*-*-*)
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/riscv-rvv.exp b/gcc/testsuite/gcc.target/riscv/rvv/riscv-rvv.exp
+index 3caff453fe8..a933011280c 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/riscv-rvv.exp
++++ b/gcc/testsuite/gcc.target/riscv/rvv/riscv-rvv.exp
+@@ -16,6 +16,9 @@
+ 
+ # GCC testsuite that uses the `dg.exp' driver.
+ 
++# Always skip for now, since we don't install the vector intrinsic header now.
++return
++
+ # Exit immediately if this isn't a RISC-V target.
+ if ![istarget riscv*-*-*] then {
+   return
+-- 
+2.25.1
+

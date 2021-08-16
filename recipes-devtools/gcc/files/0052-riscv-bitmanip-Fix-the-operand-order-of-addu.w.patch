@@ -1,0 +1,29 @@
+From 148c9ae88128c05fa312965275f86885478c5be7 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Thu, 31 Dec 2020 11:12:17 +0800
+Subject: [PATCH 52/60] [riscv-bitmanip] Fix the operand order of addu.w
+
+ - The operand order has been updated in spec:
+https://github.com/riscv/riscv-bitmanip/commit/84b6fd847308ec0fe8143996787bf4f7fead5211
+---
+ gcc/config/riscv/bitmanip.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/riscv/bitmanip.md b/gcc/config/riscv/bitmanip.md
+index 32077142f78..14e81d1b2ff 100644
+--- a/gcc/config/riscv/bitmanip.md
++++ b/gcc/config/riscv/bitmanip.md
+@@ -413,8 +413,8 @@
+ (define_insn "*addu.w"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+ 	(plus:DI (zero_extend:DI
+-		  (match_operand:SI 2 "register_operand" "r"))
+-		 (match_operand:DI 1 "register_operand" "r")))]
++		  (match_operand:SI 1 "register_operand" "r"))
++		 (match_operand:DI 2 "register_operand" "r")))]
+   "TARGET_64BIT && TARGET_ZBA"
+   "addu.w\t%0,%1,%2"
+   [(set_attr "type" "bitmanip")])
+-- 
+2.25.1
+

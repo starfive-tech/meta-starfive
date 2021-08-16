@@ -1,0 +1,33 @@
+From 2bc290c1ba1bf81a7563f399efe48b91cc9a7203 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 23 Dec 2020 07:34:50 -0800
+Subject: [PATCH 47/60] RISC-V: Fix python3 compatibility for
+ multilib-generator
+
+The subprocess return string is raw bytes in python3, it must decode
+before used as string, verifed with python2 and python3.
+
+gcc/ChangeLog:
+
+	* config/riscv/multilib-generator (arch_canonicalize): Call
+	decode for the subprocess return value.
+---
+ gcc/config/riscv/multilib-generator | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config/riscv/multilib-generator b/gcc/config/riscv/multilib-generator
+index 9c6096446ab..12881d2a6a0 100755
+--- a/gcc/config/riscv/multilib-generator
++++ b/gcc/config/riscv/multilib-generator
+@@ -58,7 +58,7 @@ def arch_canonicalize(arch):
+   proc = subprocess.Popen([sys.executable, arch_can_script, arch],
+                           stdout=subprocess.PIPE)
+   out, err = proc.communicate()
+-  return out.strip()
++  return out.decode().strip()
+ 
+ #
+ # Handle expansion operation.
+-- 
+2.25.1
+

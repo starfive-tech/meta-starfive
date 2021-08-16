@@ -1,0 +1,36 @@
+From 5fd0c90d33844c8f788a8cb494a9c56bd1d0f74f Mon Sep 17 00:00:00 2001
+From: Simon Cook <simon.cook@embecosm.com>
+Date: Wed, 9 Dec 2020 10:39:28 +0000
+Subject: [PATCH 31/60] RISC-V: Explicitly call python when using multilib
+ generator
+
+When building GCC for RISC-V with the --with-multilib-generator option,
+it may not be possible to call arch-canonicalize as an executable when
+building on Windows. Instead directly invoke the expected python
+interpreter for this step.
+
+gcc/ChangeLog:
+
+	* config/riscv/multilib-generator (arch_canonicalize): Invoke
+	python interpreter when calling arch-canonicalize script.
+---
+ gcc/config/riscv/multilib-generator | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/riscv/multilib-generator b/gcc/config/riscv/multilib-generator
+index 53c51dfa53f..ccfd9ea18ea 100755
+--- a/gcc/config/riscv/multilib-generator
++++ b/gcc/config/riscv/multilib-generator
+@@ -54,7 +54,8 @@ def arch_canonicalize(arch):
+   this_file = os.path.abspath(os.path.join( __file__))
+   arch_can_script = \
+     os.path.join(os.path.dirname(this_file), "arch-canonicalize")
+-  proc = subprocess.Popen([arch_can_script, arch], stdout=subprocess.PIPE)
++  proc = subprocess.Popen([sys.executable, arch_can_script, arch],
++                          stdout=subprocess.PIPE)
+   out, err = proc.communicate()
+   return out.strip()
+ 
+-- 
+2.25.1
+

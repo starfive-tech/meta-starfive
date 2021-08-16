@@ -1,0 +1,250 @@
+From ccd34d41401c7737f1ff1bf493ed41d0a799389e Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Fri, 19 Jun 2020 00:36:23 -0700
+Subject: [PATCH 20/60] RISC-V: Add configure option: --with-multilib-generator
+ to flexible config multi-lib settings.
+
+ - Able to configure complex multi-lib rule in configure time, without modify
+   any in-tree source.
+
+ - I was consider to implmenet this into `--with-multilib-list` option,
+   but I am not sure who will using that with riscv*-*-elf*, so I decide to
+   using another option name for that.
+
+ - --with-multilib-generator will pass arguments to multilib-generator, and
+   then using the generated multi-lib config file to build the toolchain.
+
+   e.g. Build riscv gcc, default arch/abi is rv64gc/lp64, and build multilib
+       for rv32imafd/ilp32 and rv32i/ilp32; rv32ic/ilp32 will reuse
+       rv32i/ilp32.
+    $ <GCC-SRC>/configure \
+       --target=riscv64-elf \
+       --with-arch=rv64gc --with-abi=lp64 \
+       --with-multilib-generator=rv32i-ilp32--c;rv32imafd-ilp32--
+
+V3 Changes:
+
+ - Rename --with-multilib-config to --with-multilib-generator
+ - Check --with-multilib-generator and --with-multilib-list can't be used at
+   same time.
+
+V2 Changes:
+
+ - Fix --with-multilib-config hanling on non riscv*-*-elf* triple.
+
+gcc/ChangeLog:
+
+	* config.gcc (riscv*-*-*): Handle --with-multilib-generator.
+	* configure: Regen.
+	* configure.ac: Add --with-multilib-generator.
+	* config/riscv/multilib-generator: Exit when parsing arch string error.
+	* config/riscv/t-withmultilib-generator: New.
+	* doc/install.texi: Document --with-multilib-generator.
+---
+ gcc/config.gcc                            | 36 +++++++++++++++++++----
+ gcc/config/riscv/multilib-generator       |  9 +++++-
+ gcc/config/riscv/t-withmultilib-generator |  2 ++
+ gcc/configure                             | 16 ++++++++--
+ gcc/configure.ac                          |  5 ++++
+ gcc/doc/install.texi                      | 31 +++++++++++++++++++
+ 6 files changed, 91 insertions(+), 8 deletions(-)
+ create mode 100644 gcc/config/riscv/t-withmultilib-generator
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 0657561ceef..8d0e4de710f 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -2450,11 +2450,13 @@ riscv*-*-elf* | riscv*-*-rtems*)
+ 	  tmake_file="${tmake_file} riscv/t-rtems"
+ 	  ;;
+ 	*)
+-	  case "x${enable_multilib}" in
+-	  xno) ;;
+-	  xyes) tmake_file="${tmake_file} riscv/t-elf-multilib" ;;
+-	  *) echo "Unknown value for enable_multilib"; exit 1
+-	  esac
++	  if test "x${with_multilib_generator}" == xdefault; then
++		  case "x${enable_multilib}" in
++		  xno) ;;
++		  xyes) tmake_file="${tmake_file} riscv/t-elf-multilib" ;;
++		  *) echo "Unknown value for enable_multilib"; exit 1
++		  esac
++	  fi
+ 	esac
+ 	tmake_file="${tmake_file} riscv/t-riscv"
+ 	gnu_ld=yes
+@@ -4581,6 +4583,30 @@ case "${target}" in
+ 			exit 1
+ 			;;
+ 		esac
++		# Handle --with-multilib-generator.
++		if test "x${with_multilib_generator}" != xdefault; then
++			if test "x${with_multilib_list}" != xdefault; then
++				echo "--with-multilib-list= can't used with --with-multilib-generator= at same time" 1>&2
++				exit 1
++			fi
++			case "${target}" in
++			riscv*-*-elf*)
++				if ${srcdir}/config/riscv/multilib-generator \
++					`echo ${with_multilib_generator} | sed 's/;/ /g'`\
++					> t-multilib-config;
++				then
++					tmake_file="${tmake_file} riscv/t-withmultilib-generator"
++				else
++					echo "invalid option for --with-multilib-generator" 1>&2
++					exit 1
++				fi
++				;;
++			*)
++				echo "--with-multilib-generator= is not supported for ${target}, only supported for riscv*-*-elf*" 1>&2
++				exit 1
++				;;
++			esac
++		fi
+ 
+ 		# Handle --with-multilib-list.
+ 		if test "x${with_multilib_list}" != xdefault; then
+diff --git a/gcc/config/riscv/multilib-generator b/gcc/config/riscv/multilib-generator
+index 57ee7c3a2eb..0d9ebcb321f 100755
+--- a/gcc/config/riscv/multilib-generator
++++ b/gcc/config/riscv/multilib-generator
+@@ -194,7 +194,14 @@ def expand_combination(ext):
+   return ext
+ 
+ for cfg in sys.argv[1:]:
+-  (arch, abi, extra, ext) = cfg.split('-')
++  try:
++    (arch, abi, extra, ext) = cfg.split('-')
++  except:
++    print ("Invalid configure string %s, <arch>-<abi>-<extra>-<extensions>\n"
++           "<extra> and <extensions> can be empty, "
++           "e.g. rv32imafd-ilp32--" % cfg)
++    sys.exit(1)
++
+   arch = arch_canonicalize (arch)
+   arches[arch] = 1
+   abis[abi] = 1
+diff --git a/gcc/config/riscv/t-withmultilib-generator b/gcc/config/riscv/t-withmultilib-generator
+new file mode 100644
+index 00000000000..1a35cc0bc65
+--- /dev/null
++++ b/gcc/config/riscv/t-withmultilib-generator
+@@ -0,0 +1,2 @@
++# t-multilib-config will generated in build folder by configure script.
++include t-multilib-config
+diff --git a/gcc/configure b/gcc/configure
+index b4088d8fd1e..5624b8a2fc1 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -969,6 +969,7 @@ with_documentation_root_url
+ with_changes_root_url
+ enable_languages
+ with_multilib_list
++with_multilib_generator
+ with_zstd
+ with_zstd_include
+ with_zstd_lib
+@@ -1806,6 +1807,8 @@ Optional Packages:
+   --with-changes-root-url=URL
+                           Root for GCC changes URLs
+   --with-multilib-list    select multilibs (AArch64, SH and x86-64 only)
++  --with-multilib-generator
++                          Multi-libs configuration string (RISC-V only)
+   --with-zstd=PATH        specify prefix directory for installed zstd library.
+                           Equivalent to --with-zstd-include=PATH/include plus
+                           --with-zstd-lib=PATH/lib
+@@ -8006,6 +8009,15 @@ else
+ fi
+ 
+ 
++
++# Check whether --with-multilib-generator was given.
++if test "${with_multilib_generator+set}" = set; then :
++  withval=$with_multilib_generator; :
++else
++  with_multilib_generator=default
++fi
++
++
+ # -------------------------
+ # Checks for other programs
+ # -------------------------
+@@ -19020,7 +19032,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 19023 "configure"
++#line 19035 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -19126,7 +19138,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 19129 "configure"
++#line 19141 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index 070b9c6c497..e70c19ea971 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -1110,6 +1110,11 @@ AC_ARG_WITH(multilib-list,
+ :,
+ with_multilib_list=default)
+ 
++AC_ARG_WITH(multilib-generator,
++[AS_HELP_STRING([--with-multilib-generator], [Multi-libs configuration string (RISC-V only)])],
++:,
++with_multilib_generator=default)
++
+ # -------------------------
+ # Checks for other programs
+ # -------------------------
+diff --git a/gcc/doc/install.texi b/gcc/doc/install.texi
+index 876b04f9c45..e2466abae93 100644
+--- a/gcc/doc/install.texi
++++ b/gcc/doc/install.texi
+@@ -1250,6 +1250,37 @@ If @option{--with-multilib-list} is not given, then only 32-bit and
+ 64-bit run-time libraries will be enabled.
+ @end table
+ 
++@item --with-multilib-generator=@var{config}
++Specify what multilibs to build.  @var{config} is a semicolon separated list of
++values, possibly consisting of a single value.  Currently only implemented
++for riscv*-*-elf*.  The accepted values and meanings are given below.
++
++
++Every config is constructed with four components: architecture string, ABI,
++reuse rule with architecture string and reuse rule with sub-extension.
++
++Example 1: Add multi-lib suppport for rv32i with ilp32.
++@smallexample
++rv32i-ilp32--
++@end smallexample
++
++Example 2: Add multi-lib suppport for rv32i with ilp32 and rv32imafd with ilp32.
++@smallexample
++rv32i-ilp32--;rv32imafd-ilp32--
++@end smallexample
++
++Example 3: Add multi-lib suppport for rv32i with ilp32; rv32im with ilp32 and
++rv32ic with ilp32 will reuse this multi-lib set.
++@smallexample
++rv32i-ilp32-rv32im-c
++@end smallexample
++
++Example 4: Add multi-lib suppport for rv64ima with lp64; rv64imaf with lp64,
++rv64imac with lp64 and rv64imafc with lp64 will reuse this multi-lib set.
++@smallexample
++rv64ima-lp64--f,c,fc
++@end smallexample
++
+ @item --with-endian=@var{endians}
+ Specify what endians to use.
+ Currently only implemented for sh*-*-*.
+-- 
+2.25.1
+

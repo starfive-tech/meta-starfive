@@ -1,0 +1,319 @@
+From 7cc743c2c0865d3f023cd36a96dbdf9e27dc5f74 Mon Sep 17 00:00:00 2001
+From: Monk Chiang <monk.chiang@sifive.com>
+Date: Fri, 11 Sep 2020 13:06:09 +0800
+Subject: [PATCH 44/60] Adjust testcase for compact code model
+
+---
+ gcc/testsuite/g++.dg/abi/anon4.C                        | 1 +
+ gcc/testsuite/g++.dg/opt/devirt2.C                      | 3 +++
+ gcc/testsuite/g++.dg/pr49718.C                          | 1 +
+ gcc/testsuite/gcc.dg/tree-ssa/loop-1.c                  | 6 ++++++
+ gcc/testsuite/gcc.target/riscv/arch-1.c                 | 2 +-
+ gcc/testsuite/gcc.target/riscv/arch-2.c                 | 2 +-
+ gcc/testsuite/gcc.target/riscv/arch-3.c                 | 2 +-
+ gcc/testsuite/gcc.target/riscv/arch-4.c                 | 2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-10.c           | 2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-7.c            | 2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-8.c            | 2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-9.c            | 2 +-
+ gcc/testsuite/gcc.target/riscv/flattened-struct-abi-1.c | 2 +-
+ gcc/testsuite/gcc.target/riscv/flattened-struct-abi-2.c | 2 +-
+ gcc/testsuite/gcc.target/riscv/interrupt-2.c            | 2 +-
+ gcc/testsuite/gcc.target/riscv/losum-overflow.c         | 2 +-
+ gcc/testsuite/gcc.target/riscv/pr93202.c                | 2 +-
+ gcc/testsuite/gcc.target/riscv/predef-3.c               | 2 +-
+ gcc/testsuite/gcc.target/riscv/save-restore-2.c         | 2 +-
+ gcc/testsuite/gcc.target/riscv/save-restore-3.c         | 2 +-
+ gcc/testsuite/gcc.target/riscv/save-restore-6.c         | 2 +-
+ gcc/testsuite/gcc.target/riscv/save-restore-7.c         | 2 +-
+ gcc/testsuite/gcc.target/riscv/shift-and-1.c            | 2 +-
+ gcc/testsuite/gcc.target/riscv/shift-shift-1.c          | 2 +-
+ gcc/testsuite/gcc.target/riscv/shift-shift-4.c          | 2 +-
+ 25 files changed, 32 insertions(+), 21 deletions(-)
+
+diff --git a/gcc/testsuite/g++.dg/abi/anon4.C b/gcc/testsuite/g++.dg/abi/anon4.C
+index 088ba994019..885ebf23ffc 100644
+--- a/gcc/testsuite/g++.dg/abi/anon4.C
++++ b/gcc/testsuite/g++.dg/abi/anon4.C
+@@ -1,5 +1,6 @@
+ // PR c++/65209
+ // { dg-final { scan-assembler-not "comdat" } }
++/* { dg-skip-if "" { riscv*-*-* } { "-mcmodel=compact" } { "" } } */
+ 
+ // Everything involving the anonymous namespace bits should be private, not
+ // COMDAT.
+diff --git a/gcc/testsuite/g++.dg/opt/devirt2.C b/gcc/testsuite/g++.dg/opt/devirt2.C
+index cf4842bd4df..d9e053199ab 100644
+--- a/gcc/testsuite/g++.dg/opt/devirt2.C
++++ b/gcc/testsuite/g++.dg/opt/devirt2.C
+@@ -5,6 +5,9 @@
+ // { dg-additional-options "-mshort-calls" {target epiphany-*-*} }
+ // Using -mno-abicalls avoids a R_MIPS_JALR .reloc.
+ // { dg-additional-options "-mno-abicalls" { target mips*-*-* } }
++/* Using -mcmodel=medlow avoids loading the function addresses in
++   got table and thus getting the counts wrong.  */
++// { dg-additional-options "-mcmodel=medlow" { target riscv*-*-* } }
+ // { dg-final { scan-assembler-times "xyzzy" 2 { target { ! { alpha*-*-* hppa*-*-* ia64*-*-hpux* sparc*-*-* *-*-mingw* } } } } }
+ // For *-*-mingw* there is additionally one .def match
+ // { dg-final { scan-assembler-times "xyzzy" 3 { target *-*-mingw* } } }
+diff --git a/gcc/testsuite/g++.dg/pr49718.C b/gcc/testsuite/g++.dg/pr49718.C
+index b1cc5deb7ac..b4fb059b8df 100644
+--- a/gcc/testsuite/g++.dg/pr49718.C
++++ b/gcc/testsuite/g++.dg/pr49718.C
+@@ -2,6 +2,7 @@
+ /* { dg-options "-O2 -finstrument-functions" } */
+ /* { dg-additional-options "-mno-explicit-relocs" { target alpha*-*-* } } */
+ /* { dg-additional-options "-mno-relax-pic-calls" { target mips*-*-* } } */
++/* { dg-additional-options "-mcmodel=medlow" { target riscv*-*-* } } */
+ /* { dg-final { scan-assembler-times "__cyg_profile_func_enter" 1 { target { ! { hppa*-*-hpux* } } } } } */
+ /* { dg-final { scan-assembler-times "__cyg_profile_func_enter,%r" 1 { target hppa*-*-hpux* } } } */
+ 
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/loop-1.c b/gcc/testsuite/gcc.dg/tree-ssa/loop-1.c
+index 39ee4dea883..2e776bd4fd9 100644
+--- a/gcc/testsuite/gcc.dg/tree-ssa/loop-1.c
++++ b/gcc/testsuite/gcc.dg/tree-ssa/loop-1.c
+@@ -19,6 +19,12 @@
+    to the load from the GOT this also contains the name of the function so for
+    each call the function name would appear twice.  */
+ /* { dg-options "-O1 -ftree-loop-ivcanon -funroll-loops -fdump-tree-ivcanon-details -fdump-tree-cunroll-details -fdump-tree-optimized -mno-relax-pic-calls" { target mips*-*-* } } */
++
++/* On RISCV, The compact code model for calls.  In addition
++   to the load from the GOT this also contains the name of the function so for
++   each call the function name would appear three times.  */
++/* { dg-options "-O1 -ftree-loop-ivcanon -funroll-loops -fdump-tree-ivcanon-details -fdump-tree-cunroll-details -fdump-tree-optimized -mcmodel=medlow" {target riscv*-*-*} } */
++
+ __attribute__ ((pure))
+ int foo (int x);
+ int xxx(void)
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-1.c b/gcc/testsuite/gcc.target/riscv/arch-1.c
+index 945897723dd..b47aa3cfdcf 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-1.c
++++ b/gcc/testsuite/gcc.target/riscv/arch-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -march=rv32i -march=rv32I -mabi=ilp32" } */
++/* { dg-options "-O -march=rv32i -march=rv32I -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-2.c b/gcc/testsuite/gcc.target/riscv/arch-2.c
+index 36b7850d7c6..9e6286d3b29 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-2.c
++++ b/gcc/testsuite/gcc.target/riscv/arch-2.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -march=rv32ixabc_xfoo -mabi=ilp32" } */
++/* { dg-options "-O -march=rv32ixabc_xfoo -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-3.c b/gcc/testsuite/gcc.target/riscv/arch-3.c
+index 124699405c5..3e938ed97b1 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-3.c
++++ b/gcc/testsuite/gcc.target/riscv/arch-3.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -march=rv32isabc_xbar -mabi=ilp32" } */
++/* { dg-options "-O -march=rv32isabc_xbar -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-4.c b/gcc/testsuite/gcc.target/riscv/arch-4.c
+index 6e55a7eaef5..c48af6dec91 100644
+--- a/gcc/testsuite/gcc.target/riscv/arch-4.c
++++ b/gcc/testsuite/gcc.target/riscv/arch-4.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -march=rv32i2p3_m4p2 -mabi=ilp32" } */
++/* { dg-options "-O -march=rv32i2p3_m4p2 -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-10.c b/gcc/testsuite/gcc.target/riscv/attribute-10.c
+index 26fdd08b26d..8c3746e4525 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-10.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-10.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -march=rv32i -march=rv32im_sx_unexpectedstring -mabi=ilp32" } */
++/* { dg-options "-O2 -march=rv32i -march=rv32im_sx_unexpectedstring -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-7.c b/gcc/testsuite/gcc.target/riscv/attribute-7.c
+index 3d033931b6f..e4c5ca7abc9 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-7.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-7.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32e1p9 -mabi=ilp32e" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32e1p9 -mabi=ilp32e -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-8.c b/gcc/testsuite/gcc.target/riscv/attribute-8.c
+index 90f5a4022a0..fcca3655bdb 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-8.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-8.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32i2p0xabc_xv5 -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32i2p0xabc_xv5 -mabi=ilp32 -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-9.c b/gcc/testsuite/gcc.target/riscv/attribute-9.c
+index 4598872f0a6..0f002d4518f 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-9.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-9.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32i2p0sabc_xbar -mabi=ilp32e" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32i2p0sabc_xbar -mabi=ilp32e -mcmodel=medlow" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-1.c b/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-1.c
+index f6a3c51b3fb..82b0fd4c6cf 100644
+--- a/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-1.c
++++ b/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc -mabi=ilp32d" } */
++/* { dg-options "-march=rv32gc -mabi=ilp32d -mcmodel=medlow" } */
+ struct s1 { int : 0; float f; int i; int : 0; };
+ 
+ void dummy(float, int);
+diff --git a/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-2.c b/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-2.c
+index 760826a42f1..d5864d50bf8 100644
+--- a/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-2.c
++++ b/gcc/testsuite/gcc.target/riscv/flattened-struct-abi-2.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc -mabi=ilp32d" } */
++/* { dg-options "-march=rv32gc -mabi=ilp32d -mcmodel=medlow" } */
+ struct s1 { int : 0; float f; float g; int : 0; };
+ 
+ void dummy(float, float);
+diff --git a/gcc/testsuite/gcc.target/riscv/interrupt-2.c b/gcc/testsuite/gcc.target/riscv/interrupt-2.c
+index 82e3fb24e81..9383b1c0101 100644
+--- a/gcc/testsuite/gcc.target/riscv/interrupt-2.c
++++ b/gcc/testsuite/gcc.target/riscv/interrupt-2.c
+@@ -1,6 +1,6 @@
+ /* Verify that arg regs used as temporaries get saved.  */
+ /* { dg-do compile } */
+-/* { dg-options "-O" } */
++/* { dg-options "-O -mcmodel=medlow" } */
+ void __attribute__ ((interrupt))
+ foo2 (void)
+ {
+diff --git a/gcc/testsuite/gcc.target/riscv/losum-overflow.c b/gcc/testsuite/gcc.target/riscv/losum-overflow.c
+index 9c01c7feb54..380a75d594a 100644
+--- a/gcc/testsuite/gcc.target/riscv/losum-overflow.c
++++ b/gcc/testsuite/gcc.target/riscv/losum-overflow.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc -mabi=ilp32 -O2 -fno-section-anchors" } */
++/* { dg-options "-march=rv32gc -mabi=ilp32 -O2 -fno-section-anchors -mcmodel=medlow" } */
+ 
+ /* Check for %lo overflow.  Adding an offset larger than the alignment can
+    overflow if the data is allocated to an address mod 4KB that is between
+diff --git a/gcc/testsuite/gcc.target/riscv/pr93202.c b/gcc/testsuite/gcc.target/riscv/pr93202.c
+index d8091b93179..af2ebee5789 100644
+--- a/gcc/testsuite/gcc.target/riscv/pr93202.c
++++ b/gcc/testsuite/gcc.target/riscv/pr93202.c
+@@ -1,6 +1,6 @@
+ /* PR inline-asm/93202 */
+ /* { dg-do compile { target fpic } } */
+-/* { dg-options "-fpic" } */
++/* { dg-options "-fpic -mcmodel=medlow" } */
+ 
+ void
+ foo (void)
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-3.c b/gcc/testsuite/gcc.target/riscv/predef-3.c
+index d7c9793b3d7..8f0ec9afc0a 100644
+--- a/gcc/testsuite/gcc.target/riscv/predef-3.c
++++ b/gcc/testsuite/gcc.target/riscv/predef-3.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -march=rv32imafdc -mabi=ilp32d -fpic" } */
++/* { dg-options "-O2 -march=rv32imafdc -mabi=ilp32d -fpic -mcmodel=medlow" } */
+ 
+ int main () {
+ #if !defined(__riscv)
+diff --git a/gcc/testsuite/gcc.target/riscv/save-restore-2.c b/gcc/testsuite/gcc.target/riscv/save-restore-2.c
+index 204bf67b66e..c628b8b932e 100644
+--- a/gcc/testsuite/gcc.target/riscv/save-restore-2.c
++++ b/gcc/testsuite/gcc.target/riscv/save-restore-2.c
+@@ -1,4 +1,4 @@
+-/* { dg-options "-Os -msave-restore" } */
++/* { dg-options "-Os -msave-restore -mcmodel=medlow" } */
+ 
+ /* With -msave-restore in use it should not be possible to remove the calls
+    to the save and restore stubs in this case (in current GCC).  */
+diff --git a/gcc/testsuite/gcc.target/riscv/save-restore-3.c b/gcc/testsuite/gcc.target/riscv/save-restore-3.c
+index 6bf9fb014d6..966b3a707b2 100644
+--- a/gcc/testsuite/gcc.target/riscv/save-restore-3.c
++++ b/gcc/testsuite/gcc.target/riscv/save-restore-3.c
+@@ -1,4 +1,4 @@
+-/* { dg-options "-Os -msave-restore" } */
++/* { dg-options "-Os -msave-restore -mcmodel=medlow" } */
+ 
+ /* With -msave-restore in use GCC should be able to remove the calls to the
+    save and restore stubs in this case, replacing them with a tail call to
+diff --git a/gcc/testsuite/gcc.target/riscv/save-restore-6.c b/gcc/testsuite/gcc.target/riscv/save-restore-6.c
+index 530865456a2..8edb4e9fe43 100644
+--- a/gcc/testsuite/gcc.target/riscv/save-restore-6.c
++++ b/gcc/testsuite/gcc.target/riscv/save-restore-6.c
+@@ -1,4 +1,4 @@
+-/* { dg-options "-Os -msave-restore" } */
++/* { dg-options "-Os -msave-restore -mcmodel=medlow" } */
+ 
+ /* With -msave-restore in use GCC should be able to remove the calls to the
+    save and restore stubs in this case, replacing them with a tail call to
+diff --git a/gcc/testsuite/gcc.target/riscv/save-restore-7.c b/gcc/testsuite/gcc.target/riscv/save-restore-7.c
+index 06719c4e413..4417510442b 100644
+--- a/gcc/testsuite/gcc.target/riscv/save-restore-7.c
++++ b/gcc/testsuite/gcc.target/riscv/save-restore-7.c
+@@ -1,4 +1,4 @@
+-/* { dg-options "-Os -msave-restore" } */
++/* { dg-options "-Os -msave-restore -mcmodel=medlow" } */
+ 
+ /* With -msave-restore in use it should not be possible to remove the calls
+    to the save and restore stubs in this case (in current GCC).  */
+diff --git a/gcc/testsuite/gcc.target/riscv/shift-and-1.c b/gcc/testsuite/gcc.target/riscv/shift-and-1.c
+index d1f3a05db2c..f01bb6c2c9a 100644
+--- a/gcc/testsuite/gcc.target/riscv/shift-and-1.c
++++ b/gcc/testsuite/gcc.target/riscv/shift-and-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc -mabi=ilp32 -O" } */
++/* { dg-options "-march=rv32gc -mabi=ilp32 -mcmodel=medlow -O" } */
+ 
+ /* Test for <optab>si3_mask.  */
+ int
+diff --git a/gcc/testsuite/gcc.target/riscv/shift-shift-1.c b/gcc/testsuite/gcc.target/riscv/shift-shift-1.c
+index a5343a31b14..4613a7bc9b4 100644
+--- a/gcc/testsuite/gcc.target/riscv/shift-shift-1.c
++++ b/gcc/testsuite/gcc.target/riscv/shift-shift-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32gc -mabi=ilp32 -O" } */
++/* { dg-options "-march=rv32gc -mabi=ilp32 -mcmodel=medlow -O" } */
+ 
+ /* Test for lshrsi3_zero_extend_3+1 pattern that uses p2m1_shift_operand.  */
+ unsigned int
+diff --git a/gcc/testsuite/gcc.target/riscv/shift-shift-4.c b/gcc/testsuite/gcc.target/riscv/shift-shift-4.c
+index 72a45ee87ae..eca9ac988f3 100644
+--- a/gcc/testsuite/gcc.target/riscv/shift-shift-4.c
++++ b/gcc/testsuite/gcc.target/riscv/shift-shift-4.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-march=rv32i -mabi=ilp32 -O2" } */
++/* { dg-options "-march=rv32i -mabi=ilp32 -O2 -mcmodel=medlow" } */
+ 
+ /* One zero-extend shift can be eliminated by modifying the constant in the
+    greater than test.  Started working after modifying the splitter
+-- 
+2.25.1
+

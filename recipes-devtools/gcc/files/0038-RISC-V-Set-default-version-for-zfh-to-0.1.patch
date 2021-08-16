@@ -1,0 +1,25 @@
+From ee3b6c6efcf473e1a38bd2d67a2a9058403ca1ed Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Tue, 15 Dec 2020 13:38:58 +0800
+Subject: [PATCH 38/60] RISC-V: Set default version for zfh to 0.1
+
+---
+ gcc/common/config/riscv/riscv-common.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 985c8179fd9..b2bab838ed7 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -112,6 +112,8 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
+   {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
+   {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
+ 
++  {"zfh", ISA_SPEC_CLASS_NONE, 0, 1},
++
+   /* Terminate the list.  */
+   {NULL, ISA_SPEC_CLASS_NONE, 0, 0}
+ };
+-- 
+2.25.1
+

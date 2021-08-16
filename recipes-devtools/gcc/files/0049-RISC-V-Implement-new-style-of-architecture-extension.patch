@@ -1,0 +1,314 @@
+From bd6154f04820dd6f475c8764c512468a939daf31 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Fri, 11 Dec 2020 16:51:40 +0800
+Subject: [PATCH 49/60] RISC-V: Implement new style of architecture extension
+ test macros.
+
+---
+ gcc/common/config/riscv/riscv-common.c     |  5 +++
+ gcc/config/riscv/riscv-c.c                 | 32 ++++++++++++++++
+ gcc/config/riscv/riscv-protos.h            |  9 ++++-
+ gcc/testsuite/gcc.target/riscv/predef-10.c | 43 ++++++++++++++++++++++
+ gcc/testsuite/gcc.target/riscv/predef-11.c | 43 ++++++++++++++++++++++
+ gcc/testsuite/gcc.target/riscv/predef-12.c | 43 ++++++++++++++++++++++
+ gcc/testsuite/gcc.target/riscv/predef-13.c | 43 ++++++++++++++++++++++
+ 7 files changed, 217 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/predef-10.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/predef-11.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/predef-12.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/predef-13.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 73764d7265e..718eb2de78f 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -143,6 +143,11 @@ static const char *riscv_supported_std_ext (void);
+ 
+ static riscv_subset_list *current_subset_list = NULL;
+ 
++const riscv_subset_list *riscv_current_subset_list ()
++{
++  return current_subset_list;
++}
++
+ /* struct for recording multi-lib info.  */
+ struct riscv_multi_lib_info_t {
+   std::string path;
+diff --git a/gcc/config/riscv/riscv-c.c b/gcc/config/riscv/riscv-c.c
+index 0379ca89a16..771ab343d27 100644
+--- a/gcc/config/riscv/riscv-c.c
++++ b/gcc/config/riscv/riscv-c.c
+@@ -26,6 +26,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "tm.h"
+ #include "c-family/c-common.h"
+ #include "cpplib.h"
++#include "riscv-protos.h"
+ 
+ #define builtin_define(TXT) cpp_define (pfile, TXT)
+ 
+@@ -113,4 +114,35 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
+ 
+   if (TARGET_VECTOR)
+     builtin_define ("__riscv_vector");
++
++  /* Define architecture extension test macros.  */
++  builtin_define_with_int_value ("__riscv_arch_test", 1);
++
++  const riscv_subset_list *subset_list = riscv_current_subset_list ();
++  size_t max_ext_len = 0;
++
++  /* Figure out the max length of extension name for reserving buffer.   */
++  for (const riscv_subset_t *subset = subset_list->begin ();
++       subset != subset_list->end ();
++       subset = subset->next)
++    max_ext_len = MAX (max_ext_len, subset->name.length ());
++
++
++  char *buf = (char *)alloca (max_ext_len + 10 /* For __riscv_ and '\0'.  */);
++
++  for (const riscv_subset_t *subset = subset_list->begin ();
++       subset != subset_list->end ();
++       subset = subset->next)
++    {
++      int version_value = (subset->major_version * 1000000)
++			  + (subset->minor_version * 1000);
++      /* Special rule for zicsr and zifencei, it's used for ISA spec 2.2 or
++	 earlier.  */
++      if ((subset->name == "zicsr" || subset->name == "zifencei")
++	  && version_value == 0)
++	version_value = 2000000;
++
++      sprintf (buf, "__riscv_%s", subset->name.c_str ());
++      builtin_define_with_int_value (buf, version_value);
++    }
+ }
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index 8c4be065eb8..ac152a4a4d6 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -22,6 +22,8 @@ along with GCC; see the file COPYING3.  If not see
+ #ifndef GCC_RISCV_PROTOS_H
+ #define GCC_RISCV_PROTOS_H
+ 
++#include <string>
++
+ /* Symbol types we understand.  The order of this list must match that of
+    the unspec enum in riscv.md, subsequent to UNSPEC_ADDRESS_FIRST.  */
+ enum riscv_symbol_type {
+@@ -178,11 +180,16 @@ public:
+ 
+   std::string to_string (bool) const;
+ 
+-  unsigned xlen() const {return m_xlen;};
++  unsigned xlen () const {return m_xlen;};
+ 
+   static riscv_subset_list *parse (const char *, location_t);
+ 
+   int match_score (riscv_subset_list *) const;
++
++  const riscv_subset_t *begin () const {return m_head;};
++  const riscv_subset_t *end () const {return NULL;};
+ };
+ 
++extern const riscv_subset_list *riscv_current_subset_list (void);
++
+ #endif /* ! GCC_RISCV_PROTOS_H */
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-10.c b/gcc/testsuite/gcc.target/riscv/predef-10.c
+new file mode 100644
+index 00000000000..a4a13ef02ef
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/predef-10.c
+@@ -0,0 +1,43 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32i2p0 -mabi=ilp32 -mcmodel=medlow" } */
++
++int main () {
++
++#ifndef __riscv_arch_test
++#error "__riscv_arch_test"
++#endif
++
++#if __riscv_xlen != 32
++#error "__riscv_xlen"
++#endif
++
++#if !defined(__riscv_i) || (__riscv_i != (2 * 1000 * 1000))
++#error "__riscv_i"
++#endif
++
++#if defined(__riscv_c)
++#error "__riscv_c"
++#endif
++
++#if defined(__riscv_e)
++#error "__riscv_e"
++#endif
++
++#if defined(__riscv_a)
++#error "__riscv_a"
++#endif
++
++#if defined(__riscv_m)
++#error "__riscv_m"
++#endif
++
++#if defined(__riscv_f)
++#error "__riscv_f"
++#endif
++
++#if defined(__riscv_d)
++#error "__riscv_d"
++#endif
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-11.c b/gcc/testsuite/gcc.target/riscv/predef-11.c
+new file mode 100644
+index 00000000000..80f48113dfa
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/predef-11.c
+@@ -0,0 +1,43 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv64gc -mabi=lp64 -mcmodel=medlow -misa-spec=2.2" } */
++
++int main () {
++
++#ifndef __riscv_arch_test
++#error "__riscv_arch_test"
++#endif
++
++#if __riscv_xlen != 64
++#error "__riscv_xlen"
++#endif
++
++#if !defined(__riscv_i) || (__riscv_i != (2 * 1000 * 1000))
++#error "__riscv_i"
++#endif
++
++#if !defined(__riscv_c) || (__riscv_c != (2 * 1000 * 1000))
++#error "__riscv_c"
++#endif
++
++#if defined(__riscv_e)
++#error "__riscv_e"
++#endif
++
++#if !defined(__riscv_a) || (__riscv_a != (2 * 1000 * 1000))
++#error "__riscv_a"
++#endif
++
++#if !defined(__riscv_m) || (__riscv_m != (2 * 1000 * 1000))
++#error "__riscv_m"
++#endif
++
++#if !defined(__riscv_f) || (__riscv_f != (2 * 1000 * 1000))
++#error "__riscv_f"
++#endif
++
++#if !defined(__riscv_d) || (__riscv_d != (2 * 1000 * 1000))
++#error "__riscv_d"
++#endif
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-12.c b/gcc/testsuite/gcc.target/riscv/predef-12.c
+new file mode 100644
+index 00000000000..dd35dbde925
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/predef-12.c
+@@ -0,0 +1,43 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv64gc -mabi=lp64 -mcmodel=medlow -misa-spec=20191213" } */
++
++int main () {
++
++#ifndef __riscv_arch_test
++#error "__riscv_arch_test"
++#endif
++
++#if __riscv_xlen != 64
++#error "__riscv_xlen"
++#endif
++
++#if !defined(__riscv_i) || (__riscv_i != (2 * 1000 * 1000 + 1 * 1000))
++#error "__riscv_i"
++#endif
++
++#if !defined(__riscv_c) || (__riscv_c != (2 * 1000 * 1000))
++#error "__riscv_c"
++#endif
++
++#if defined(__riscv_e)
++#error "__riscv_e"
++#endif
++
++#if !defined(__riscv_a) || (__riscv_a != (2 * 1000 * 1000 + 1 * 1000))
++#error "__riscv_a"
++#endif
++
++#if !defined(__riscv_m) || (__riscv_m != (2 * 1000 * 1000))
++#error "__riscv_m"
++#endif
++
++#if !defined(__riscv_f) || (__riscv_f != (2 * 1000 * 1000 + 2 * 1000))
++#error "__riscv_f"
++#endif
++
++#if !defined(__riscv_d) || (__riscv_d != (2 * 1000 * 1000 + 2 * 1000))
++#error "__riscv_d"
++#endif
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-13.c b/gcc/testsuite/gcc.target/riscv/predef-13.c
+new file mode 100644
+index 00000000000..3b5d2287eb5
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/predef-13.c
+@@ -0,0 +1,43 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32e -mabi=ilp32e -mcmodel=medlow" } */
++
++int main () {
++
++#ifndef __riscv_arch_test
++#error "__riscv_arch_test"
++#endif
++
++#if __riscv_xlen != 32
++#error "__riscv_xlen"
++#endif
++
++#if defined(__riscv_i)
++#error "__riscv_i"
++#endif
++
++#if defined(__riscv_c)
++#error "__riscv_c"
++#endif
++
++#if !defined(__riscv_e) || (__riscv_e != (1 * 1000 * 1000 + 9 * 1000))
++#error "__riscv_e"
++#endif
++
++#if defined(__riscv_a)
++#error "__riscv_a"
++#endif
++
++#if defined(__riscv_m)
++#error "__riscv_m"
++#endif
++
++#if defined(__riscv_f)
++#error "__riscv_f"
++#endif
++
++#if defined(__riscv_d)
++#error "__riscv_d"
++#endif
++
++  return 0;
++}
+-- 
+2.25.1
+

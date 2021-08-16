@@ -1,0 +1,28 @@
+From b234ae0f59744b0c7449e3fb33c7b32f2a4f103b Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Mon, 18 Jan 2021 13:47:44 +0800
+Subject: [PATCH 57/60] Fix riscv_check_other_cond for non-multi-lib build
+
+---
+ gcc/common/config/riscv/riscv-common.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 81ac07e2e0d..27bf9828325 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -1303,6 +1303,11 @@ riscv_check_other_cond (
+ 	}
+ 
+       arg = std::string (this_arg, p - this_arg);
++
++      /* We might got empty arg when multi-lib is disabled.  */
++      if (arg.empty ())
++	continue;
++
+       ok = riscv_check_cond (switches, n_switches, arg, not_arg);
+ 
+       if (!ok)
+-- 
+2.25.1
+

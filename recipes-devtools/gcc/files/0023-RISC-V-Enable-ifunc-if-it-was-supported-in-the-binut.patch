@@ -1,0 +1,112 @@
+From 9d756db1f79035e28b84c6454dae1b4a806576c0 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Tue, 10 Nov 2020 19:33:38 -0800
+Subject: [PATCH 23/60] RISC-V: Enable ifunc if it was supported in the
+ binutils for linux toolchain.
+
+	gcc/
+	* configure: Regenerated.
+	* configure.ac: If ifunc was supported in the binutils for
+	linux toolchain, then set enable_gnu_indirect_function to yes.
+---
+ gcc/configure    | 37 +++++++++++++++++++++++++++++++++++++
+ gcc/configure.ac | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+
+diff --git a/gcc/configure b/gcc/configure
+index 5624b8a2fc1..6f5a3a0ffe1 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -23409,6 +23409,43 @@ else
+ fi
+ 
+ 
++case "${target}" in
++  riscv*-*-linux*)
++    { $as_echo "$as_me:${as_lineno-$LINENO}: checking linker ifunc IRELATIVE support" >&5
++$as_echo_n "checking linker ifunc IRELATIVE support... " >&6; }
++    cat > conftest.s <<EOF
++	.text
++	.type	foo_resolver, @function
++foo_resolver:
++	ret
++	.size	foo_resolver, .-foo_resolver
++
++	.globl	foo
++	.type	foo, %gnu_indirect_function
++	.set	foo, foo_resolver
++
++	.globl	bar
++	.type	bar, @function
++bar:
++	call	foo
++	ret
++	.size	bar, .-bar
++EOF
++    if test x$gcc_cv_as != x \
++       && test x$gcc_cv_ld != x \
++       && test x$gcc_cv_readelf != x \
++       && $gcc_cv_as -o conftest.o conftest.s > /dev/null 2>&1 \
++       && $gcc_cv_ld -o conftest conftest.o > /dev/null 2>&1 \
++       && $gcc_cv_readelf --relocs --wide conftest \
++	  | grep R_RISCV_IRELATIVE > /dev/null 2>&1; then
++      enable_gnu_indirect_function=yes
++    fi
++    rm -f conftest conftest.o conftest.s
++    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $enable_gnu_indirect_function" >&5
++$as_echo "$enable_gnu_indirect_function" >&6; }
++    ;;
++esac
++
+ gif=`if test x$enable_gnu_indirect_function = xyes; then echo 1; else echo 0; fi`
+ 
+ cat >>confdefs.h <<_ACEOF
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index e70c19ea971..d524c4b0d8e 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -2813,6 +2813,41 @@ Valid choices are 'yes' and 'no'.]) ;;
+   esac],
+  [enable_gnu_indirect_function="$default_gnu_indirect_function"])
+ 
++case "${target}" in
++  riscv*-*-linux*)
++    AC_MSG_CHECKING(linker ifunc IRELATIVE support)
++    cat > conftest.s <<EOF
++	.text
++	.type	foo_resolver, @function
++foo_resolver:
++	ret
++	.size	foo_resolver, .-foo_resolver
++
++	.globl	foo
++	.type	foo, %gnu_indirect_function
++	.set	foo, foo_resolver
++
++	.globl	bar
++	.type	bar, @function
++bar:
++	call	foo
++	ret
++	.size	bar, .-bar
++EOF
++    if test x$gcc_cv_as != x \
++       && test x$gcc_cv_ld != x \
++       && test x$gcc_cv_readelf != x \
++       && $gcc_cv_as -o conftest.o conftest.s > /dev/null 2>&1 \
++       && $gcc_cv_ld -o conftest conftest.o > /dev/null 2>&1 \
++       && $gcc_cv_readelf --relocs --wide conftest \
++	  | grep R_RISCV_IRELATIVE > /dev/null 2>&1; then
++      enable_gnu_indirect_function=yes
++    fi
++    rm -f conftest conftest.o conftest.s
++    AC_MSG_RESULT($enable_gnu_indirect_function)
++    ;;
++esac
++
+ gif=`if test x$enable_gnu_indirect_function = xyes; then echo 1; else echo 0; fi`
+ AC_DEFINE_UNQUOTED(HAVE_GNU_INDIRECT_FUNCTION, $gif,
+ [Define if your system supports gnu indirect functions.])
+-- 
+2.25.1
+

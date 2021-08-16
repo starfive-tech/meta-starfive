@@ -1,0 +1,93 @@
+From 157c82983c1b62be6ca2e2cef21069da3be86be4 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 25 Nov 2020 17:04:33 +0800
+Subject: [PATCH 27/60] Fix print_multilib_info when default arguments appear
+ in the option list with '!'
+
+This issue is found when we try to always define MULTILIB_DEFAULTS for -march
+and -mabi for RISC-V back-end, however `-print-multi-lib` will skip
+multi-lib setting if match any one of flag in MULTILIB_DEFAULTS, even
+some options are specified in the option list with '!'.
+
+e.g.
+
+We have default march=rv32i and mabi=ilp32.
+
+And we have following multi-lib set:
+
+". !march=rv32i !march=rv32im !march=rv32imafc !mabi=ilp32 !mabi=ilp32f;"
+"rv32i/ilp32 march=rv32i !march=rv32im !march=rv32imafc mabi=ilp32 !mabi=ilp32f;"
+"rv32im/ilp32 !march=rv32i march=rv32im !march=rv32imafc mabi=ilp32 !mabi=ilp32f;"
+"rv32imafc/ilp32f !march=rv32i !march=rv32ic !march=rv32im march=rv32imafc !mabi=ilp32 mabi=ilp32f;"
+
+`-print-multi-lib` willl show `.` and `rv32imafc/ilp32f` only, because
+the mabi=ilp32 is matched, however there is `!march=rv32i` in `rv32im/ilp32`, so
+`rv32im/ilp32` should keep, because it reject march=rv32i.
+
+Note: This can be reproduced via following configure options with patch [1]:
+gcc/configure --target=riscv64-elf --with-arch=rv32i --with-abi=ilp32 \
+  --with-multilib-generator="rv32i-ilp32--;rv32im-ilp32--;rv32imafc-ilp32f--"
+
+[1] https://gcc.gnu.org/pipermail/gcc-patches/2020-November/559707.html
+
+gcc/ChangeLog:
+
+	* gcc.c (print_multilib_info): Check default arguments not
+	appeared in multi-lib option list with '!'
+---
+ gcc/gcc.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/gcc/gcc.c b/gcc/gcc.c
+index 9f790db0daf..5ecd8fbf031 100644
+--- a/gcc/gcc.c
++++ b/gcc/gcc.c
+@@ -9109,6 +9109,7 @@ print_multilib_info (void)
+   const char *p = multilib_select;
+   const char *last_path = 0, *this_path;
+   int skip;
++  int not_arg;
+   unsigned int last_path_len = 0;
+ 
+   while (*p != '\0')
+@@ -9263,9 +9264,13 @@ print_multilib_info (void)
+ 		goto invalid_select;
+ 
+ 	      if (*q == '!')
+-		arg = NULL;
++		{
++		  not_arg = 1;
++		  q++;
++		}
+ 	      else
+-		arg = q;
++		not_arg = 0;
++	      arg = q;
+ 
+ 	      while (*q != ' ' && *q != ';')
+ 		{
+@@ -9274,11 +9279,17 @@ print_multilib_info (void)
+ 		  ++q;
+ 		}
+ 
+-	      if (arg != NULL
+-		  && default_arg (arg, q - arg))
++	      if (default_arg (arg, q - arg))
+ 		{
+-		  skip = 1;
+-		  break;
++		  /* Stop checking if any default arguments appeared in not
++		     list.  */
++		  if (not_arg)
++		    {
++		      skip = 0;
++		      break;
++		    }
++		  else
++		    skip = 1;
+ 		}
+ 
+ 	      if (*q == ' ')
+-- 
+2.25.1
+

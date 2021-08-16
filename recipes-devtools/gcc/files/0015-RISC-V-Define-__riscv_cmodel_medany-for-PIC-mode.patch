@@ -1,0 +1,92 @@
+From 6377653f0c072eb9ab3f7a48269a1420fb03a7e6 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Fri, 25 Sep 2020 10:57:16 +0800
+Subject: [PATCH 15/60] RISC-V: Define __riscv_cmodel_medany for PIC mode.
+
+ - According the conclusion in RISC-V C API document, we decide to deprecat
+   the __riscv_cmodel_pic marco
+
+ - __riscv_cmodel_pic is deprecated and will removed in next GCC
+   release.
+
+[1] https://github.com/riscv/riscv-c-api-doc/pull/11
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv-c.c (riscv_cpu_cpp_builtins): Define
+	__riscv_cmodel_medany when PIC mode.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/predef-3.c: Update testcase.
+	* gcc.target/riscv/predef-6.c: Ditto.
+---
+ gcc/config/riscv/riscv-c.c                | 9 ++++++---
+ gcc/testsuite/gcc.target/riscv/predef-3.c | 6 +++---
+ gcc/testsuite/gcc.target/riscv/predef-6.c | 6 +++---
+ 3 files changed, 12 insertions(+), 9 deletions(-)
+
+diff --git a/gcc/config/riscv/riscv-c.c b/gcc/config/riscv/riscv-c.c
+index 735f2f2f513..c600badb313 100644
+--- a/gcc/config/riscv/riscv-c.c
++++ b/gcc/config/riscv/riscv-c.c
+@@ -90,12 +90,15 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
+       builtin_define ("__riscv_cmodel_medlow");
+       break;
+ 
++    case CM_PIC:
++      /* __riscv_cmodel_pic is deprecated, and will removed in next GCC release.
++	 see https://github.com/riscv/riscv-c-api-doc/pull/11  */
++      builtin_define ("__riscv_cmodel_pic");
++      /* FALLTHROUGH. */
++
+     case CM_MEDANY:
+       builtin_define ("__riscv_cmodel_medany");
+       break;
+ 
+-    case CM_PIC:
+-      builtin_define ("__riscv_cmodel_pic");
+-      break;
+     }
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-3.c b/gcc/testsuite/gcc.target/riscv/predef-3.c
+index 6f4f2e21994..d7c9793b3d7 100644
+--- a/gcc/testsuite/gcc.target/riscv/predef-3.c
++++ b/gcc/testsuite/gcc.target/riscv/predef-3.c
+@@ -55,11 +55,11 @@ int main () {
+ #if defined(__riscv_cmodel_medlow)
+ #error "__riscv_cmodel_medlow"
+ #endif
+-#if defined(__riscv_cmodel_medany)
+-#error "__riscv_cmodel_medlow"
++#if !defined(__riscv_cmodel_medany)
++#error "__riscv_cmodel_medany"
+ #endif
+ #if !defined(__riscv_cmodel_pic)
+-#error "__riscv_cmodel_medlow"
++#error "__riscv_cmodel_pic"
+ #endif
+ 
+   return 0;
+diff --git a/gcc/testsuite/gcc.target/riscv/predef-6.c b/gcc/testsuite/gcc.target/riscv/predef-6.c
+index ee4e02bcb63..7530f9598ae 100644
+--- a/gcc/testsuite/gcc.target/riscv/predef-6.c
++++ b/gcc/testsuite/gcc.target/riscv/predef-6.c
+@@ -55,11 +55,11 @@ int main () {
+ #if defined(__riscv_cmodel_medlow)
+ #error "__riscv_cmodel_medlow"
+ #endif
+-#if defined(__riscv_cmodel_medany)
+-#error "__riscv_cmodel_medlow"
++#if !defined(__riscv_cmodel_medany)
++#error "__riscv_cmodel_medany"
+ #endif
+ #if !defined(__riscv_cmodel_pic)
+-#error "__riscv_cmodel_medlow"
++#error "__riscv_cmodel_medpic"
+ #endif
+ 
+   return 0;
+-- 
+2.25.1
+

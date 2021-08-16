@@ -1,0 +1,36 @@
+From ae0f8b643de051dfc592c1b15d6c02e90addb2c3 Mon Sep 17 00:00:00 2001
+From: David Edelsohn <dje.gcc@gmail.com>
+Date: Wed, 1 Jul 2020 14:05:26 -0400
+Subject: [PATCH 12/60] testsuite: Adjust gfortran.dg/pr95690.f90 line number.
+
+gfortran produces associates a different line number for the same error
+message depending on x86 versus other architectures.  This patch adjusts
+the dg-error line number depending on the target.
+
+gcc/testsuite/ChangeLog
+
+2020-07-01  David Edelsohn  <dje.gcc@gmail.com>
+
+	* gfortran.dg/pr95690.f90: Adjust dg-error line number.
+---
+ gcc/testsuite/gfortran.dg/pr95690.f90 | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/gfortran.dg/pr95690.f90 b/gcc/testsuite/gfortran.dg/pr95690.f90
+index 2da08912a4d..f17f3c623cc 100644
+--- a/gcc/testsuite/gfortran.dg/pr95690.f90
++++ b/gcc/testsuite/gfortran.dg/pr95690.f90
+@@ -2,8 +2,8 @@
+ module m
+ contains
+    subroutine s
+-      print *, (erfc) ! { dg-error "not a floating constant" }
+-   end
++      print *, (erfc) ! { dg-error "not a floating constant" "" { target i?86-*-* x86_64-*-* } }
++   end ! { dg-error "not a floating constant" "" { target { ! "i?86-*-* x86_64-*-*" } } }
+    function erfc()
+    end
+ end
+-- 
+2.25.1
+

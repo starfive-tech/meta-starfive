@@ -1,0 +1,261 @@
+From 4fa82780468fb60ea585df1b65b9bbc7bf917470 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 6 Jan 2021 14:21:09 +0800
+Subject: [PATCH 53/60] Fix MacOS build
+
+---
+ gcc/common/config/riscv/riscv-common.c |  1 +
+ gcc/config/riscv/riscv-c.c             |  3 +-
+ gcc/config/riscv/riscv-protos.h        | 74 --------------------
+ gcc/config/riscv/riscv-subset.h        | 94 ++++++++++++++++++++++++++
+ gcc/config/riscv/t-riscv               |  7 +-
+ 5 files changed, 102 insertions(+), 77 deletions(-)
+ create mode 100644 gcc/config/riscv/riscv-subset.h
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 718eb2de78f..ff7858de474 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "flags.h"
+ #include "diagnostic-core.h"
+ #include "config/riscv/riscv-protos.h"
++#include "config/riscv/riscv-subset.h"
+ #include <vector>
+ 
+ /* Type for implied ISA info.  */
+diff --git a/gcc/config/riscv/riscv-c.c b/gcc/config/riscv/riscv-c.c
+index 6e3e08c46f4..acc1acb53b0 100644
+--- a/gcc/config/riscv/riscv-c.c
++++ b/gcc/config/riscv/riscv-c.c
+@@ -20,13 +20,14 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ #define IN_TARGET_CODE 1
+ 
++#define INCLUDE_STRING
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
+ #include "c-family/c-common.h"
+ #include "cpplib.h"
+-#include "riscv-protos.h"
++#include "riscv-subset.h"
+ 
+ #define builtin_define(TXT) cpp_define (pfile, TXT)
+ 
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index ac152a4a4d6..c4318e27348 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -22,8 +22,6 @@ along with GCC; see the file COPYING3.  If not see
+ #ifndef GCC_RISCV_PROTOS_H
+ #define GCC_RISCV_PROTOS_H
+ 
+-#include <string>
+-
+ /* Symbol types we understand.  The order of this list must match that of
+    the unspec enum in riscv.md, subsequent to UNSPEC_ADDRESS_FIRST.  */
+ enum riscv_symbol_type {
+@@ -120,76 +118,4 @@ extern const riscv_cpu_info *riscv_find_cpu (const char *);
+ /* Routines for vector tuple types.  */
+ extern int riscv_get_nf (machine_mode);
+ 
+-/* Subset info.  */
+-struct riscv_subset_t
+-{
+-  riscv_subset_t ();
+-
+-  std::string name;
+-  int major_version;
+-  int minor_version;
+-  struct riscv_subset_t *next;
+-
+-  bool explicit_version_p;
+-  bool implied_p;
+-};
+-
+-#define RISCV_DONT_CARE_VERSION -1
+-
+-/* Subset list.  */
+-class riscv_subset_list
+-{
+-private:
+-  /* Original arch string.  */
+-  const char *m_arch;
+-
+-  /* Location of arch string, used for report error.  */
+-  location_t m_loc;
+-
+-  /* Head of subset info list.  */
+-  riscv_subset_t *m_head;
+-
+-  /* Tail of subset info list.  */
+-  riscv_subset_t *m_tail;
+-
+-  /* X-len of m_arch. */
+-  unsigned m_xlen;
+-
+-  riscv_subset_list (const char *, location_t);
+-
+-  const char *parsing_subset_version (const char *, const char *, unsigned *,
+-				      unsigned *, bool, bool *);
+-
+-  const char *parse_std_ext (const char *);
+-
+-  const char *parse_multiletter_ext (const char *, const char *,
+-				     const char *);
+-
+-  void handle_implied_ext (riscv_subset_t *);
+-
+-public:
+-  ~riscv_subset_list ();
+-
+-  void add (const char *, int, int, bool, bool);
+-
+-  void add (const char *, bool);
+-
+-  riscv_subset_t *lookup (const char *,
+-			  int major_version = RISCV_DONT_CARE_VERSION,
+-			  int minor_version = RISCV_DONT_CARE_VERSION) const;
+-
+-  std::string to_string (bool) const;
+-
+-  unsigned xlen () const {return m_xlen;};
+-
+-  static riscv_subset_list *parse (const char *, location_t);
+-
+-  int match_score (riscv_subset_list *) const;
+-
+-  const riscv_subset_t *begin () const {return m_head;};
+-  const riscv_subset_t *end () const {return NULL;};
+-};
+-
+-extern const riscv_subset_list *riscv_current_subset_list (void);
+-
+ #endif /* ! GCC_RISCV_PROTOS_H */
+diff --git a/gcc/config/riscv/riscv-subset.h b/gcc/config/riscv/riscv-subset.h
+new file mode 100644
+index 00000000000..0035f6d45d6
+--- /dev/null
++++ b/gcc/config/riscv/riscv-subset.h
+@@ -0,0 +1,94 @@
++/* Definition of data structure of RISC-V subset for GNU compiler.
++   Copyright (C) 2011-2021 Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++#ifndef GCC_RISCV_SUBSET_H
++#define GCC_RISCV_SUBSET_H
++
++struct riscv_subset_t
++{
++  riscv_subset_t ();
++
++  std::string name;
++  int major_version;
++  int minor_version;
++  struct riscv_subset_t *next;
++
++  bool explicit_version_p;
++  bool implied_p;
++};
++
++#define RISCV_DONT_CARE_VERSION -1
++
++/* Subset list.  */
++class riscv_subset_list
++{
++private:
++  /* Original arch string.  */
++  const char *m_arch;
++
++  /* Location of arch string, used for report error.  */
++  location_t m_loc;
++
++  /* Head of subset info list.  */
++  riscv_subset_t *m_head;
++
++  /* Tail of subset info list.  */
++  riscv_subset_t *m_tail;
++
++  /* X-len of m_arch. */
++  unsigned m_xlen;
++
++  riscv_subset_list (const char *, location_t);
++
++  const char *parsing_subset_version (const char *, const char *, unsigned *,
++				      unsigned *, bool, bool *);
++
++  const char *parse_std_ext (const char *);
++
++  const char *parse_multiletter_ext (const char *, const char *,
++				     const char *);
++
++  void handle_implied_ext (riscv_subset_t *);
++
++public:
++  ~riscv_subset_list ();
++
++  void add (const char *, int, int, bool, bool);
++
++  void add (const char *, bool);
++
++  riscv_subset_t *lookup (const char *,
++			  int major_version = RISCV_DONT_CARE_VERSION,
++			  int minor_version = RISCV_DONT_CARE_VERSION) const;
++
++  std::string to_string (bool) const;
++
++  unsigned xlen () const {return m_xlen;};
++
++  static riscv_subset_list *parse (const char *, location_t);
++
++  int match_score (riscv_subset_list *) const;
++
++  const riscv_subset_t *begin () const {return m_head;};
++  const riscv_subset_t *end () const {return NULL;};
++};
++
++extern const riscv_subset_list *riscv_current_subset_list (void);
++
++#endif /* ! GCC_RISCV_SUBSET_H */
+diff --git a/gcc/config/riscv/t-riscv b/gcc/config/riscv/t-riscv
+index 8fc9cc10c2f..553e46c190c 100644
+--- a/gcc/config/riscv/t-riscv
++++ b/gcc/config/riscv/t-riscv
+@@ -12,7 +12,8 @@ riscv-sr.o: $(srcdir)/config/riscv/riscv-sr.c $(CONFIG_H) \
+ 		$(srcdir)/config/riscv/riscv-sr.c
+ 
+ riscv-c.o: $(srcdir)/config/riscv/riscv-c.c $(CONFIG_H) $(SYSTEM_H) \
+-    coretypes.h $(TM_H) $(TREE_H) output.h $(C_COMMON_H) $(TARGET_H)
++    coretypes.h $(TM_H) $(TREE_H) output.h $(C_COMMON_H) $(TARGET_H) \
++    $(srcdir)/config/riscv/riscv-subset.h
+ 	$(COMPILER) -c $(ALL_COMPILERFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
+ 		$(srcdir)/config/riscv/riscv-c.c
+ 
+@@ -28,4 +29,6 @@ riscv.o: $(srcdir)/config/riscv/riscv-vector-iterator.h
+ 
+ PASSES_EXTRA += $(srcdir)/config/riscv/riscv-passes.def
+ 
+-$(common_out_file): $(srcdir)/config/riscv/riscv-cores.def
++$(common_out_file): $(srcdir)/config/riscv/riscv-cores.def \
++	$(srcdir)/config/riscv/riscv-protos.h \
++	$(srcdir)/config/riscv/riscv-subset.h
+-- 
+2.25.1
+

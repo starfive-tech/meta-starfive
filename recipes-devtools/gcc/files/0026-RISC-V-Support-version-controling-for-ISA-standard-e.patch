@@ -1,0 +1,945 @@
+From bf6dfea5bee47f37f74d07d482762e9c143d440b Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 11 Nov 2020 16:33:57 +0800
+Subject: [PATCH 26/60] RISC-V: Support version controling for ISA standard
+ extensions
+
+ - New option -misa-spec support: -misa-spec=[2.2|20190608|20191213] and
+   corresponding configuration option --with-isa-spec.
+
+ - Current default ISA spec set to 2.2, but we intend to bump this to
+   20191213 or later in next release.
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.c (riscv_ext_version): New.
+	(riscv_ext_version_table): Ditto.
+	(get_default_version): Ditto.
+	(riscv_subset_t::implied_p): New field.
+	(riscv_subset_t::riscv_subset_t): Init implied_p.
+	(riscv_subset_list::add): New.
+	(riscv_subset_list::handle_implied_ext): Pass riscv_subset_t
+	instead of separated argument.
+	(riscv_subset_list::to_string): Handle zifencei and zicsr, and
+	omit version if version is unknown.
+	(riscv_subset_list::parsing_subset_version): New argument `ext`,
+	remove default_major_version and default_minor_version, get
+	default version info via get_default_version.
+	(riscv_subset_list::parse_std_ext): Update argument for
+	parsing_subset_version calls.
+	Handle 2.2 ISA spec, always enable zicsr and zifencei, they are
+	included in baseline ISA in that time.
+	(riscv_subset_list::parse_multiletter_ext): Update argument for
+	`parsing_subset_version` and `add` calls.
+	(riscv_subset_list::parse): Adjust argument for
+	riscv_subset_list::handle_implied_ext call.
+	* config.gcc (riscv*-*-*): Handle --with-isa-spec=.
+	* config.in (HAVE_AS_MISA_SPEC): New.
+	(HAVE_AS_MARCH_ZIFENCEI): Ditto.
+	* config/riscv/riscv-opts.h (riscv_isa_spec_class): New.
+	(riscv_isa_spec): Ditto.
+	* config/riscv/riscv.h (HAVE_AS_MISA_SPEC): New.
+	(ASM_SPEC): Pass -misa-spec if gas supported.
+	* config/riscv/riscv.opt (riscv_isa_spec_class) New.
+	* configure.ac (HAVE_AS_MARCH_ZIFENCEI): New test.
+	(HAVE_AS_MISA_SPEC): Ditto.
+	* configure: Regen.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/arch-9.c: New.
+	* gcc.target/riscv/arch-10.c: Ditto.
+	* gcc.target/riscv/arch-11.c: Ditto.
+	* gcc.target/riscv/attribute-6.c: Remove, we don't support G
+	with version anymore.
+	* gcc.target/riscv/attribute-8.c: Reorder arch string to fit canonical
+	ordering.
+	* gcc.target/riscv/attribute-9.c: We don't emit version for
+	unknown extensions now.
+	* gcc.target/riscv/attribute-11.c: Add -misa-spec=2.2 flags.
+	* gcc.target/riscv/attribute-12.c: Ditto.
+	* gcc.target/riscv/attribute-13.c: Ditto.
+	* gcc.target/riscv/attribute-14.c: Ditto.
+	* gcc.target/riscv/attribute-15.c: New.
+	* gcc.target/riscv/attribute-16.c: Ditto.
+	* gcc.target/riscv/attribute-17.c: Ditto.
+---
+ gcc/common/config/riscv/riscv-common.c        | 287 +++++++++++++-----
+ gcc/config.gcc                                |  17 +-
+ gcc/config.in                                 |  12 +
+ gcc/config/riscv/riscv-opts.h                 |  10 +
+ gcc/config/riscv/riscv.h                      |   9 +-
+ gcc/config/riscv/riscv.opt                    |  17 ++
+ gcc/configure                                 |  62 ++++
+ gcc/configure.ac                              |  10 +
+ gcc/testsuite/gcc.target/riscv/arch-10.c      |   6 +
+ gcc/testsuite/gcc.target/riscv/arch-11.c      |   5 +
+ gcc/testsuite/gcc.target/riscv/arch-9.c       |   6 +
+ gcc/testsuite/gcc.target/riscv/attribute-11.c |   2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-12.c |   2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-13.c |   2 +-
+ gcc/testsuite/gcc.target/riscv/attribute-14.c |   4 +-
+ gcc/testsuite/gcc.target/riscv/attribute-15.c |   6 +
+ gcc/testsuite/gcc.target/riscv/attribute-16.c |   6 +
+ gcc/testsuite/gcc.target/riscv/attribute-17.c |   6 +
+ gcc/testsuite/gcc.target/riscv/attribute-6.c  |   6 -
+ gcc/testsuite/gcc.target/riscv/attribute-8.c  |   4 +-
+ gcc/testsuite/gcc.target/riscv/attribute-9.c  |   2 +-
+ 21 files changed, 393 insertions(+), 88 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/arch-10.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/arch-11.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/arch-9.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/attribute-15.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/attribute-16.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/attribute-17.c
+ delete mode 100644 gcc/testsuite/gcc.target/riscv/attribute-6.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index ca88ca1dacd..5e3ddcf3f81 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -44,6 +44,7 @@ struct riscv_subset_t
+   struct riscv_subset_t *next;
+ 
+   bool explicit_version_p;
++  bool implied_p;
+ };
+ 
+ /* Type for implied ISA info.  */
+@@ -62,6 +63,58 @@ static const riscv_implied_info_t riscv_implied_info[] =
+   {NULL, NULL}
+ };
+ 
++/* This structure holds version information for specific ISA version.  */
++
++struct riscv_ext_version
++{
++  const char *name;
++  enum riscv_isa_spec_class isa_spec_class;
++  int major_version;
++  int minor_version;
++};
++
++/* All standard extensions defined in all supported ISA spec.  */
++static const struct riscv_ext_version riscv_ext_version_table[] =
++{
++  /* name, ISA spec, major version, minor_version.  */
++  {"e", ISA_SPEC_CLASS_20191213, 1, 9},
++  {"e", ISA_SPEC_CLASS_20190608, 1, 9},
++  {"e", ISA_SPEC_CLASS_2P2,      1, 9},
++
++  {"i", ISA_SPEC_CLASS_20191213, 2, 1},
++  {"i", ISA_SPEC_CLASS_20190608, 2, 1},
++  {"i", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"m", ISA_SPEC_CLASS_20191213, 2, 0},
++  {"m", ISA_SPEC_CLASS_20190608, 2, 0},
++  {"m", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"a", ISA_SPEC_CLASS_20191213, 2, 1},
++  {"a", ISA_SPEC_CLASS_20190608, 2, 0},
++  {"a", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"f", ISA_SPEC_CLASS_20191213, 2, 2},
++  {"f", ISA_SPEC_CLASS_20190608, 2, 2},
++  {"f", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"d", ISA_SPEC_CLASS_20191213, 2, 2},
++  {"d", ISA_SPEC_CLASS_20190608, 2, 2},
++  {"d", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"c", ISA_SPEC_CLASS_20191213, 2, 0},
++  {"c", ISA_SPEC_CLASS_20190608, 2, 0},
++  {"c", ISA_SPEC_CLASS_2P2,      2, 0},
++
++  {"zicsr", ISA_SPEC_CLASS_20191213, 2, 0},
++  {"zicsr", ISA_SPEC_CLASS_20190608, 2, 0},
++
++  {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
++  {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
++
++  /* Terminate the list.  */
++  {NULL, ISA_SPEC_CLASS_NONE, 0, 0}
++};
++
+ static const riscv_cpu_info riscv_cpu_tables[] =
+ {
+ #define RISCV_CORE(CORE_NAME, ARCH, TUNE) \
+@@ -91,20 +144,22 @@ private:
+ 
+   riscv_subset_list (const char *, location_t);
+ 
+-  const char *parsing_subset_version (const char *, unsigned *, unsigned *,
+-				      unsigned, unsigned, bool, bool *);
++  const char *parsing_subset_version (const char *, const char *, unsigned *,
++				      unsigned *, bool, bool *);
+ 
+   const char *parse_std_ext (const char *);
+ 
+   const char *parse_multiletter_ext (const char *, const char *,
+ 				     const char *);
+ 
+-  void handle_implied_ext (const char *, int, int, bool);
++  void handle_implied_ext (riscv_subset_t *);
+ 
+ public:
+   ~riscv_subset_list ();
+ 
+-  void add (const char *, int, int, bool);
++  void add (const char *, int, int, bool, bool);
++
++  void add (const char *, bool);
+ 
+   riscv_subset_t *lookup (const char *,
+ 			  int major_version = RISCV_DONT_CARE_VERSION,
+@@ -124,7 +179,7 @@ static riscv_subset_list *current_subset_list = NULL;
+ 
+ riscv_subset_t::riscv_subset_t ()
+   : name (), major_version (0), minor_version (0), next (NULL),
+-    explicit_version_p (false)
++    explicit_version_p (false), implied_p (false)
+ {
+ }
+ 
+@@ -274,8 +329,31 @@ subset_cmp (const std::string &a, const std::string &b)
+ 
+ void
+ riscv_subset_list::add (const char *subset, int major_version,
+-			int minor_version, bool explicit_version_p)
++			int minor_version, bool explicit_version_p,
++			bool implied_p)
+ {
++  riscv_subset_t *ext = lookup (subset);
++
++  if (ext)
++    {
++      if (ext->implied_p)
++	{
++	  /* We won't add impiled `ext` if it already in list. */
++	  gcc_assert (!implied_p);
++	  ext->implied_p = implied_p;
++	  ext->major_version = major_version;
++	  ext->minor_version = minor_version;
++	}
++      else
++	error_at (
++	  m_loc,
++	  "%<-march=%s%>: Extension `%s' appear more than one time.",
++	  m_arch,
++	  subset);
++
++      return;
++    }
++
+   riscv_subset_t *s = new riscv_subset_t ();
+   riscv_subset_t *itr;
+ 
+@@ -286,6 +364,7 @@ riscv_subset_list::add (const char *subset, int major_version,
+   s->major_version = major_version;
+   s->minor_version = minor_version;
+   s->explicit_version_p = explicit_version_p;
++  s->implied_p = implied_p;
+   s->next = NULL;
+ 
+   if (m_tail == NULL)
+@@ -330,6 +409,43 @@ riscv_subset_list::add (const char *subset, int major_version,
+   m_tail = s;
+ }
+ 
++static void
++get_default_version (const char *ext,
++		     unsigned int *major_version,
++		     unsigned int *minor_version)
++{
++  const riscv_ext_version *ext_ver;
++  for (ext_ver = &riscv_ext_version_table[0];
++       ext_ver->name != NULL;
++       ++ext_ver)
++    if (strcmp (ext, ext_ver->name) == 0)
++      {
++	if ((ext_ver->isa_spec_class == riscv_isa_spec) ||
++	    (ext_ver->isa_spec_class == ISA_SPEC_CLASS_NONE))
++	  {
++	    *major_version = ext_ver->major_version;
++	    *minor_version = ext_ver->minor_version;
++	    return;
++	  }
++      }
++
++  /* Not found version info.  */
++  *major_version = 0;
++  *minor_version = 0;
++}
++
++/* Add new subset to list, but using default version from ISA spec version.  */
++
++void
++riscv_subset_list::add (const char *subset, bool implied_p)
++{
++  unsigned int major_version = 0, minor_version = 0;
++
++  get_default_version (subset, &major_version, &minor_version);
++
++  add (subset, major_version, minor_version, false, implied_p);
++}
++
+ /* Convert subset info to string with explicit version info,
+    VERSION_P to determine append version info or not.  */
+ 
+@@ -340,10 +456,37 @@ riscv_subset_list::to_string (bool version_p) const
+   oss << "rv" << m_xlen;
+ 
+   bool first = true;
+-  riscv_subset_t *subset = m_head;
++  riscv_subset_t *subset;
++
++  bool skip_zifencei = false;
++  bool skip_zicsr = false;
++
++  /* For RISC-V ISA version 2.2 or earlier version, zicsr and zifencei is
++     included in the base ISA.  */
++  if (riscv_isa_spec == ISA_SPEC_CLASS_2P2)
++    {
++      skip_zifencei = true;
++      skip_zicsr = true;
++    }
+ 
+-  while (subset != NULL)
++#ifndef HAVE_AS_MISA_SPEC
++  /* Skip since older binutils doesn't recognize zicsr.  */
++  skip_zicsr = true;
++#endif
++#ifndef HAVE_AS_MARCH_ZIFENCE
++  /* Skip since older binutils doesn't recognize zifencei, we made
++     a mistake in that binutils 2.35 supports zicsr but not zifencei.  */
++  skip_zifencei = true;
++#endif
++
++  for (subset = m_head; subset != NULL; subset = subset->next)
+     {
++      if (subset->implied_p && skip_zifencei && subset->name == "zifencei")
++	continue;
++
++      if (subset->implied_p && skip_zicsr && subset->name == "zicsr")
++	continue;
++
+       /* For !version_p, we only separate extension with underline for
+ 	 multi-letter extension.  */
+       if (!first &&
+@@ -355,12 +498,12 @@ riscv_subset_list::to_string (bool version_p) const
+ 
+       oss << subset->name;
+ 
+-      if (version_p || subset->explicit_version_p)
++      /* Let binutils decide the extension version if we don't know.  */
++      if ((version_p || subset->explicit_version_p) &&
++	  (subset->major_version != 0 || subset->minor_version != 0))
+ 	oss  << subset->major_version
+ 	     << 'p'
+ 	     << subset->minor_version;
+-
+-      subset = subset->next;
+     }
+ 
+   return oss.str ();
+@@ -408,23 +551,21 @@ riscv_supported_std_ext (void)
+      Points to the end of version
+ 
+    Arguments:
++     `ext`: This extension.
+      `p`: Current parsing position.
+      `major_version`: Parsing result of major version, using
+       default_major_version if version is not present in arch string.
+      `minor_version`: Parsing result of minor version, set to 0 if version is
+      not present in arch string, but set to `default_minor_version` if
+      `major_version` using default_major_version.
+-     `default_major_version`: Default major version.
+-     `default_minor_version`: Default minor version.
+      `std_ext_p`: True if parsing std extension.
+      `explicit_version_p`: True if this subset is not using default version.  */
+ 
+ const char *
+-riscv_subset_list::parsing_subset_version (const char *p,
++riscv_subset_list::parsing_subset_version (const char *ext,
++					   const char *p,
+ 					   unsigned *major_version,
+ 					   unsigned *minor_version,
+-					   unsigned default_major_version,
+-					   unsigned default_minor_version,
+ 					   bool std_ext_p,
+ 					   bool *explicit_version_p)
+ {
+@@ -475,11 +616,7 @@ riscv_subset_list::parsing_subset_version (const char *p,
+     minor = version;
+ 
+   if (major == 0 && minor == 0)
+-    {
+-      /* We didn't find any version string, use default version.  */
+-      *major_version = default_major_version;
+-      *minor_version = default_minor_version;
+-    }
++    get_default_version (ext, major_version, minor_version);
+   else
+     {
+       *explicit_version_p = true;
+@@ -513,23 +650,17 @@ riscv_subset_list::parse_std_ext (const char *p)
+     {
+     case 'i':
+       p++;
+-      p = parsing_subset_version (p, &major_version, &minor_version,
+-				  /* default_major_version= */ 2,
+-				  /* default_minor_version= */ 0,
+-				  /* std_ext_p= */ true,
+-				  &explicit_version_p);
+-      add ("i", major_version, minor_version, explicit_version_p);
++      p = parsing_subset_version ("i", p, &major_version, &minor_version,
++				  /* std_ext_p= */ true, &explicit_version_p);
++      add ("i", major_version, minor_version, explicit_version_p, false);
+       break;
+ 
+     case 'e':
+       p++;
+-      p = parsing_subset_version (p, &major_version, &minor_version,
+-				  /* default_major_version= */ 1,
+-				  /* default_minor_version= */ 9,
+-				  /* std_ext_p= */ true,
+-				  &explicit_version_p);
++      p = parsing_subset_version ("e", p, &major_version, &minor_version,
++				  /* std_ext_p= */ true, &explicit_version_p);
+ 
+-      add ("e", major_version, minor_version, explicit_version_p);
++      add ("e", major_version, minor_version, explicit_version_p, false);
+ 
+       if (m_xlen > 32)
+ 	{
+@@ -541,18 +672,26 @@ riscv_subset_list::parse_std_ext (const char *p)
+ 
+     case 'g':
+       p++;
+-      p = parsing_subset_version (p, &major_version, &minor_version,
+-				  /* default_major_version= */ 2,
+-				  /* default_minor_version= */ 0,
+-				  /* std_ext_p= */ true,
+-				  &explicit_version_p);
+-      add ("i", major_version, minor_version, explicit_version_p);
+-
+-      for (; *std_exts != 'q'; std_exts++)
++      p = parsing_subset_version ("g", p, &major_version, &minor_version,
++				  /* std_ext_p= */ true, &explicit_version_p);
++      if (major_version != 0 || minor_version != 0)
+ 	{
+-	  const char subset[] = {*std_exts, '\0'};
+-	  add (subset, major_version, minor_version, explicit_version_p);
++	  warning_at (m_loc, 0, "version of `g` will be omitted, please "
++				"specify version for individual extension.");
+ 	}
++
++      /* We have special rule for G, we disallow rv32gm2p but allow rv32g_zicsr
++	 here, basically we treating G expand to imafd and implied zicsr and
++	 zifencei.  */
++
++      add ("i", false);
++      add ("m", false);
++      add ("a", false);
++      add ("f", false);
++      add ("d", false);
++      add ("zicsr", true);
++      add ("zifencei", true);
++
+       break;
+ 
+     default:
+@@ -595,44 +734,47 @@ riscv_subset_list::parse_std_ext (const char *p)
+       std_exts++;
+ 
+       p++;
+-      p = parsing_subset_version (p, &major_version, &minor_version,
+-				  /* default_major_version= */ 2,
+-				  /* default_minor_version= */ 0,
+-				  /* std_ext_p= */ true,
+-				  &explicit_version_p);
+-
+       subset[0] = std_ext;
+ 
+-      add (subset, major_version, minor_version, explicit_version_p);
++      p = parsing_subset_version (subset, p, &major_version, &minor_version,
++				  /* std_ext_p= */ true, &explicit_version_p);
++
++      add (subset, major_version, minor_version, explicit_version_p, false);
+     }
+   return p;
+ }
+ 
+ 
+-/* Check any implied extensions for EXT with version
+-   MAJOR_VERSION.MINOR_VERSION, EXPLICIT_VERSION_P indicate the version is
+-   explicitly given by user or not.  */
++/* Check any implied extensions for EXT.  */
+ void
+-riscv_subset_list::handle_implied_ext (const char *ext,
+-				       int major_version,
+-				       int minor_version,
+-				       bool explicit_version_p)
++riscv_subset_list::handle_implied_ext (riscv_subset_t *ext)
+ {
+   const riscv_implied_info_t *implied_info;
+   for (implied_info = &riscv_implied_info[0];
+        implied_info->ext;
+        ++implied_info)
+     {
+-      if (strcmp (ext, implied_info->ext) != 0)
++      if (strcmp (ext->name.c_str (), implied_info->ext) != 0)
+ 	continue;
+ 
+       /* Skip if implied extension already present.  */
+       if (lookup (implied_info->implied_ext))
+ 	continue;
+ 
+-      /* TODO: Implied extension might use different version.  */
+-      add (implied_info->implied_ext, major_version, minor_version,
+-	   explicit_version_p);
++      /* Version of implied extension will get from current ISA spec
++	 version.  */
++      add (implied_info->implied_ext, true);
++    }
++
++  /* For RISC-V ISA version 2.2 or earlier version, zicsr and zifence is
++     included in the base ISA.  */
++  if (riscv_isa_spec == ISA_SPEC_CLASS_2P2)
++    {
++      if (lookup ("zicsr") == NULL)
++	add ("zicsr", true);
++
++      if (lookup ("zifencei") == NULL)
++	add ("zifencei", true);
+     }
+ }
+ 
+@@ -670,16 +812,21 @@ riscv_subset_list::parse_multiletter_ext (const char *p,
+       char *q = subset;
+       const char *end_of_version;
+       bool explicit_version_p = false;
++      char *ext;
++      char backup;
+ 
+       while (*++q != '\0' && *q != '_' && !ISDIGIT (*q))
+ 	;
+ 
++      backup = *q;
++      *q = '\0';
++      ext = xstrdup (subset);
++      *q = backup;
++
+       end_of_version
+-	= parsing_subset_version (q, &major_version, &minor_version,
+-				  /* default_major_version= */ 2,
+-				  /* default_minor_version= */ 0,
+-				  /* std_ext_p= */ FALSE,
+-				  &explicit_version_p);
++	= parsing_subset_version (ext, q, &major_version, &minor_version,
++				  /* std_ext_p= */ false, &explicit_version_p);
++      free (ext);
+ 
+       *q = '\0';
+ 
+@@ -691,7 +838,7 @@ riscv_subset_list::parse_multiletter_ext (const char *p,
+ 	  return NULL;
+ 	}
+ 
+-      add (subset, major_version, minor_version, explicit_version_p);
++      add (subset, major_version, minor_version, explicit_version_p, false);
+       free (subset);
+       p += end_of_version - subset;
+ 
+@@ -770,11 +917,7 @@ riscv_subset_list::parse (const char *arch, location_t loc)
+ 
+   for (itr = subset_list->m_head; itr != NULL; itr = itr->next)
+     {
+-      subset_list->handle_implied_ext (
+-	itr->name.c_str (),
+-	itr->major_version,
+-	itr->minor_version,
+-	itr->explicit_version_p);
++      subset_list->handle_implied_ext (itr);
+     }
+ 
+   return subset_list;
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 8d0e4de710f..0ff57662114 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -4496,7 +4496,7 @@ case "${target}" in
+ 		;;
+ 
+ 	riscv*-*-*)
+-		supported_defaults="abi arch tune riscv_attribute"
++		supported_defaults="abi arch tune riscv_attribute isa_spec"
+ 
+ 		case "${target}" in
+ 		riscv-* | riscv32*) xlen=32 ;;
+@@ -4504,6 +4504,21 @@ case "${target}" in
+ 		*) echo "Unsupported RISC-V target ${target}" 1>&2; exit 1 ;;
+ 		esac
+ 
++		case "${with_isa_spec}" in
++		""|default|2.2)
++			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_2P2"
++			;;
++		20191213 | 201912)
++			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_20191213"
++			;;
++		20190608 | 201906)
++			tm_defines="${tm_defines} TARGET_DEFAULT_ISA_SPEC=ISA_SPEC_CLASS_20190608"
++			;;
++		*)
++			echo "--with-isa-spec only accept 2.2, 20191213, 201912, 20190608 or 201906" 1>&2
++			exit 1
++		esac
++
+ 		case "${with_riscv_attribute}" in
+ 		yes)
+ 			tm_defines="${tm_defines} TARGET_RISCV_ATTRIBUTE=1"
+diff --git a/gcc/config.in b/gcc/config.in
+index 364eba47737..8b8a5c52a62 100644
+--- a/gcc/config.in
++++ b/gcc/config.in
+@@ -643,6 +643,18 @@
+ #endif
+ 
+ 
++/* Define if your assembler supports -misa-spec=. */
++#ifndef USED_FOR_TARGET
++#undef HAVE_AS_MISA_SPEC
++#endif
++
++
++/* Define if your assembler supports -march=rv*_zifencei. */
++#ifndef USED_FOR_TARGET
++#undef HAVE_AS_MARCH_ZIFENCEI
++#endif
++
++
+ /* Define if your assembler supports relocs needed by -fpic. */
+ #ifndef USED_FOR_TARGET
+ #undef HAVE_AS_SMALL_PIC_RELOCS
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index 48b4e84ec1e..8c9bebe08ef 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -39,6 +39,16 @@ enum riscv_code_model {
+ };
+ extern enum riscv_code_model riscv_cmodel;
+ 
++enum riscv_isa_spec_class {
++  ISA_SPEC_CLASS_NONE,
++
++  ISA_SPEC_CLASS_2P2,
++  ISA_SPEC_CLASS_20190608,
++  ISA_SPEC_CLASS_20191213
++};
++
++extern enum riscv_isa_spec_class riscv_isa_spec;
++
+ /* Keep this list in sync with define_attr "tune" in riscv.md.  */
+ enum riscv_microarchitecture_type {
+   generic,
+diff --git a/gcc/config/riscv/riscv.h b/gcc/config/riscv/riscv.h
+index 172c7ca7c98..f66336cbad3 100644
+--- a/gcc/config/riscv/riscv.h
++++ b/gcc/config/riscv/riscv.h
+@@ -70,13 +70,20 @@ extern const char *riscv_default_mtune (int argc, const char **argv);
+ #define TARGET_64BIT           (__riscv_xlen == 64)
+ #endif /* IN_LIBGCC2 */
+ 
++#ifdef HAVE_AS_MISA_SPEC
++#define ASM_MISA_SPEC "%{misa-spec=*}"
++#else
++#define ASM_MISA_SPEC ""
++#endif
++
+ #undef ASM_SPEC
+ #define ASM_SPEC "\
+ %(subtarget_asm_debugging_spec) \
+ %{" FPIE_OR_FPIC_SPEC ":-fpic} \
+ %{march=*} \
+ %{mabi=*} \
+-%(subtarget_asm_spec)"
++%(subtarget_asm_spec)" \
++ASM_MISA_SPEC
+ 
+ #undef DRIVER_SELF_SPECS
+ #define DRIVER_SELF_SPECS					\
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 629aeeaf4d6..aaada74afb6 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -158,3 +158,20 @@ Enum(riscv_align_data) String(natural) Value(riscv_align_data_type_natural)
+ 
+ TargetVariable
+ int riscv_zi_subext
++
++Enum
++Name(isa_spec_class) Type(enum riscv_isa_spec_class)
++Supported ISA specs (for use with the -misa-spec= option):
++
++EnumValue
++Enum(isa_spec_class) String(2.2) Value(ISA_SPEC_CLASS_2P2)
++
++EnumValue
++Enum(isa_spec_class) String(20190608) Value(ISA_SPEC_CLASS_20190608)
++
++EnumValue
++Enum(isa_spec_class) String(20191213) Value(ISA_SPEC_CLASS_20191213)
++
++misa-spec=
++Target Report RejectNegative Joined Enum(isa_spec_class) Var(riscv_isa_spec) Init(TARGET_DEFAULT_ISA_SPEC)
++Set the version of RISC-V ISA spec.
+diff --git a/gcc/configure b/gcc/configure
+index 6f5a3a0ffe1..26781b5735f 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -28144,6 +28144,68 @@ if test $gcc_cv_as_riscv_attribute = yes; then
+ 
+ $as_echo "#define HAVE_AS_RISCV_ATTRIBUTE 1" >>confdefs.h
+ 
++fi
++
++    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -misa-spec= support" >&5
++$as_echo_n "checking assembler for -misa-spec= support... " >&6; }
++if ${gcc_cv_as_riscv_isa_spec+:} false; then :
++  $as_echo_n "(cached) " >&6
++else
++  gcc_cv_as_riscv_isa_spec=no
++  if test x$gcc_cv_as != x; then
++    $as_echo '' > conftest.s
++    if { ac_try='$gcc_cv_as $gcc_cv_as_flags -misa-spec=2.2 -o conftest.o conftest.s >&5'
++  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
++  test $ac_status = 0; }; }
++    then
++	gcc_cv_as_riscv_isa_spec=yes
++    else
++      echo "configure: failed program was" >&5
++      cat conftest.s >&5
++    fi
++    rm -f conftest.o conftest.s
++  fi
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_riscv_isa_spec" >&5
++$as_echo "$gcc_cv_as_riscv_isa_spec" >&6; }
++if test $gcc_cv_as_riscv_isa_spec = yes; then
++
++$as_echo "#define HAVE_AS_MISA_SPEC 1" >>confdefs.h
++
++fi
++
++    { $as_echo "$as_me:${as_lineno-$LINENO}: checking assembler for -march=rv32i_zifencei support" >&5
++$as_echo_n "checking assembler for -march=rv32i_zifencei support... " >&6; }
++if ${gcc_cv_as_riscv_march_zifencei+:} false; then :
++  $as_echo_n "(cached) " >&6
++else
++  gcc_cv_as_riscv_march_zifencei=no
++  if test x$gcc_cv_as != x; then
++    $as_echo '' > conftest.s
++    if { ac_try='$gcc_cv_as $gcc_cv_as_flags -march=rv32i_zifencei -o conftest.o conftest.s >&5'
++  { { eval echo "\"\$as_me\":${as_lineno-$LINENO}: \"$ac_try\""; } >&5
++  (eval $ac_try) 2>&5
++  ac_status=$?
++  $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
++  test $ac_status = 0; }; }
++    then
++	gcc_cv_as_riscv_march_zifencei=yes
++    else
++      echo "configure: failed program was" >&5
++      cat conftest.s >&5
++    fi
++    rm -f conftest.o conftest.s
++  fi
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_as_riscv_march_zifencei" >&5
++$as_echo "$gcc_cv_as_riscv_march_zifencei" >&6; }
++if test $gcc_cv_as_riscv_march_zifencei = yes; then
++
++$as_echo "#define HAVE_AS_MARCH_ZIFENCEI 1" >>confdefs.h
++
+ fi
+ 
+     ;;
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index d524c4b0d8e..bedce434955 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -5123,6 +5123,16 @@ configured with --enable-newlib-nano-formatted-io.])
+       [.attribute stack_align,4],,
+       [AC_DEFINE(HAVE_AS_RISCV_ATTRIBUTE, 1,
+ 	  [Define if your assembler supports .attribute.])])
++    gcc_GAS_CHECK_FEATURE([-misa-spec= support],
++      gcc_cv_as_riscv_isa_spec,,
++      [-misa-spec=2.2],,,
++      [AC_DEFINE(HAVE_AS_MISA_SPEC, 1,
++		 [Define if the assembler understands -misa-spec=.])])
++    gcc_GAS_CHECK_FEATURE([-march=rv32i_zifencei support],
++      gcc_cv_as_riscv_march_zifencei,,
++      [-march=rv32i_zifencei],,,
++      [AC_DEFINE(HAVE_AS_MARCH_ZIFENCEI, 1,
++		 [Define if the assembler understands -march=rv*_zifencei.])])
+     ;;
+     s390*-*-*)
+     gcc_GAS_CHECK_FEATURE([.gnu_attribute support],
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-10.c b/gcc/testsuite/gcc.target/riscv/arch-10.c
+new file mode 100644
+index 00000000000..47dbda333c9
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/arch-10.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32gf2 -mabi=ilp32" } */
++int foo()
++{
++}
++/* { dg-error "Extension `f' appear more than one time." "" { target *-*-* } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-11.c b/gcc/testsuite/gcc.target/riscv/arch-11.c
+new file mode 100644
+index 00000000000..129d8f72804
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/arch-11.c
+@@ -0,0 +1,5 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32g_zicsr2 -mabi=ilp32" } */
++int foo()
++{
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-9.c b/gcc/testsuite/gcc.target/riscv/arch-9.c
+new file mode 100644
+index 00000000000..74e64103563
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/arch-9.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32g2 -mabi=ilp32" } */
++int foo()
++{
++}
++/* { dg-warning "version of `g` will be omitted, please specify version for individual extension." "" { target *-*-* } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-11.c b/gcc/testsuite/gcc.target/riscv/attribute-11.c
+index a8649508b2f..98bd8d4da42 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-11.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-11.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32id -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32id -mabi=ilp32 -misa-spec=2.2" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-12.c b/gcc/testsuite/gcc.target/riscv/attribute-12.c
+index df27fc3234d..44fccad3b29 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-12.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-12.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32ifd -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32ifd -mabi=ilp32 -misa-spec=2.2" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-13.c b/gcc/testsuite/gcc.target/riscv/attribute-13.c
+index 1e860013293..1b8f93ceaaf 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-13.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-13.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32if3d -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32if3d -mabi=ilp32 -misa-spec=2.2" } */
+ int foo()
+ {
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-14.c b/gcc/testsuite/gcc.target/riscv/attribute-14.c
+index 48456277152..2591c1f92f6 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-14.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-14.c
+@@ -1,6 +1,6 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32if -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32if -mabi=ilp32 -misa-spec=20190608" } */
+ int foo()
+ {
+ }
+-/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_f2p0_zicsr2p0\"" } } */
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p1_f2p2_zicsr2p0\"" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-15.c b/gcc/testsuite/gcc.target/riscv/attribute-15.c
+new file mode 100644
+index 00000000000..9cae1a27a6f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/attribute-15.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O -mriscv-attribute -march=rv32gc -mabi=ilp32 -misa-spec=2.2" } */
++int foo()
++{
++}
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_m2p0_a2p0_f2p0_d2p0_c2p0\"" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-16.c b/gcc/testsuite/gcc.target/riscv/attribute-16.c
+new file mode 100644
+index 00000000000..f090363b979
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/attribute-16.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O -mriscv-attribute -march=rv32gc -mabi=ilp32 -misa-spec=20190608" } */
++int foo()
++{
++}
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p1_m2p0_a2p0_f2p2_d2p2_c2p0_zicsr2p0" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-17.c b/gcc/testsuite/gcc.target/riscv/attribute-17.c
+new file mode 100644
+index 00000000000..19ef540b5b9
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/attribute-17.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O -mriscv-attribute -march=rv32gc -mabi=ilp32 -misa-spec=20191213" } */
++int foo()
++{
++}
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-6.c b/gcc/testsuite/gcc.target/riscv/attribute-6.c
+deleted file mode 100644
+index c75b0d62200..00000000000
+--- a/gcc/testsuite/gcc.target/riscv/attribute-6.c
++++ /dev/null
+@@ -1,6 +0,0 @@
+-/* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32g2p0 -mabi=ilp32" } */
+-int foo()
+-{
+-}
+-/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_m2p0_a2p0_f2p0_d2p0\"" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-8.c b/gcc/testsuite/gcc.target/riscv/attribute-8.c
+index 1d161763805..90f5a4022a0 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-8.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-8.c
+@@ -1,6 +1,6 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O -mriscv-attribute -march=rv32i2p0xv5_xabc -mabi=ilp32" } */
++/* { dg-options "-O -mriscv-attribute -march=rv32i2p0xabc_xv5 -mabi=ilp32" } */
+ int foo()
+ {
+ }
+-/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_xv5p0_xabc2p0\"" } } */
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_xabc_xv5p0\"" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-9.c b/gcc/testsuite/gcc.target/riscv/attribute-9.c
+index bc4db0eb647..4598872f0a6 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-9.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-9.c
+@@ -3,4 +3,4 @@
+ int foo()
+ {
+ }
+-/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_sabc2p0_xbar2p0\"" } } */
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_sabc_xbar\"" } } */
+-- 
+2.25.1
+

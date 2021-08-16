@@ -1,0 +1,659 @@
+From 5e0f0c214682b77310918885fdb08d6d444d37a7 Mon Sep 17 00:00:00 2001
+From: Monk Chiang <monk.chiang@sifive.com>
+Date: Tue, 1 Sep 2020 10:25:32 +0800
+Subject: [PATCH 43/60] Implement compact code model.
+
+---
+ gcc/config/riscv/riscv-c.c      |   6 +
+ gcc/config/riscv/riscv-opts.h   |   1 +
+ gcc/config/riscv/riscv-protos.h |   4 +-
+ gcc/config/riscv/riscv.c        | 264 +++++++++++++++++++++++++++++++-
+ gcc/config/riscv/riscv.h        |  15 +-
+ gcc/config/riscv/riscv.md       |  89 +++++++++++
+ gcc/config/riscv/riscv.opt      |   3 +
+ 7 files changed, 370 insertions(+), 12 deletions(-)
+
+diff --git a/gcc/config/riscv/riscv-c.c b/gcc/config/riscv/riscv-c.c
+index 08b1100c9a1..0379ca89a16 100644
+--- a/gcc/config/riscv/riscv-c.c
++++ b/gcc/config/riscv/riscv-c.c
+@@ -103,6 +103,12 @@ riscv_cpu_cpp_builtins (cpp_reader *pfile)
+       builtin_define ("__riscv_cmodel_medany");
+       break;
+ 
++    case CM_COMPACT:
++      if (flag_pic)
++	builtin_define ("__riscv_cmodel_pic");
++
++      builtin_define ("__riscv_cmodel_compact");
++      break;
+     }
+ 
+   if (TARGET_VECTOR)
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index cd6f57c1d1d..7a84aadbe9b 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -35,6 +35,7 @@ extern enum riscv_abi_type riscv_abi;
+ enum riscv_code_model {
+   CM_MEDLOW,
+   CM_MEDANY,
++  CM_COMPACT,
+   CM_PIC
+ };
+ extern enum riscv_code_model riscv_cmodel;
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index 897ef06c37a..c4318e27348 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -31,7 +31,9 @@ enum riscv_symbol_type {
+   SYMBOL_TLS,
+   SYMBOL_TLS_LE,
+   SYMBOL_TLS_IE,
+-  SYMBOL_TLS_GD
++  SYMBOL_TLS_GD,
++  SYMBOL_GPREL,
++  SYMBOL_GOT_GPREL
+ };
+ #define NUM_SYMBOL_TYPES (SYMBOL_TLS_GD + 1)
+ 
+diff --git a/gcc/config/riscv/riscv.c b/gcc/config/riscv/riscv.c
+index c6a756a76ce..d3da49c9d72 100644
+--- a/gcc/config/riscv/riscv.c
++++ b/gcc/config/riscv/riscv.c
+@@ -49,6 +49,8 @@ along with GCC; see the file COPYING3.  If not see
+ #include "target-def.h"
+ #include "tm-constrs.h"
+ #include "basic-block.h"
++#include "cfg.h"
++#include "cfgrtl.h"
+ #include "expr.h"
+ #include "optabs.h"
+ #include "bitmap.h"
+@@ -257,6 +259,9 @@ struct riscv_tune_info {
+ /* Whether unaligned accesses execute very slowly.  */
+ bool riscv_slow_unaligned_access_p;
+ 
++/* Whether generate compact code.  */
++bool compact_code_needed;
++
+ /* Stack alignment to assume/maintain.  */
+ unsigned riscv_stack_boundary;
+ 
+@@ -652,6 +657,27 @@ riscv_classify_symbol (const_rtx x)
+   if (riscv_tls_symbol_p (x))
+     return SYMBOL_TLS;
+ 
++  if (COMPACT_CMODEL_P)
++    {
++      if (GET_CODE (x) == SYMBOL_REF)
++	{
++	  if (SYMBOL_REF_FLAGS (x) & SYMBOL_FLAG_FUNCTION)
++	    if (riscv_symbol_binds_local_p (x))
++	      return SYMBOL_PCREL;
++	    else
++	      return SYMBOL_GOT_GPREL;
++	  else if (!riscv_symbol_binds_local_p (x))
++	    return SYMBOL_GOT_GPREL;
++	  else
++	    return SYMBOL_GPREL;
++	}
++      else
++	{
++	  gcc_assert (GET_CODE (x) == LABEL_REF);
++	  return SYMBOL_GPREL;
++	}
++    }
++
+   if (GET_CODE (x) == SYMBOL_REF && flag_pic && !riscv_symbol_binds_local_p (x))
+     return SYMBOL_GOT_DISP;
+ 
+@@ -719,6 +745,8 @@ static int riscv_symbol_insns (enum riscv_symbol_type type)
+     case SYMBOL_PCREL: return 2; /* AUIPC + the reference.  */
+     case SYMBOL_TLS_LE: return 3; /* LUI + ADD TP + the reference.  */
+     case SYMBOL_GOT_DISP: return 3; /* AUIPC + LD GOT + the reference.  */
++    case SYMBOL_GOT_GPREL: return 4; /* LUI + ADD + LD GOT + the reference.  */
++    case SYMBOL_GPREL: return 3; /* LUI + ADD + the reference.  */
+     default: gcc_unreachable ();
+     }
+ }
+@@ -848,10 +876,20 @@ riscv_split_symbol_type (enum riscv_symbol_type symbol_type)
+   if (symbol_type == SYMBOL_TLS_LE)
+     return true;
+ 
++  /* If Symbol is from functions, generating a pseudo instruction. */
++  if (COMPACT_CMODEL_P)
++    {
++      if (symbol_type == SYMBOL_PCREL)
++	return false;
++      if (symbol_type == SYMBOL_GOT_GPREL ||
++	  symbol_type == SYMBOL_GPREL)
++	return true;
++    }
++
+   if (!TARGET_EXPLICIT_RELOCS)
+     return false;
+ 
+-  return symbol_type == SYMBOL_ABSOLUTE || symbol_type == SYMBOL_PCREL;
++  return (symbol_type == SYMBOL_ABSOLUTE || symbol_type == SYMBOL_PCREL);
+ }
+ 
+ /* Return true if a LO_SUM can address a value of mode MODE when the
+@@ -1365,6 +1403,74 @@ riscv_split_symbol (rtx temp, rtx addr, machine_mode mode, rtx *low_out,
+ 	}
+ 	break;
+ 
++      case SYMBOL_GPREL:
++	{
++	  gcc_assert (COMPACT_CMODEL_P);
++	  /* The symbol of GPREL instructions.
++	     lui   temp, %gprel_hi(symbol)
++	     add   temp, pic_reg, %gprel(symbol)
++	     addi  temp, temp, %gprel_lo(symbol)  */
++
++	  compact_code_needed = true;
++	  crtl->uses_pic_offset_table = 1;
++
++	  rtx insn = NULL_RTX;
++	  rtx high = gen_rtx_HIGH (Pmode, copy_rtx (addr));
++
++	  if (temp == NULL)
++	    temp = gen_reg_rtx (Pmode);
++
++	  if (Pmode == DImode)
++	    insn = emit_insn (gen_compact_gpreldi (temp,
++						   pic_offset_table_rtx,
++						   copy_rtx (addr)));
++	  else
++	    insn = emit_insn (gen_compact_gprelsi (temp,
++						   pic_offset_table_rtx,
++						   copy_rtx (addr)));
++
++	  set_unique_reg_note (insn, REG_EQUAL,
++			       gen_rtx_PLUS (Pmode, high,
++					     pic_offset_table_rtx));
++
++	  *low_out = gen_rtx_LO_SUM (Pmode, temp, addr);
++	}
++	break;
++
++      case SYMBOL_GOT_GPREL:
++	{
++	  gcc_assert (COMPACT_CMODEL_P);
++	  /* The symbol of GOT_GPREL instructions.
++	     lui   temp, %got_gprel_hi(symbol)
++	     add   temp, pic_reg, %got_gprel(symbol)
++	     ld    temp, %got_gprel_lo(symbol)(temp)
++	     ld    temp, 0(temp)  */
++
++	  compact_code_needed = true;
++	  crtl->uses_pic_offset_table = 1;
++
++	  rtx insn = NULL_RTX;
++	  rtx high = gen_rtx_HIGH (Pmode, copy_rtx (addr));
++	  high = riscv_force_temporary (temp, high, in_splitter);
++	  rtx mem = gen_frame_mem (Pmode, gen_rtx_LO_SUM (Pmode, high, addr));
++
++	  if (Pmode == DImode)
++	    insn = emit_insn (gen_got_gprel_adddi (high, high,
++						   pic_offset_table_rtx,
++						   addr));
++	  else
++	    insn = emit_insn (gen_got_gprel_addsi (high, high,
++						   pic_offset_table_rtx,
++						   addr));
++
++	  set_unique_reg_note (insn, REG_EQUAL,
++			       gen_rtx_PLUS (Pmode, high,
++					     pic_offset_table_rtx));
++	  emit_move_insn (high, mem);
++	  *low_out = high;
++	}
++	break;
++
+       default:
+ 	gcc_unreachable ();
+       }
+@@ -1425,7 +1531,21 @@ riscv_call_tls_get_addr (rtx sym, rtx result)
+ 
+   start_sequence ();
+ 
+-  emit_insn (riscv_got_load_tls_gd (a0, sym));
++  if (COMPACT_CMODEL_P)
++    {
++      compact_code_needed = true;
++      crtl->uses_pic_offset_table = 1;
++
++      if (Pmode == DImode)
++	emit_insn (gen_compact_got_load_tls_gddi (a0, sym,
++						  pic_offset_table_rtx));
++      else
++	emit_insn (gen_compact_got_load_tls_gdsi (a0, sym,
++						  pic_offset_table_rtx));
++    }
++  else
++    emit_insn (riscv_got_load_tls_gd (a0, sym));
++
+   insn = emit_call_insn (gen_call_value (result, func, const0_rtx, NULL));
+   RTL_CONST_CALL_P (insn) = 1;
+   use_reg (&CALL_INSN_FUNCTION_USAGE (insn), a0);
+@@ -1468,7 +1588,22 @@ riscv_legitimize_tls_address (rtx loc)
+       /* la.tls.ie; tp-relative add */
+       tp = gen_rtx_REG (Pmode, THREAD_POINTER_REGNUM);
+       tmp = gen_reg_rtx (Pmode);
+-      emit_insn (riscv_got_load_tls_ie (tmp, loc));
++
++      if (COMPACT_CMODEL_P)
++	{
++	  compact_code_needed = true;
++	  crtl->uses_pic_offset_table = 1;
++
++	  if (Pmode == DImode)
++	    emit_insn (gen_compact_got_load_tls_iedi (tmp, loc,
++						      pic_offset_table_rtx));
++	  else
++	    emit_insn (gen_compact_got_load_tls_iesi (tmp, loc,
++						      pic_offset_table_rtx));
++	}
++      else
++	emit_insn (riscv_got_load_tls_ie (tmp, loc));
++
+       dest = gen_reg_rtx (Pmode);
+       emit_insn (gen_add3_insn (dest, tmp, tp));
+       break;
+@@ -3525,6 +3660,14 @@ riscv_print_operand_reloc (FILE *file, rtx op, bool hi_reloc)
+ 	reloc = hi_reloc ? "%tprel_hi" : "%tprel_lo";
+ 	break;
+ 
++      case SYMBOL_GPREL:
++	reloc = hi_reloc ? "%gprel_hi" : "%gprel_lo";
++	break;
++
++      case SYMBOL_GOT_GPREL:
++	reloc = hi_reloc ? "%got_gprel_hi" : "%got_gprel_lo";
++	break;
++
+       default:
+ 	output_operand_lossage ("invalid use of '%%%c'", hi_reloc ? 'h' : 'R');
+ 	return;
+@@ -3704,7 +3847,29 @@ riscv_print_operand (FILE *file, rtx op, int letter)
+ 	  if (letter && letter != 'z')
+ 	    output_operand_lossage ("invalid use of '%%%c'", letter);
+ 	  else
+-	    output_address (mode, XEXP (op, 0));
++	    {
++	      output_address (mode, XEXP (op, 0));
++
++	      /* Output a symbol reference hint, if code model is compact.  */
++	      if (COMPACT_CMODEL_P
++		  && (REG_P (XEXP (op, 0))
++		      || GET_CODE (XEXP (op, 0)) == PLUS)
++		  && MEM_EXPR (op)
++		  && DECL_RTL_SET_P (MEM_EXPR (op)))
++		{
++		  rtx mem_ref = DECL_RTL (MEM_EXPR (op));
++		  if (MEM_P (mem_ref))
++		    mem_ref = XEXP (mem_ref, 0);
++
++		  if (GET_CODE (mem_ref) == SYMBOL_REF)
++		    if (riscv_classify_symbol (mem_ref) == SYMBOL_GOT_GPREL)
++		      {
++			fprintf (file, ",%%got_gprel(");
++			assemble_name (file, XSTR (mem_ref, 0));
++			fputc (')', file);
++		      }
++		}
++	    }
+ 	  break;
+ 
+ 	case CONST_VECTOR:
+@@ -5238,8 +5403,12 @@ riscv_file_start (void)
+ {
+   default_file_start ();
+ 
+-  /* Instruct GAS to generate position-[in]dependent code.  */
+-  fprintf (asm_out_file, "\t.option %spic\n", (flag_pic ? "" : "no"));
++  /* Instruct GAS to generate position-[in]dependent code.
++     If the code model is compact, then we use compact way.  */
++  if (COMPACT_CMODEL_P)
++    fprintf (asm_out_file, "\t.option compact\n");
++  else
++    fprintf (asm_out_file, "\t.option %spic\n", (flag_pic ? "" : "no"));
+ 
+   /* If the user specifies "-mno-relax" on the command line then disable linker
+      relaxation in the assembler.  */
+@@ -5250,6 +5419,22 @@ riscv_file_start (void)
+     riscv_emit_attribute ();
+ }
+ 
++static void
++riscv_code_end (void)
++{
++  if (COMPACT_CMODEL_P && compact_code_needed)
++    {
++      fprintf (asm_out_file, "\t.section .text.__global_pointer__, \"aMG\","
++			     "@progbits, 8, __global_pointer__, comdat\n"
++			     "\t.align 3\n"
++			     "\t.hidden __global_pointer__\n"
++			     "\t.global __global_pointer__\n"
++			     "\t.type   __global_pointer__, object\n"
++			     "__global_pointer__:\n"
++			     "\t.quad   __global_pointer$ -.\n");
++    }
++}
++
+ /* Implement TARGET_ASM_OUTPUT_MI_THUNK.  Generate rtl rather than asm text
+    in order to avoid duplicating too much logic from elsewhere.  */
+ 
+@@ -5350,6 +5535,8 @@ riscv_option_override (void)
+ 
+   flag_pcc_struct_return = 0;
+ 
++  compact_code_needed = false;
++
+   if (flag_pic)
+     g_switch_value = 0;
+ 
+@@ -5378,6 +5565,7 @@ riscv_option_override (void)
+      -m[no-]strict-align is left unspecified, heed -mtune's advice.  */
+   riscv_slow_unaligned_access_p = (cpu->tune_param->slow_unaligned_access
+ 				   || TARGET_STRICT_ALIGN);
++
+   if ((target_flags_explicit & MASK_STRICT_ALIGN) == 0
+       && cpu->tune_param->slow_unaligned_access)
+     target_flags |= MASK_STRICT_ALIGN;
+@@ -5390,7 +5578,7 @@ riscv_option_override (void)
+   /* Function to allocate machine-dependent function status.  */
+   init_machine_status = &riscv_init_machine_status;
+ 
+-  if (flag_pic)
++  if (flag_pic && !COMPACT_CMODEL_P)
+     riscv_cmodel = CM_PIC;
+ 
+   /* We get better code with explicit relocs for CM_MEDLOW, but
+@@ -5399,6 +5587,12 @@ riscv_option_override (void)
+     if (riscv_cmodel == CM_MEDLOW)
+       target_flags |= MASK_EXPLICIT_RELOCS;
+ 
++  if (COMPACT_CMODEL_P)
++    target_flags |= MASK_EXPLICIT_RELOCS;
++
++  if (!TARGET_64BIT && COMPACT_CMODEL_P)
++   error ("only support compact code model on RV64 toolchain.");
++
+   /* Require that the ISA supports the requested floating-point ABI.  */
+   if (UNITS_PER_FP_ARG > (TARGET_HARD_FLOAT ? UNITS_PER_FP_REG : 0))
+     error ("requested ABI requires %<-march%> to subsume the %qc extension",
+@@ -6452,6 +6646,54 @@ riscv_verify_type_context (location_t loc, type_context_kind context,
+ 
+ }
+ 
++/* Implement TARGET_USE_PSEUDO_PIC_REG.  */
++
++static bool
++riscv_use_pseudo_pic_reg (void)
++{
++  return COMPACT_CMODEL_P;
++}
++
++/* Implement TARGET_INIT_PIC_REG.  */
++
++static void
++riscv_init_pic_reg (void)
++{
++  edge entry_edge;
++  rtx_insn *seq;
++
++  if (!COMPACT_CMODEL_P || !crtl->uses_pic_offset_table)
++    return;
++
++  /* Init compact code model instructions.
++     .label:
++     auipc pic_reg, %pcrel_hi(__global_pointer__)
++     addi  pic_reg, pic_reg, %pcrel_lo(.label)
++     ld    temp_reg, 0(pic_reg)
++     add   pic_reg, pic_reg, temp_reg  */
++
++  rtx gp_symbol = gen_rtx_SYMBOL_REF (Pmode, "__global_pointer__");
++  rtx temp_reg = gen_reg_rtx (Pmode);
++
++  start_sequence ();
++
++  if (Pmode == DImode)
++    emit_insn (gen_init_compact_gpdi (pic_offset_table_rtx, gp_symbol));
++  else
++    emit_insn (gen_init_compact_gpsi (pic_offset_table_rtx, gp_symbol));
++
++  emit_move_insn (temp_reg,
++		  gen_frame_mem (Pmode, pic_offset_table_rtx));
++  emit_insn (gen_add3_insn (pic_offset_table_rtx,
++			    pic_offset_table_rtx, temp_reg));
++  seq = get_insns ();
++  end_sequence ();
++
++  entry_edge = single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun));
++  insert_insn_on_edge (seq, entry_edge);
++  commit_one_edge_insertion (entry_edge);
++}
++
+ /* Initialize the GCC target structure.  */
+ #undef TARGET_ASM_ALIGNED_HI_OP
+ #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
+@@ -6488,6 +6730,8 @@ riscv_verify_type_context (location_t loc, type_context_kind context,
+ #define TARGET_ASM_FILE_START riscv_file_start
+ #undef TARGET_ASM_FILE_START_FILE_DIRECTIVE
+ #define TARGET_ASM_FILE_START_FILE_DIRECTIVE true
++#undef TARGET_ASM_CODE_END
++#define TARGET_ASM_CODE_END riscv_code_end
+ 
+ #undef TARGET_EXPAND_BUILTIN_VA_START
+ #define TARGET_EXPAND_BUILTIN_VA_START riscv_va_start
+@@ -6551,6 +6795,12 @@ riscv_verify_type_context (location_t loc, type_context_kind context,
+ #undef TARGET_CONDITIONAL_REGISTER_USAGE
+ #define TARGET_CONDITIONAL_REGISTER_USAGE riscv_conditional_register_usage
+ 
++#undef TARGET_INIT_PIC_REG
++#define TARGET_INIT_PIC_REG riscv_init_pic_reg
++
++#undef TARGET_USE_PSEUDO_PIC_REG
++#define TARGET_USE_PSEUDO_PIC_REG riscv_use_pseudo_pic_reg
++
+ #undef TARGET_CLASS_MAX_NREGS
+ #define TARGET_CLASS_MAX_NREGS riscv_class_max_nregs
+ 
+diff --git a/gcc/config/riscv/riscv.h b/gcc/config/riscv/riscv.h
+index cd105832017..c3f8d5df2bf 100644
+--- a/gcc/config/riscv/riscv.h
++++ b/gcc/config/riscv/riscv.h
+@@ -103,6 +103,8 @@ ASM_MISA_SPEC
+ 
+ #define TARGET_DEFAULT_CMODEL CM_MEDLOW
+ 
++#define COMPACT_CMODEL_P (riscv_cmodel == CM_COMPACT)
++
+ #define LOCAL_LABEL_PREFIX	"."
+ #define USER_LABEL_PREFIX	""
+ 
+@@ -731,7 +733,7 @@ typedef struct {
+   } while (0)
+ 
+ #define JUMP_TABLES_IN_TEXT_SECTION 0
+-#define CASE_VECTOR_MODE SImode
++#define CASE_VECTOR_MODE (COMPACT_CMODEL_P ? DImode : SImode)
+ #define CASE_VECTOR_PC_RELATIVE (riscv_cmodel != CM_MEDLOW)
+ 
+ /* The load-address macro is used for PC-relative addressing of symbols
+@@ -919,12 +921,15 @@ typedef struct {
+ /* This is how to output an element of a case-vector that is absolute.  */
+ 
+ #define ASM_OUTPUT_ADDR_VEC_ELT(STREAM, VALUE)				\
+-  fprintf (STREAM, "\t.word\t%sL%d\n", LOCAL_LABEL_PREFIX, VALUE)
++  fprintf (STREAM, "\t%s\t%sL%d\n",					\
++	   COMPACT_CMODEL_P ? ".dword" : ".word",			\
++	   LOCAL_LABEL_PREFIX, VALUE)
+ 
+ /* This is how to output an element of a PIC case-vector. */
+ 
+ #define ASM_OUTPUT_ADDR_DIFF_ELT(STREAM, BODY, VALUE, REL)		\
+-  fprintf (STREAM, "\t.word\t%sL%d-%sL%d\n",				\
++  fprintf (STREAM, "\t%s\t%sL%d-%sL%d\n",				\
++	   COMPACT_CMODEL_P ? ".dword" : ".word",			\
+ 	   LOCAL_LABEL_PREFIX, VALUE, LOCAL_LABEL_PREFIX, REL)
+ 
+ /* This is how to output an assembler line
+@@ -1009,10 +1014,12 @@ while (0)
+ extern const enum reg_class riscv_regno_to_class[];
+ extern bool riscv_slow_unaligned_access_p;
+ extern unsigned riscv_stack_boundary;
++extern bool compact_code_needed;
+ #endif
+ 
+ #define ASM_PREFERRED_EH_DATA_FORMAT(CODE,GLOBAL) \
+-  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel | DW_EH_PE_sdata4)
++  (((GLOBAL) ? DW_EH_PE_indirect : 0) | DW_EH_PE_pcrel \
++    | (COMPACT_CMODEL_P ? DW_EH_PE_sdata8 : DW_EH_PE_sdata4))
+ 
+ #define XLEN_SPEC \
+   "%{march=rv32*:32}" \
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index 57901f4bd1e..a79312d89d5 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -32,10 +32,19 @@
+   UNSPEC_TLS_LE
+   UNSPEC_TLS_IE
+   UNSPEC_TLS_GD
++  ;; Compact code model.
++  UNSPEC_GPREL
++  UNSPEC_GOT_GPREL
++  UNSPEC_GPREL_ADD
++  UNSPEC_COMPACT_TLS_GD
++  UNSPEC_COMPACT_TLS_IE
+ 
+   ;; High part of PC-relative address.
+   UNSPEC_AUIPC
+ 
++  ;; Initial global pointer
++  UNSPEC_COMPACT_GP
++
+   ;; Floating-point unspecs.
+   UNSPEC_FLT_QUIET
+   UNSPEC_FLE_QUIET
+@@ -1441,6 +1450,17 @@
+   [(set_attr "got" "load")
+    (set_attr "mode" "<MODE>")])
+ 
++(define_insn "compact_got_load_tls_gd<mode>"
++  [(set (match_operand:P      0 "register_operand" "=&r")
++	(unspec:P
++	    [(match_operand:P 1 "symbolic_operand" "")
++	     (match_operand:P 2 "register_operand" "r")]
++	    UNSPEC_COMPACT_TLS_GD))]
++  "COMPACT_CMODEL_P"
++  "la.tls.gd\t%0,%1,%2"
++  [(set_attr "got" "load")
++   (set_attr "mode" "<MODE>")])
++
+ (define_insn "got_load_tls_ie<mode>"
+   [(set (match_operand:P      0 "register_operand" "=r")
+ 	(unspec:P
+@@ -1451,6 +1471,17 @@
+   [(set_attr "got" "load")
+    (set_attr "mode" "<MODE>")])
+ 
++(define_insn "compact_got_load_tls_ie<mode>"
++  [(set (match_operand:P      0 "register_operand" "=&r")
++	(unspec:P
++	    [(match_operand:P 1 "symbolic_operand" "")
++	     (match_operand:P 2 "register_operand" "r")]
++	    UNSPEC_COMPACT_TLS_IE))]
++  "COMPACT_CMODEL_P"
++  "la.tls.ie\t%0,%1,%2"
++  [(set_attr "got" "load")
++   (set_attr "mode" "<MODE>")])
++
+ (define_insn "auipc<mode>"
+   [(set (match_operand:P           0 "register_operand" "=r")
+ 	(unspec:P
+@@ -1476,6 +1507,64 @@
+   [(set_attr "type" "arith")
+    (set_attr "mode" "<MODE>")])
+ 
++;; Compact code model.
++
++(define_insn "init_compact_gp<mode>"
++  [(set (match_operand:P    0 "register_operand" "+r")
++	(unspec:P
++	  [(match_operand:P 1 "symbolic_operand" "")
++	   (pc)]
++	  UNSPEC_COMPACT_GP))]
++  "COMPACT_CMODEL_P"
++  "1:\n\tauipc\t%0 ,%%pcrel_hi(%1)\n\taddi\t%0, %0, %%pcrel_lo(1b)"
++  [(set_attr "type" "multi")
++   (set_attr "mode" "<MODE>")])
++
++(define_insn "got_gprel_add<mode>"
++  [(set (match_operand:P    0 "register_operand" "=r")
++	(unspec:P
++	  [(match_operand:P 1 "register_operand" "r")
++	   (match_operand:P 2 "register_operand" "r")
++	   (match_operand:P 3 "symbolic_operand" "")]
++	  UNSPEC_GOT_GPREL))]
++  "COMPACT_CMODEL_P"
++  "add\t%0,%1,%2,%%got_gprel(%3)"
++  [(set_attr "type" "arith")
++   (set_attr "mode" "<MODE>")])
++
++;; Split lui and addi instructions,
++;; it helps optimization for loop invariant motion.
++(define_insn_and_split "compact_gprel<mode>"
++  [(set (match_operand:P    0 "register_operand" "=&r")
++	(unspec:P
++	  [(match_operand:P 1 "register_operand" "r")
++	   (match_operand:P 2 "symbolic_operand" "")]
++	  UNSPEC_GPREL))]
++  "COMPACT_CMODEL_P"
++  "#"
++  "&& 1"
++  [(set (match_dup 0)
++	(high:P (match_dup 2)))
++   (set (match_dup 0)
++	(unspec:P
++	  [(match_dup 0)
++	   (match_dup 1)
++	   (match_dup 2)]UNSPEC_GPREL_ADD))]
++  ""
++)
++
++(define_insn "gprel_add<mode>"
++  [(set (match_operand:P    0 "register_operand" "=r")
++	(unspec:P
++	  [(match_operand:P 1 "register_operand" "0")
++	   (match_operand:P 2 "register_operand" "r")
++	   (match_operand:P 3 "symbolic_operand" "")]
++	  UNSPEC_GPREL_ADD))]
++  "COMPACT_CMODEL_P"
++  "add\t%0,%1,%2,%%gprel(%3)"
++  [(set_attr "type" "arith")
++   (set_attr "mode" "<MODE>")])
++
+ ;; Allow combine to split complex const_int load sequences, using operand 2
+ ;; to store the intermediate results.  See move_operand for details.
+ (define_split
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 85567c24e5a..18005c2cee7 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -115,6 +115,9 @@ Enum(code_model) String(medlow) Value(CM_MEDLOW)
+ EnumValue
+ Enum(code_model) String(medany) Value(CM_MEDANY)
+ 
++EnumValue
++Enum(code_model) String(compact) Value(CM_COMPACT)
++
+ mexplicit-relocs
+ Target Report Mask(EXPLICIT_RELOCS)
+ Use %reloc() operators, rather than assembly macros, to load addresses.
+-- 
+2.25.1
+

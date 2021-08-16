@@ -1,0 +1,136 @@
+From 144053b1e85e8766e4cc504f7552bae3f6da5f87 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 11 Nov 2020 14:04:34 +0800
+Subject: [PATCH 25/60] RISC-V: Support zicsr and zifencei extension for
+ -march.
+
+ - CSR related instructions and fence instructions has to be splitted from
+   baseline ISA, zicsr and zifencei are corresponding sub-extension.
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.c (riscv_implied_info):
+	d and f implied zicsr.
+	(riscv_ext_flag_table): Handle zicsr and zifencei.
+	* config/riscv/riscv-opts.h (MASK_ZICSR): New.
+	(MASK_ZIFENCEI): Ditto.
+	(TARGET_ZICSR): Ditto.
+	(TARGET_ZIFENCEI): Ditto.
+	* config/riscv/riscv.md (clear_cache): Check TARGET_ZIFENCEI.
+	(fence_i): Ditto.
+	* config/riscv/riscv.opt (riscv_zi_subext): New.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/arch-8.c: New.
+	* gcc.target/riscv/attribute-14.c: Ditto.
+---
+ gcc/common/config/riscv/riscv-common.c        | 6 ++++++
+ gcc/config/riscv/riscv-opts.h                 | 6 ++++++
+ gcc/config/riscv/riscv.md                     | 5 +++--
+ gcc/config/riscv/riscv.opt                    | 3 +++
+ gcc/testsuite/gcc.target/riscv/arch-8.c       | 5 +++++
+ gcc/testsuite/gcc.target/riscv/attribute-14.c | 6 ++++++
+ 6 files changed, 29 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/arch-8.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/attribute-14.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index f5f7be3cfff..ca88ca1dacd 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -57,6 +57,8 @@ struct riscv_implied_info_t
+ static const riscv_implied_info_t riscv_implied_info[] =
+ {
+   {"d", "f"},
++  {"f", "zicsr"},
++  {"d", "zicsr"},
+   {NULL, NULL}
+ };
+ 
+@@ -812,6 +814,10 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"f", &gcc_options::x_target_flags, MASK_HARD_FLOAT},
+   {"d", &gcc_options::x_target_flags, MASK_DOUBLE_FLOAT},
+   {"c", &gcc_options::x_target_flags, MASK_RVC},
++
++  {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
++  {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
++
+   {NULL, NULL, 0}
+ };
+ 
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index 8f12e50b9f1..48b4e84ec1e 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -51,4 +51,10 @@ enum riscv_align_data {
+   riscv_align_data_type_natural
+ };
+ 
++#define MASK_ZICSR    (1 << 0)
++#define MASK_ZIFENCEI (1 << 1)
++
++#define TARGET_ZICSR    ((riscv_zi_subext & MASK_ZICSR) != 0)
++#define TARGET_ZIFENCEI ((riscv_zi_subext & MASK_ZIFENCEI) != 0)
++
+ #endif /* ! GCC_RISCV_OPTS_H */
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index 36012ad1f77..d06d5575b2a 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -1538,7 +1538,8 @@
+ 		     LCT_NORMAL, VOIDmode, operands[0], Pmode,
+ 		     operands[1], Pmode, const0_rtx, Pmode);
+ #else
+-  emit_insn (gen_fence_i ());
++  if (TARGET_ZIFENCEI)
++    emit_insn (gen_fence_i ());
+ #endif
+   DONE;
+ })
+@@ -1550,7 +1551,7 @@
+ 
+ (define_insn "fence_i"
+   [(unspec_volatile [(const_int 0)] UNSPECV_FENCE_I)]
+-  ""
++  "TARGET_ZIFENCEI"
+   "fence.i")
+ 
+ ;;
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 09830aabf9e..629aeeaf4d6 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -155,3 +155,6 @@ Enum(riscv_align_data) String(xlen) Value(riscv_align_data_type_xlen)
+ 
+ EnumValue
+ Enum(riscv_align_data) String(natural) Value(riscv_align_data_type_natural)
++
++TargetVariable
++int riscv_zi_subext
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-8.c b/gcc/testsuite/gcc.target/riscv/arch-8.c
+new file mode 100644
+index 00000000000..d7760fc576f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/arch-8.c
+@@ -0,0 +1,5 @@
++/* { dg-do compile } */
++/* { dg-options "-O -march=rv32id_zicsr_zifence -mabi=ilp32" } */
++int foo()
++{
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-14.c b/gcc/testsuite/gcc.target/riscv/attribute-14.c
+new file mode 100644
+index 00000000000..48456277152
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/attribute-14.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O -mriscv-attribute -march=rv32if -mabi=ilp32" } */
++int foo()
++{
++}
++/* { dg-final { scan-assembler ".attribute arch, \"rv32i2p0_f2p0_zicsr2p0\"" } } */
+-- 
+2.25.1
+

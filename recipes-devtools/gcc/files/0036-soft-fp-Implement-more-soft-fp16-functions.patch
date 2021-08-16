@@ -1,0 +1,644 @@
+From 3adffbc5e34f974b9b9d4f2bdc1e5994387dbd78 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Fri, 19 Jun 2020 10:39:18 +0800
+Subject: [PATCH 36/60] soft-fp: Implement more soft fp16 functions.
+
+ - extendhfsf2, truncsfhf2
+
+ - eqhf2, gehf2, lehf2, neghf2, unordhf2
+
+ - fixhfsi, fixunshfsi, floatsihf, floatunsihf
+---
+ libgcc/soft-fp/eqhf2.c       | 51 ++++++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/extendhfsf2.c | 49 ++++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/fixhfsi.c     | 45 +++++++++++++++++++++++++++++++
+ libgcc/soft-fp/fixunshfsi.c  | 45 +++++++++++++++++++++++++++++++
+ libgcc/soft-fp/floatsihf.c   | 45 +++++++++++++++++++++++++++++++
+ libgcc/soft-fp/floatunsihf.c | 45 +++++++++++++++++++++++++++++++
+ libgcc/soft-fp/gehf2.c       | 51 ++++++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/half.h        |  4 +++
+ libgcc/soft-fp/lehf2.c       | 51 ++++++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/neghf2.c      | 46 ++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/truncsfhf2.c  | 48 +++++++++++++++++++++++++++++++++
+ libgcc/soft-fp/unordhf2.c    | 48 +++++++++++++++++++++++++++++++++
+ 12 files changed, 528 insertions(+)
+ create mode 100644 libgcc/soft-fp/eqhf2.c
+ create mode 100644 libgcc/soft-fp/extendhfsf2.c
+ create mode 100644 libgcc/soft-fp/fixhfsi.c
+ create mode 100644 libgcc/soft-fp/fixunshfsi.c
+ create mode 100644 libgcc/soft-fp/floatsihf.c
+ create mode 100644 libgcc/soft-fp/floatunsihf.c
+ create mode 100644 libgcc/soft-fp/gehf2.c
+ create mode 100644 libgcc/soft-fp/lehf2.c
+ create mode 100644 libgcc/soft-fp/neghf2.c
+ create mode 100644 libgcc/soft-fp/truncsfhf2.c
+ create mode 100644 libgcc/soft-fp/unordhf2.c
+
+diff --git a/libgcc/soft-fp/eqhf2.c b/libgcc/soft-fp/eqhf2.c
+new file mode 100644
+index 00000000000..880073a319b
+--- /dev/null
++++ b/libgcc/soft-fp/eqhf2.c
+@@ -0,0 +1,51 @@
++/* Software floating-point emulation.
++   Return 0 iff a == b, 1 otherwise
++   Copyright (C) 1997-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Richard Henderson (rth@cygnus.com) and
++		  Jakub Jelinek (jj@ultra.linux.cz).
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++CMPtype
++__eqhf2 (HFtype a, HFtype b)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  FP_DECL_H (B);
++  CMPtype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_UNPACK_RAW_H (B, b);
++  FP_CMP_EQ_H (r, A, B, 1);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
++
++strong_alias (__eqhf2, __nehf2);
+diff --git a/libgcc/soft-fp/extendhfsf2.c b/libgcc/soft-fp/extendhfsf2.c
+new file mode 100644
+index 00000000000..cb6fe14c726
+--- /dev/null
++++ b/libgcc/soft-fp/extendhfsf2.c
+@@ -0,0 +1,49 @@
++/* Software floating-point emulation.
++   Return an IEEE half converted to IEEE single
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#define FP_NO_EXACT_UNDERFLOW
++#include "soft-fp.h"
++#include "half.h"
++#include "single.h"
++
++SFtype
++__extendhfsf2 (HFtype a)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  FP_DECL_S (R);
++  SFtype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_EXTEND (S, H, 1, 1, R, A);
++  FP_PACK_RAW_S (r, R);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
+diff --git a/libgcc/soft-fp/fixhfsi.c b/libgcc/soft-fp/fixhfsi.c
+new file mode 100644
+index 00000000000..2f3e0f1ebdb
+--- /dev/null
++++ b/libgcc/soft-fp/fixhfsi.c
+@@ -0,0 +1,45 @@
++/* Software floating-point emulation.
++   Convert a IEEE half to 32bit signed integer
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++SItype
++__fixhfsi (HFtype a)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  USItype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_TO_INT_H (r, A, SI_BITS, 1);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
+diff --git a/libgcc/soft-fp/fixunshfsi.c b/libgcc/soft-fp/fixunshfsi.c
+new file mode 100644
+index 00000000000..74ed208bbd9
+--- /dev/null
++++ b/libgcc/soft-fp/fixunshfsi.c
+@@ -0,0 +1,45 @@
++/* Software floating-point emulation.
++   Convert IEEE half to 32bit unsigned integer
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++USItype
++__fixunshfsi (HFtype a)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  USItype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_TO_INT_H (r, A, SI_BITS, 0);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
+diff --git a/libgcc/soft-fp/floatsihf.c b/libgcc/soft-fp/floatsihf.c
+new file mode 100644
+index 00000000000..e046ef14056
+--- /dev/null
++++ b/libgcc/soft-fp/floatsihf.c
+@@ -0,0 +1,45 @@
++/* Software floating-point emulation.
++   Convert a 32bit signed integer to IEEE half
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++HFtype
++__floatsihf (SItype i)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  HFtype a;
++
++  FP_INIT_ROUNDMODE;
++  FP_FROM_INT_H (A, i, SI_BITS, USItype);
++  FP_PACK_RAW_H (a, A);
++  FP_HANDLE_EXCEPTIONS;
++
++  return a;
++}
+diff --git a/libgcc/soft-fp/floatunsihf.c b/libgcc/soft-fp/floatunsihf.c
+new file mode 100644
+index 00000000000..bc21d1ec28d
+--- /dev/null
++++ b/libgcc/soft-fp/floatunsihf.c
+@@ -0,0 +1,45 @@
++/* Software floating-point emulation.
++   Convert a 32bit unsigned integer to IEEE half.
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++HFtype
++__floatunsihf (USItype i)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  HFtype a;
++
++  FP_INIT_ROUNDMODE;
++  FP_FROM_INT_H (A, i, SI_BITS, USItype);
++  FP_PACK_RAW_H (a, A);
++  FP_HANDLE_EXCEPTIONS;
++
++  return a;
++}
+diff --git a/libgcc/soft-fp/gehf2.c b/libgcc/soft-fp/gehf2.c
+new file mode 100644
+index 00000000000..2e3fd4c75b5
+--- /dev/null
++++ b/libgcc/soft-fp/gehf2.c
+@@ -0,0 +1,51 @@
++/* Software floating-point emulation.
++   Return 0 iff a == b, 1 iff a > b, -2 iff a ? b, -1 iff a < b
++   Copyright (C) 1997-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Richard Henderson (rth@cygnus.com) and
++		  Jakub Jelinek (jj@ultra.linux.cz).
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++CMPtype
++__gehf2 (HFtype a, HFtype b)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  FP_DECL_H (B);
++  CMPtype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_UNPACK_RAW_H (B, b);
++  FP_CMP_H (r, A, B, -2, 2);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
++
++strong_alias (__gehf2, __gthf2);
+diff --git a/libgcc/soft-fp/half.h b/libgcc/soft-fp/half.h
+index c7823ac61d3..e131eb7b3f2 100644
+--- a/libgcc/soft-fp/half.h
++++ b/libgcc/soft-fp/half.h
+@@ -156,6 +156,10 @@ union _FP_UNION_H
+     }						\
+   while (0)
+ 
++#define FP_CMP_H(r, X, Y, un, ex)	_FP_CMP (H, 1, (r), X, Y, (un), (ex))
++#define FP_CMP_EQ_H(r, X, Y, ex)	_FP_CMP_EQ (H, 1, (r), X, Y, (ex))
++#define FP_CMP_UNORD_H(r, X, Y, ex)	_FP_CMP_UNORD (H, 1, (r), X, Y, (ex))
++
+ #define FP_TO_INT_H(r, X, rsz, rsg)	_FP_TO_INT (H, 1, (r), X, (rsz), (rsg))
+ #define FP_TO_INT_ROUND_H(r, X, rsz, rsg)	\
+   _FP_TO_INT_ROUND (H, 1, (r), X, (rsz), (rsg))
+diff --git a/libgcc/soft-fp/lehf2.c b/libgcc/soft-fp/lehf2.c
+new file mode 100644
+index 00000000000..206bc3806f8
+--- /dev/null
++++ b/libgcc/soft-fp/lehf2.c
+@@ -0,0 +1,51 @@
++/* Software floating-point emulation.
++   Return 0 iff a == b, 1 iff a > b, 2 iff a ? b, -1 iff a < b
++   Copyright (C) 1997-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Richard Henderson (rth@cygnus.com) and
++		  Jakub Jelinek (jj@ultra.linux.cz).
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++CMPtype
++__lehf2 (HFtype a, HFtype b)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  FP_DECL_H (B);
++  CMPtype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_UNPACK_RAW_H (B, b);
++  FP_CMP_H (r, A, B, 2, 2);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
++
++strong_alias (__lehf2, __lthf2);
+diff --git a/libgcc/soft-fp/neghf2.c b/libgcc/soft-fp/neghf2.c
+new file mode 100644
+index 00000000000..6fdec832ae9
+--- /dev/null
++++ b/libgcc/soft-fp/neghf2.c
+@@ -0,0 +1,46 @@
++/* Software floating-point emulation.
++   Return -a
++   Copyright (C) 1997-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Richard Henderson (rth@cygnus.com) and
++		  Jakub Jelinek (jj@ultra.linux.cz).
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++HFtype
++__neghf2 (HFtype a)
++{
++  FP_DECL_H (A);
++  FP_DECL_H (R);
++  HFtype r;
++
++  FP_UNPACK_RAW_H (A, a);
++  FP_NEG_H (R, A);
++  FP_PACK_RAW_H (r, R);
++
++  return r;
++}
+diff --git a/libgcc/soft-fp/truncsfhf2.c b/libgcc/soft-fp/truncsfhf2.c
+new file mode 100644
+index 00000000000..c1fbd0b8b29
+--- /dev/null
++++ b/libgcc/soft-fp/truncsfhf2.c
+@@ -0,0 +1,48 @@
++/* Software floating-point emulation.
++   Truncate IEEE single into IEEE half
++   Copyright (C) 2020 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++#include "single.h"
++
++HFtype
++__truncsfhf2 (SFtype a)
++{
++  FP_DECL_EX;
++  FP_DECL_S (A);
++  FP_DECL_H (R);
++  HFtype r;
++
++  FP_INIT_ROUNDMODE;
++  FP_UNPACK_SEMIRAW_S (A, a);
++  FP_TRUNC (H, S, 1, 1, R, A);
++  FP_PACK_SEMIRAW_H (r, R);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
+diff --git a/libgcc/soft-fp/unordhf2.c b/libgcc/soft-fp/unordhf2.c
+new file mode 100644
+index 00000000000..27d1edbd872
+--- /dev/null
++++ b/libgcc/soft-fp/unordhf2.c
+@@ -0,0 +1,48 @@
++/* Software floating-point emulation.
++   Return 1 iff a or b is a NaN, 0 otherwise.
++   Copyright (C) 2006-2019 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++   Contributed by Joseph Myers (joseph@codesourcery.com).
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   In addition to the permissions in the GNU Lesser General Public
++   License, the Free Software Foundation gives you unlimited
++   permission to link the compiled version of this file into
++   combinations with other programs, and to distribute those
++   combinations without any restriction coming from the use of this
++   file.  (The Lesser General Public License restrictions do apply in
++   other respects; for example, they cover modification of the file,
++   and distribution when not linked into a combine executable.)
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include "soft-fp.h"
++#include "half.h"
++
++CMPtype
++__unordhf2 (HFtype a, HFtype b)
++{
++  FP_DECL_EX;
++  FP_DECL_H (A);
++  FP_DECL_H (B);
++  CMPtype r;
++
++  FP_INIT_EXCEPTIONS;
++  FP_UNPACK_RAW_H (A, a);
++  FP_UNPACK_RAW_H (B, b);
++  FP_CMP_UNORD_H (r, A, B, 1);
++  FP_HANDLE_EXCEPTIONS;
++
++  return r;
++}
+-- 
+2.25.1
+

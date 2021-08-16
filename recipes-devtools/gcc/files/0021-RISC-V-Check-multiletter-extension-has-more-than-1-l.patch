@@ -1,0 +1,68 @@
+From c3911e6425f35e0722129cb30cc5ccaf3390cd75 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Thu, 20 Aug 2020 17:19:41 +0800
+Subject: [PATCH 21/60] RISC-V: Check multiletter extension has more than 1
+ letter
+
+gcc/ChangeLog:
+
+	* common/config/riscv/riscv-common.c
+	(riscv_subset_list::parse_multiletter_ext): Checking multiletter
+	extension has more than 1 letter.
+
+gcc/testsuite/ChangeLog
+
+	* gcc.target/riscv/arch-7.c: New.
+	* gcc.target/riscv/attribute-10.c: Update test arch string.
+---
+ gcc/common/config/riscv/riscv-common.c        | 8 ++++++++
+ gcc/testsuite/gcc.target/riscv/arch-7.c       | 6 ++++++
+ gcc/testsuite/gcc.target/riscv/attribute-10.c | 2 +-
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/arch-7.c
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index b84503a7742..84695a6ed1b 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -524,6 +524,14 @@ riscv_subset_list::parse_multiletter_ext (const char *p,
+ 
+       *q = '\0';
+ 
++      if (strlen (subset) == 1)
++	{
++	  error_at (m_loc, "%<-march=%s%>: name of %s must be more than 1 letter",
++		    m_arch, ext_type_str);
++	  free (subset);
++	  return NULL;
++	}
++
+       add (subset, major_version, minor_version, explicit_version_p);
+       free (subset);
+       p += end_of_version - subset;
+diff --git a/gcc/testsuite/gcc.target/riscv/arch-7.c b/gcc/testsuite/gcc.target/riscv/arch-7.c
+new file mode 100644
+index 00000000000..74ab248fa57
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/arch-7.c
+@@ -0,0 +1,6 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=rv32i -march=rv32im_s -mabi=ilp32" } */
++int foo()
++{
++}
++/* { dg-error ".'-march=rv32im_s': name of supervisor extension must be more than 1 letter" "" { target *-*-* } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/attribute-10.c b/gcc/testsuite/gcc.target/riscv/attribute-10.c
+index a874a6234dc..26fdd08b26d 100644
+--- a/gcc/testsuite/gcc.target/riscv/attribute-10.c
++++ b/gcc/testsuite/gcc.target/riscv/attribute-10.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -march=rv32i -march=rv32im_s_sx_unexpectedstring -mabi=ilp32" } */
++/* { dg-options "-O2 -march=rv32i -march=rv32im_sx_unexpectedstring -mabi=ilp32" } */
+ int foo()
+ {
+ }
+-- 
+2.25.1
+
