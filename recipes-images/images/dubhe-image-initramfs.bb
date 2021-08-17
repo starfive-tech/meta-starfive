@@ -6,7 +6,7 @@ first 'init' program more efficiently."
 INITRAMFS_SCRIPTS ?= "\
                       initramfs-boot packagegroup-core-boot \
                      "
-PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL}"
+PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} helloworld coremark dhrystone"
 
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""
