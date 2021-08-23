@@ -7,7 +7,7 @@ INHIBIT_PACKAGE_STRIP = "1"
 SRC_URI = "git://github.com/sifive/benchmark-dhrystone.git \
            file://0001-Edit-Makefile-to-add-compiler-flags.patch \
            "
-SRCREV = "${AUTOREV}"
+SRCREV = "0ddff533cc9052c524990d5ace4560372053314b"
 
 S = "${WORKDIR}/git"
 

@@ -7,7 +7,7 @@ INHIBIT_PACKAGE_STRIP = "1"
 SRC_URI = "git://github.com/sifive/benchmark-coremark.git \
            file://0001-Add-Compiler-Flags-and-remove-exe-from-output.patch \
            "
-SRCREV = "${AUTOREV}"
+SRCREV = "4486de1f0afe9d6c1fa8dd63743e5751286f3d2f"
 
 S = "${WORKDIR}/git"
 
