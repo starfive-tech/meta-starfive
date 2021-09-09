@@ -10,7 +10,7 @@
   <project name="openembedded-core" remote="openembedded" path="openembedded-core" revision="hardknott" />
   <project name="bitbake" remote="openembedded" path="openembedded-core/bitbake" revision="1.50" />
   <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="hardknott" />
-  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="hardknott-dev" />
+  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-hardknott" />
 
 </manifest>
 
