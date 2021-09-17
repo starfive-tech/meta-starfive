@@ -1,12 +1,12 @@
 FORK = "starfive-tech"
-BRANCH = "starfive-5.13-dev"
+BRANCH = "starfive-5.13"
 
 LINUX_VERSION ?= "5.13.0"
 LINUX_VERSION_EXTENSION_append = "-starlight"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
 
-SRC_URI = "git://git@192.168.110.45/starfive-tech/linux;protocol=ssh;branch=${BRANCH}"
+SRC_URI = "git://github.com/starfive-tech/linux.git;protocol=git;branch=${BRANCH}"
 
 INITRAMFS_IMAGE_BUNDLE = "1"
 
