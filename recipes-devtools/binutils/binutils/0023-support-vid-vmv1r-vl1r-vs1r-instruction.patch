@@ -1,0 +1,99 @@
+From 392661532fdf03c24d3b3715145f655b5c259986 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 24 Jun 2021 11:40:56 +0800
+Subject: [PATCH 23/28] support vid vmv1r vl1r vs1r instruction
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ gas/testsuite/gas/riscv/vector-insns.d | 13 +++++++++++++
+ gas/testsuite/gas/riscv/vector-insns.s | 13 +++++++++++++
+ opcodes/riscv-opc.c                    | 10 ++++++++++
+ 3 files changed, 36 insertions(+)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index fe6a95cba5..d8d6608fb3 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -98,6 +98,18 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+0ec57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12
+ [ 	]+[0-9a-f]+:[ 	]+0ec57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12
+ [ 	]+[0-9a-f]+:[ 	]+0cc57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12,v0.t
++[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[   ]+028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
++[ 	]+[0-9a-f]+:[   ]+028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
+ [ 	]+[0-9a-f]+:[ 	]+0e804257[ 	]+vneg.v[ 	]+v4,v8
+ [ 	]+[0-9a-f]+:[ 	]+0c804257[ 	]+vneg.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+02860257[ 	]+vadd.vv[ 	]+v4,v8,v12
+@@ -474,3 +486,4 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+30803257[ 	]+vrgather.vi[ 	]+v4,v8,0,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+308fb257[ 	]+vrgather.vi[ 	]+v4,v8,31,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+5e862257[ 	]+vcompress.vm[ 	]+v4,v8,v12
++[ 	]+[0-9a-f]+:[   ]+9e2030d7[     ]+vmv1r.v[      ]+v1,v2
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index a6f906e416..5cb7c7a5e2 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -102,6 +102,18 @@
+ 	vsoxei64.v v4, 0(a0), v12
+ 	vsoxei64.v v4, (a0), v12, v0.t
+ 
++        vl1r.v v3, (a0)
++        vl1r.v v3, 0(a0)
++        vl1re8.v v3, (a0)
++        vl1re8.v v3, 0(a0)
++        vl1re16.v v3, (a0)
++        vl1re16.v v3, 0(a0)
++        vl1re32.v v3, (a0)
++        vl1re32.v v3, 0(a0)
++        vl1re64.v v3, (a0)
++        vl1re64.v v3, 0(a0)
++        vs1r.v v3, (a1)
++        vs1r.v v3, 0(a1)
+ 	vneg.v v4, v8
+ 	vneg.v v4, v8, v0.t
+ 
+@@ -519,3 +531,4 @@
+ 
+ 	vcompress.vm v4, v8, v12
+ 
++        vmv1r.v v1, v2
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 067ebe3115..9229f7f87a 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1580,6 +1580,14 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vsoxei32.v",  0, INSN_CLASS_V,  "Vd,0(s),VtVm", MATCH_VSOXEI32V, MASK_VSOXEI32V, match_vd_neq_vm, INSN_DREF },
+ {"vsoxei64.v",  0, INSN_CLASS_V,  "Vd,0(s),VtVm", MATCH_VSOXEI64V, MASK_VSOXEI64V, match_vd_neq_vm, INSN_DREF },
+ 
++{"vl1r.v",      0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RE8V, MASK_VL1RE8V, match_vls_nf_rv, INSN_DREF|INSN_ALIAS },
++{"vl1re8.v",    0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RE8V, MASK_VL1RE8V, match_vls_nf_rv, INSN_DREF },
++{"vl1re16.v",   0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RE16V, MASK_VL1RE16V, match_vls_nf_rv, INSN_DREF },
++{"vl1re32.v",   0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RE32V, MASK_VL1RE32V, match_vls_nf_rv, INSN_DREF },
++{"vl1re64.v",   0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RE64V, MASK_VL1RE64V, match_vls_nf_rv, INSN_DREF },
++
++{"vs1r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VS1RV, MASK_VS1RV, match_vls_nf_rv, INSN_DREF },
++
+ {"vneg.v",     0, INSN_CLASS_V,  "Vd,VtVm",  MATCH_VRSUBVX, MASK_VRSUBVX | MASK_RS1, match_vd_neq_vm, INSN_ALIAS },
+ 
+ {"vadd.vv",    0, INSN_CLASS_V,  "Vd,Vt,VsVm", MATCH_VADDVV, MASK_VADDVV, match_vd_neq_vm, 0 },
+@@ -1808,6 +1816,8 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vrgather.vi",    0, INSN_CLASS_V, "Vd,Vt,VjVm", MATCH_VRGATHERVI, MASK_VRGATHERVI, match_vd_neq_vs2_neq_vm, 0},
+ 
+ {"vcompress.vm",0, INSN_CLASS_V, "Vd,Vt,Vs", MATCH_VCOMPRESSVM, MASK_VCOMPRESSVM, match_vd_neq_vs1_neq_vs2, 0},
++
++{"vmv1r.v",    0, INSN_CLASS_V, "Vd,Vt", MATCH_VMV1RV, MASK_VMV1RV, match_vmv_nf_rv, 0},
+ /* END RVV */
+ 
+ /* Terminate the list.  */
+-- 
+2.33.0
+

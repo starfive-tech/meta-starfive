@@ -59,7 +59,9 @@ file://0057-Fix-riscv_check_other_cond-for-non-multi-lib-build.patch \
 file://0058-Add-more-comment-for-riscv_check_other_cond.patch \
 file://0059-Do-not-install-riscv_vector.h-and-riscv_vector_itr.h.patch \
 file://0060-Avoid-to-use-same-temp-register-to-adjust-stack-poin.patch \
+file://0060-Initial-support-for-0.94-Bitmap.patch \
+file://0061-Remove-unsupported-bext.w-in-gcc.patch \
 file://0001-Yocto-patch-for-arch-canonicalize-to-use-python3.patch \
-file://0001-Fix-compilation-issue-when-building-multilib.patch \
 "
-EXTRA_OECONF_append_riscv64 = " --with-arch=rv64gcv_zba_zbb --with-cmodel=medany"
+
+EXTRA_OECONF_append_riscv64 = " --with-arch=rv64gcb CFLAGS_FOR_TARGET="-O2 -mcmodel=medany"  CXXFLAGS_FOR_TARGET="-O2 -mcmodel=medany""

@@ -1,0 +1,214 @@
+From 4dce782d6beccc91ce1723fd07e4706ee632a092 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Tue, 22 Jun 2021 15:44:01 +0800
+Subject: [PATCH 24/28] add vid instruction support
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ .../gas/riscv/vector-insns-fail-unsupport.l   | 15 ----------
+ .../gas/riscv/vector-insns-fail-unsupport.s   | 16 ----------
+ gas/testsuite/gas/riscv/vector-insns.d        | 30 +++++++++++--------
+ gas/testsuite/gas/riscv/vector-insns.s        | 28 +++++++++--------
+ opcodes/riscv-opc.c                           |  1 +
+ 5 files changed, 33 insertions(+), 57 deletions(-)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.l b/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.l
+index ae2230cb9e..2b726b0268 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.l
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.l
+@@ -813,16 +813,6 @@
+ .*: Error: unrecognized opcode `vlseg8e64ff.v v4,\(a0\)'
+ .*: Error: unrecognized opcode `vlseg8e64ff.v v4,0\(a0\)'
+ .*: Error: unrecognized opcode `vlseg8e64ff.v v4,\(a0\),v0.t'
+-.*: Error: unrecognized opcode `vl1r.v v3,\(a0\)'
+-.*: Error: unrecognized opcode `vl1r.v v3,0\(a0\)'
+-.*: Error: unrecognized opcode `vl1re8.v v3,\(a0\)'
+-.*: Error: unrecognized opcode `vl1re8.v v3,0\(a0\)'
+-.*: Error: unrecognized opcode `vl1re16.v v3,\(a0\)'
+-.*: Error: unrecognized opcode `vl1re16.v v3,0\(a0\)'
+-.*: Error: unrecognized opcode `vl1re32.v v3,\(a0\)'
+-.*: Error: unrecognized opcode `vl1re32.v v3,0\(a0\)'
+-.*: Error: unrecognized opcode `vl1re64.v v3,\(a0\)'
+-.*: Error: unrecognized opcode `vl1re64.v v3,0\(a0\)'
+ .*: Error: unrecognized opcode `vl2r.v v2,\(a0\)'
+ .*: Error: unrecognized opcode `vl2r.v v2,0\(a0\)'
+ .*: Error: unrecognized opcode `vl2re8.v v2,\(a0\)'
+@@ -853,8 +843,6 @@
+ .*: Error: unrecognized opcode `vl8re32.v v8,0\(a0\)'
+ .*: Error: unrecognized opcode `vl8re64.v v8,\(a0\)'
+ .*: Error: unrecognized opcode `vl8re64.v v8,0\(a0\)'
+-.*: Error: unrecognized opcode `vs1r.v v3,\(a1\)'
+-.*: Error: unrecognized opcode `vs1r.v v3,0\(a1\)'
+ .*: Error: unrecognized opcode `vs2r.v v2,\(a1\)'
+ .*: Error: unrecognized opcode `vs2r.v v2,0\(a1\)'
+ .*: Error: unrecognized opcode `vs4r.v v4,\(a1\)'
+@@ -1455,15 +1443,12 @@
+ .*: Error: unrecognized opcode `vmsif.m v4,v8'
+ .*: Error: unrecognized opcode `vmsof.m v4,v8'
+ .*: Error: unrecognized opcode `viota.m v4,v8'
+-.*: Error: unrecognized opcode `vid.v v4'
+ .*: Error: unrecognized opcode `vmsbf.m v4,v8,v0.t'
+ .*: Error: unrecognized opcode `vmsif.m v4,v8,v0.t'
+ .*: Error: unrecognized opcode `vmsof.m v4,v8,v0.t'
+ .*: Error: unrecognized opcode `viota.m v4,v8,v0.t'
+-.*: Error: unrecognized opcode `vid.v v4,v0.t'
+ .*: Error: unrecognized opcode `vrgatherei16.vv v4,v8,v12'
+ .*: Error: unrecognized opcode `vrgatherei16.vv v4,v8,v12,v0.t'
+-.*: Error: unrecognized opcode `vmv1r.v v1,v2'
+ .*: Error: unrecognized opcode `vmv2r.v v2,v4'
+ .*: Error: unrecognized opcode `vmv4r.v v4,v8'
+ .*: Error: unrecognized opcode `vmv8r.v v0,v8'
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.s b/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.s
+index 0116ac2c06..0112d0bce7 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.s
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-unsupport.s
+@@ -967,17 +967,6 @@
+ 	vlseg8e64ff.v v4, 0(a0)
+ 	vlseg8e64ff.v v4, (a0), v0.t
+ 
+-	vl1r.v v3, (a0)
+-	vl1r.v v3, 0(a0)
+-	vl1re8.v v3, (a0)
+-	vl1re8.v v3, 0(a0)
+-	vl1re16.v v3, (a0)
+-	vl1re16.v v3, 0(a0)
+-	vl1re32.v v3, (a0)
+-	vl1re32.v v3, 0(a0)
+-	vl1re64.v v3, (a0)
+-	vl1re64.v v3, 0(a0)
+-
+ 	vl2r.v v2, (a0)
+ 	vl2r.v v2, 0(a0)
+ 	vl2re8.v v2, (a0)
+@@ -1011,8 +1000,6 @@
+ 	vl8re64.v v8, (a0)
+ 	vl8re64.v v8, 0(a0)
+ 
+-	vs1r.v v3, (a1)
+-	vs1r.v v3, 0(a1)
+ 	vs2r.v v2, (a1)
+ 	vs2r.v v2, 0(a1)
+ 	vs4r.v v4, (a1)
+@@ -1662,18 +1649,15 @@
+ 	vmsif.m v4, v8
+ 	vmsof.m v4, v8
+ 	viota.m v4, v8
+-	vid.v v4
+ 	
+ 	vmsbf.m v4, v8, v0.t
+ 	vmsif.m v4, v8, v0.t
+ 	vmsof.m v4, v8, v0.t
+ 	viota.m v4, v8, v0.t
+-	vid.v v4, v0.t
+ 
+ 	vrgatherei16.vv v4, v8, v12
+ 	vrgatherei16.vv v4, v8, v12, v0.t
+ 
+-	vmv1r.v v1, v2
+ 	vmv2r.v v2, v4
+ 	vmv4r.v v4, v8
+ 	vmv8r.v v0, v8
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index d8d6608fb3..09c12ddfef 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -98,18 +98,6 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+0ec57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12
+ [ 	]+[0-9a-f]+:[ 	]+0ec57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12
+ [ 	]+[0-9a-f]+:[ 	]+0cc57227[ 	]+vsoxei64.v[ 	]+v4,\(a0\),v12,v0.t
+-[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02850187[     ]+vl1r.v[       ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
+-[ 	]+[0-9a-f]+:[   ]+028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
+-[ 	]+[0-9a-f]+:[   ]+028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
+ [ 	]+[0-9a-f]+:[ 	]+0e804257[ 	]+vneg.v[ 	]+v4,v8
+ [ 	]+[0-9a-f]+:[ 	]+0c804257[ 	]+vneg.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+02860257[ 	]+vadd.vv[ 	]+v4,v8,v12
+@@ -486,4 +474,20 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+30803257[ 	]+vrgather.vi[ 	]+v4,v8,0,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+308fb257[ 	]+vrgather.vi[ 	]+v4,v8,31,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+5e862257[ 	]+vcompress.vm[ 	]+v4,v8,v12
+-[ 	]+[0-9a-f]+:[   ]+9e2030d7[     ]+vmv1r.v[      ]+v1,v2
++[ 	]+[0-9a-f]+:[ 	]+9e2030d7[ 	]+vmv1r.v[ 	]+v1,v2
++[ 	]+[0-9a-f]+:[ 	]+5208a257[ 	]+vid.v[ 	]+v4
++[ 	]+[0-9a-f]+:[ 	]+5008a257[ 	]+vid.v[ 	]+v4,v0.t
++[ 	]+[0-9a-f]+:[ 	]++02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02850187[     ]+vl1r.v[       ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02855187[     ]+vl1re16.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02856187[     ]+vl1re32.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++02857187[     ]+vl1re64.v[    ]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]++028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]++028581a7[     ]+vs1r.v[       ]+v3,\(a1\)
++
++
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index 5cb7c7a5e2..81ef661af9 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -102,18 +102,6 @@
+ 	vsoxei64.v v4, 0(a0), v12
+ 	vsoxei64.v v4, (a0), v12, v0.t
+ 
+-        vl1r.v v3, (a0)
+-        vl1r.v v3, 0(a0)
+-        vl1re8.v v3, (a0)
+-        vl1re8.v v3, 0(a0)
+-        vl1re16.v v3, (a0)
+-        vl1re16.v v3, 0(a0)
+-        vl1re32.v v3, (a0)
+-        vl1re32.v v3, 0(a0)
+-        vl1re64.v v3, (a0)
+-        vl1re64.v v3, 0(a0)
+-        vs1r.v v3, (a1)
+-        vs1r.v v3, 0(a1)
+ 	vneg.v v4, v8
+ 	vneg.v v4, v8, v0.t
+ 
+@@ -530,5 +518,19 @@
+ 	vrgather.vi v4, v8, 31, v0.t
+ 
+ 	vcompress.vm v4, v8, v12
+-
+         vmv1r.v v1, v2
++        vid.v v4
++        vid.v v4, v0.t
++        vl1r.v v3, (a0)
++        vl1r.v v3, 0(a0)
++        vl1re8.v v3, (a0)
++        vl1re8.v v3, 0(a0)
++        vl1re16.v v3, (a0)
++        vl1re16.v v3, 0(a0)
++        vl1re32.v v3, (a0)
++        vl1re32.v v3, 0(a0)
++        vl1re64.v v3, (a0)
++        vl1re64.v v3, 0(a0)
++        vs1r.v v3, (a1)
++        vs1r.v v3, 0(a1)
++
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 9229f7f87a..7052d965d5 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1794,6 +1794,7 @@ const struct riscv_opcode riscv_opcodes[] =
+ 
+ {"vpopc.m",    0, INSN_CLASS_V, "d,VtVm", MATCH_VPOPCM, MASK_VPOPCM, match_opcode, 0},
+ {"vfirst.m",   0, INSN_CLASS_V, "d,VtVm", MATCH_VFIRSTM, MASK_VFIRSTM, match_opcode, 0},
++{"vid.v",      0, INSN_CLASS_V, "VdVm", MATCH_VIDV, MASK_VIDV, match_vd_neq_vm, 0},
+ 
+ {"vmv.x.s",    0, INSN_CLASS_V, "d,Vt", MATCH_VMVXS, MASK_VMVXS, match_opcode, 0},
+ {"vmv.s.x",    0, INSN_CLASS_V, "Vd,s", MATCH_VMVSX, MASK_VMVSX, match_opcode, 0},
+-- 
+2.33.0
+

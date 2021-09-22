@@ -1,0 +1,93 @@
+From aba02c462271b8d844aeea6906cadeb810ad9407 Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Tue, 22 Jun 2021 14:58:23 +0800
+Subject: [PATCH 13/28] Fix gas test cases
+
+---
+ gas/testsuite/gas/riscv/b-ext-64.d | 8 ++++----
+ gas/testsuite/gas/riscv/b-ext-64.s | 4 ++--
+ gas/testsuite/gas/riscv/b-ext.d    | 2 +-
+ gas/testsuite/gas/riscv/b-ext.s    | 2 +-
+ 4 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/gas/testsuite/gas/riscv/b-ext-64.d b/gas/testsuite/gas/riscv/b-ext-64.d
+index 23da2e0d58..8a1daf2766 100755
+--- a/gas/testsuite/gas/riscv/b-ext-64.d
++++ b/gas/testsuite/gas/riscv/b-ext-64.d
+@@ -73,7 +73,7 @@ Disassembly of section .text:
+ [ 	]+f8:[ 	]+48c59533[ 	]+bclr[ 	]+a0,a1,a2
+ [ 	]+fc:[ 	]+68c59533[ 	]+binv[ 	]+a0,a1,a2
+ [ 	]+100:[ 	]+48c5d533[ 	]+bext[ 	]+a0,a1,a2
+-[ 	]+104:[ 	]+48c5e533[ 	]+bdep[ 	]+a0,a1,a2
++[ 	]+104:[ 	]+48c5e533[ 	]+bdecompress[ 	]+a0,a1,a2
+ [ 	]+108:[ 	]+28259513[ 	]+bseti[ 	]+a0,a1,0x2
+ [ 	]+10c:[ 	]+48259513[ 	]+bclri[ 	]+a0,a1,0x2
+ [ 	]+110:[ 	]+68259513[ 	]+binvi[ 	]+a0,a1,0x2
+@@ -82,7 +82,7 @@ Disassembly of section .text:
+ [ 	]+11c:[ 	]+48c5953b[ 	]+bclrw[ 	]+a0,a1,a2
+ [ 	]+120:[ 	]+68c5953b[ 	]+binvw[ 	]+a0,a1,a2
+ [ 	]+124:[ 	]+48c5d53b[ 	]+bextw[ 	]+a0,a1,a2
+-[ 	]+128:[ 	]+4825e53b[ 	]+bdepw[ 	]+a0,a1,0x2
++[ 	]+128:[ 	]+4825e53b[ 	]+bdecompressw[ 	]+a0,a1,0x2
+ [ 	]+12c:[ 	]+2825951b[ 	]+bsetiw[ 	]+a0,a1,0x2
+ [ 	]+130:[ 	]+4825951b[ 	]+bclriw[ 	]+a0,a1,0x2
+ [ 	]+134:[ 	]+6825951b[ 	]+binviw[ 	]+a0,a1,0x2
+@@ -113,5 +113,5 @@ Disassembly of section .text:
+ [ 	]+198:[ 	]+6cc5d533[ 	]+fsr[ 	]+a0,a1,a2,a3
+ [ 	]+19c:[ 	]+6c25d513[ 	]+fsri[ 	]+a0,a1,0x2,a3
+ [ 	]+1a0:[ 	]+6c25953b[ 	]+fslw[ 	]+a0,a1,0x2,a3
+-[ 	]+1a4:[ 	]+6c25b53b[ 	]+fsrw[ 	]+a0,a1,0x2,a3
+-[ 	]+1a8:[ 	]+6c25b51b[ 	]+fsriw[ 	]+a0,a1,0x2,a3
++[ 	]+1a4:[ 	]+6c25d53b[ 	]+fsrw[ 	]+a0,a1,0x2,a3
++[ 	]+1a8:[ 	]+6c25d51b[ 	]+fsriw[ 	]+a0,a1,0x2,a3
+diff --git a/gas/testsuite/gas/riscv/b-ext-64.s b/gas/testsuite/gas/riscv/b-ext-64.s
+index 176d617be5..945ce167dd 100755
+--- a/gas/testsuite/gas/riscv/b-ext-64.s
++++ b/gas/testsuite/gas/riscv/b-ext-64.s
+@@ -64,7 +64,7 @@ target:
+ 	bclr	a0, a1, a2
+ 	binv	a0, a1, a2
+ 	bext	a0, a1, a2
+-	bdep	a0, a1, a2
++	bdecompress	a0, a1, a2
+ 	bseti	a0, a1, 2
+ 	bclri	a0, a1, 2
+ 	binvi	a0, a1, 2
+@@ -73,7 +73,7 @@ target:
+ 	bclrw	a0, a1, a2
+ 	binvw	a0, a1, a2
+ 	bextw	a0, a1, a2
+-	bdepw	a0, a1, 2
++	bdecompressw	a0, a1, 2
+ 	bsetiw	a0, a1, 2
+ 	bclriw	a0, a1, 2
+ 	binviw	a0, a1, 2
+diff --git a/gas/testsuite/gas/riscv/b-ext.d b/gas/testsuite/gas/riscv/b-ext.d
+index 4df9e90693..82c22b3cdf 100755
+--- a/gas/testsuite/gas/riscv/b-ext.d
++++ b/gas/testsuite/gas/riscv/b-ext.d
+@@ -51,7 +51,7 @@ Disassembly of section .text:
+ [ 	]+a0:[ 	]+48c59533[ 	]+bclr[ 	]+a0,a1,a2
+ [ 	]+a4:[ 	]+68c59533[ 	]+binv[ 	]+a0,a1,a2
+ [ 	]+a8:[ 	]+48c5d533[ 	]+bext[ 	]+a0,a1,a2
+-[ 	]+ac:[ 	]+48c5e533[ 	]+bdep[ 	]+a0,a1,a2
++[ 	]+ac:[ 	]+48c5e533[ 	]+bdecompress[ 	]+a0,a1,a2
+ [ 	]+b0:[ 	]+28259513[ 	]+bseti[ 	]+a0,a1,0x2
+ [ 	]+b4:[ 	]+48259513[ 	]+bclri[ 	]+a0,a1,0x2
+ [ 	]+b8:[ 	]+68259513[ 	]+binvi[ 	]+a0,a1,0x2
+diff --git a/gas/testsuite/gas/riscv/b-ext.s b/gas/testsuite/gas/riscv/b-ext.s
+index 429c005849..e41223b627 100755
+--- a/gas/testsuite/gas/riscv/b-ext.s
++++ b/gas/testsuite/gas/riscv/b-ext.s
+@@ -42,7 +42,7 @@ target:
+ 	bclr	 a0, a1, a2
+ 	binv	 a0, a1, a2
+ 	bext	 a0, a1, a2
+-	bdep	 a0, a1, a2
++	bdecompress	 a0, a1, a2
+ 	bseti	 a0, a1, 2
+ 	bclri	 a0, a1, 2
+ 	binvi	 a0, a1, 2
+-- 
+2.33.0
+

@@ -1,0 +1,27 @@
+From c7d793a52e9a523c646a5b465bb1750f4b5348da Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Thu, 24 Jun 2021 16:10:23 +0800
+Subject: [PATCH 22/28] Fix r operands type from fpr to gpr
+
+riscv_fpr_names riscv_gpr_names
+---
+ opcodes/riscv-dis.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index e3ee7b9d9b..b3bd43347f 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -372,6 +372,9 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 	  break;
+ 	
+ 	case 'r':
++	  print (info->stream, "%s", riscv_gpr_names[EXTRACT_OPERAND (RS3, l)]);
++      break;
++
+ 	case 'R':
+ 	  print (info->stream, "%s", riscv_fpr_names[EXTRACT_OPERAND (RS3, l)]);
+ 	  break;
+-- 
+2.33.0
+

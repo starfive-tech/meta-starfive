@@ -1,0 +1,25 @@
+From 7043dfdd782f25eee672658049af6c2271c2571d Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Thu, 24 Jun 2021 15:15:58 +0800
+Subject: [PATCH 20/28] Fix rev2.n test case
+
+---
+ gas/testsuite/gas/riscv/b-ext-64.d | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gas/testsuite/gas/riscv/b-ext-64.d b/gas/testsuite/gas/riscv/b-ext-64.d
+index eeb5087229..10aaf70c8a 100755
+--- a/gas/testsuite/gas/riscv/b-ext-64.d
++++ b/gas/testsuite/gas/riscv/b-ext-64.d
+@@ -52,7 +52,7 @@ Disassembly of section .text:
+ [ 	]+a4:[ 	]+0825c53b[ 	]+packw[ 	]+a0,a1,0x2
+ [ 	]+a8:[ 	]+4825c53b[ 	]+packuw[ 	]+a0,a1,0x2
+ [ 	]+ac:[ 	]+68c5d533[ 	]+grev[ 	]+a0,a1,a2
+-[ 	]+b0:[ 	]+6825d513[ 	]+grevi[ 	]+a0,a1,0x2
++[ 	]+b0:[ 	]+6825d513[ 	]+rev2.n[ 	]+a0,a1
+ [ 	]+b4:[ 	]+6825d53b[ 	]+grevw[ 	]+a0,a1,0x2
+ [ 	]+b8:[ 	]+6825d51b[ 	]+greviw[ 	]+a0,a1,0x2
+ [ 	]+bc:[ 	]+28c5d533[ 	]+gorc[ 	]+a0,a1,a2
+-- 
+2.33.0
+

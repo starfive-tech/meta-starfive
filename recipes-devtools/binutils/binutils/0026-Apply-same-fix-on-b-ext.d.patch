@@ -1,0 +1,34 @@
+From 336cafb0229b2e1c36e98ff94c0fb38b391eab00 Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Thu, 24 Jun 2021 16:29:33 +0800
+Subject: [PATCH 26/28] Apply same fix on b-ext.d
+
+---
+ gas/testsuite/gas/riscv/b-ext.d | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gas/testsuite/gas/riscv/b-ext.d b/gas/testsuite/gas/riscv/b-ext.d
+index 82c22b3cdf..6a9245976e 100755
+--- a/gas/testsuite/gas/riscv/b-ext.d
++++ b/gas/testsuite/gas/riscv/b-ext.d
+@@ -37,13 +37,13 @@ Disassembly of section .text:
+ [ 	]+68:[ 	]+48c5c533[ 	]+packu[ 	]+a0,a1,a2
+ [ 	]+6c:[ 	]+08c5f533[ 	]+packh[ 	]+a0,a1,a2
+ [ 	]+70:[ 	]+68c5d533[ 	]+grev[ 	]+a0,a1,a2
+-[ 	]+74:[ 	]+6825d513[ 	]+grevi[ 	]+a0,a1,0x2
++[ 	]+74:[ 	]+6825d513[ 	]+rev2.n[ 	]+a0,a1
+ [ 	]+78:[ 	]+28c5d533[ 	]+gorc[ 	]+a0,a1,a2
+-[ 	]+7c:[ 	]+2825d513[ 	]+gorci[ 	]+a0,a1,0x2
++[ 	]+7c:[ 	]+2825d513[ 	]+orc2.n[ 	]+a0,a1
+ [ 	]+80:[ 	]+08c59533[ 	]+shfl[ 	]+a0,a1,a2
+-[ 	]+84:[ 	]+08259513[ 	]+shfli[ 	]+a0,a1,0x2
++[ 	]+84:[ 	]+08259513[ 	]+zip2.b[ 	]+a0,a1
+ [ 	]+88:[ 	]+08c5d533[ 	]+unshfl[ 	]+a0,a1,a2
+-[ 	]+8c:[ 	]+0825d513[ 	]+unshfli[ 	]+a0,a1,0x2
++[ 	]+8c:[ 	]+0825d513[ 	]+unzip2.b[ 	]+a0,a1
+ [ 	]+90:[ 	]+28c5a533[ 	]+xperm.n[ 	]+a0,a1,a2
+ [ 	]+94:[ 	]+28c5c533[ 	]+xperm.b[ 	]+a0,a1,a2
+ [ 	]+98:[ 	]+28c5e533[ 	]+xperm.h[ 	]+a0,a1,a2
+-- 
+2.33.0
+

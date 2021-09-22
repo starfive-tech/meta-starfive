@@ -1,0 +1,25 @@
+From 1a450f0c0489c69b0079923c6cc84445126880c8 Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Thu, 24 Jun 2021 15:12:30 +0800
+Subject: [PATCH 19/28] Fix orc2.n testcase
+
+---
+ gas/testsuite/gas/riscv/b-ext-64.d | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gas/testsuite/gas/riscv/b-ext-64.d b/gas/testsuite/gas/riscv/b-ext-64.d
+index 094ee2d554..eeb5087229 100755
+--- a/gas/testsuite/gas/riscv/b-ext-64.d
++++ b/gas/testsuite/gas/riscv/b-ext-64.d
+@@ -56,7 +56,7 @@ Disassembly of section .text:
+ [ 	]+b4:[ 	]+6825d53b[ 	]+grevw[ 	]+a0,a1,0x2
+ [ 	]+b8:[ 	]+6825d51b[ 	]+greviw[ 	]+a0,a1,0x2
+ [ 	]+bc:[ 	]+28c5d533[ 	]+gorc[ 	]+a0,a1,a2
+-[ 	]+c0:[ 	]+2825d513[ 	]+gorci[ 	]+a0,a1,0x2
++[ 	]+c0:[ 	]+2825d513[ 	]+orc2.n[ 	]+a0,a1
+ [ 	]+c4:[ 	]+2825d53b[ 	]+gorcw[ 	]+a0,a1,0x2
+ [ 	]+c8:[ 	]+2825d51b[ 	]+gorciw[ 	]+a0,a1,0x2
+ [ 	]+cc:[ 	]+08c59533[ 	]+shfl[ 	]+a0,a1,a2
+-- 
+2.33.0
+

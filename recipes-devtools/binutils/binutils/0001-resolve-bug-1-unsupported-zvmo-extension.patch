@@ -1,0 +1,25 @@
+From 7578dbdb2be0b6183b36303d115521ebae28f2f6 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 18 May 2021 18:05:37 -0700
+Subject: [PATCH 01/28] resolve bug#1: unsupported zvmo extension
+
+---
+ bfd/elfxx-riscv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 97ad51f865..0d5bec4762 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1597,7 +1597,7 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 
+ static const char * const riscv_std_z_ext_strtab[] =
+ {
+-  "zicsr", "zifencei", "zihintpause", NULL
++  "zicsr", "zifencei", "zihintpause", "zvamo", "zvlsseg", NULL
+ };
+ 
+ static const char * const riscv_std_s_ext_strtab[] =
+-- 
+2.33.0
+

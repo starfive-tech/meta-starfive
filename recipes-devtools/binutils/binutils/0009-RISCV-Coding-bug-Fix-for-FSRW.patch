@@ -1,0 +1,25 @@
+From 85e66e4e2dbcb44c17f00833cf0abfc338ced168 Mon Sep 17 00:00:00 2001
+From: LevyHsu <admin@levyhsu.com>
+Date: Thu, 10 Jun 2021 15:45:29 +0800
+Subject: [PATCH 09/28] [RISCV] Coding bug Fix for FSRW
+
+---
+ include/opcode/riscv-opc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 8a25e90f65..5bc9345178 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -657,7 +657,7 @@
+ #define MASK_GREVIW  0xfe00707f
+ #define MATCH_FSLW 0x400103b
+ #define MASK_FSLW  0x600707f
+-#define MATCH_FSRW 0x400303b
++#define MATCH_FSRW 0x400503B
+ #define MASK_FSRW  0x600707f
+ #define MATCH_FSRIW 0x400301b
+ #define MASK_FSRIW  0x600707f
+-- 
+2.33.0
+
