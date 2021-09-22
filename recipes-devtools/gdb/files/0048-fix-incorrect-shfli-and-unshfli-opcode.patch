@@ -1,0 +1,28 @@
+From 121340d222814e74833c6cce8be887c20af20769 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 30 Jun 2021 23:19:07 -0700
+Subject: [PATCH 48/48] fix incorrect shfli and unshfli opcode
+
+---
+ include/opcode/riscv-opc.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index d481d5e2e6..12cc31ec45 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -308,9 +308,9 @@
+ #define MATCH_BFP 0x48007033
+ #define MASK_BFP  0xfe00707f
+ #define MATCH_SHFLI 0x8001013
+-#define MASK_SHFLI  0xfe00707f
++#define MASK_SHFLI  0xfc00707f
+ #define MATCH_UNSHFLI 0x8005013
+-#define MASK_UNSHFLI  0xfe00707f
++#define MASK_UNSHFLI  0xfc00707f
+ #define MATCH_BMATFLIP 0x60301013
+ #define MASK_BMATFLIP  0xfff0707f
+ #define MATCH_CRC32_D 0x61301013
+-- 
+2.33.0
+

@@ -1,0 +1,134 @@
+From aefce8023a15dad4835317dbc26c5e8bf93061f2 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Mon, 6 Jul 2020 15:31:05 +0800
+Subject: [PATCH 17/48] Added reciprocal and reciprocal square-root estimate
+ instruction.
+
+Add new instruction vfrsqrte7.v and vfrece7.v.  The former set VFUNARY1 (vs1)
+to 00100, and the later set VFUNARY1 to 00101.
+---
+ gas/testsuite/gas/riscv/vector-insns.d |  8 ++++++--
+ gas/testsuite/gas/riscv/vector-insns.s |  9 ++++++---
+ include/opcode/riscv-opc.h             | 15 ++++++++++-----
+ opcodes/riscv-opc.c                    |  5 +++--
+ 4 files changed, 25 insertions(+), 12 deletions(-)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index 99eb5abf70..8909e822a0 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -2168,6 +2168,12 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+fc865257[ 	]+vfwnmsac.vf[ 	]+v4,fa2,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+4e801257[ 	]+vfsqrt.v[ 	]+v4,v8
+ [ 	]+[0-9a-f]+:[ 	]+4c801257[ 	]+vfsqrt.v[ 	]+v4,v8,v0.t
++[ 	]+[0-9a-f]+:[ 	]+4e821257[ 	]+vfrsqrte7.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+4c821257[ 	]+vfrsqrte7.v[ 	]+v4,v8,v0.t
++[ 	]+[0-9a-f]+:[ 	]+4e829257[ 	]+vfrece7.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+4c829257[ 	]+vfrece7.v[ 	]+v4,v8,v0.t
++[ 	]+[0-9a-f]+:[ 	]+4e881257[ 	]+vfclass.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+4c881257[ 	]+vfclass.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+12861257[ 	]+vfmin.vv[ 	]+v4,v8,v12
+ [ 	]+[0-9a-f]+:[ 	]+12865257[ 	]+vfmin.vf[ 	]+v4,v8,fa2
+ [ 	]+[0-9a-f]+:[ 	]+1a861257[ 	]+vfmax.vv[ 	]+v4,v8,v12
+@@ -2212,8 +2218,6 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+64865257[ 	]+vmfle.vf[ 	]+v4,v8,fa2,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+74865257[ 	]+vmfgt.vf[ 	]+v4,v8,fa2,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+7c865257[ 	]+vmfge.vf[ 	]+v4,v8,fa2,v0.t
+-[ 	]+[0-9a-f]+:[ 	]+4e881257[ 	]+vfclass.v[ 	]+v4,v8
+-[ 	]+[0-9a-f]+:[ 	]+4c881257[ 	]+vfclass.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+5c865257[ 	]+vfmerge.vfm[ 	]+v4,v8,fa2,v0
+ [ 	]+[0-9a-f]+:[ 	]+5e05d257[ 	]+vfmv.v.f[ 	]+v4,fa1
+ [ 	]+[0-9a-f]+:[ 	]+4a801257[ 	]+vfcvt.xu.f.v[ 	]+v4,v8
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index 3b489685c9..39da92bab7 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -2474,6 +2474,12 @@
+ 
+ 	vfsqrt.v v4, v8
+ 	vfsqrt.v v4, v8, v0.t
++	vfrsqrte7.v v4, v8
++	vfrsqrte7.v v4, v8, v0.t
++	vfrece7.v v4, v8
++	vfrece7.v v4, v8, v0.t
++	vfclass.v v4, v8
++	vfclass.v v4, v8, v0.t
+ 
+ 	vfmin.vv v4, v8, v12
+ 	vfmin.vf v4, v8, fa2
+@@ -2524,9 +2530,6 @@
+ 	vmfgt.vf v4, v8, fa2, v0.t
+ 	vmfge.vf v4, v8, fa2, v0.t
+ 
+-	vfclass.v v4, v8
+-	vfclass.v v4, v8, v0.t
+-
+ 	vfmerge.vfm v4, v8, fa2, v0
+ 	vfmv.v.f v4, fa1
+ 
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 71eb770f5a..2da0574cc0 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -1950,6 +1950,8 @@ vs1
+ VFUNARY1
+ vs1
+ 00000 vfsqrt.v
++00100 vfrsqrte7.v
++00101 vfrece7.v
+ 10000 vfclass.v
+ 
+ 31-26 25 24-20   19-15     14-12 11-7 6-0
+@@ -2441,8 +2443,14 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define MATCH_VFWNMSACVF 0xfc005057
+ #define MASK_VFWNMSACVF  0xfc00707f
+ 
+-#define MATCH_VFSQRTV 0x4c001057
+-#define MASK_VFSQRTV  0xfc0ff07f
++#define MATCH_VFSQRTV    0x4c001057
++#define MASK_VFSQRTV     0xfc0ff07f
++#define MATCH_VFRSQRTE7V 0x4c021057
++#define MASK_VFRSQRTE7V  0xfc0ff07f
++#define MATCH_VFRECE7V   0x4c029057
++#define MASK_VFRECE7V    0xfc0ff07f
++#define MATCH_VFCLASSV   0x4c081057
++#define MASK_VFCLASSV    0xfc0ff07f
+ 
+ #define MATCH_VFMINVV  0x10001057
+ #define MASK_VFMINVV   0xfc00707f
+@@ -2487,9 +2495,6 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define MATCH_VMFGEVF  0x7c005057
+ #define MASK_VMFGEVF   0xfc00707f
+ 
+-#define MATCH_VFCLASSV 0x4c081057
+-#define MASK_VFCLASSV  0xfc0ff07f
+-
+ #define MATCH_VFMERGEVFM 0x5c005057
+ #define MASK_VFMERGEVFM  0xfe00707f
+ #define MATCH_VFMVVF     0x5e005057
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 66c3046150..cb89f59208 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1875,6 +1875,9 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vfwnmsac.vf", 0, INSN_CLASS_V_AND_F, "Vd,S,VtVm", MATCH_VFWNMSACVF, MASK_VFWNMSACVF, match_widen_vd_neq_vs2_neq_vm, 0},
+ 
+ {"vfsqrt.v",   0, INSN_CLASS_V_AND_F, "Vd,VtVm", MATCH_VFSQRTV, MASK_VFSQRTV, match_opcode, 0},
++{"vfrsqrte7.v",0, INSN_CLASS_V_AND_F, "Vd,VtVm", MATCH_VFRSQRTE7V, MASK_VFRSQRTE7V, match_opcode, 0},
++{"vfrece7.v",  0, INSN_CLASS_V_AND_F, "Vd,VtVm", MATCH_VFRECE7V, MASK_VFRECE7V, match_opcode, 0},
++{"vfclass.v",  0, INSN_CLASS_V_AND_F, "Vd,VtVm", MATCH_VFCLASSV, MASK_VFCLASSV, match_opcode, 0},
+ 
+ {"vfmin.vv",   0, INSN_CLASS_V_AND_F, "Vd,Vt,VsVm", MATCH_VFMINVV, MASK_VFMINVV, match_opcode, 0},
+ {"vfmin.vf",   0, INSN_CLASS_V_AND_F, "Vd,Vt,SVm", MATCH_VFMINVF, MASK_VFMINVF, match_opcode, 0},
+@@ -1903,8 +1906,6 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vmfgt.vv",    0, INSN_CLASS_V_AND_F, "Vd,Vs,VtVm", MATCH_VMFLTVV, MASK_VMFLTVV, match_opcode, INSN_ALIAS},
+ {"vmfge.vv",   0, INSN_CLASS_V_AND_F, "Vd,Vs,VtVm", MATCH_VMFLEVV, MASK_VMFLEVV, match_opcode, INSN_ALIAS},
+ 
+-{"vfclass.v",  0, INSN_CLASS_V_AND_F, "Vd,VtVm", MATCH_VFCLASSV, MASK_VFCLASSV, match_opcode, 0},
+-
+ {"vfmerge.vfm",0, INSN_CLASS_V_AND_F, "Vd,Vt,S,V0", MATCH_VFMERGEVFM, MASK_VFMERGEVFM, match_opcode, 0},
+ {"vfmv.v.f",   0, INSN_CLASS_V_AND_F, "Vd,S", MATCH_VFMVVF, MASK_VFMVVF, match_opcode, 0 },
+ 
+-- 
+2.33.0
+

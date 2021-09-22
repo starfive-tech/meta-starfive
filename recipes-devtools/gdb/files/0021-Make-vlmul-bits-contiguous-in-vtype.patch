@@ -1,0 +1,157 @@
+From 3013bd5c37a680dfafd903b0bb06c5c8ad31ce7f Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Wed, 22 Jul 2020 10:38:15 +0800
+Subject: [PATCH 21/48] Make vlmul bits contiguous in vtype.
+
+---
+ gas/config/tc-riscv.c                  |  6 +++---
+ gas/testsuite/gas/riscv/insn.d         |  4 ++--
+ gas/testsuite/gas/riscv/vector-insns.d | 30 +++++++++++++-------------
+ include/opcode/riscv.h                 | 21 ++++++------------
+ opcodes/riscv-dis.c                    |  2 +-
+ 5 files changed, 27 insertions(+), 36 deletions(-)
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 222214d7e4..67353ab725 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -1880,11 +1880,11 @@ my_getVsetvliExpression (expressionS *ep, char *str)
+   if (vsew_found || vlmul_found || vediv_found || vta_found || vma_found)
+     {
+       ep->X_op = O_constant;
+-      ep->X_add_number = (vediv_value << OP_SH_VEDIV)
++      ep->X_add_number = (vlmul_value << OP_SH_VLMUL)
+ 			 | (vsew_value << OP_SH_VSEW)
+ 			 | (vta_value << OP_SH_VTA)
+-			 | (vma_value << OP_SH_VMA) ;
+-      INSERT_VLMUL (ep->X_add_number, vlmul_value);
++			 | (vma_value << OP_SH_VMA)
++			 | (vediv_value << OP_SH_VEDIV);
+       expr_end = str;
+     }
+   else
+diff --git a/gas/testsuite/gas/riscv/insn.d b/gas/testsuite/gas/riscv/insn.d
+index 9d417b0794..e55f21c179 100644
+--- a/gas/testsuite/gas/riscv/insn.d
++++ b/gas/testsuite/gas/riscv/insn.d
+@@ -122,8 +122,8 @@ Disassembly of section .text:
+ [^:]+:[ 	]+00d655d7[ 	]+vfadd.vf[ 	]+v11,v13,fa2,v0.t
+ [^:]+:[ 	]+38d665d7[ 	]+vslide1up.vx[ 	]+v11,v13,a2,v0.t
+ [^:]+:[ 	]+3cd665d7[ 	]+vslide1down.vx[ 	]+v11,v13,a2,v0.t
+-[^:]+:[ 	]+00d675d7[ 	]+vsetvli[ 	]+a1,a2,e64,m2,tu,mu,d1
+-[^:]+:[ 	]+00d675d7[ 	]+vsetvli[ 	]+a1,a2,e64,m2,tu,mu,d1
++[^:]+:[ 	]+00d675d7[ 	]+vsetvli[ 	]+a1,a2,e16,mf8,tu,mu,d1
++[^:]+:[ 	]+00d675d7[ 	]+vsetvli[ 	]+a1,a2,e16,mf8,tu,mu,d1
+ [^:]+:[ 	]+00d035d7[ 	]+vadd.vi[ 	]+v11,v13,0,v0.t
+ [^:]+:[ 	]+00d0b5d7[ 	]+vadd.vi[ 	]+v11,v13,1,v0.t
+ [^:]+:[ 	]+00d7b5d7[ 	]+vadd.vi[ 	]+v11,v13,15,v0.t
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index 8ac80fba1b..24a559cee5 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -10,22 +10,22 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+80c5f557[ 	]+vsetvl[ 	]+a0,a1,a2
+ [ 	]+[0-9a-f]+:[ 	]+0005f557[ 	]+vsetvli[ 	]+a0,a1,e8,m1,tu,mu,d1
+ [ 	]+[0-9a-f]+:[ 	]+7ff5f557[ 	]+vsetvli[ 	]+a0,a1,2047
+-[ 	]+[0-9a-f]+:[ 	]+2055f557[ 	]+vsetvli[ 	]+a0,a1,e16,m2,tu,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+3175f557[ 	]+vsetvli[ 	]+a0,a1,e256,m8,tu,mu,d8
+-[ 	]+[0-9a-f]+:[ 	]+31b5f557[ 	]+vsetvli[ 	]+a0,a1,e512,m8,tu,mu,d8
+-[ 	]+[0-9a-f]+:[ 	]+31f5f557[ 	]+vsetvli[ 	]+a0,a1,e1024,m8,tu,mu,d8
+-[ 	]+[0-9a-f]+:[ 	]+31c5f557[ 	]+vsetvli[ 	]+a0,a1,e1024,m1,tu,mu,d8
++[ 	]+[0-9a-f]+:[ 	]+2095f557[ 	]+vsetvli[ 	]+a0,a1,e16,m2,tu,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+32b5f557[ 	]+vsetvli[ 	]+a0,a1,e256,m8,tu,mu,d8
++[ 	]+[0-9a-f]+:[ 	]+3335f557[ 	]+vsetvli[ 	]+a0,a1,e512,m8,tu,mu,d8
++[ 	]+[0-9a-f]+:[ 	]+33b5f557[ 	]+vsetvli[ 	]+a0,a1,e1024,m8,tu,mu,d8
++[ 	]+[0-9a-f]+:[ 	]+3385f557[ 	]+vsetvli[ 	]+a0,a1,e1024,m1,tu,mu,d8
+ [ 	]+[0-9a-f]+:[ 	]+33f5f557[ 	]+vsetvli[ 	]+a0,a1,e1024,mf2,tu,mu,d8
+-[ 	]+[0-9a-f]+:[ 	]+13a5f557[ 	]+vsetvli[ 	]+a0,a1,e512,mf4,tu,mu,d2
+-[ 	]+[0-9a-f]+:[ 	]+2355f557[ 	]+vsetvli[ 	]+a0,a1,e256,mf8,tu,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+2555f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+2955f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,ma,d4
+-[ 	]+[0-9a-f]+:[ 	]+2155f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+2155f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+2d55f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,ma,d4
+-[ 	]+[0-9a-f]+:[ 	]+2955f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,ma,d4
+-[ 	]+[0-9a-f]+:[ 	]+2555f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,mu,d4
+-[ 	]+[0-9a-f]+:[ 	]+2155f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+1365f557[ 	]+vsetvli[ 	]+a0,a1,e512,mf4,tu,mu,d2
++[ 	]+[0-9a-f]+:[ 	]+22d5f557[ 	]+vsetvli[ 	]+a0,a1,e256,mf8,tu,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+2695f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+2a95f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,ma,d4
++[ 	]+[0-9a-f]+:[ 	]+2295f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+2295f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+2e95f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,ma,d4
++[ 	]+[0-9a-f]+:[ 	]+2a95f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,ma,d4
++[ 	]+[0-9a-f]+:[ 	]+2695f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,ta,mu,d4
++[ 	]+[0-9a-f]+:[ 	]+2295f557[ 	]+vsetvli[ 	]+a0,a1,e256,m2,tu,mu,d4
+ [ 	]+[0-9a-f]+:[ 	]+02050207[ 	]+vle8.v[ 	]+v4,\(a0\)
+ [ 	]+[0-9a-f]+:[ 	]+02050207[ 	]+vle8.v[ 	]+v4,\(a0\)
+ [ 	]+[0-9a-f]+:[ 	]+00050207[ 	]+vle8.v[ 	]+v4,\(a0\),v0.t
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 62049bdd23..b1d3c068db 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -310,18 +310,18 @@ static const char * const riscv_vma[2] =
+ #define OP_MASK_VFUNCT6		0x3f
+ #define OP_SH_VFUNCT6		26
+ 
+-#define OP_MASK_VLMUL		0x23
++#define OP_MASK_VLMUL		0x7
+ #define OP_SH_VLMUL		0
+ #define OP_MASK_VSEW		0x7
+-#define OP_SH_VSEW		2
+-#define OP_MASK_VEDIV		0x3
+-#define OP_SH_VEDIV		8
+-#define OP_MASK_VTYPE_RES	0x1
+-#define OP_SH_VTYPE_RES		10
++#define OP_SH_VSEW		3
+ #define OP_MASK_VTA		0x1
+ #define OP_SH_VTA		6
+ #define OP_MASK_VMA		0x1
+ #define OP_SH_VMA		7
++#define OP_MASK_VEDIV		0x3
++#define OP_SH_VEDIV		8
++#define OP_MASK_VTYPE_RES	0x1
++#define OP_SH_VTYPE_RES 	10
+ 
+ #define OP_MASK_VWD		0x1
+ #define OP_SH_VWD		26
+@@ -354,10 +354,6 @@ static const char * const riscv_vma[2] =
+   (STRUCT) = (((STRUCT) & ~((insn_t)(MASK) << (SHIFT))) \
+ 	      | ((insn_t)((VALUE) & (MASK)) << (SHIFT)))
+ 
+-#define INSERT_VLMUL(STRUCT, VALUE) \
+-  INSERT_BITS (STRUCT, (VALUE & 0x3), (OP_MASK_VLMUL & 0x3), 0), \
+-  INSERT_BITS (STRUCT, (((VALUE & 0x4) >> 2) <<5), (OP_MASK_VLMUL & 0x20), 0)
+-
+ /* Extract bits MASK << SHIFT from STRUCT and shift them right
+    SHIFT places.  */
+ #define EXTRACT_BITS(STRUCT, MASK, SHIFT) \
+@@ -367,11 +363,6 @@ static const char * const riscv_vma[2] =
+ #define EXTRACT_OPERAND(FIELD, INSN) \
+   EXTRACT_BITS ((INSN), OP_MASK_##FIELD, OP_SH_##FIELD)
+ 
+-/* Extract the vlmul value from vsetvli instrucion.  */
+-#define EXTRACT_VLMUL(INSN) \
+-  (((EXTRACT_OPERAND (VLMUL, INSN) >> 5) << 2) \
+-   | (EXTRACT_OPERAND (VLMUL, INSN) & 0x3))
+-
+ /* The maximal number of subset can be required. */
+ #define MAX_SUBSET_NUM 4
+ 
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 25e0a93e88..875b69a1da 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -439,7 +439,7 @@ print_insn_args (const char *d, insn_t l, bfd_vma pc, disassemble_info *info)
+ 	    case 'c':
+ 	      {
+ 		int imm = EXTRACT_RVV_VC_IMM (l);
+-		unsigned int imm_vlmul = EXTRACT_VLMUL (imm);
++		unsigned int imm_vlmul = EXTRACT_OPERAND (VLMUL, imm);
+ 		unsigned int imm_vsew = EXTRACT_OPERAND (VSEW, imm);
+ 		unsigned int imm_vediv = EXTRACT_OPERAND (VEDIV, imm);
+ 		unsigned int imm_vta = EXTRACT_OPERAND (VTA, imm);
+-- 
+2.33.0
+

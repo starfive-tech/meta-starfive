@@ -1,0 +1,166 @@
+From 786771070f564a133c536e05939eb51b546dc02d Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Mon, 23 Nov 2020 11:34:34 +0800
+Subject: [PATCH 31/48] RISC-V: Add assembly pseudoinstructions, vneg.v and
+ vfneg.v.
+
+vneg.v vd,vs = vrsub.vx vd,vs,x0
+vfneg.v vd,vs = vfsgnjn.vv vd,vs,vs
+---
+ .../riscv/vector-insns-fail-arith-floatp.l    |  1 +
+ .../riscv/vector-insns-fail-arith-floatp.s    |  3 +++
+ .../gas/riscv/vector-insns-fail-arith-int.l   |  1 +
+ .../gas/riscv/vector-insns-fail-arith-int.s   |  3 +++
+ gas/testsuite/gas/riscv/vector-insns.d        |  4 +++
+ gas/testsuite/gas/riscv/vector-insns.s        |  6 +++++
+ opcodes/riscv-opc.c                           | 25 +++++++++++++++++++
+ 7 files changed, 43 insertions(+)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.l b/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.l
+index c55c7d24cd..bcc49a0908 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.l
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.l
+@@ -33,6 +33,7 @@
+ .*Error: illegal operands vd cannot overlap vm `vfmin.vf v0,v4,fa1,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vfmax.vv v0,v4,v8,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vfmax.vf v0,v4,fa1,v0.t'
++.*Error: illegal operands vd cannot overlap vm `vfneg.v v0,v4,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vfsgnj.vv v0,v4,v8,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vfsgnj.vf v0,v4,fa1,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vfsgnjn.vv v0,v4,v8,v0.t'
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.s b/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.s
+index 3231c35ada..a48b1a3fd3 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.s
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-arith-floatp.s
+@@ -118,6 +118,9 @@
+ 
+ # Vector Floating-Point Sign-Injection Instructions
+ 
++	vfneg.v v4, v4			# OK
++	vfneg.v v0, v4, v0.t		# vd overlap vm
++
+ 	vfsgnj.vv v4, v4, v8		# OK
+ 	vfsgnj.vv v8, v4, v8		# OK
+ 	vfsgnj.vv v0, v4, v8, v0.t	# vd overlap vm
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.l b/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.l
+index 3b1d780fa4..5c9016dd4c 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.l
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.l
+@@ -1,4 +1,5 @@
+ .*: Assembler messages:
++.*Error: illegal operands vd cannot overlap vm `vneg.v v0,v4,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vadd.vv v0,v4,v8,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vadd.vx v0,v4,a1,v0.t'
+ .*Error: illegal operands vd cannot overlap vm `vadd.vi v0,v4,15,v0.t'
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.s b/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.s
+index e014125c29..6ce4e420c7 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.s
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-arith-int.s
+@@ -1,5 +1,8 @@
+ # Vector Single-Width Integer Add and Subtract
+ 
++	vneg.v v4, v4			# OK
++	vneg.v v0, v4, v0.t		# vd overlap vm
++
+ 	vadd.vv v4, v4, v8		# OK
+ 	vadd.vv v8, v4, v8		# OK
+ 	vadd.vv v0, v4, v8, v0.t	# vd overlap vm
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index 24a559cee5..29a38b3716 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -1726,6 +1726,8 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+e285f22f[ 	]+vamomaxuei64.v[ 	]+zero,\(a1\),v8,v4
+ [ 	]+[0-9a-f]+:[ 	]+e485f22f[ 	]+vamomaxuei64.v[ 	]+v4,\(a1\),v8,v4,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+e085f22f[ 	]+vamomaxuei64.v[ 	]+zero,\(a1\),v8,v4,v0.t
++[ 	]+[0-9a-f]+:[ 	]+0e804257[ 	]+vneg.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+0c804257[ 	]+vneg.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+02860257[ 	]+vadd.vv[ 	]+v4,v8,v12
+ [ 	]+[0-9a-f]+:[ 	]+0285c257[ 	]+vadd.vx[ 	]+v4,v8,a1
+ [ 	]+[0-9a-f]+:[ 	]+0287b257[ 	]+vadd.vi[ 	]+v4,v8,15
+@@ -2246,6 +2248,8 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+10865257[ 	]+vfmin.vf[ 	]+v4,v8,fa2,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+18861257[ 	]+vfmax.vv[ 	]+v4,v8,v12,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+18865257[ 	]+vfmax.vf[ 	]+v4,v8,fa2,v0.t
++[ 	]+[0-9a-f]+:[ 	]+26841257[ 	]+vfneg.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+24841257[ 	]+vfneg.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+22861257[ 	]+vfsgnj.vv[ 	]+v4,v8,v12
+ [ 	]+[0-9a-f]+:[ 	]+22865257[ 	]+vfsgnj.vf[ 	]+v4,v8,fa2
+ [ 	]+[0-9a-f]+:[ 	]+26861257[ 	]+vfsgnjn.vv[ 	]+v4,v8,v12
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index afec58c03b..b78604025a 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -1999,6 +1999,9 @@
+ 	vamomaxuei64.v v4, 0(a1), v8, v4, v0.t
+ 	vamomaxuei64.v x0, 0(a1), v8, v4, v0.t
+ 
++	vneg.v v4, v8
++	vneg.v v4, v8, v0.t
++
+ 	vadd.vv v4, v8, v12
+ 	vadd.vx v4, v8, a1
+ 	vadd.vi v4, v8, 15
+@@ -2557,6 +2560,9 @@
+ 	vfmax.vv v4, v8, v12, v0.t
+ 	vfmax.vf v4, v8, fa2, v0.t
+ 
++	vfneg.v v4, v8
++	vfneg.v v4, v8, v0.t
++
+ 	vfsgnj.vv v4, v8, v12
+ 	vfsgnj.vf v4, v8, fa2
+ 	vfsgnjn.vv v4, v8, v12
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index af3d787fe6..e0383d08e9 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -138,6 +138,27 @@ match_vs1_eq_vs2 (const struct riscv_opcode *op,
+   return match_opcode (op, insn, 0, NULL) && vs1 == vs2;
+ }
+ 
++static int
++match_vs1_eq_vs2_neq_vm (const struct riscv_opcode *op,
++			 insn_t insn,
++			 int constraints,
++			 const char **error)
++{
++  int vd = (insn & MASK_VD) >> OP_SH_VD;
++  int vs1 = (insn & MASK_VS1) >> OP_SH_VS1;
++  int vs2 = (insn & MASK_VS2) >> OP_SH_VS2;
++  int vm = (insn & MASK_VMASK) >> OP_SH_VMASK;
++
++  if (!constraints || error == NULL)
++    return match_opcode (op, insn, 0, NULL) && vs1 == vs2;
++
++  if (!vm && vm == vd)
++    *error = "illegal operands vd cannot overlap vm";
++  else
++    return match_opcode (op, insn, 0, NULL) && vs1 == vs2;
++  return 0;
++}
++
+ static int
+ match_vd_eq_vs1_eq_vs2 (const struct riscv_opcode *op,
+ 			insn_t insn,
+@@ -1819,6 +1840,8 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vamominuei64.v",  0, INSN_CLASS_V_OR_ZVAMO,  "Ve,0(s),Vt,VfVm", MATCH_VAMOMINUEI64V, MASK_VAMOMINUEI64V, match_vd_neq_vm, INSN_DREF},
+ {"vamomaxuei64.v",  0, INSN_CLASS_V_OR_ZVAMO,  "Ve,0(s),Vt,VfVm", MATCH_VAMOMAXUEI64V, MASK_VAMOMAXUEI64V, match_vd_neq_vm, INSN_DREF},
+ 
++{"vneg.v",     0, INSN_CLASS_V,  "Vd,VtVm",  MATCH_VRSUBVX, MASK_VRSUBVX | MASK_RS1, match_vd_neq_vm, INSN_ALIAS },
++
+ {"vadd.vv",    0, INSN_CLASS_V,  "Vd,Vt,VsVm", MATCH_VADDVV, MASK_VADDVV, match_vd_neq_vm, 0 },
+ {"vadd.vx",    0, INSN_CLASS_V,  "Vd,Vt,sVm", MATCH_VADDVX, MASK_VADDVX, match_vd_neq_vm, 0 },
+ {"vadd.vi",    0, INSN_CLASS_V,  "Vd,Vt,ViVm", MATCH_VADDVI, MASK_VADDVI, match_vd_neq_vm, 0 },
+@@ -2103,6 +2126,8 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vfmax.vv",   0, INSN_CLASS_V_AND_F, "Vd,Vt,VsVm", MATCH_VFMAXVV, MASK_VFMAXVV, match_vd_neq_vm, 0},
+ {"vfmax.vf",   0, INSN_CLASS_V_AND_F, "Vd,Vt,SVm", MATCH_VFMAXVF, MASK_VFMAXVF, match_vd_neq_vm, 0},
+ 
++{"vfneg.v",    0, INSN_CLASS_V_AND_F, "Vd,VuVm", MATCH_VFSGNJNVV, MASK_VFSGNJNVV, match_vs1_eq_vs2_neq_vm, INSN_ALIAS },
++
+ {"vfsgnj.vv",  0, INSN_CLASS_V_AND_F, "Vd,Vt,VsVm", MATCH_VFSGNJVV, MASK_VFSGNJVV, match_vd_neq_vm, 0},
+ {"vfsgnj.vf",  0, INSN_CLASS_V_AND_F, "Vd,Vt,SVm", MATCH_VFSGNJVF, MASK_VFSGNJVF, match_vd_neq_vm, 0},
+ {"vfsgnjn.vv", 0, INSN_CLASS_V_AND_F, "Vd,Vt,VsVm", MATCH_VFSGNJNVV, MASK_VFSGNJNVV, match_vd_neq_vm, 0},
+-- 
+2.33.0
+

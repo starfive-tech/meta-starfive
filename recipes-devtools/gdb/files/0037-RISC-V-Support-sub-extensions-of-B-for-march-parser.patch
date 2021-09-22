@@ -1,0 +1,70 @@
+From 9a13033a9799982d53f47f853f8322ce6ed8246e Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Tue, 3 Nov 2020 01:28:01 -0800
+Subject: [PATCH 37/48] RISC-V: Support sub-extensions of B for -march parser
+
+---
+ bfd/elfxx-riscv.c                                 |  1 +
+ gas/testsuite/gas/riscv/attribute-15-unratified.d |  4 ++--
+ opcodes/riscv-opc.c                               | 13 +++++++++++++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 67dbc2e682..75add5be1c 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1567,6 +1567,7 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ static const char * const riscv_std_z_ext_strtab[] =
+ {
+   "zicsr", "zifencei", "zfh",
++  "zba", "zbb", "zbc", "zbe", "zbf", "zbm", "zbp", "zbr", "zbs", "zbt",
+   "zvamo", "zvediv", "zvlsseg", "zvqmac",
+   NULL
+ };
+diff --git a/gas/testsuite/gas/riscv/attribute-15-unratified.d b/gas/testsuite/gas/riscv/attribute-15-unratified.d
+index 09d64edbe6..4645762bd6 100644
+--- a/gas/testsuite/gas/riscv/attribute-15-unratified.d
++++ b/gas/testsuite/gas/riscv/attribute-15-unratified.d
+@@ -1,6 +1,6 @@
+-#as: -march-attr -march=rv32ifv_zvamo_zvediv_zvlsseg_zvqmac
++#as: -march-attr -march=rv32ibv_zfh_zba_zbb_zbc_zbe_zbf_zbm_zbp_zbr_zbs_zbt_zvamo_zvediv_zvlsseg_zvqmac
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: ".*_v1p0_zvamo1p0_zvediv1p0_zvlsseg1p0_zvqmac1p0"
++  Tag_RISCV_arch: ".*_b0p92_v1p0_zfh0p1_zba0p92_zbb0p92_zbc0p92_zbe0p92_zbf0p92_zbm0p92_zbp0p92_zbr0p92_zbs0p92_zbt0p92_zvamo1p0_zvediv1p0_zvlsseg1p0_zvqmac1p0"
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 1869f545cf..bf36ada39c 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -2758,6 +2758,8 @@ const struct riscv_ext_version riscv_ext_version_table[] =
+ {"c", ISA_SPEC_CLASS_20190608, 2, 0},
+ {"c", ISA_SPEC_CLASS_2P2,      2, 0},
+ 
++{"b", ISA_SPEC_CLASS_NONE,     0, 92},
++
+ {"v", ISA_SPEC_CLASS_NONE,     1, 0},
+ 
+ {"zicsr", ISA_SPEC_CLASS_20191213, 2, 0},
+@@ -2768,6 +2770,17 @@ const struct riscv_ext_version riscv_ext_version_table[] =
+ 
+ {"zfh", ISA_SPEC_CLASS_NONE, 0, 1},
+ 
++{"zba", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbb", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbc", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbe", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbf", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbm", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbp", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbr", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbs", ISA_SPEC_CLASS_NONE, 0, 92},
++{"zbt", ISA_SPEC_CLASS_NONE, 0, 92},
++
+ {"zvamo",   ISA_SPEC_CLASS_NONE, 1, 0},
+ {"zvediv",  ISA_SPEC_CLASS_NONE, 1, 0},
+ {"zvlsseg", ISA_SPEC_CLASS_NONE, 1, 0},
+-- 
+2.33.0
+

@@ -1,0 +1,864 @@
+From 5b427d5371e8b33f4cdbfae6d16f339ed94c521e Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 20 Nov 2020 17:26:04 +0800
+Subject: [PATCH 08/48] RISC-V: Improve the version parsing for arch string.
+
+Keep the riscv_add_subset to do the same thing, and use a new
+function, riscv_parse_add_subset, to cover most of the things
+when parsing, including find the default versions for extensions,
+and check whether the versions are valid.  The version 0p0 should
+be an invalid version, that is the mistake I made before.  This
+patch clarify the version rules as follows,
+
+* We accept any version of extensions set by users, except 0p0.
+* The non-standard x extensions must be set with versions in arch string.
+* If user don't set the versions, or set 0p0 for the extensions, then try
+  to find the supported versions according to the chosen ISA spec.
+  Otherwise, report errors rather than output 0p0 for them.
+
+Besides, we use as_bad rather than as_fatal to report more errors
+for assembler.
+
+	bfd/
+	* elfxx-riscv.c (riscv_lookup_subset): Moved to front.
+	(riscv_add_subset): Likewise.
+	(riscv_release_subset_list): Likewise.
+	(riscv_parse_add_subset): New function.  Find and check the
+	versions before adding them by riscv_add_subset.
+	(riscv_parsing_subset_version): Remove use_default_version
+	and change the version type from unsigned to int.  Set the
+	versions to RISCV_UNKNOWN_VERSION if we can not find them
+	in the arch string.
+	(riscv_parse_std_ext): Updated.
+	(riscv_parse_prefixed_ext): Updated.  Since we use as_bad
+	rather than as_fatal to report more errors, return NULL
+	string if the parsed end_of_version is NULL, too.
+	(riscv_parse_subset): Use a new boolean, no_conflict, to
+	report more errors when we have more than one ISA conflicts.
+
+	* elfxx-riscv.h (RISCV_DONT_CARE_VERSION): Changed to
+	RISCV_UNKNOWN_VERSION.
+	(riscv_lookup_subset_version): Removed.
+	(riscv_parse_subset_t): Updated.
+
+	gas/
+	* config/tc-riscv.c (riscv_get_default_ext_version):
+	Change the version type from unsigned to int.
+	(riscv_set_arch): Use as_bad rather than as_fatal to
+	report more errors.
+
+	* testsuite/gas/riscv/attribute-02.d: Updated since x must be
+	set with versions.
+	* testsuite/gas/riscv/attribute-03.d: Likewise.
+	* testsuite/gas/riscv/march-ok-two-nse.d: Likewise.
+	* testsuite/gas/riscv/attribute-09.d: zicsr wasn't supported
+	in the spec 2.2, so choose the newer spec.
+	* testsuite/gas/riscv/march-fail-base-01.l: Updated since as_bad.
+	* testsuite/gas/riscv/march-fail-base-02.l: Likewise.
+	* testsuite/gas/riscv/march-fail-order-std.l: Likewise.
+	* testsuite/gas/riscv/march-fail-order-x.l: Likewise.
+	* testsuite/gas/riscv/march-fail-order-z.l: Likewise.
+	* testsuite/gas/riscv/march-fail-porder.l: Likewise.
+	* testsuite/gas/riscv/march-fail-rv32ef.l: Likewise.
+	* testsuite/gas/riscv/march-fail-rv32id.l: Likewise.
+	* testsuite/gas/riscv/march-fail-rv32iq.l: Likewise.
+	* testsuite/gas/riscv/march-fail-rv64iq.l: Likewise.
+	* testsuite/gas/riscv/march-fail-single-char.l: Likewise.
+	* testsuite/gas/riscv/march-fail-unknown-std.l: Likewise.
+	* testsuite/gas/riscv/march-fail-unknown.l: Likewise.
+	* testsuite/gas/riscv/march-fail-uppercase.l: Likewise.
+	* testsuite/gas/riscv/march-fail-version.l: Likewise.
+	* testsuite/gas/riscv/march-fail-isa-spec.d: Likewise.
+	* testsuite/gas/riscv/march-fail-isa-spec.l: Likewise.
+
+	include/
+	* opcode/riscv.h (riscv_ext_version):
+	Change the version type from unsigned to int.
+---
+ bfd/elfxx-riscv.c                             | 324 ++++++++----------
+ bfd/elfxx-riscv.h                             |  11 +-
+ gas/config/tc-riscv.c                         |  23 +-
+ gas/testsuite/gas/riscv/attribute-02.d        |   4 +-
+ gas/testsuite/gas/riscv/attribute-03.d        |   4 +-
+ gas/testsuite/gas/riscv/attribute-09.d        |   4 +-
+ gas/testsuite/gas/riscv/march-fail-base-01.l  |   2 +-
+ gas/testsuite/gas/riscv/march-fail-base-02.l  |   2 +-
+ gas/testsuite/gas/riscv/march-fail-isa-spec.d |   3 +
+ gas/testsuite/gas/riscv/march-fail-isa-spec.l |   5 +
+ .../gas/riscv/march-fail-order-std.l          |   2 +-
+ gas/testsuite/gas/riscv/march-fail-order-x.l  |   2 +-
+ gas/testsuite/gas/riscv/march-fail-order-z.l  |   2 +-
+ gas/testsuite/gas/riscv/march-fail-porder.l   |   2 +-
+ gas/testsuite/gas/riscv/march-fail-rv32ef.l   |   2 +-
+ gas/testsuite/gas/riscv/march-fail-rv32id.l   |   2 +-
+ gas/testsuite/gas/riscv/march-fail-rv32iq.l   |   3 +-
+ gas/testsuite/gas/riscv/march-fail-rv64iq.l   |   2 +-
+ .../gas/riscv/march-fail-single-char.l        |   2 +-
+ .../gas/riscv/march-fail-unknown-std.l        |   2 +-
+ gas/testsuite/gas/riscv/march-fail-unknown.l  |   2 +-
+ .../gas/riscv/march-fail-uppercase.l          |   2 +-
+ gas/testsuite/gas/riscv/march-fail-version.l  |   3 +-
+ gas/testsuite/gas/riscv/march-ok-two-nse.d    |   2 +-
+ include/opcode/riscv.h                        |   4 +-
+ 25 files changed, 193 insertions(+), 223 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-isa-spec.d
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-isa-spec.l
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 5a95c5cb6c..233f4e20d6 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1010,6 +1010,96 @@ riscv_elf_add_sub_reloc (bfd *abfd,
+   return bfd_reloc_ok;
+ }
+ 
++/* Find subset in list, return NULL if not found.  */
++
++riscv_subset_t *
++riscv_lookup_subset (const riscv_subset_list_t *subset_list,
++		     const char *subset)
++{
++  riscv_subset_t *s;
++
++  for (s = subset_list->head; s != NULL; s = s->next)
++    if (strcasecmp (s->name, subset) == 0)
++      return s;
++
++  return NULL;
++}
++
++/* Add extension to the subset list.  */
++
++void
++riscv_add_subset (riscv_subset_list_t *subset_list,
++		  const char *subset,
++		  int major,
++		  int minor)
++{
++  riscv_subset_t *s = xmalloc (sizeof *s);
++
++  if (subset_list->head == NULL)
++    subset_list->head = s;
++
++  s->name = xstrdup (subset);
++  s->major_version = major;
++  s->minor_version = minor;
++  s->next = NULL;
++
++  if (subset_list->tail != NULL)
++    subset_list->tail->next = s;
++  subset_list->tail = s;
++}
++
++/* Find the default versions for the extension before adding them to
++   the subset list, if their versions are RISCV_UNKNOWN_VERSION.
++   Afterwards, report errors if we can not find their default versions.  */
++
++static void
++riscv_parse_add_subset (riscv_parse_subset_t *rps,
++			const char *subset,
++			int major,
++			int minor)
++{
++  int major_version = major;
++  int minor_version = minor;
++
++  if ((major_version == RISCV_UNKNOWN_VERSION
++       || minor_version == RISCV_UNKNOWN_VERSION)
++      && rps->get_default_version != NULL)
++    rps->get_default_version (subset, &major_version, &minor_version);
++
++  if (major_version == RISCV_UNKNOWN_VERSION
++      || minor_version == RISCV_UNKNOWN_VERSION)
++    {
++      if (subset[0] == 'x')
++	rps->error_handler
++	  (_("x ISA extension `%s' must be set with the versions"),
++	   subset);
++      else
++	rps->error_handler
++	  (_("cannot find default versions of the ISA extension `%s'"),
++	   subset);
++      return;
++    }
++
++  riscv_add_subset (rps->subset_list, subset,
++		    major_version, minor_version);
++}
++
++/* Release subset list.  */
++
++void
++riscv_release_subset_list (riscv_subset_list_t *subset_list)
++{
++   while (subset_list->head != NULL)
++    {
++      riscv_subset_t *next = subset_list->head->next;
++      free ((void *)subset_list->head->name);
++      free (subset_list->head);
++      subset_list->head = next;
++    }
++
++  subset_list->tail = NULL;
++}
++
+ /* Parsing extension version.
+ 
+    Return Value:
+@@ -1019,25 +1109,20 @@ riscv_elf_add_sub_reloc (bfd *abfd,
+      `rps`: Hooks and status for parsing extensions.
+      `march`: Full arch string.
+      `p`: Curent parsing position.
+-     `major_version`: Parsing result of major version, using
+-      default_major_version if version is not present in arch string.
+-     `minor_version`: Parsing result of minor version, set to 0 if version is
+-     not present in arch string, but set to `default_minor_version` if
+-     `major_version` using default_major_version.
+-     `std_ext_p`: True if parsing std extension.
+-     `use_default_version`: Set it to True if we need the default version.  */
++     `major_version`: Parsed major version.
++     `minor_version`: Parsed minor version.
++     `std_ext_p`: True if parsing standard extension.  */
+ 
+ static const char *
+ riscv_parsing_subset_version (riscv_parse_subset_t *rps,
+ 			      const char *march,
+ 			      const char *p,
+-			      unsigned *major_version,
+-			      unsigned *minor_version,
+-			      bfd_boolean std_ext_p,
+-			      bfd_boolean *use_default_version)
++			      int *major_version,
++			      int *minor_version,
++			      bfd_boolean std_ext_p)
+ {
+   bfd_boolean major_p = TRUE;
+-  unsigned version = 0;
++  int version = 0;
+   char np;
+ 
+   *major_version = 0;
+@@ -1081,11 +1166,13 @@ riscv_parsing_subset_version (riscv_parse_subset_t *rps,
+   else
+     *minor_version = version;
+ 
+-  /* We can not find any version in string, need to parse default version.  */
+-  if (use_default_version != NULL
+-      && *major_version == 0
+-      && *minor_version == 0)
+-    *use_default_version = TRUE;
++  /* We can not find any version in string.  */
++  if (*major_version == 0 && *minor_version == 0)
++    {
++      *major_version = RISCV_UNKNOWN_VERSION;
++      *minor_version = RISCV_UNKNOWN_VERSION;
++    }
++
+   return p;
+ }
+ 
+@@ -1115,9 +1202,8 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ {
+   const char *all_std_exts = riscv_supported_std_ext ();
+   const char *std_exts = all_std_exts;
+-  unsigned major_version = 0;
+-  unsigned minor_version = 0;
+-  bfd_boolean use_default_version = FALSE;
++  int major_version;
++  int minor_version;
+   char subset[2] = {0, 0};
+ 
+   /* First letter must start with i, e or g.  */
+@@ -1126,42 +1212,23 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+       case 'i':
+ 	p = riscv_parsing_subset_version (rps, march, ++p,
+ 					  &major_version,
+-					  &minor_version, TRUE,
+-					  &use_default_version);
+-	/* Find the default version if needed.  */
+-	if (use_default_version
+-	    && rps->get_default_version != NULL)
+-	  rps->get_default_version ("i",
+-				    &major_version,
+-				    &minor_version);
+-	riscv_add_subset (rps->subset_list, "i",
+-			  major_version,
+-			  minor_version);
++					  &minor_version, TRUE);
++	riscv_parse_add_subset (rps, "i",
++				major_version,
++				minor_version);
+ 	break;
+ 
+       case 'e':
+ 	p = riscv_parsing_subset_version (rps, march, ++p,
+ 					  &major_version,
+-					  &minor_version, TRUE,
+-					  &use_default_version);
+-	/* Find the default version if needed.  */
+-	if (use_default_version
+-	    && rps->get_default_version != NULL)
+-	  rps->get_default_version ("e",
+-				    &major_version,
+-				    &minor_version);
+-	riscv_add_subset (rps->subset_list, "e",
+-			  major_version,
+-			  minor_version);
+-
++					  &minor_version, TRUE);
++	riscv_parse_add_subset (rps, "e",
++				major_version,
++				minor_version);
+ 	/* i-ext must be enabled.  */
+-	if (rps->get_default_version != NULL)
+-	  rps->get_default_version ("i",
+-				    &major_version,
+-				    &minor_version);
+-	riscv_add_subset (rps->subset_list, "i",
+-			  major_version,
+-			  minor_version);
++	riscv_parse_add_subset (rps, "i",
++				RISCV_UNKNOWN_VERSION,
++				RISCV_UNKNOWN_VERSION);
+ 
+ 	if (*rps->xlen > 32)
+ 	  {
+@@ -1177,27 +1244,17 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ 	   skip the setting if user set a version to it.  */
+ 	p = riscv_parsing_subset_version (rps, march, ++p,
+ 					  &major_version,
+-					  &minor_version, TRUE,
+-					  &use_default_version);
++					  &minor_version, TRUE);
+ 	/* i-ext must be enabled.  */
+-	if (rps->get_default_version != NULL)
+-	  rps->get_default_version ("i",
+-				    &major_version,
+-				    &minor_version);
+-	riscv_add_subset (rps->subset_list, "i",
+-			  major_version,
+-			  minor_version);
+-
++	riscv_parse_add_subset (rps, "i",
++				RISCV_UNKNOWN_VERSION,
++				RISCV_UNKNOWN_VERSION);
+ 	for ( ; *std_exts != 'q'; std_exts++)
+ 	  {
+ 	    subset[0] = *std_exts;
+-	    if (rps->get_default_version != NULL)
+-	      rps->get_default_version (subset,
+-					&major_version,
+-					&minor_version);
+-	    riscv_add_subset (rps->subset_list, subset,
+-			      major_version,
+-			      minor_version);
++	    riscv_parse_add_subset (rps, subset,
++				    RISCV_UNKNOWN_VERSION,
++				    RISCV_UNKNOWN_VERSION);
+ 	  }
+ 	break;
+ 
+@@ -1238,21 +1295,13 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ 	}
+ 
+       std_exts++;
+-      use_default_version = FALSE;
+       subset[0] = std_ext;
+       p = riscv_parsing_subset_version (rps, march, ++p,
+ 					&major_version,
+-					&minor_version, TRUE,
+-					&use_default_version);
+-      /* Find the default version if needed.  */
+-      if (use_default_version
+-	  && rps->get_default_version != NULL)
+-	rps->get_default_version (subset,
+-				  &major_version,
+-				  &minor_version);
+-      riscv_add_subset (rps->subset_list, subset,
+-			major_version,
+-			minor_version);
++					&minor_version, TRUE);
++      riscv_parse_add_subset (rps, subset,
++			      major_version,
++			      minor_version);
+     }
+ 
+   return p;
+@@ -1309,11 +1358,10 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 			  const char *p,
+ 			  const riscv_parse_config_t *config)
+ {
+-  unsigned major_version = 0;
+-  unsigned minor_version = 0;
++  int major_version;
++  int minor_version;
+   const char *last_name;
+   riscv_isa_ext_class_t class;
+-  bfd_boolean use_default_version;
+ 
+   while (*p)
+     {
+@@ -1337,14 +1385,18 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+       while (*++q != '\0' && *q != '_' && !ISDIGIT (*q))
+ 	;
+ 
+-      use_default_version = FALSE;
+       end_of_version =
+ 	riscv_parsing_subset_version (rps, march, q,
+ 				      &major_version,
+-				      &minor_version, FALSE,
+-				      &use_default_version);
++				      &minor_version, FALSE);
+       *q = '\0';
+ 
++      if (end_of_version == NULL)
++	{
++	  free (subset);
++	  return NULL;
++	}
++
+       /* Check that the prefix extension is known.
+ 	 For 'x', anything goes but it cannot simply be 'x'.
+ 	 For 's', it must be known from a list and cannot simply be 's'.
+@@ -1384,16 +1436,9 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 	  return NULL;
+ 	}
+ 
+-      /* Find the default version if needed.  */
+-      if (use_default_version
+-         && rps->get_default_version != NULL)
+-       rps->get_default_version (subset,
+-                                 &major_version,
+-                                 &minor_version);
+-      riscv_add_subset (rps->subset_list, subset,
+-			major_version,
+-			minor_version);
+-
++      riscv_parse_add_subset (rps, subset,
++			      major_version,
++			      minor_version);
+       free (subset);
+       p += end_of_version - subset;
+ 
+@@ -1514,6 +1559,7 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+ {
+   const char *p;
+   size_t i;
++  bfd_boolean no_conflict = TRUE;
+ 
+   for (p = arch; *p != '\0'; p++)
+     {
+@@ -1580,7 +1626,7 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+       rps->error_handler
+ 	(_("-march=%s: rv32e does not support the `f' extension"),
+ 	 arch);
+-      return FALSE;
++      no_conflict = FALSE;
+     }
+ 
+   if (riscv_lookup_subset (rps->subset_list, "q") && *rps->xlen < 64)
+@@ -1588,7 +1634,7 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+       rps->error_handler
+ 	(_("-march=%s: rv32 does not support the `q' extension"),
+ 	 arch);
+-      return FALSE;
++      no_conflict = FALSE;
+     }
+ 
+   if (riscv_lookup_subset (rps->subset_list, "d")
+@@ -1597,7 +1643,7 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+       rps->error_handler
+ 	(_("-march=%s: `d' extension requires `f' extension"),
+ 	 arch);
+-      return FALSE;
++      no_conflict = FALSE;
+     }
+ 
+   if (riscv_lookup_subset (rps->subset_list, "q")
+@@ -1606,88 +1652,10 @@ riscv_parse_subset (riscv_parse_subset_t *rps,
+       rps->error_handler
+ 	(_("-march=%s: `q' extension requires `d' extension"),
+ 	 arch);
+-      return FALSE;
+-    }
+-
+-  return TRUE;
+-}
+-
+-/* Add new subset to list.  */
+-
+-void
+-riscv_add_subset (riscv_subset_list_t *subset_list,
+-		  const char *subset,
+-		  int major,
+-		  int minor)
+-{
+-  riscv_subset_t *s = xmalloc (sizeof *s);
+-
+-  if (subset_list->head == NULL)
+-    subset_list->head = s;
+-
+-  s->name = xstrdup (subset);
+-  s->major_version = major;
+-  s->minor_version = minor;
+-  s->next = NULL;
+-
+-  if (subset_list->tail != NULL)
+-    subset_list->tail->next = s;
+-
+-  subset_list->tail = s;
+-}
+-
+-/* Find subset in list without version checking, return NULL if not found.  */
+-
+-riscv_subset_t *
+-riscv_lookup_subset (const riscv_subset_list_t *subset_list,
+-		     const char *subset)
+-{
+-  return riscv_lookup_subset_version
+-    (subset_list, subset,
+-     RISCV_DONT_CARE_VERSION,
+-     RISCV_DONT_CARE_VERSION);
+-}
+-
+-/* Find subset in list with version checking, return NULL if not found.  */
+-
+-riscv_subset_t *
+-riscv_lookup_subset_version (const riscv_subset_list_t *subset_list,
+-			     const char *subset,
+-			     int major, int minor)
+-{
+-  riscv_subset_t *s;
+-
+-  for (s = subset_list->head; s != NULL; s = s->next)
+-    if (strcasecmp (s->name, subset) == 0)
+-      {
+-	if ((major != RISCV_DONT_CARE_VERSION)
+-	    && (s->major_version != major))
+-	  return NULL;
+-
+-	if ((minor != RISCV_DONT_CARE_VERSION)
+-	    && (s->minor_version != minor))
+-	  return NULL;
+-
+-	return s;
+-      }
+-
+-  return NULL;
+-}
+-
+-/* Release subset list.  */
+-
+-void
+-riscv_release_subset_list (riscv_subset_list_t *subset_list)
+-{
+-   while (subset_list->head != NULL)
+-    {
+-      riscv_subset_t *next = subset_list->head->next;
+-      free ((void *)subset_list->head->name);
+-      free (subset_list->head);
+-      subset_list->head = next;
++      no_conflict = FALSE;
+     }
+ 
+-  subset_list->tail = NULL;
++  return no_conflict;
+ }
+ 
+ /* Return the number of digits for the input.  */
+diff --git a/bfd/elfxx-riscv.h b/bfd/elfxx-riscv.h
+index 6b7cc5b0bf..45705ce31c 100644
+--- a/bfd/elfxx-riscv.h
++++ b/bfd/elfxx-riscv.h
+@@ -33,7 +33,7 @@ riscv_reloc_type_lookup (bfd *, bfd_reloc_code_real_type);
+ extern reloc_howto_type *
+ riscv_elf_rtype_to_howto (bfd *, unsigned int r_type);
+ 
+-#define RISCV_DONT_CARE_VERSION -1
++#define RISCV_UNKNOWN_VERSION -1
+ 
+ /* The information of architecture attribute.  */
+ struct riscv_subset_t
+@@ -64,11 +64,6 @@ extern riscv_subset_t *
+ riscv_lookup_subset (const riscv_subset_list_t *,
+ 		     const char *);
+ 
+-extern riscv_subset_t *
+-riscv_lookup_subset_version (const riscv_subset_list_t *,
+-			     const char *,
+-			     int, int);
+-
+ typedef struct
+ {
+   riscv_subset_list_t *subset_list;
+@@ -76,8 +71,8 @@ typedef struct
+ 			 ...) ATTRIBUTE_PRINTF_1;
+   unsigned *xlen;
+   void (*get_default_version) (const char *,
+-			       unsigned int *,
+-			       unsigned int *);
++			       int *,
++			       int *);
+ } riscv_parse_subset_t;
+ 
+ extern bfd_boolean
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 9df6d3f415..24771b0a0b 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -267,28 +267,25 @@ init_ext_version_hash (const struct riscv_ext_version *table)
+ 
+ static void
+ riscv_get_default_ext_version (const char *name,
+-                              unsigned int *major_version,
+-                              unsigned int *minor_version)
++			       int *major_version,
++			       int *minor_version)
+ {
+   struct riscv_ext_version *ext;
+ 
+-  *major_version = 0;
+-  *minor_version = 0;
+-
+   if (name == NULL || default_isa_spec == ISA_SPEC_CLASS_NONE)
+     return;
+ 
+   ext = (struct riscv_ext_version *) str_hash_find (ext_version_hash, name);
+   while (ext
+-        && ext->name
+-        && strcmp (ext->name, name) == 0)
++	 && ext->name
++	 && strcmp (ext->name, name) == 0)
+     {
+       if (ext->isa_spec_class == default_isa_spec)
+-       {
+-         *major_version = ext->major_version;
+-         *minor_version = ext->minor_version;
+-         return;
+-       }
++	{
++	  *major_version = ext->major_version;
++	  *minor_version = ext->minor_version;
++	  return;
++	}
+       ext++;
+     }
+ }
+@@ -300,7 +297,7 @@ riscv_set_arch (const char *s)
+ {
+   riscv_parse_subset_t rps;
+   rps.subset_list = &riscv_subsets;
+-  rps.error_handler = as_fatal;
++  rps.error_handler = as_bad;
+   rps.xlen = &xlen;
+   rps.get_default_version = riscv_get_default_ext_version;
+ 
+diff --git a/gas/testsuite/gas/riscv/attribute-02.d b/gas/testsuite/gas/riscv/attribute-02.d
+index ae0195e9a2..45b89f2d62 100644
+--- a/gas/testsuite/gas/riscv/attribute-02.d
++++ b/gas/testsuite/gas/riscv/attribute-02.d
+@@ -1,6 +1,6 @@
+-#as: -march=rv32gxargle -march-attr -misa-spec=2.2
++#as: -march=rv32gxargle2p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle0p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle2p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-03.d b/gas/testsuite/gas/riscv/attribute-03.d
+index 9916ff6e92..11416d63d2 100644
+--- a/gas/testsuite/gas/riscv/attribute-03.d
++++ b/gas/testsuite/gas/riscv/attribute-03.d
+@@ -1,6 +1,6 @@
+-#as: -march=rv32gxargle_xfoo -march-attr -misa-spec=2.2
++#as: -march=rv32gxargle2p0_xfoo3p0 -march-attr -misa-spec=2.2
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle0p0_xfoo0p0"
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0_xargle2p0_xfoo3p0"
+diff --git a/gas/testsuite/gas/riscv/attribute-09.d b/gas/testsuite/gas/riscv/attribute-09.d
+index cad1713b0a..fc87f82c55 100644
+--- a/gas/testsuite/gas/riscv/attribute-09.d
++++ b/gas/testsuite/gas/riscv/attribute-09.d
+@@ -1,6 +1,6 @@
+-#as: -march-attr -march=rv32i2p1m_zicsr -misa-spec=2.2
++#as: -march-attr -march=rv32i2p2m_zicsr -misa-spec=20191213
+ #readelf: -A
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p1_m2p0_zicsr0p0"
++  Tag_RISCV_arch: "rv32i2p2_m2p0_zicsr2p0"
+diff --git a/gas/testsuite/gas/riscv/march-fail-base-01.l b/gas/testsuite/gas/riscv/march-fail-base-01.l
+index 9fa071f5b0..45d5c9ad98 100644
+--- a/gas/testsuite/gas/riscv/march-fail-base-01.l
++++ b/gas/testsuite/gas/riscv/march-fail-base-01.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*first ISA extension must be `e', `i' or `g'
++.*Error: .*first ISA extension must be `e', `i' or `g'
+diff --git a/gas/testsuite/gas/riscv/march-fail-base-02.l b/gas/testsuite/gas/riscv/march-fail-base-02.l
+index 6fc4dfa7ba..f6a3c1dc51 100644
+--- a/gas/testsuite/gas/riscv/march-fail-base-02.l
++++ b/gas/testsuite/gas/riscv/march-fail-base-02.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*rv64e is not a valid base ISA
++.*Error: .*rv64e is not a valid base ISA
+diff --git a/gas/testsuite/gas/riscv/march-fail-isa-spec.d b/gas/testsuite/gas/riscv/march-fail-isa-spec.d
+new file mode 100644
+index 0000000000..af707e232e
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-isa-spec.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32iln_zicsr_xargle_xbargle -misa-spec=20191213
++#source: empty.s
++#error_output: march-fail-isa-spec.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-isa-spec.l b/gas/testsuite/gas/riscv/march-fail-isa-spec.l
+new file mode 100644
+index 0000000000..e714ddf7ba
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-isa-spec.l
+@@ -0,0 +1,5 @@
++.*Assembler messages:
++.*Error: cannot find default versions of the ISA extension `l'
++.*Error: cannot find default versions of the ISA extension `n'
++.*Error: x ISA extension `xargle' must be set with the versions
++.*Error: x ISA extension `xbargle' must be set with the versions
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-std.l b/gas/testsuite/gas/riscv/march-fail-order-std.l
+index 666a8c0d2c..9e3ce5e8d9 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-std.l
++++ b/gas/testsuite/gas/riscv/march-fail-order-std.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*standard ISA extension `m' is not in canonical order
++.*Error: .*standard ISA extension `m' is not in canonical order
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-x.l b/gas/testsuite/gas/riscv/march-fail-order-x.l
+index f7b383d855..025db14686 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-x.l
++++ b/gas/testsuite/gas/riscv/march-fail-order-x.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*x ISA extension `xargle' is not in alphabetical order.  It must come before `xbargle'
++.*Error: .*x ISA extension `xargle' is not in alphabetical order.  It must come before `xbargle'
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-z.l b/gas/testsuite/gas/riscv/march-fail-order-z.l
+index 1129219f2b..a98c53a279 100644
+--- a/gas/testsuite/gas/riscv/march-fail-order-z.l
++++ b/gas/testsuite/gas/riscv/march-fail-order-z.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*z ISA extension `zicsr' is not in alphabetical order.  It must come before `zifencei'
++.*Error: .*z ISA extension `zicsr' is not in alphabetical order.  It must come before `zifencei'
+diff --git a/gas/testsuite/gas/riscv/march-fail-porder.l b/gas/testsuite/gas/riscv/march-fail-porder.l
+index a06d586580..c5496eab49 100644
+--- a/gas/testsuite/gas/riscv/march-fail-porder.l
++++ b/gas/testsuite/gas/riscv/march-fail-porder.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unexpected ISA string at end:.*
++.*Error: .*unexpected ISA string at end:.*
+diff --git a/gas/testsuite/gas/riscv/march-fail-rv32ef.l b/gas/testsuite/gas/riscv/march-fail-rv32ef.l
+index d2d915d872..e6d93f28fa 100644
+--- a/gas/testsuite/gas/riscv/march-fail-rv32ef.l
++++ b/gas/testsuite/gas/riscv/march-fail-rv32ef.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*rv32e does not support the `f' extension
++.*Error: .*rv32e does not support the `f' extension
+diff --git a/gas/testsuite/gas/riscv/march-fail-rv32id.l b/gas/testsuite/gas/riscv/march-fail-rv32id.l
+index 29b2717ef7..c5f990cd73 100644
+--- a/gas/testsuite/gas/riscv/march-fail-rv32id.l
++++ b/gas/testsuite/gas/riscv/march-fail-rv32id.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*`d' extension requires `f' extension
++.*Error: .*`d' extension requires `f' extension
+diff --git a/gas/testsuite/gas/riscv/march-fail-rv32iq.l b/gas/testsuite/gas/riscv/march-fail-rv32iq.l
+index 361c381b86..8143dd441d 100644
+--- a/gas/testsuite/gas/riscv/march-fail-rv32iq.l
++++ b/gas/testsuite/gas/riscv/march-fail-rv32iq.l
+@@ -1,2 +1,3 @@
+ .*Assembler messages:
+-.*Fatal error: .*rv32 does not support the `q' extension
++.*Error: .*rv32 does not support the `q' extension
++.*Error: .*`q' extension requires `d' extension
+diff --git a/gas/testsuite/gas/riscv/march-fail-rv64iq.l b/gas/testsuite/gas/riscv/march-fail-rv64iq.l
+index 76a41043e3..787f46d1ed 100644
+--- a/gas/testsuite/gas/riscv/march-fail-rv64iq.l
++++ b/gas/testsuite/gas/riscv/march-fail-rv64iq.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*`q' extension requires `d' extension
++.*Error: .*`q' extension requires `d' extension
+diff --git a/gas/testsuite/gas/riscv/march-fail-single-char.l b/gas/testsuite/gas/riscv/march-fail-single-char.l
+index 6466e164ff..435d0b23a4 100644
+--- a/gas/testsuite/gas/riscv/march-fail-single-char.l
++++ b/gas/testsuite/gas/riscv/march-fail-single-char.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unknown (s|h|z|x) ISA extension `(s|h|z|x)'
++.*Error: .*unknown (s|h|z|x) ISA extension `(s|h|z|x)'
+diff --git a/gas/testsuite/gas/riscv/march-fail-unknown-std.l b/gas/testsuite/gas/riscv/march-fail-unknown-std.l
+index cb856377b3..75cdda3894 100644
+--- a/gas/testsuite/gas/riscv/march-fail-unknown-std.l
++++ b/gas/testsuite/gas/riscv/march-fail-unknown-std.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unknown standard ISA extension `[^eimafdqiglcbjtpvn]'
++.*Error: .*unknown standard ISA extension `[^eimafdqiglcbjtpvn]'
+diff --git a/gas/testsuite/gas/riscv/march-fail-unknown.l b/gas/testsuite/gas/riscv/march-fail-unknown.l
+index 28a864dbb7..874b8d461b 100644
+--- a/gas/testsuite/gas/riscv/march-fail-unknown.l
++++ b/gas/testsuite/gas/riscv/march-fail-unknown.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unknown (s|h|z) ISA extension `(s|h|z)foo'
++.*Error: .*unknown (s|h|z) ISA extension `(s|h|z)foo'
+diff --git a/gas/testsuite/gas/riscv/march-fail-uppercase.l b/gas/testsuite/gas/riscv/march-fail-uppercase.l
+index 292c18adcc..14f03d6954 100644
+--- a/gas/testsuite/gas/riscv/march-fail-uppercase.l
++++ b/gas/testsuite/gas/riscv/march-fail-uppercase.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*ISA string cannot contain uppercase letters
++.*Error: .*ISA string cannot contain uppercase letters
+diff --git a/gas/testsuite/gas/riscv/march-fail-version.l b/gas/testsuite/gas/riscv/march-fail-version.l
+index b5d0b91350..c7f8a4d548 100644
+--- a/gas/testsuite/gas/riscv/march-fail-version.l
++++ b/gas/testsuite/gas/riscv/march-fail-version.l
+@@ -1,2 +1,3 @@
+ .*Assembler messages:
+-.*Fatal error: .*expect number after `2p'
++.*Error: cannot find default versions of the ISA extension `p'
++.*Error: .*expect number after `2p'
+diff --git a/gas/testsuite/gas/riscv/march-ok-two-nse.d b/gas/testsuite/gas/riscv/march-ok-two-nse.d
+index 0fe503793b..e78cf9dd09 100644
+--- a/gas/testsuite/gas/riscv/march-ok-two-nse.d
++++ b/gas/testsuite/gas/riscv/march-ok-two-nse.d
+@@ -1,4 +1,4 @@
+-#as: -march=rv32imafd_xargle_xbargle
++#as: -march=rv32imafd_xargle2p0_xbargle3p0
+ #objdump: -dr
+ #source: empty.s
+ 
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 2f1bc793e5..94a13803d9 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -360,8 +360,8 @@ struct riscv_ext_version
+ {
+   const char *name;
+   enum riscv_isa_spec_class isa_spec_class;
+-  unsigned int major_version;
+-  unsigned int minor_version;
++  int major_version;
++  int minor_version;
+ };
+ 
+ /* All RISC-V CSR belong to one of these classes.  */
+-- 
+2.33.0
+

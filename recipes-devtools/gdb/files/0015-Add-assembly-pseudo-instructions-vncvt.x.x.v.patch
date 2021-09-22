@@ -1,0 +1,103 @@
+From ed4bec347a9a77c8845a43d6dfe23317bc8091e0 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Mon, 6 Jul 2020 14:31:14 +0800
+Subject: [PATCH 15/48] Add assembly pseudo instructions vncvt.x.x.v.
+
+An integer value can be halved in width using the narrowing integer
+shift instructions with a scalar operand of x0. Can define assembly
+pseudo instruction "vncvt.x.x.v vd,vs,vm" to "vnsrl.wx vd,vs,x0,vm".
+---
+ gas/testsuite/gas/riscv/vector-insns-fail-05.l | 3 +++
+ gas/testsuite/gas/riscv/vector-insns-fail-05.s | 6 ++++++
+ gas/testsuite/gas/riscv/vector-insns.d         | 2 ++
+ gas/testsuite/gas/riscv/vector-insns.s         | 4 ++++
+ include/opcode/riscv-opc.h                     | 3 +++
+ opcodes/riscv-opc.c                            | 2 ++
+ 6 files changed, 20 insertions(+)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-05.l b/gas/testsuite/gas/riscv/vector-insns-fail-05.l
+index fa519ffcf9..f2bee3d1e0 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-05.l
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-05.l
+@@ -1,4 +1,7 @@
+ .*: Assembler messages:
++.*Error: illegal operands `vncvt.x.x.v v2,v2'
++.*Error: illegal operands `vncvt.x.x.v v2,v3'
++.*Error: illegal operands `vncvt.x.x.v v3,v2'
+ .*Error: illegal operands `vnsrl.wv v2,v2,v4'
+ .*Error: illegal operands `vnsrl.wv v2,v3,v4'
+ .*Error: illegal operands `vnsrl.wv v3,v2,v4'
+diff --git a/gas/testsuite/gas/riscv/vector-insns-fail-05.s b/gas/testsuite/gas/riscv/vector-insns-fail-05.s
+index 2ec027299c..6b68680fd9 100644
+--- a/gas/testsuite/gas/riscv/vector-insns-fail-05.s
++++ b/gas/testsuite/gas/riscv/vector-insns-fail-05.s
+@@ -1,5 +1,11 @@
+ # Narrowing Vector Arithmetic Instructions
+ 
++	vncvt.x.x.v v0, v2		# OK
++	vncvt.x.x.v v2, v2		# vd overlap vs2
++	vncvt.x.x.v v2, v3		# vs2 should be multiple of 2
++	vncvt.x.x.v v3, v2		# vd overlap vs2
++	vncvt.x.x.v v0, v2, v0.t	# We can't know the LMUL, so skip the vm checking
++
+ 	vnsrl.wv v0, v2, v4		# OK
+ 	vnsrl.wv v2, v2, v4		# vd overlap vs2
+ 	vnsrl.wv v2, v3, v4		# vs2 should be multiple of 2
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index 634ff2945c..99eb5abf70 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -1796,6 +1796,8 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+a485c257[ 	]+vsra.vx[ 	]+v4,v8,a1,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+a480b257[ 	]+vsra.vi[ 	]+v4,v8,1,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+a48fb257[ 	]+vsra.vi[ 	]+v4,v8,31,v0.t
++[ 	]+[0-9a-f]+:[ 	]+b2804257[ 	]+vncvt.x.x.v[ 	]+v4,v8
++[ 	]+[0-9a-f]+:[ 	]+b0804257[ 	]+vncvt.x.x.v[ 	]+v4,v8,v0.t
+ [ 	]+[0-9a-f]+:[ 	]+b2860257[ 	]+vnsrl.wv[ 	]+v4,v8,v12
+ [ 	]+[0-9a-f]+:[ 	]+b285c257[ 	]+vnsrl.wx[ 	]+v4,v8,a1
+ [ 	]+[0-9a-f]+:[ 	]+b280b257[ 	]+vnsrl.wi[ 	]+v4,v8,1
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index e6cfcad9ba..3b489685c9 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -2076,6 +2076,10 @@
+ 	vsra.vi v4, v8, 1, v0.t
+ 	vsra.vi v4, v8, 31, v0.t
+ 
++	# Aliases
++	vncvt.x.x.v v4, v8
++	vncvt.x.x.v v4, v8, v0.t
++
+ 	vnsrl.wv v4, v8, v12
+ 	vnsrl.wx v4, v8, a1
+ 	vnsrl.wi v4, v8, 1
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index e196e27736..4e4ecc91d0 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2096,6 +2096,9 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define MATCH_VSRAVI 0xa4003057
+ #define MASK_VSRAVI  0xfc00707f
+ 
++#define MATCH_VNCVTXXV 0xb0004057
++#define MASK_VNCVTXXV  0xfc0ff07f
++
+ #define MATCH_VNSRLWV  0xb0000057
+ #define MASK_VNSRLWV   0xfc00707f
+ #define MATCH_VNSRLWX  0xb0004057
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 475c65d7e5..66c3046150 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1673,6 +1673,8 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vsra.vx",    0, INSN_CLASS_V,  "Vd,Vt,sVm", MATCH_VSRAVX, MASK_VSRAVX, match_opcode, 0 },
+ {"vsra.vi",    0, INSN_CLASS_V,  "Vd,Vt,VjVm", MATCH_VSRAVI, MASK_VSRAVI, match_opcode, 0 },
+ 
++{"vncvt.x.x.v",0, INSN_CLASS_V,  "Vd,VtVm", MATCH_VNCVTXXV, MASK_VNCVTXXV, match_narrow_vd_neq_vs2, INSN_ALIAS },
++
+ {"vnsrl.wv",   0, INSN_CLASS_V,  "Vd,Vt,VsVm", MATCH_VNSRLWV, MASK_VNSRLWV, match_narrow_vd_neq_vs2, 0 },
+ {"vnsrl.wx",   0, INSN_CLASS_V,  "Vd,Vt,sVm", MATCH_VNSRLWX, MASK_VNSRLWX, match_narrow_vd_neq_vs2, 0 },
+ {"vnsrl.wi",   0, INSN_CLASS_V,  "Vd,Vt,VjVm", MATCH_VNSRLWI, MASK_VNSRLWI, match_narrow_vd_neq_vs2, 0 },
+-- 
+2.33.0
+

@@ -1,0 +1,25 @@
+From baabe8640ae726f4244ba08713bf2312a5ea1be3 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Mon, 21 Dec 2020 15:12:42 +0800
+Subject: [PATCH 45/48] Fix sim build since op->match_func have more arguments.
+
+---
+ sim/riscv/sim-main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sim/riscv/sim-main.c b/sim/riscv/sim-main.c
+index d773a35cb5..037e1641fb 100644
+--- a/sim/riscv/sim-main.c
++++ b/sim/riscv/sim-main.c
+@@ -2220,7 +2220,7 @@ void step_once (SIM_CPU *cpu)
+   for (; op->name; op++)
+     {
+       /* Does the opcode match?  */
+-      if (!(op->match_func) (op, iw))
++      if (!(op->match_func) (op, iw, 0, NULL))
+ 	continue;
+       /* Is this a pseudo-instruction?  */
+       if ((op->pinfo & INSN_ALIAS))
+-- 
+2.33.0
+

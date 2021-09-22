@@ -1,0 +1,195 @@
+From a091f66f69e2f7b4c029c73edd2a031045a106d8 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 20 Nov 2020 15:35:17 +0800
+Subject: [PATCH 06/48] RISC-V: Add zifencei and prefixed h class extensions.
+
+	bfd/
+	* elfxx-riscv.c (riscv_parse_std_ext): Stop parsing standard
+	extensions when parsed h keyword.
+	(riscv_get_prefix_class): Support prefixed h class.
+	(riscv_std_h_ext_strtab): Likewise.
+	(riscv_ext_h_valid_p): Likewise.
+	(parse_config): Likewise.
+	(riscv_std_z_ext_strtab): Add zifencei.
+	* elfxx-riscv.h (riscv_isa_ext_class): Add RV_ISA_CLASS_H.
+
+	gas/
+	* testsuite/gas/riscv/march-fail-order-z.d: New testcase, check
+	orders of prefixed z extensions.
+	* testsuite/gas/riscv/march-fail-order-z.l: Likewise.
+	* testsuite/gas/riscv/march-fail-single-char-h.d: New testcase.
+	* testsuite/gas/riscv/march-fail-single-char.l: Updated.
+	* testsuite/gas/riscv/march-fail-unknown-h.d: New testcase.
+	* testsuite/gas/riscv/march-fail-unknown.l: Updated.
+
+	opcodes/
+	* riscv-opc.c (riscv_ext_version_table): Add zifencei.
+---
+ bfd/elfxx-riscv.c                             | 21 +++++++++++++++++--
+ bfd/elfxx-riscv.h                             |  1 +
+ gas/testsuite/gas/riscv/march-fail-order-z.d  |  3 +++
+ gas/testsuite/gas/riscv/march-fail-order-z.l  |  2 ++
+ .../gas/riscv/march-fail-single-char-h.d      |  3 +++
+ .../gas/riscv/march-fail-single-char.l        |  2 +-
+ .../gas/riscv/march-fail-unknown-h.d          |  3 +++
+ gas/testsuite/gas/riscv/march-fail-unknown.l  |  2 +-
+ opcodes/riscv-opc.c                           |  3 +++
+ 9 files changed, 36 insertions(+), 4 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-order-z.d
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-order-z.l
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-single-char-h.d
+ create mode 100644 gas/testsuite/gas/riscv/march-fail-unknown-h.d
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index d29bb0375e..5a95c5cb6c 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1210,7 +1210,7 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ 
+   while (p != NULL && *p != '\0')
+     {
+-      if (*p == 'x' || *p == 's' || *p == 'z')
++      if (*p == 'x' || *p == 's' || *p == 'h' || *p == 'z')
+ 	break;
+ 
+       if (*p == '_')
+@@ -1266,6 +1266,7 @@ riscv_get_prefix_class (const char *arch)
+   switch (*arch)
+     {
+     case 's': return RV_ISA_CLASS_S;
++    case 'h': return RV_ISA_CLASS_H;
+     case 'x': return RV_ISA_CLASS_X;
+     case 'z': return RV_ISA_CLASS_Z;
+     default: return RV_ISA_CLASS_UNKNOWN;
+@@ -1347,6 +1348,7 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+       /* Check that the prefix extension is known.
+ 	 For 'x', anything goes but it cannot simply be 'x'.
+ 	 For 's', it must be known from a list and cannot simply be 's'.
++	 For 'h', it must be known from a list and cannot simply be 'h'.
+ 	 For 'z', it must be known from a list and cannot simply be 'z'.  */
+ 
+       /* Check that the extension name is well-formed.  */
+@@ -1417,7 +1419,7 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 
+ static const char * const riscv_std_z_ext_strtab[] =
+ {
+-  "zicsr", NULL
++  "zicsr", "zifencei", NULL
+ };
+ 
+ static const char * const riscv_std_s_ext_strtab[] =
+@@ -1425,6 +1427,11 @@ static const char * const riscv_std_s_ext_strtab[] =
+   NULL
+ };
+ 
++static const char * const riscv_std_h_ext_strtab[] =
++{
++  NULL
++};
++
+ /* For the extension `ext`, search through the list of known extensions
+    `known_exts` for a match, and return TRUE if found.  */
+ 
+@@ -1471,12 +1478,22 @@ riscv_ext_s_valid_p (const char *arg)
+   return riscv_multi_letter_ext_valid_p (arg, riscv_std_s_ext_strtab);
+ }
+ 
++/* Predicator function for 'h' prefixed extensions.
++   Only known h-extensions are permitted.  */
++
++static bfd_boolean
++riscv_ext_h_valid_p (const char *arg)
++{
++  return riscv_multi_letter_ext_valid_p (arg, riscv_std_h_ext_strtab);
++}
++
+ /* Parsing order of the prefixed extensions that is specified by
+    the ISA spec.  */
+ 
+ static const riscv_parse_config_t parse_config[] =
+ {
+   {RV_ISA_CLASS_S, "s", riscv_ext_s_valid_p},
++  {RV_ISA_CLASS_H, "h", riscv_ext_h_valid_p},
+   {RV_ISA_CLASS_Z, "z", riscv_ext_z_valid_p},
+   {RV_ISA_CLASS_X, "x", riscv_ext_x_valid_p},
+   {RV_ISA_CLASS_UNKNOWN, NULL, NULL}
+diff --git a/bfd/elfxx-riscv.h b/bfd/elfxx-riscv.h
+index b5b17d1687..6b7cc5b0bf 100644
+--- a/bfd/elfxx-riscv.h
++++ b/bfd/elfxx-riscv.h
+@@ -102,6 +102,7 @@ riscv_estimate_digit (unsigned);
+ typedef enum riscv_isa_ext_class
+ {
+   RV_ISA_CLASS_S,
++  RV_ISA_CLASS_H,
+   RV_ISA_CLASS_Z,
+   RV_ISA_CLASS_X,
+   RV_ISA_CLASS_UNKNOWN
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-z.d b/gas/testsuite/gas/riscv/march-fail-order-z.d
+new file mode 100644
+index 0000000000..dd076c6d35
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-order-z.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32i_zifencei2p0_zicsr2p0
++#source: empty.s
++#error_output: march-fail-order-z.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-order-z.l b/gas/testsuite/gas/riscv/march-fail-order-z.l
+new file mode 100644
+index 0000000000..1129219f2b
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-order-z.l
+@@ -0,0 +1,2 @@
++.*Assembler messages:
++.*Fatal error: .*z ISA extension `zicsr' is not in alphabetical order.  It must come before `zifencei'
+diff --git a/gas/testsuite/gas/riscv/march-fail-single-char-h.d b/gas/testsuite/gas/riscv/march-fail-single-char-h.d
+new file mode 100644
+index 0000000000..7fca9576bf
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-single-char-h.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32ih
++#source: empty.s
++#error_output: march-fail-single-char.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-single-char.l b/gas/testsuite/gas/riscv/march-fail-single-char.l
+index aa87a8db1a..6466e164ff 100644
+--- a/gas/testsuite/gas/riscv/march-fail-single-char.l
++++ b/gas/testsuite/gas/riscv/march-fail-single-char.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unknown (s|z|x) ISA extension `(s|z|x)'
++.*Fatal error: .*unknown (s|h|z|x) ISA extension `(s|h|z|x)'
+diff --git a/gas/testsuite/gas/riscv/march-fail-unknown-h.d b/gas/testsuite/gas/riscv/march-fail-unknown-h.d
+new file mode 100644
+index 0000000000..b0b83231aa
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-fail-unknown-h.d
+@@ -0,0 +1,3 @@
++#as: -march=rv32ihfoo2p0
++#source: empty.s
++#error_output: march-fail-unknown.l
+diff --git a/gas/testsuite/gas/riscv/march-fail-unknown.l b/gas/testsuite/gas/riscv/march-fail-unknown.l
+index ac22fe60eb..28a864dbb7 100644
+--- a/gas/testsuite/gas/riscv/march-fail-unknown.l
++++ b/gas/testsuite/gas/riscv/march-fail-unknown.l
+@@ -1,2 +1,2 @@
+ .*Assembler messages:
+-.*Fatal error: .*unknown (s|z) ISA extension `(s|z)foo'
++.*Fatal error: .*unknown (s|h|z) ISA extension `(s|h|z)foo'
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 03e3bd7c05..121f3fee41 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -935,6 +935,9 @@ const struct riscv_ext_version riscv_ext_version_table[] =
+ {"zicsr", ISA_SPEC_CLASS_20191213, 2, 0},
+ {"zicsr", ISA_SPEC_CLASS_20190608, 2, 0},
+ 
++{"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
++{"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
++
+ /* Terminate the list.  */
+ {NULL, 0, 0, 0}
+ };
+-- 
+2.33.0
+

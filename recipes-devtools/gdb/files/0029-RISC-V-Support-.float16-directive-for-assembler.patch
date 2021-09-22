@@ -1,0 +1,97 @@
+From d1f2bc0a3f745ba7f49d2576300c7c000c5728ef Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Tue, 21 Apr 2020 14:42:20 +0800
+Subject: [PATCH 29/48] RISC-V: Support .float16 directive for assembler.
+
+---
+ gas/config/tc-riscv.c             |  3 ++-
+ gas/read.c                        |  5 +++++
+ gas/testsuite/gas/riscv/float16.d | 10 ++++++++++
+ gas/testsuite/gas/riscv/float16.s | 21 +++++++++++++++++++++
+ 4 files changed, 38 insertions(+), 1 deletion(-)
+ create mode 100644 gas/testsuite/gas/riscv/float16.d
+ create mode 100644 gas/testsuite/gas/riscv/float16.s
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index bb2819db4a..57d2908fcd 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -362,7 +362,7 @@ const char EXP_CHARS[] = "eE";
+ /* Chars that mean this number is a floating point constant */
+ /* As in 0f12.456 */
+ /* or    0d1.2345e12 */
+-const char FLT_CHARS[] = "rRsSfFdDxXpP";
++const char FLT_CHARS[] = "rRsSfFdDxXpPhH";
+ 
+ /* Indicate we are already assemble any instructions or not.  */
+ static bfd_boolean start_assemble = FALSE;
+@@ -4182,6 +4182,7 @@ static const pseudo_typeS riscv_pseudo_table[] =
+   {"sleb128", s_riscv_leb128, 1},
+   {"insn", s_riscv_insn, 0},
+   {"attribute", s_riscv_attribute, 0},
++  {"float16", float_cons, 'h'},
+ 
+   { NULL, NULL, 0 },
+ };
+diff --git a/gas/read.c b/gas/read.c
+index cd06ea51d9..c549629268 100644
+--- a/gas/read.c
++++ b/gas/read.c
+@@ -4763,6 +4763,11 @@ hex_float (int float_type, char *bytes)
+ 
+   switch (float_type)
+     {
++    case 'h':
++    case 'H':
++      length = 2;
++      break;
++
+     case 'f':
+     case 'F':
+     case 's':
+diff --git a/gas/testsuite/gas/riscv/float16.d b/gas/testsuite/gas/riscv/float16.d
+new file mode 100644
+index 0000000000..e75971d941
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/float16.d
+@@ -0,0 +1,10 @@
++# source: float16.s
++# objdump: -sj .data
++# as:
++
++.*:[ 	]+file format .*
++
++Contents of section \.data:
++ 0000 004adf2f 191cff7b 0100ff03 0004003c.*
++ 0010 013cff7f 007c00fc 00000080 00bce7bb.*
++ 0020 fffb0042 004a3e60 007e017e.*
+diff --git a/gas/testsuite/gas/riscv/float16.s b/gas/testsuite/gas/riscv/float16.s
+new file mode 100644
+index 0000000000..709ea0af7c
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/float16.s
+@@ -0,0 +1,21 @@
++.data
++	.float16 12.0
++	.float16 0.123
++	.float16 0.004
++	.float16 65504
++	.float16 5.9605e-8
++	.float16 6.0976e-5
++	.float16 6.1035e-5
++	.float16 1
++	.float16 1.001
++	.float16 NaN
++	.float16 +Inf
++	.float16 -Inf
++	.float16 +0
++	.float16 -0
++	.float16 -1
++	.float16 -0.98765
++	.float16 -65504
++	.float16 3.0, 12.0, 543.123
++	.float16 0h:7e00	# qNaNh
++	.float16 0h:7e01	# sNaNh
+-- 
+2.33.0
+

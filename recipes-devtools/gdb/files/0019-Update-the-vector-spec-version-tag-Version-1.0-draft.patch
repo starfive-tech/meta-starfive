@@ -1,0 +1,26 @@
+From 9d6a0b42daeecddb2bc855a3caed62b6ca1b44dd Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Mon, 6 Jul 2020 22:36:34 +0800
+Subject: [PATCH 19/48] Update the vector spec version tag (Version
+ 1.0-draft-20200703).
+
+---
+ include/opcode/riscv-opc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index a17a1e8ca3..14527e8515 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -549,7 +549,7 @@
+ #define MASK_C_SDSP  0xe003
+ 
+ /* RVV */
+-/* Version 1.0-draft-20200702.  */
++/* Version 1.0-draft-20200703.  */
+ 
+ #define MATCH_VSETVL  0x80007057
+ #define MASK_VSETVL   0xfe00707f
+-- 
+2.33.0
+

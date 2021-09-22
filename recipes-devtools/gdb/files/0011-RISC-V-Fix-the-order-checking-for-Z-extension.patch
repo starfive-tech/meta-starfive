@@ -1,0 +1,34 @@
+From 6424f98467fbdd6d7ad8fad1c9ba4fd6a517f846 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 20 Nov 2020 23:42:28 +0800
+Subject: [PATCH 11/48] RISC-V: Fix the order checking for Z* extension.
+
+We have to check the first char of the Z* extensions, to make sure that
+they follow the order of the standard extensions.  But we can not have
+the testcases for this patch, since we only support the zicsr and zifencei
+so far, both of them are the sub extensions of i.
+
+	bfd/
+	* elfxx-riscv.c (riscv_parse_prefixed_ext): Use riscv_compare_subsets
+	to check the Z* extensions' order.
+---
+ bfd/elfxx-riscv.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 7ff8c52620..86c0d94d0e 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1528,8 +1528,7 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 	}
+ 
+       /* Check that the extension is in alphabetical order.  */
+-      if (!strncasecmp (last_name, config->prefix, 1)
+-	  && strcasecmp (last_name, subset) > 0)
++      if (riscv_compare_subsets (last_name, subset) > 0)
+ 	{
+ 	  rps->error_handler
+ 	    (_("-march=%s: %s ISA extension `%s' is not in alphabetical "
+-- 
+2.33.0
+

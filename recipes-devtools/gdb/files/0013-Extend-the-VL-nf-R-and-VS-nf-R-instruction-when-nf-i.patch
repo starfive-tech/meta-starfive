@@ -1,0 +1,132 @@
+From 3eca424ccd778b50ce4a0b862c79afcd57fc3a82 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 3 Jul 2020 12:54:09 +0800
+Subject: [PATCH 13/48] Extend the VL<nf>R and VS<nf>R instruction, when <nf>
+ is 2, 4, 8.
+
+These instruction are added back in the risc-v vector spec,
+
+commit 0fec0e257cca5e389a0e1774e7d5aaac729b4ad2,
+Added clarifications on loads/stores.
+
+Note that the base V extension only enable the single register load/store
+variant with <nf> is 0.  It is clear to me that how to enable other register
+load/store is <nf> is 2, 4, 8, so I will add the limitation when it is
+clarified.
+---
+ gas/testsuite/gas/riscv/vector-insns.d | 12 ++++++++++++
+ gas/testsuite/gas/riscv/vector-insns.s | 13 +++++++++++++
+ include/opcode/riscv-opc.h             | 17 +++++++++++++++--
+ opcodes/riscv-opc.c                    |  7 +++++++
+ 4 files changed, 47 insertions(+), 2 deletions(-)
+
+diff --git a/gas/testsuite/gas/riscv/vector-insns.d b/gas/testsuite/gas/riscv/vector-insns.d
+index 5e7267c3f8..70366fb787 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.d
++++ b/gas/testsuite/gas/riscv/vector-insns.d
+@@ -1396,8 +1396,20 @@ Disassembly of section .text:
+ [ 	]+[0-9a-f]+:[ 	]+f1057207[ 	]+vlseg8e1024ff.v[ 	]+v4,\(a0\),v0.t
+ [ 	]+[0-9a-f]+:[ 	]+02850187[ 	]+vl1r.v[ 	]+v3,\(a0\)
+ [ 	]+[0-9a-f]+:[ 	]+02850187[ 	]+vl1r.v[ 	]+v3,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+22850107[ 	]+vl2r.v[ 	]+v2,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+22850107[ 	]+vl2r.v[ 	]+v2,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+62850207[ 	]+vl4r.v[ 	]+v4,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+62850207[ 	]+vl4r.v[ 	]+v4,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+e2850407[ 	]+vl8r.v[ 	]+v8,\(a0\)
++[ 	]+[0-9a-f]+:[ 	]+e2850407[ 	]+vl8r.v[ 	]+v8,\(a0\)
+ [ 	]+[0-9a-f]+:[ 	]+028581a7[ 	]+vs1r.v[ 	]+v3,\(a1\)
+ [ 	]+[0-9a-f]+:[ 	]+028581a7[ 	]+vs1r.v[ 	]+v3,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+22858127[ 	]+vs2r.v[ 	]+v2,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+22858127[ 	]+vs2r.v[ 	]+v2,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+62858227[ 	]+vs4r.v[ 	]+v4,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+62858227[ 	]+vs4r.v[ 	]+v4,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+e2858427[ 	]+vs8r.v[ 	]+v8,\(a1\)
++[ 	]+[0-9a-f]+:[ 	]+e2858427[ 	]+vs8r.v[ 	]+v8,\(a1\)
+ [ 	]+[0-9a-f]+:[ 	]+0685822f[ 	]+vamoaddei8.v[ 	]+v4,\(a1\),v8,v4
+ [ 	]+[0-9a-f]+:[ 	]+0285822f[ 	]+vamoaddei8.v[ 	]+zero,\(a1\),v8,v4
+ [ 	]+[0-9a-f]+:[ 	]+0485822f[ 	]+vamoaddei8.v[ 	]+v4,\(a1\),v8,v4,v0.t
+diff --git a/gas/testsuite/gas/riscv/vector-insns.s b/gas/testsuite/gas/riscv/vector-insns.s
+index 8b9a894418..edd94d7d29 100644
+--- a/gas/testsuite/gas/riscv/vector-insns.s
++++ b/gas/testsuite/gas/riscv/vector-insns.s
+@@ -1644,8 +1644,21 @@
+ 
+ 	vl1r.v v3, (a0)
+ 	vl1r.v v3, 0(a0)
++	vl2r.v v2, (a0)
++	vl2r.v v2, 0(a0)
++	vl4r.v v4, (a0)
++	vl4r.v v4, 0(a0)
++	vl8r.v v8, (a0)
++	vl8r.v v8, 0(a0)
++
+ 	vs1r.v v3, (a1)
+ 	vs1r.v v3, 0(a1)
++	vs2r.v v2, (a1)
++	vs2r.v v2, 0(a1)
++	vs4r.v v4, (a1)
++	vs4r.v v4, 0(a1)
++	vs8r.v v8, (a1)
++	vs8r.v v8, 0(a1)
+ 
+ 	vamoaddei8.v v4, (a1), v8, v4
+ 	vamoaddei8.v x0, (a1), v8, v4
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 6ec4c2a33a..579bae2670 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -611,8 +611,8 @@ NF MEW MOP VM LUMOP/RS2 RS1 WIDTH VD opcode
+ 000 - 11 x xxxxx xxxxx --- xxxxx 0100111 VSXE<EEW>I
+ 000 - 01 x xxxxx xxxxx --- xxxxx 0100111 VSUXE<EEW>I
+ 000 - 00 x 10000 xxxxx --- xxxxx 0000111 VLE<EEW>FF
+-000 0 00 1 01000 xxxxx 000 xxxxx 0000111 VL<nf>R, nf = 1
+-000 0 00 1 01000 xxxxx 000 xxxxx 0100111 VS<nf>R, nf = 1
++xxx 0 00 1 01000 xxxxx 000 xxxxx 0000111 VL<nf>R, nf = 1,2,4,8
++xxx 0 00 1 01000 xxxxx 000 xxxxx 0100111 VS<nf>R, nf = 1,2,4,8
+ 
+ xxx - 00 x 00000 xxxxx --- xxxxx 0000111 VLSEG<nf>E<EEW>
+ xxx - 00 x 00000 xxxxx --- xxxxx 0100111 VSSEG<nf>E<EEW>
+@@ -1577,8 +1577,21 @@ xxx - 00 x 10000 xxxxx --- xxxxx 0000111 VLSEG<nf>E<EEW>FF
+ 
+ #define MATCH_VL1RV  0x02800007
+ #define MASK_VL1RV   0xfff0707f
++#define MATCH_VL2RV  0x22800007
++#define MASK_VL2RV   0xfff0707f
++#define MATCH_VL4RV  0x62800007
++#define MASK_VL4RV   0xfff0707f
++#define MATCH_VL8RV  0xe2800007
++#define MASK_VL8RV   0xfff0707f
++
+ #define MATCH_VS1RV  0x02800027
+ #define MASK_VS1RV   0xfff0707f
++#define MATCH_VS2RV  0x22800027
++#define MASK_VS2RV   0xfff0707f
++#define MATCH_VS4RV  0x62800027
++#define MASK_VS4RV   0xfff0707f
++#define MATCH_VS8RV  0xe2800027
++#define MASK_VS8RV   0xfff0707f
+ 
+ /* Temporary AMO encoding info
+ 
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index fcd87e2261..ce9b10e411 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1563,7 +1563,14 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"vlseg8e1024ff.v",  0, INSN_CLASS_V_OR_ZVLSSEG,  "Vd,0(s)Vm", MATCH_VLSEG8E1024FFV, MASK_VLSEG8E1024FFV, match_vd_neq_vm, INSN_DREF },
+ 
+ {"vl1r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL1RV, MASK_VL1RV, match_opcode, INSN_DREF },
++{"vl2r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL2RV, MASK_VL2RV, match_opcode, INSN_DREF },
++{"vl4r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL4RV, MASK_VL4RV, match_opcode, INSN_DREF },
++{"vl8r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VL8RV, MASK_VL8RV, match_opcode, INSN_DREF },
++
+ {"vs1r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VS1RV, MASK_VS1RV, match_opcode, INSN_DREF },
++{"vs2r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VS2RV, MASK_VS2RV, match_opcode, INSN_DREF },
++{"vs4r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VS4RV, MASK_VS4RV, match_opcode, INSN_DREF },
++{"vs8r.v",  0, INSN_CLASS_V,  "Vd,0(s)", MATCH_VS8RV, MASK_VS8RV, match_opcode, INSN_DREF },
+ 
+ {"vamoaddei8.v",   0, INSN_CLASS_V_OR_ZVAMO,  "Ve,0(s),Vt,VfVm", MATCH_VAMOADDEI8V, MASK_VAMOADDEI8V, match_opcode, INSN_DREF},
+ {"vamoswapei8.v",  0, INSN_CLASS_V_OR_ZVAMO,  "Ve,0(s),Vt,VfVm", MATCH_VAMOSWAPEI8V, MASK_VAMOSWAPEI8V, match_opcode, INSN_DREF},
+-- 
+2.33.0
+

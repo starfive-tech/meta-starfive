@@ -1,0 +1,128 @@
+From 6d82557fb262e1b17d523ee34a76f8216918ff26 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Thu, 3 Dec 2020 17:47:35 +0800
+Subject: [PATCH 40/48] RISC-V: Add missing zext.[hw] pseudo instructions.
+
+I only add the zext pseudo which will be converted to the physical
+b-ext instrcution.  As for the zext.b, it should be controlled by i-ext,
+and be added to FSF binutils directly, not here.
+---
+ gas/testsuite/gas/riscv/zext-32.d         | 11 +++++++++++
+ gas/testsuite/gas/riscv/zext-64.d         | 12 ++++++++++++
+ gas/testsuite/gas/riscv/zext-noalias-32.d | 11 +++++++++++
+ gas/testsuite/gas/riscv/zext-noalias-64.d | 12 ++++++++++++
+ gas/testsuite/gas/riscv/zext.s            |  6 ++++++
+ opcodes/riscv-opc.c                       |  3 +++
+ 6 files changed, 55 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/zext-32.d
+ create mode 100644 gas/testsuite/gas/riscv/zext-64.d
+ create mode 100644 gas/testsuite/gas/riscv/zext-noalias-32.d
+ create mode 100644 gas/testsuite/gas/riscv/zext-noalias-64.d
+ create mode 100644 gas/testsuite/gas/riscv/zext.s
+
+diff --git a/gas/testsuite/gas/riscv/zext-32.d b/gas/testsuite/gas/riscv/zext-32.d
+new file mode 100644
+index 0000000000..9111177941
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zext-32.d
+@@ -0,0 +1,11 @@
++#as: -march=rv32ib
++#source: zext.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+0805c533[ 	]+zext.h[ 	]+a0,a1
+diff --git a/gas/testsuite/gas/riscv/zext-64.d b/gas/testsuite/gas/riscv/zext-64.d
+new file mode 100644
+index 0000000000..3b0955a00f
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zext-64.d
+@@ -0,0 +1,12 @@
++#as: -march=rv64ib -defsym __64_bit__=1
++#source: zext.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+0805c53b[ 	]+zext.h[ 	]+a0,a1
++[ 	]+4:[ 	]+0805853b[ 	]+zext.w[ 	]+a0,a1
+diff --git a/gas/testsuite/gas/riscv/zext-noalias-32.d b/gas/testsuite/gas/riscv/zext-noalias-32.d
+new file mode 100644
+index 0000000000..bdecbc2fc2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zext-noalias-32.d
+@@ -0,0 +1,11 @@
++#as: -march=rv32ib
++#source: zext.s
++#objdump: -d -Mno-aliases
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+0805c533[ 	]+pack[ 	]+a0,a1,zero
+diff --git a/gas/testsuite/gas/riscv/zext-noalias-64.d b/gas/testsuite/gas/riscv/zext-noalias-64.d
+new file mode 100644
+index 0000000000..8dfd77bf43
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zext-noalias-64.d
+@@ -0,0 +1,12 @@
++#as: -march=rv64ib -defsym __64_bit__=1
++#source: zext.s
++#objdump: -d -Mno-aliases
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+0805c53b[ 	]+packw[ 	]+a0,a1,zero
++[ 	]+4:[ 	]+0805853b[ 	]+addu.w[ 	]+a0,a1,zero
+diff --git a/gas/testsuite/gas/riscv/zext.s b/gas/testsuite/gas/riscv/zext.s
+new file mode 100644
+index 0000000000..e2e127d949
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/zext.s
+@@ -0,0 +1,6 @@
++target:
++	zext.h	a0, a1
++
++.ifdef __64_bit__
++	zext.w  a0, a1
++.endif
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index f55e1281ed..dbabc5c2f6 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -1061,6 +1061,8 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"xperm.h",   0, INSN_CLASS_B_OR_ZBP,   "d,s,t",  MATCH_XPERMH, MASK_XPERMH, match_opcode, 0 },
+ {"bdep",      0, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BDEP, MASK_BDEP, match_opcode, 0 },
+ {"bext",      0, INSN_CLASS_B_OR_ZBE,   "d,s,t",  MATCH_BEXT, MASK_BEXT, match_opcode, 0 },
++{"zext.h",   32, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  MATCH_PACK, MASK_PACK | MASK_RS2, match_opcode, INSN_ALIAS },
++{"zext.h",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  MATCH_PACKW, MASK_PACKW | MASK_RS2, match_opcode, INSN_ALIAS },
+ {"pack",      0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACK, MASK_PACK, match_opcode, 0 },
+ {"packu",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKU, MASK_PACKU, match_opcode, 0 },
+ {"packh",     0, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s,t",  MATCH_PACKH, MASK_PACKH, match_opcode, 0 },
+@@ -1068,6 +1070,7 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"bmatxor",  64, INSN_CLASS_B_OR_ZBM,   "d,s,t",  MATCH_BMATXOR, MASK_BMATXOR, match_opcode, 0 },
+ {"bfp",       0, INSN_CLASS_B_OR_ZBF,   "d,s,t",  MATCH_BFP, MASK_BFP, match_opcode, 0 },
+ {"slliu.w",  64, INSN_CLASS_B_OR_ZBB,   "d,s,>",  MATCH_SLLIU_W, MASK_SLLIU_W, match_opcode, 0 },
++{"zext.w",   64, INSN_CLASS_B_OR_ZBB_OR_ZBP,   "d,s",  MATCH_ADDU_W, MASK_ADDU_W | MASK_RS2, match_opcode, INSN_ALIAS },
+ {"addu.w",   64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_ADDU_W, MASK_ADDU_W, match_opcode, 0 },
+ {"subu.w",   64, INSN_CLASS_B_OR_ZBB,   "d,s,t",  MATCH_SUBU_W, MASK_SUBU_W, match_opcode, 0 },
+ {"sloiw",    64, INSN_CLASS_B_OR_ZBP,   "d,s,<",  MATCH_SLOIW, MASK_SLOIW, match_opcode, 0 },
+-- 
+2.33.0
+

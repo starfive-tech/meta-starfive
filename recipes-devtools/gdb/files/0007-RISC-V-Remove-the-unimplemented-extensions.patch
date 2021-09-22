@@ -1,0 +1,42 @@
+From 5b9cc689d4ba988a2540ea7047f9b285eda3da5a Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 20 Nov 2020 16:52:35 +0800
+Subject: [PATCH 07/48] RISC-V: Remove the unimplemented extensions.
+
+Although spec had defined and ratified p, v and n extensions,
+but we don't have any related implementaitons so far, so keep
+them in the supported extension table looks weird.  Remove them
+until we have the related implementations.
+
+	opcodes/
+	* riscv-opc.c (riscv_ext_version_table): Remove the p, v, n
+	and their versions.
+---
+ opcodes/riscv-opc.c | 11 -----------
+ 1 file changed, 11 deletions(-)
+
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 121f3fee41..7ca44dc5b8 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -921,17 +921,6 @@ const struct riscv_ext_version riscv_ext_version_table[] =
+ {"c", ISA_SPEC_CLASS_20190608, 2, 0},
+ {"c", ISA_SPEC_CLASS_2P2,      2, 0},
+ 
+-{"p", ISA_SPEC_CLASS_20191213, 0, 2},
+-{"p", ISA_SPEC_CLASS_20190608, 0, 2},
+-{"p", ISA_SPEC_CLASS_2P2,      0, 1},
+-
+-{"v", ISA_SPEC_CLASS_20191213, 0, 7},
+-{"v", ISA_SPEC_CLASS_20190608, 0, 7},
+-{"v", ISA_SPEC_CLASS_2P2,      0, 7},
+-
+-{"n", ISA_SPEC_CLASS_20190608, 1, 1},
+-{"n", ISA_SPEC_CLASS_2P2,      1, 1},
+-
+ {"zicsr", ISA_SPEC_CLASS_20191213, 2, 0},
+ {"zicsr", ISA_SPEC_CLASS_20190608, 2, 0},
+ 
+-- 
+2.33.0
+

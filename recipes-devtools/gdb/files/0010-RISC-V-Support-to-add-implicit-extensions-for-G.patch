@@ -1,0 +1,173 @@
+From fc4fc5e8d08978e94212af98282b3123e4313390 Mon Sep 17 00:00:00 2001
+From: Nelson Chu <nelson.chu@sifive.com>
+Date: Fri, 20 Nov 2020 22:33:11 +0800
+Subject: [PATCH 10/48] RISC-V: Support to add implicit extensions for G.
+
+G is a special case, consider the ISA spec github issue as follows,
+https://github.com/riscv/riscv-isa-manual/issues/575
+
+My understand is that - i, m, a, f and d extensions are not g's implicit
+extensions, they are g's expansions.  The zifencei is the implicit extension
+of g, and so is zicsr, since it is implicited by f (or i2p1).  However,
+we add the g with the RISCV_UNKNOWN_VERSION to the subset list, and it
+will not output to the arch string, it is only used to check what implicit
+extensions are need to be added.
+
+	bfd/
+	* elfxx-riscv.c (riscv_parse_add_subset): Allow to add g with
+	RISCV_UNKNOWN_VERSION versions.
+	(riscv_parse_std_ext): Add g to the subset list, we only use it
+	to add the implicit extensions, but won't output it to arch string.
+	(riscv_parse_add_implicit_subsets): Add implicit zicsr and zifencei
+	for g extension.
+	(riscv_arch_str1): Do not output g to the arch string.
+	* elfxx-riscv.h (RISCV_UNKNOWN_VERSION): Moved to include/opcode/riscv.h.
+
+	gas/
+	* testsuite/gas/riscv/attribute-10.d: Updated.
+	* testsuite/gas/riscv/march-imply-g.d: New testcase for g.
+	* testsuite/gas/riscv/march-imply-unsupported.d: The zicsr and zifencei
+	are not supported in the ISA spec v2.2, so don't add and output them.
+
+	include/
+	* opcode/riscv.h (RISCV_UNKNOWN_VERSION): added.
+---
+ bfd/elfxx-riscv.c                             | 27 ++++++++++++++-----
+ bfd/elfxx-riscv.h                             |  2 --
+ gas/testsuite/gas/riscv/attribute-10.d        |  2 +-
+ gas/testsuite/gas/riscv/march-imply-g.d       |  6 +++++
+ .../gas/riscv/march-imply-unsupported.d       |  6 +++++
+ include/opcode/riscv.h                        |  2 ++
+ 6 files changed, 36 insertions(+), 9 deletions(-)
+ create mode 100644 gas/testsuite/gas/riscv/march-imply-g.d
+ create mode 100644 gas/testsuite/gas/riscv/march-imply-unsupported.d
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 38c4de19bd..7ff8c52620 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1158,6 +1158,7 @@ riscv_parse_add_subset (riscv_parse_subset_t *rps,
+     rps->get_default_version (subset, &major_version, &minor_version);
+ 
+   if (!implicit
++      && strcmp (subset, "g") != 0
+       && (major_version == RISCV_UNKNOWN_VERSION
+ 	  || minor_version == RISCV_UNKNOWN_VERSION))
+     {
+@@ -1339,8 +1340,6 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ 	break;
+ 
+       case 'g':
+-	/* The g-ext shouldn't has the version, so we just
+-	   skip the setting if user set a version to it.  */
+ 	p = riscv_parsing_subset_version (rps, march, ++p,
+ 					  &major_version,
+ 					  &minor_version, TRUE);
+@@ -1348,6 +1347,11 @@ riscv_parse_std_ext (riscv_parse_subset_t *rps,
+ 	riscv_parse_add_subset (rps, "i",
+ 				RISCV_UNKNOWN_VERSION,
+ 				RISCV_UNKNOWN_VERSION, FALSE);
++	/* g-ext is used to add the implicit extensions, but will
++	   not be output to the arch string.  */
++	riscv_parse_add_subset (rps, "g",
++				major_version,
++				minor_version, FALSE);
+ 	for ( ; *std_exts != 'q'; std_exts++)
+ 	  {
+ 	    subset[0] = *std_exts;
+@@ -1727,6 +1731,16 @@ riscv_parse_add_implicit_subsets (riscv_parse_subset_t *rps)
+     riscv_parse_add_subset (rps, "zicsr",
+ 			    RISCV_UNKNOWN_VERSION,
+ 			    RISCV_UNKNOWN_VERSION, TRUE);
++
++  if ((riscv_lookup_subset (rps->subset_list, "g", &subset)))
++    {
++      riscv_parse_add_subset (rps, "zicsr",
++			      RISCV_UNKNOWN_VERSION,
++			      RISCV_UNKNOWN_VERSION, TRUE);
++      riscv_parse_add_subset (rps, "zifencei",
++			      RISCV_UNKNOWN_VERSION,
++			      RISCV_UNKNOWN_VERSION, TRUE);
++    }
+ }
+ 
+ /* Function for parsing arch string.
+@@ -1896,10 +1910,11 @@ riscv_arch_str1 (riscv_subset_t *subset,
+ 
+   strncat (attr_str, buf, bufsz);
+ 
+-  /* Skip 'i' extension after 'e'.  */
+-  if ((strcasecmp (subset->name, "e") == 0)
+-      && subset->next
+-      && (strcasecmp (subset->next->name, "i") == 0))
++  /* Skip 'i' extension after 'e', and skip 'g' extension.  */
++  if (subset->next
++      && ((strcmp (subset->name, "e") == 0
++	   && strcmp (subset->next->name, "i") == 0)
++	  || strcmp (subset->next->name, "g") == 0))
+     riscv_arch_str1 (subset->next->next, attr_str, buf, bufsz);
+   else
+     riscv_arch_str1 (subset->next, attr_str, buf, bufsz);
+diff --git a/bfd/elfxx-riscv.h b/bfd/elfxx-riscv.h
+index 89d4abb86e..4e03ce1e86 100644
+--- a/bfd/elfxx-riscv.h
++++ b/bfd/elfxx-riscv.h
+@@ -33,8 +33,6 @@ riscv_reloc_type_lookup (bfd *, bfd_reloc_code_real_type);
+ extern reloc_howto_type *
+ riscv_elf_rtype_to_howto (bfd *, unsigned int r_type);
+ 
+-#define RISCV_UNKNOWN_VERSION -1
+-
+ /* The information of architecture attribute.  */
+ struct riscv_subset_t
+ {
+diff --git a/gas/testsuite/gas/riscv/attribute-10.d b/gas/testsuite/gas/riscv/attribute-10.d
+index ba903d1727..30b82d7207 100644
+--- a/gas/testsuite/gas/riscv/attribute-10.d
++++ b/gas/testsuite/gas/riscv/attribute-10.d
+@@ -3,4 +3,4 @@
+ #source: empty.s
+ Attribute Section: riscv
+ File Attributes
+-  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0"
++  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_zicsr2p0_zifencei2p0"
+diff --git a/gas/testsuite/gas/riscv/march-imply-g.d b/gas/testsuite/gas/riscv/march-imply-g.d
+new file mode 100644
+index 0000000000..33a243d78d
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-imply-g.d
+@@ -0,0 +1,6 @@
++#as: -march=rv32g -march-attr -misa-spec=20191213
++#readelf: -A
++#source: empty.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p1_m2p0_a2p1_f2p2_d2p2_zicsr2p0_zifencei2p0"
+diff --git a/gas/testsuite/gas/riscv/march-imply-unsupported.d b/gas/testsuite/gas/riscv/march-imply-unsupported.d
+new file mode 100644
+index 0000000000..2e19e09abf
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/march-imply-unsupported.d
+@@ -0,0 +1,6 @@
++#as: -march=rv32g -march-attr -misa-spec=2.2
++#readelf: -A
++#source: empty.s
++Attribute Section: riscv
++File Attributes
++  Tag_RISCV_arch: "rv32i2p0_m2p0_a2p0_f2p0_d2p0"
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index 94a13803d9..680780a664 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -354,6 +354,8 @@ enum riscv_isa_spec_class
+   ISA_SPEC_CLASS_20191213
+ };
+ 
++#define RISCV_UNKNOWN_VERSION -1
++
+ /* This structure holds version information for specific ISA.  */
+ 
+ struct riscv_ext_version
+-- 
+2.33.0
+
