@@ -1,0 +1,137 @@
+From 8aee0b0ae5bf3becd7544e0ed0694268ccaf135a Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Fri, 9 Jul 2021 11:02:06 +0800
+Subject: [PATCH 05/11] target/riscv: rvb: add crossbar permutation
+ instructions
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 39 +++++++++++++++++++++++++
+ target/riscv/helper.h                   |  4 +++
+ target/riscv/insn32.decode              |  4 +++
+ target/riscv/insn_trans/trans_rvb.c.inc | 18 ++++++++++++
+ 4 files changed, 65 insertions(+)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 0e4780a4cb..6185fe44d3 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -320,3 +320,42 @@ target_ulong HELPER(unshflw)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_unshflw(rs1, rs2, TARGET_LONG_BITS);
+ }
++
++static target_ulong do_xperm(target_ulong rs1,
++                             target_ulong rs2,
++                             int sz_log2,
++                             int bits)
++{
++    target_ulong pos = 0;
++    target_ulong r = 0;
++    target_ulong sz = 1LL << sz_log2;
++    target_ulong mask = (1LL << sz) - 1;
++    int i;
++    for (i = 0; i < bits; i += sz) {
++        pos = ((rs2 >> i) & mask) << sz_log2;
++        if (pos < bits)
++            r |= ((rs1 >> pos) & mask) << i;
++    }
++
++    return r;
++}
++
++target_ulong HELPER(xperm_n)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_b)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 3, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_h)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 4, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_w)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 5, TARGET_LONG_BITS);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 8190b72880..2e6d4c3704 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -70,6 +70,10 @@ DEF_HELPER_FLAGS_2(shfl, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(unshfl, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(shflw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(unshflw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_n, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_b, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_h, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_w, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsl, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsr, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index cd3518d716..3fcddcd5e3 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -701,6 +701,9 @@ clmulh     0000101 .......... 011 ..... 0110011 @r
+ clmulr     0000101 .......... 010 ..... 0110011 @r
+ shfl       0000100 .......... 001 ..... 0110011 @r
+ unshfl     0000100 .......... 101 ..... 0110011 @r
++xperm_n    0010100 .......... 010 ..... 0110011 @r
++xperm_b    0010100 .......... 100 ..... 0110011 @r
++xperm_h    0010100 .......... 110 ..... 0110011 @r
+ cmix       .....11 .......... 001 ..... 0110011 @r3
+ cmov       .....11 .......... 101 ..... 0110011 @r3
+ fsl        .....10 .......... 001 ..... 0110011 @r3
+@@ -742,6 +745,7 @@ sh3add_uw  0010000 .......... 110 ..... 0111011 @r
+ add_uw     0000100 .......... 000 ..... 0111011 @r
+ shflw      0000100 .......... 001 ..... 0111011 @r
+ unshflw    0000100 .......... 101 ..... 0111011 @r
++xperm_w    0010100 .......... 000 ..... 0110011 @r
+ fslw       .....10 .......... 001 ..... 0111011 @r3
+ fsrw       .....10 .......... 101 ..... 0111011 @r3
+ 
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index 4317a8b2db..12cfb0d955 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -278,6 +278,17 @@ static bool trans_unshfli(DisasContext *ctx, arg_unshfli *a)
+     return gen_shifti(ctx, a, gen_helper_unshfl);
+ }
+ 
++#define GEN_TRANS_XPERM(NAME)                                   \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)      \
++{                                                               \
++    REQUIRE_EXT(ctx, RVB);                                      \
++    return gen_arith(ctx, a, gen_helper_##NAME);                \
++}
++
++GEN_TRANS_XPERM(xperm_n)
++GEN_TRANS_XPERM(xperm_b)
++GEN_TRANS_XPERM(xperm_h)
++
+ static bool trans_cmix(DisasContext *ctx, arg_cmix *a)
+ {
+     REQUIRE_EXT(ctx, RVB);
+@@ -327,6 +338,13 @@ static bool trans_unshflw(DisasContext *ctx, arg_unshflw *a)
+     return gen_arith(ctx, a, gen_helper_unshflw);
+ }
+ 
++static bool trans_xperm_w(DisasContext *ctx, arg_xperm_w *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_xperm_w);
++}
++
+ static bool trans_fslw(DisasContext *ctx, arg_fslw *a)
+ {
+     REQUIRE_64BIT(ctx);
+-- 
+2.33.0
+

@@ -1,0 +1,276 @@
+From 12b81cda67d951924d9a4ae3b3e430c35a2f7f05 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 8 Jul 2021 19:33:13 +0800
+Subject: [PATCH 03/11] target/riscv: rvb: add funnel shfit instruction
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 54 +++++++++++++++++++++++++
+ target/riscv/helper.h                   |  4 ++
+ target/riscv/insn32.decode              | 37 +++++++++++------
+ target/riscv/insn_trans/trans_rvb.c.inc | 49 ++++++++++++++++++++++
+ target/riscv/translate.c                | 21 ++++++++++
+ 5 files changed, 152 insertions(+), 13 deletions(-)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 46b51399f2..b90bdafb62 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -134,3 +134,57 @@ target_ulong HELPER(cmov)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
+ {
+     return do_cmov(rs1, rs2, rs3);
+ }
++
++
++static target_ulong do_fsl(target_ulong rs1,
++                           target_ulong rs2,
++                           target_ulong rs3,
++                           int bits)
++{
++    int shamt = rs2 & (2*bits - 1);
++    target_ulong a = rs1, b = rs3;
++
++    if (shamt >= bits) {
++        shamt -= bits;
++        a = rs3;
++        b = rs1;
++    }
++
++    return shamt ? (a << shamt) | (b >> (bits - shamt)) : a;
++}
++
++target_ulong HELPER(fsl)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fsl(rs1, rs2, rs3, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(fsr)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fsl(rs1, -rs2, rs3, TARGET_LONG_BITS);
++}
++
++static target_ulong do_fslw(target_ulong rs1,
++                            target_ulong rs2,
++                            target_ulong rs3)
++{
++    int shamt = rs2 & 63;
++    target_ulong a = rs1, b = rs3;
++
++    if (shamt >= 32) {
++        shamt -= 32;
++        a = rs3;
++        b = rs1;
++    }
++
++    return shamt ? (a << shamt) | (b >> (32 - shamt)) : a;
++}
++
++target_ulong HELPER(fslw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fslw(rs1, rs2, rs3);
++}
++
++target_ulong HELPER(fsrw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fslw(rs1, -rs2, rs3);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 1282aada80..dcf87f2423 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -67,6 +67,10 @@ DEF_HELPER_FLAGS_2(clmul, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(clmulh, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(clmulr, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsl, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsr, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fslw, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsrw, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ 
+ /* Special functions */
+ DEF_HELPER_3(csrrw, tl, env, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index 06527db5f2..e635b0b6e1 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -24,6 +24,7 @@
+ %sh5       20:5
+ 
+ %sh7    20:7
++%sh6    20:6
+ %csr    20:12
+ %rm     12:3
+ %nf     29:3                     !function=ex_plus_1
+@@ -43,6 +44,7 @@
+ &r    rd rs1 rs2
+ &r2   rd rs1
+ &r3   rd rs1 rs2 rs3
++&r3i  rd rs1 imm rs3
+ &s    imm rs1 rs2
+ &u    imm rd
+ &shift     shamt rs1 rd
+@@ -62,12 +64,15 @@
+ @j       ....................      ..... ....... &j      imm=%imm_j          %rd
+ 
+ @sh      ......  ...... .....  ... ..... ....... &shift  shamt=%sh7     %rs1 %rd
++@sh6     ......  ...... .....  ... ..... ....... &shift  shamt=%sh6     %rs1 %rd
+ @csr     ............   .....  ... ..... .......               %csr     %rs1 %rd
+ 
+ @atom_ld ..... aq:1 rl:1 ..... ........ ..... ....... &atomic rs2=0     %rs1 %rd
+ @atom_st ..... aq:1 rl:1 ..... ........ ..... ....... &atomic %rs2      %rs1 %rd
+ 
+ @r3      ..... ..  ..... ..... ... ..... ....... &r3 %rs3 %rs2 %rs1 %rd
++@r3_imm  ..... .  ...... ..... ... ..... ....... &r3i %rs3 imm=%sh6 %rs1 %rd
++@r3w_imm ..... .  ...... ..... ... ..... ....... &r3i %rs3 imm=%sh5 %rs1 %rd
+ @r4_rm   ..... ..  ..... ..... ... ..... ....... %rs3 %rs2 %rs1 %rm %rd
+ @r_rm    .......   ..... ..... ... ..... ....... %rs2 %rs1 %rm %rd
+ @r2_rm   .......   ..... ..... ... ..... ....... %rs1 %rm %rd
+@@ -128,9 +133,9 @@ sltiu    ............     ..... 011 ..... 0010011 @i
+ xori     ............     ..... 100 ..... 0010011 @i
+ ori      ............     ..... 110 ..... 0010011 @i
+ andi     ............     ..... 111 ..... 0010011 @i
+-slli     00000. ......    ..... 001 ..... 0010011 @sh
+-srli     00000. ......    ..... 101 ..... 0010011 @sh
+-srai     01000. ......    ..... 101 ..... 0010011 @sh
++slli     000000 ......    ..... 001 ..... 0010011 @sh6
++srli     000000 ......    ..... 101 ..... 0010011 @sh6
++srai     010000 ......    ..... 101 ..... 0010011 @sh6
+ add      0000000 .....    ..... 000 ..... 0110011 @r
+ sub      0100000 .....    ..... 000 ..... 0110011 @r
+ sll      0000000 .....    ..... 001 ..... 0110011 @r
+@@ -696,16 +701,19 @@ clmulh     0000101 .......... 011 ..... 0110011 @r
+ clmulr     0000101 .......... 010 ..... 0110011 @r
+ cmix       .....11 .......... 001 ..... 0110011 @r3
+ cmov       .....11 .......... 101 ..... 0110011 @r3
+-
+-bseti      00101. ........... 001 ..... 0010011 @sh
+-bclri      01001. ........... 001 ..... 0010011 @sh
+-binvi      01101. ........... 001 ..... 0010011 @sh
+-bexti      01001. ........... 101 ..... 0010011 @sh
+-sloi       00100. ........... 001 ..... 0010011 @sh
+-sroi       00100. ........... 101 ..... 0010011 @sh
+-rori       01100. ........... 101 ..... 0010011 @sh
+-grevi      01101. ........... 101 ..... 0010011 @sh
+-gorci      00101. ........... 101 ..... 0010011 @sh
++fsl        .....10 .......... 001 ..... 0110011 @r3
++fsr        .....10 .......... 101 ..... 0110011 @r3
++
++fsri       .....1 ........... 101 ..... 0010011 @r3_imm
++bseti      001010 ........... 001 ..... 0010011 @sh6
++bclri      010010 ........... 001 ..... 0010011 @sh6
++binvi      011010 ........... 001 ..... 0010011 @sh6
++bexti      010010 ........... 101 ..... 0010011 @sh6
++sloi       001000 ........... 001 ..... 0010011 @sh6
++sroi       001000 ........... 101 ..... 0010011 @sh6
++rori       011000 ........... 101 ..... 0010011 @sh6
++grevi      011010 ........... 101 ..... 0010011 @sh6
++gorci      001010 ........... 101 ..... 0010011 @sh6
+ 
+ # *** RV64B Standard Extension (in addition to RV32B) ***
+ clzw       0110000 00000 ..... 001 ..... 0011011 @r2
+@@ -728,7 +736,10 @@ sh1add_uw  0010000 .......... 010 ..... 0111011 @r
+ sh2add_uw  0010000 .......... 100 ..... 0111011 @r
+ sh3add_uw  0010000 .......... 110 ..... 0111011 @r
+ add_uw     0000100 .......... 000 ..... 0111011 @r
++fslw       .....10 .......... 001 ..... 0111011 @r3
++fsrw       .....10 .......... 101 ..... 0111011 @r3
+ 
++fsriw      .....10 .......... 101 ..... 0011011 @r3w_imm
+ bsetiw     0010100 .......... 001 ..... 0011011 @sh5
+ bclriw     0100100 .......... 001 ..... 0011011 @sh5
+ binviw     0110100 .......... 001 ..... 0011011 @sh5
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index 2a143d9d8f..91762aace5 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -260,6 +260,55 @@ static bool trans_cmov(DisasContext *ctx, arg_cmov *a)
+     return gen_quat(ctx, a, gen_helper_cmov);
+ }
+ 
++static bool trans_fsl(DisasContext *ctx, arg_fsl *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsl);
++}
++
++static bool trans_fsr(DisasContext *ctx, arg_fsr *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsr);
++}
++
++static bool trans_fsri(DisasContext *ctx, arg_fsri *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++
++    if (a->imm >= 64) {
++        return false;
++    }
++
++    return gen_quati(ctx, a, gen_helper_fsr);
++}
++
++static bool trans_fslw(DisasContext *ctx, arg_fslw *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsl);
++}
++
++static bool trans_fsrw(DisasContext *ctx, arg_fsrw *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsrw);
++}
++
++static bool trans_fsriw(DisasContext *ctx, arg_fsri *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++
++    if (a->imm >= 32) {
++        return false;
++    }
++
++    return gen_quati(ctx, a, gen_helper_fsrw);
++}
++
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+ {
+     REQUIRE_64BIT(ctx);
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index 50aeb2b4c8..daaffa2b26 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -836,6 +836,27 @@ static bool gen_shift(DisasContext *ctx, arg_r *a,
+     return true;
+ }
+ 
++static bool gen_quati(DisasContext *ctx, arg_r3i *a,
++                      void(*func)(TCGv, TCGv, TCGv, TCGv))
++{
++    TCGv source1, source2, source3;
++    source1 = tcg_temp_new();
++    source2 = tcg_temp_new();
++    source3 = tcg_temp_new();
++
++    gen_get_gpr(source1, a->rs1);
++    tcg_gen_movi_tl(source2, a->imm);
++    gen_get_gpr(source3, a->rs3);
++
++    (*func)(source1, source1, source2, source3);
++
++    gen_set_gpr(a->rd, source1);
++    tcg_temp_free(source1);
++    tcg_temp_free(source2);
++    tcg_temp_free(source3);
++    return true;
++}
++
+ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
+ {
+     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+-- 
+2.33.0
+

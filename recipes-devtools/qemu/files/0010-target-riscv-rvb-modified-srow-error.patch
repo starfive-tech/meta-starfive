@@ -1,0 +1,69 @@
+From 98a9115f2667b9d029fd83da50c42c15d5e40bd6 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Tue, 13 Jul 2021 13:15:23 +0800
+Subject: [PATCH 10/11] target/riscv: rvb: modified srow error
+
+    srow rd, rs1, rs2
+    modified the error when rs1 >= 0xffffffff
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/insn_trans/trans_rvb.c.inc |  4 ++--
+ target/riscv/translate.c                | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index fde91c1953..307fb982e0 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -547,14 +547,14 @@ static bool trans_srow(DisasContext *ctx, arg_srow *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_shiftw(ctx, a, gen_sro);
++    return gen_shiftw(ctx, a, gen_srow);
+ }
+ 
+ static bool trans_sroiw(DisasContext *ctx, arg_sroiw *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_shiftiw(ctx, a, gen_sro);
++    return gen_shiftiw(ctx, a, gen_srow);
+ }
+ 
+ static bool trans_rorw(DisasContext *ctx, arg_rorw *a)
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index 79d93feec3..4d713b16e0 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -627,6 +627,26 @@ static void gen_sro(TCGv ret, TCGv arg1, TCGv arg2)
+     tcg_gen_not_tl(ret, ret);
+ }
+ 
++static void gen_srow(TCGv ret, TCGv arg1, TCGv arg2)
++{
++    TCGv_i32 t1 = tcg_temp_new_i32();
++    TCGv_i32 t2 = tcg_temp_new_i32();
++
++    /* truncate to 32-bits */
++    tcg_gen_trunc_tl_i32(t1, arg1);
++    tcg_gen_trunc_tl_i32(t2, arg2);
++
++    tcg_gen_not_i32(t1, t1);
++    tcg_gen_shr_i32(t1, t1, t2);
++    tcg_gen_not_i32(t1, t1);
++
++    /* sign-extend 64-bits */
++    tcg_gen_ext_i32_tl(ret, t1);
++
++    tcg_temp_free_i32(t1);
++    tcg_temp_free_i32(t2);
++}
++
+ static bool gen_grevi(DisasContext *ctx, arg_grevi *a)
+ {
+     TCGv source1 = tcg_temp_new();
+-- 
+2.33.0
+

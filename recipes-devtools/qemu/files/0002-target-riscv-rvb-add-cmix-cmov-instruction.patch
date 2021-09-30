@@ -1,0 +1,142 @@
+From 9401079bda6803c2b7c6251eb579fca5657991d1 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 8 Jul 2021 13:43:50 +0800
+Subject: [PATCH 02/11] target/riscv: rvb: add cmix/cmov instruction
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 12 ++++++++++
+ target/riscv/helper.h                   |  1 +
+ target/riscv/insn32.decode              |  5 ++++-
+ target/riscv/insn_trans/trans_rvb.c.inc | 12 ++++++++++
+ target/riscv/translate.c                | 29 +++++++++++++++++++++++++
+ 5 files changed, 58 insertions(+), 1 deletion(-)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 29dfe921ab..46b51399f2 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -122,3 +122,15 @@ target_ulong HELPER(clmulr)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_clmulr(rs1, rs2, TARGET_LONG_BITS);
+ }
++
++static target_ulong do_cmov(target_ulong rs1,
++                            target_ulong rs2,
++                            target_ulong rs3)
++{
++    return rs2 ? rs1 : rs3;
++}
++
++target_ulong HELPER(cmov)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_cmov(rs1, rs2, rs3);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 6ee9e8d058..1282aada80 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -66,6 +66,7 @@ DEF_HELPER_FLAGS_2(gorcw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(clmul, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(clmulh, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(clmulr, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ 
+ /* Special functions */
+ DEF_HELPER_3(csrrw, tl, env, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index 617ead6669..06527db5f2 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -42,6 +42,7 @@
+ &j    imm rd
+ &r    rd rs1 rs2
+ &r2   rd rs1
++&r3   rd rs1 rs2 rs3
+ &s    imm rs1 rs2
+ &u    imm rd
+ &shift     shamt rs1 rd
+@@ -66,6 +67,7 @@
+ @atom_ld ..... aq:1 rl:1 ..... ........ ..... ....... &atomic rs2=0     %rs1 %rd
+ @atom_st ..... aq:1 rl:1 ..... ........ ..... ....... &atomic %rs2      %rs1 %rd
+ 
++@r3      ..... ..  ..... ..... ... ..... ....... &r3 %rs3 %rs2 %rs1 %rd
+ @r4_rm   ..... ..  ..... ..... ... ..... ....... %rs3 %rs2 %rs1 %rm %rd
+ @r_rm    .......   ..... ..... ... ..... ....... %rs2 %rs1 %rm %rd
+ @r2_rm   .......   ..... ..... ... ..... ....... %rs1 %rm %rd
+@@ -692,7 +694,8 @@ sh3add     0010000 .......... 110 ..... 0110011 @r
+ clmul      0000101 .......... 001 ..... 0110011 @r
+ clmulh     0000101 .......... 011 ..... 0110011 @r
+ clmulr     0000101 .......... 010 ..... 0110011 @r
+-
++cmix       .....11 .......... 001 ..... 0110011 @r3
++cmov       .....11 .......... 101 ..... 0110011 @r3
+ 
+ bseti      00101. ........... 001 ..... 0010011 @sh
+ bclri      01001. ........... 001 ..... 0010011 @sh
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index 181cbf285c..2a143d9d8f 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -248,6 +248,18 @@ GEN_TRANS_CLMUL(clmul)
+ GEN_TRANS_CLMUL(clmulh)
+ GEN_TRANS_CLMUL(clmulr)
+ 
++static bool trans_cmix(DisasContext *ctx, arg_cmix *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_cmix);
++}
++
++static bool trans_cmov(DisasContext *ctx, arg_cmov *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_cmov);
++}
++
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+ {
+     REQUIRE_64BIT(ctx);
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index 62a7d7e4c7..50aeb2b4c8 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -789,6 +789,35 @@ static bool gen_arith(DisasContext *ctx, arg_r *a,
+     return true;
+ }
+ 
++static void gen_cmix(TCGv ret, TCGv arg1, TCGv arg2, TCGv arg3)
++{
++    tcg_gen_and_tl(arg1, arg1, arg2);
++    tcg_gen_not_tl(arg2, arg2);
++    tcg_gen_and_tl(arg3, arg3, arg2);
++    tcg_gen_or_tl(ret, arg1, arg3);
++}
++
++static bool gen_quat(DisasContext *ctx, arg_r3 *a,
++                     void(*func)(TCGv, TCGv, TCGv, TCGv))
++{
++    TCGv source1, source2, source3;
++    source1 = tcg_temp_new();
++    source2 = tcg_temp_new();
++    source3 = tcg_temp_new();
++
++    gen_get_gpr(source1, a->rs1);
++    gen_get_gpr(source2, a->rs2);
++    gen_get_gpr(source3, a->rs3);
++
++    (*func)(source1, source1, source2, source3);
++
++    gen_set_gpr(a->rd, source1);
++    tcg_temp_free(source1);
++    tcg_temp_free(source2);
++    tcg_temp_free(source3);
++    return true;
++}
++
+ static bool gen_shift(DisasContext *ctx, arg_r *a,
+                         void(*func)(TCGv, TCGv, TCGv))
+ {
+-- 
+2.33.0
+

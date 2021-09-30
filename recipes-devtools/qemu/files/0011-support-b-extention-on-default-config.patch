@@ -1,0 +1,29 @@
+From 324b218c168ea816bb477127a2fe78d8d17de5b7 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 29 Jul 2021 09:26:34 +0800
+Subject: [PATCH 11/11] support b-extention on default config
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/cpu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/target/riscv/cpu.c b/target/riscv/cpu.c
+index 991a6bb760..95032fcb9f 100644
+--- a/target/riscv/cpu.c
++++ b/target/riscv/cpu.c
+@@ -153,9 +153,9 @@ static void riscv_any_cpu_init(Object *obj)
+ {
+     CPURISCVState *env = &RISCV_CPU(obj)->env;
+ #if defined(TARGET_RISCV32)
+-    set_misa(env, RV32 | RVI | RVM | RVA | RVF | RVD | RVC | RVU);
++    set_misa(env, RV32 | RVI | RVM | RVA | RVF | RVD | RVC | RVB | RVU);
+ #elif defined(TARGET_RISCV64)
+-    set_misa(env, RV64 | RVI | RVM | RVA | RVF | RVD | RVC | RVU);
++    set_misa(env, RV64 | RVI | RVM | RVA | RVF | RVD | RVC | RVB | RVU);
+ #endif
+     set_priv_version(env, PRIV_VERSION_1_11_0);
+ }
+-- 
+2.33.0
+

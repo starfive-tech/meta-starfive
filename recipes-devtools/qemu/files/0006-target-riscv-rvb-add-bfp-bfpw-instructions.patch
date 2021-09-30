@@ -1,0 +1,153 @@
+From 27fd4ca5ae5a5cd8ba49482305d54961a2031932 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Fri, 9 Jul 2021 12:36:57 +0800
+Subject: [PATCH 06/11] target/riscv: rvb: add bfp/bfpw instructions
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 40 ++++++++++++++++++++++++-
+ target/riscv/helper.h                   |  2 ++
+ target/riscv/insn32.decode              |  2 ++
+ target/riscv/insn_trans/trans_rvb.c.inc | 13 ++++++++
+ target/riscv/translate.c                |  6 ++++
+ 5 files changed, 62 insertions(+), 1 deletion(-)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 6185fe44d3..a610b22fa6 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -135,7 +135,6 @@ target_ulong HELPER(cmov)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
+     return do_cmov(rs1, rs2, rs3);
+ }
+ 
+-
+ static target_ulong do_fsl(target_ulong rs1,
+                            target_ulong rs2,
+                            target_ulong rs3,
+@@ -359,3 +358,42 @@ target_ulong HELPER(xperm_w)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_xperm(rs1, rs2, 5, TARGET_LONG_BITS);
+ }
++
++static target_ulong do_bfp(target_ulong rs1,
++                           target_ulong rs2,
++                           int bits)
++{
++    target_ulong cfg = rs2 >> (bits/2);
++    if ((cfg >> 30) == 2)
++        cfg = cfg >> 16;
++    int len = (cfg >> 8) & (bits/2 - 1);
++    int off = cfg & (bits - 1);
++    len = len ? len : bits/2;
++    target_ulong mask = ~(~(target_ulong)0 << len) << off;
++    target_ulong data = rs2 << off;
++
++    return (data & mask) | (rs1 & ~mask);
++}
++
++static target_ulong do_bfpw(target_ulong rs1,
++                            target_ulong rs2)
++{
++    target_ulong cfg = rs2 >> 16;
++    int len = (cfg >> 8) & 15;
++    int off = cfg & 31;
++    len = len ? len : 16;
++    target_ulong mask = ~(~(target_ulong)(0) << len) << off;
++    target_ulong data = rs2 << off;
++
++    return (data & mask) | (rs1 & ~mask);
++}
++
++target_ulong HELPER(bfp)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bfp(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bfpw)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bfpw(rs1, rs2);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 2e6d4c3704..2ae199f399 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -74,6 +74,8 @@ DEF_HELPER_FLAGS_2(xperm_n, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(xperm_b, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(xperm_h, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(xperm_w, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bfp, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bfpw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsl, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsr, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index 3fcddcd5e3..8187c42323 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -704,6 +704,7 @@ unshfl     0000100 .......... 101 ..... 0110011 @r
+ xperm_n    0010100 .......... 010 ..... 0110011 @r
+ xperm_b    0010100 .......... 100 ..... 0110011 @r
+ xperm_h    0010100 .......... 110 ..... 0110011 @r
++bfp        0100100 .......... 111 ..... 0110011 @r
+ cmix       .....11 .......... 001 ..... 0110011 @r3
+ cmov       .....11 .......... 101 ..... 0110011 @r3
+ fsl        .....10 .......... 001 ..... 0110011 @r3
+@@ -746,6 +747,7 @@ add_uw     0000100 .......... 000 ..... 0111011 @r
+ shflw      0000100 .......... 001 ..... 0111011 @r
+ unshflw    0000100 .......... 101 ..... 0111011 @r
+ xperm_w    0010100 .......... 000 ..... 0110011 @r
++bfpw       0100100 .......... 111 ..... 0111011 @r
+ fslw       .....10 .......... 001 ..... 0111011 @r3
+ fsrw       .....10 .......... 101 ..... 0111011 @r3
+ 
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index 12cfb0d955..e15f0a7999 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -289,6 +289,12 @@ GEN_TRANS_XPERM(xperm_n)
+ GEN_TRANS_XPERM(xperm_b)
+ GEN_TRANS_XPERM(xperm_h)
+ 
++static bool trans_bfp(DisasContext *ctx, arg_bfp *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bfp);
++}
++
+ static bool trans_cmix(DisasContext *ctx, arg_cmix *a)
+ {
+     REQUIRE_EXT(ctx, RVB);
+@@ -345,6 +351,13 @@ static bool trans_xperm_w(DisasContext *ctx, arg_xperm_w *a)
+     return gen_arith(ctx, a, gen_helper_xperm_w);
+ }
+ 
++static bool trans_bfpw(DisasContext *ctx, arg_bfpw *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_bfpw);
++}
++
+ static bool trans_fslw(DisasContext *ctx, arg_fslw *a)
+ {
+     REQUIRE_64BIT(ctx);
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index daaffa2b26..37eb0ea046 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -857,6 +857,12 @@ static bool gen_quati(DisasContext *ctx, arg_r3i *a,
+     return true;
+ }
+ 
++static void gen_bfpw(TCGv ret, TCGv arg1, TCGv arg2)
++{
++    gen_helper_bfpw(ret, arg1, arg2);
++    tcg_gen_ext32s_tl(ret, ret);
++}
++
+ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
+ {
+     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+-- 
+2.33.0
+

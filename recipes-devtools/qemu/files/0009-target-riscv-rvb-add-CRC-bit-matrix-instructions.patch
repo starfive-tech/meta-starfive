@@ -1,0 +1,262 @@
+From c3c43d0d0a746b557ca2cf647c7181f8e8aa9b20 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Fri, 9 Jul 2021 17:27:44 +0800
+Subject: [PATCH 09/11] target/riscv: rvb: add CRC & bit matrix instructions
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 137 ++++++++++++++++++++++++
+ target/riscv/helper.h                   |  11 ++
+ target/riscv/insn32.decode              |  11 ++
+ target/riscv/insn_trans/trans_rvb.c.inc |  37 +++++++
+ 4 files changed, 196 insertions(+)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 5e46b69159..7303f42ccb 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -440,3 +440,140 @@ target_ulong HELPER(bdecompress)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_bdecompress(rs1, rs2, TARGET_LONG_BITS);
+ }
++
++#define DO_CRC(NAME, VALUE)                             \
++static target_ulong do_##NAME(target_ulong rs1,         \
++                             int nbits)                 \
++{                                                       \
++    int i;                                              \
++    target_ulong x = rs1;                               \
++    for (i = 0; i < nbits; i++)                         \
++       x = (x >> 1) ^ ((VALUE) & ~((x&1)-1));           \
++    return x;                                           \
++}
++
++DO_CRC(crc32, 0xEDB88320)
++DO_CRC(crc32c, 0x82F63B78)
++
++target_ulong HELPER(crc32_b)(target_ulong rs1)
++{
++    return do_crc32(rs1, 8);
++}
++
++target_ulong HELPER(crc32_h)(target_ulong rs1)
++{
++    return do_crc32(rs1, 16);
++}
++
++target_ulong HELPER(crc32_w)(target_ulong rs1)
++{
++    return do_crc32(rs1, 32);
++}
++
++target_ulong HELPER(crc32_d)(target_ulong rs1)
++{
++    return do_crc32(rs1, 64);
++}
++
++target_ulong HELPER(crc32c_b)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 8);
++}
++
++target_ulong HELPER(crc32c_h)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 16);
++}
++
++target_ulong HELPER(crc32c_w)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 32);
++}
++
++target_ulong HELPER(crc32c_d)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 64);
++}
++
++static inline uint64_t popcount(uint64_t val)
++{
++    val = (val & 0x5555555555555555U) + ((val >>  1) & 0x5555555555555555U);
++    val = (val & 0x3333333333333333U) + ((val >>  2) & 0x3333333333333333U);
++    val = (val & 0x0f0f0f0f0f0f0f0fU) + ((val >>  4) & 0x0f0f0f0f0f0f0f0fU);
++    val = (val & 0x00ff00ff00ff00ffU) + ((val >>  8) & 0x00ff00ff00ff00ffU);
++    val = (val & 0x0000ffff0000ffffU) + ((val >> 16) & 0x0000ffff0000ffffU);
++    val = (val & 0x00000000ffffffffU) + ((val >> 32) & 0x00000000ffffffffU);
++    return val;
++}
++
++static target_ulong do_bmatflip(target_ulong rs1,
++                                int bits)
++{
++    target_ulong x = rs1;
++    for (int i = 0; i < 3; i++)
++        x = do_shfl(x, 31, bits);
++    return x;
++}
++
++static target_ulong do_bmatxor(target_ulong rs1,
++                               target_ulong rs2,
++                               int bits)
++{
++    int i;
++    uint8_t u[8];
++    uint8_t v[8];
++    uint64_t x = 0;
++
++    target_ulong rs2t = do_bmatflip(rs2, bits);
++
++    for (i = 0; i < 8; i++) {
++        u[i] = rs1 >> (i * 8);
++        v[i] = rs2t >> (i * 8);
++    }
++
++    for (int i = 0; i < 64; i++) {
++        if (popcount(u[i / 8] & v[i % 8]) & 1)
++            x |= 1LL << i;
++    }
++
++    return x;
++}
++
++static target_ulong do_bmator(target_ulong rs1,
++                              target_ulong rs2,
++                              int bits)
++{
++    int i;
++    uint8_t u[8];
++    uint8_t v[8];
++    uint64_t x = 0;
++
++    target_ulong rs2t = do_bmatflip(rs2, bits);
++
++    for (i = 0; i < 8; i++) {
++        u[i] = rs1 >> (i * 8);
++        v[i] = rs2t >> (i * 8);
++    }
++
++    for (int i = 0; i < 64; i++) {
++        if ((u[i / 8] & v[i % 8]) != 0)
++            x |= 1LL << i;
++    }
++
++    return x;
++}
++
++target_ulong HELPER(bmatflip)(target_ulong rs1)
++{
++    return do_bmatflip(rs1, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bmatxor)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bmatxor(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bmator)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bmator(rs1, rs2, TARGET_LONG_BITS);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 577f9f6811..815609c084 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -78,6 +78,17 @@ DEF_HELPER_FLAGS_2(bfp, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(bfpw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(bcompress, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(bdecompress, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bmatxor, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bmator, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_1(bmatflip, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_b, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_h, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_w, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_d, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_b, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_h, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_w, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_d, TCG_CALL_NO_RWG_SE, tl, tl)
+ DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsl, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ DEF_HELPER_FLAGS_3(fsr, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index 8aaca89ce9..55dc56aa2a 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -670,8 +670,17 @@ vamomaxud_v     11100 . . ..... ..... 111 ..... 0101111 @r_wdvm
+ clz        011000 000000 ..... 001 ..... 0010011 @r2
+ ctz        011000 000001 ..... 001 ..... 0010011 @r2
+ cpop       011000 000010 ..... 001 ..... 0010011 @r2
++bmatflip   011000 000011 ..... 001 ..... 0010011 @r2
+ sext_b     011000 000100 ..... 001 ..... 0010011 @r2
+ sext_h     011000 000101 ..... 001 ..... 0010011 @r2
++crc32_b    0110000 10000 ..... 001 ..... 0010011 @r2
++crc32_h    0110000 10001 ..... 001 ..... 0010011 @r2
++crc32_w    0110000 10010 ..... 001 ..... 0010011 @r2
++crc32_d    0110000 10011 ..... 001 ..... 0010011 @r2
++crc32c_b   0110000 11000 ..... 001 ..... 0010011 @r2
++crc32c_h   0110000 11001 ..... 001 ..... 0010011 @r2
++crc32c_w   0110000 11010 ..... 001 ..... 0010011 @r2
++crc32c_d   0110000 11011 ..... 001 ..... 0010011 @r2
+ 
+ andn       0100000 .......... 111 ..... 0110011 @r
+ orn        0100000 .......... 110 ..... 0110011 @r
+@@ -711,6 +720,8 @@ fsl        .....10 .......... 001 ..... 0110011 @r3
+ fsr        .....10 .......... 101 ..... 0110011 @r3
+ bcompress    0000100 .......... 110 ..... 0110011 @r
+ bdecompress  0100100 .......... 110 ..... 0110011 @r
++bmator       0000100 .......... 011 ..... 0110011 @r
++bmatxor      0100100 .......... 011 ..... 0110011 @r
+ 
+ fsri       .....1 ........... 101 ..... 0010011 @r3_imm
+ bseti      001010 ........... 001 ..... 0010011 @sh6
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index d4374d174e..fde91c1953 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -408,6 +408,43 @@ static bool trans_bdecompressw(DisasContext *ctx, arg_bdecompressw *a)
+     return gen_arith(ctx, a, gen_bdecompressw);
+ }
+ 
++#define GEN_TRANS_CRC(NAME)                                     \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)      \
++{                                                               \
++    REQUIRE_EXT(ctx, RVB);                                      \
++    return gen_unary(ctx, a, gen_helper_##NAME);                \
++}                                                               \
++
++GEN_TRANS_CRC(crc32_b)
++GEN_TRANS_CRC(crc32_h)
++GEN_TRANS_CRC(crc32_w)
++GEN_TRANS_CRC(crc32_d)
++GEN_TRANS_CRC(crc32c_b)
++GEN_TRANS_CRC(crc32c_h)
++GEN_TRANS_CRC(crc32c_w)
++GEN_TRANS_CRC(crc32c_d)
++
++static bool trans_bmatflip(DisasContext *ctx, arg_bmatflip *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_unary(ctx, a, gen_helper_bmatflip);
++}
++
++static bool trans_bmatxor(DisasContext *ctx, arg_bmatxor *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bmatxor);
++}
++
++static bool trans_bmator(DisasContext *ctx, arg_bmatxor *a)
++{
++    REQUIRE_64BIT(ctx);
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bmator);
++}
++
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+ {
+     REQUIRE_64BIT(ctx);
+-- 
+2.33.0
+

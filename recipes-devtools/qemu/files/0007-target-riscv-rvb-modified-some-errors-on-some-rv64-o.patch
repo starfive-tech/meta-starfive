@@ -1,0 +1,164 @@
+From 8df40236e0d5f32a2c69b0864d378d169a851de3 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Fri, 9 Jul 2021 14:04:34 +0800
+Subject: [PATCH 07/11] target/riscv: rvb: modified some errors on some rv64
+ only support instrutions
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 13 ++++++------
+ target/riscv/insn_trans/trans_rvb.c.inc | 10 ++++-----
+ target/riscv/translate.c                | 27 +++++++++++++++++++------
+ 3 files changed, 32 insertions(+), 18 deletions(-)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index a610b22fa6..d9c5c56468 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -175,7 +175,7 @@ static target_ulong do_fslw(target_ulong rs1,
+         b = rs1;
+     }
+ 
+-    return shamt ? (a << shamt) | (b >> (32 - shamt)) : a;
++    return shamt ? (a << shamt) | ((b & 0xffffffff) >> (32 - shamt)) : a;
+ }
+ 
+ target_ulong HELPER(fslw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
+@@ -187,6 +187,7 @@ target_ulong HELPER(fsrw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
+ {
+     return do_fslw(rs1, -rs2, rs3);
+ }
++
+ static target_ulong do_shfl(target_ulong rs1,
+                             target_ulong rs2,
+                             int bits)
+@@ -249,8 +250,7 @@ static target_ulong do_unshfl(target_ulong rs1,
+ }
+ 
+ static target_ulong do_shflw(target_ulong rs1,
+-                             target_ulong rs2,
+-                             int bits)
++                             target_ulong rs2)
+ {
+     target_ulong x = rs1;
+     int shamt = rs2 & 15;
+@@ -275,8 +275,7 @@ static target_ulong do_shflw(target_ulong rs1,
+ }
+ 
+ static target_ulong do_unshflw(target_ulong rs1,
+-                               target_ulong rs2,
+-                               int bits)
++                               target_ulong rs2)
+ {
+     target_ulong x = rs1;
+     int shamt = rs2 & 15;
+@@ -312,12 +311,12 @@ target_ulong HELPER(unshfl)(target_ulong rs1, target_ulong rs2)
+ 
+ target_ulong HELPER(shflw)(target_ulong rs1, target_ulong rs2)
+ {
+-    return do_shflw(rs1, rs2, TARGET_LONG_BITS);
++    return do_shflw(rs1, rs2);
+ }
+ 
+ target_ulong HELPER(unshflw)(target_ulong rs1, target_ulong rs2)
+ {
+-    return do_unshflw(rs1, rs2, TARGET_LONG_BITS);
++    return do_unshflw(rs1, rs2);
+ }
+ 
+ static target_ulong do_xperm(target_ulong rs1,
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index e15f0a7999..28a5b34bd4 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -334,14 +334,14 @@ static bool trans_shflw(DisasContext *ctx, arg_shflw *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_arith(ctx, a, gen_helper_shflw);
++    return gen_arith(ctx, a, gen_shflw);
+ }
+ 
+ static bool trans_unshflw(DisasContext *ctx, arg_unshflw *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_arith(ctx, a, gen_helper_unshflw);
++    return gen_arith(ctx, a, gen_unshflw);
+ }
+ 
+ static bool trans_xperm_w(DisasContext *ctx, arg_xperm_w *a)
+@@ -362,14 +362,14 @@ static bool trans_fslw(DisasContext *ctx, arg_fslw *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_quat(ctx, a, gen_helper_fsl);
++    return gen_quat(ctx, a, gen_fslw);
+ }
+ 
+ static bool trans_fsrw(DisasContext *ctx, arg_fsrw *a)
+ {
+     REQUIRE_64BIT(ctx);
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_quat(ctx, a, gen_helper_fsrw);
++    return gen_quat(ctx, a, gen_fsrw);
+ }
+ 
+ static bool trans_fsriw(DisasContext *ctx, arg_fsri *a)
+@@ -381,7 +381,7 @@ static bool trans_fsriw(DisasContext *ctx, arg_fsri *a)
+         return false;
+     }
+ 
+-    return gen_quati(ctx, a, gen_helper_fsrw);
++    return gen_quati(ctx, a, gen_fsrw);
+ }
+ 
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index 37eb0ea046..24bcf8c580 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -771,6 +771,27 @@ static void gen_add_uw(TCGv ret, TCGv arg1, TCGv arg2)
+     tcg_gen_add_tl(ret, arg1, arg2);
+ }
+ 
++#define GEN_RV64ONLY_INSN_3(NAME)                                   \
++static void gen_##NAME(TCGv ret, TCGv arg1, TCGv arg2, TCGv arg3)   \
++{                                                                   \
++    gen_helper_##NAME(ret, arg1, arg2, arg3);                       \
++    tcg_gen_ext32s_tl(ret, ret);                                    \
++}                                                                   \
++
++GEN_RV64ONLY_INSN_3(fslw)
++GEN_RV64ONLY_INSN_3(fsrw)
++
++#define GEN_RV64ONLY_INSN_2(NAME)                                   \
++static void gen_##NAME(TCGv ret, TCGv arg1, TCGv arg2)              \
++{                                                                   \
++    gen_helper_##NAME(ret, arg1, arg2);                             \
++    tcg_gen_ext32s_tl(ret, ret);                                    \
++}                                                                   \
++
++GEN_RV64ONLY_INSN_2(shflw)
++GEN_RV64ONLY_INSN_2(unshflw)
++GEN_RV64ONLY_INSN_2(bfpw)
++
+ static bool gen_arith(DisasContext *ctx, arg_r *a,
+                       void(*func)(TCGv, TCGv, TCGv))
+ {
+@@ -857,12 +878,6 @@ static bool gen_quati(DisasContext *ctx, arg_r3i *a,
+     return true;
+ }
+ 
+-static void gen_bfpw(TCGv ret, TCGv arg1, TCGv arg2)
+-{
+-    gen_helper_bfpw(ret, arg1, arg2);
+-    tcg_gen_ext32s_tl(ret, ret);
+-}
+-
+ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
+ {
+     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+-- 
+2.33.0
+

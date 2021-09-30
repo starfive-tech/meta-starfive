@@ -1,0 +1,109 @@
+From 5e47b23aded34646d4a2d0424d5ccc3eff3bcb6c Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Wed, 7 Jul 2021 11:19:22 +0800
+Subject: [PATCH 01/11] target/riscv: rvb: Carry-less multiply instruction
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 34 +++++++++++++++++++++++++
+ target/riscv/helper.h                   |  3 +++
+ target/riscv/insn32.decode              |  4 +++
+ target/riscv/insn_trans/trans_rvb.c.inc | 11 ++++++++
+ 4 files changed, 52 insertions(+)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 5b2f795d03..29dfe921ab 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -88,3 +88,37 @@ target_ulong HELPER(gorcw)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_gorc(rs1, rs2, 32);
+ }
++
++#define DO_CLMULA(NAME, NUM, BODY)                          \
++static target_ulong do_##NAME(target_ulong rs1,             \
++                              target_ulong rs2,             \
++                              int bits)                     \
++{                                                           \
++    target_ulong x = 0;                                     \
++    int i;                                                  \
++                                                            \
++    for(i = NUM; i < bits; i++)                             \
++        if ((rs2 >> i) & 1)                                 \
++            x ^= BODY;                                      \
++                                                            \
++    return x;                                               \
++}
++
++DO_CLMULA(clmul, 0, (rs1 << i))
++DO_CLMULA(clmulh, 1, (rs1 >> (bits - i)))
++DO_CLMULA(clmulr, 0, (rs1 >> (bits - i - 1)))
++
++target_ulong HELPER(clmul)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmul(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(clmulh)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmulh(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(clmulr)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmulr(rs1, rs2, TARGET_LONG_BITS);
++}
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 415e37bc37..6ee9e8d058 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -63,6 +63,9 @@ DEF_HELPER_FLAGS_2(grev, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(grevw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(gorc, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(gorcw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(clmul, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(clmulh, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(clmulr, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ 
+ /* Special functions */
+ DEF_HELPER_3(csrrw, tl, env, tl, tl)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index f09f8d5faf..617ead6669 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -689,6 +689,10 @@ gorc       0010100 .......... 101 ..... 0110011 @r
+ sh1add     0010000 .......... 010 ..... 0110011 @r
+ sh2add     0010000 .......... 100 ..... 0110011 @r
+ sh3add     0010000 .......... 110 ..... 0110011 @r
++clmul      0000101 .......... 001 ..... 0110011 @r
++clmulh     0000101 .......... 011 ..... 0110011 @r
++clmulr     0000101 .......... 010 ..... 0110011 @r
++
+ 
+ bseti      00101. ........... 001 ..... 0010011 @sh
+ bclri      01001. ........... 001 ..... 0010011 @sh
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index 9e81f6e3de..181cbf285c 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -237,6 +237,17 @@ GEN_TRANS_SHADD(1)
+ GEN_TRANS_SHADD(2)
+ GEN_TRANS_SHADD(3)
+ 
++#define GEN_TRANS_CLMUL(NAME)                                             \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)                \
++{                                                                         \
++    REQUIRE_EXT(ctx, RVB);                                                \
++    return gen_arith(ctx, a, gen_helper_##NAME);                          \
++}
++
++GEN_TRANS_CLMUL(clmul)
++GEN_TRANS_CLMUL(clmulh)
++GEN_TRANS_CLMUL(clmulr)
++
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+ {
+     REQUIRE_64BIT(ctx);
+-- 
+2.33.0
+

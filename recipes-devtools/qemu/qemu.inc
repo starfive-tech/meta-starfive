@@ -14,38 +14,22 @@ inherit pkgconfig ptest
 LIC_FILES_CHKSUM = "file://COPYING;md5=441c28d2cf86e15a37fa47e15a72fbac \
                     file://COPYING.LIB;endline=24;md5=8c5efda6cf1e1b03dcfd0e6c0d271c7f"
 
-PV="6.1.0-rc1"
-
-SRC_URI = "https://download.qemu.org/${BPN}-${PV}.tar.xz  \
+S = "${WORKDIR}/git"
+SRCREV = "711c0418c8c1ce3a24346f058b001c4c5a2f0f81"
+SRC_URI = "gitsm://github.com/qemu/qemu.git; \
            file://powerpc_rom.bin \
            file://run-ptest \
-           file://0001-qemu-Add-missing-wacom-HID-descriptor.patch \
-           file://0003-qemu-Add-addition-environment-space-to-boot-loader-q.patch \
-           file://0004-qemu-disable-Valgrind.patch \
-           file://0006-chardev-connect-socket-to-a-spawned-command.patch \
-           file://0007-apic-fixup-fallthrough-to-PIC.patch \
-           file://0010-configure-Add-pkg-config-handling-for-libgcrypt.patch \
-           file://0001-Add-enable-disable-udev.patch \
-           file://0001-qemu-Do-not-include-file-if-not-exists.patch \
-           file://mmap2.patch \
-           file://determinism.patch \
-           file://0001-tests-meson.build-use-relative-path-to-refer-to-file.patch \
-           file://0001-configure-fix-detection-of-gdbus-codegen.patch \
-           file://0001-vhost-user-gpu-fix-memory-disclosure-in-virgl_cmd_ge.patch \
-           file://0002-vhost-user-gpu-fix-resource-leak-in-vg_resource_crea.patch \
-           file://0003-vhost-user-gpu-fix-memory-leak-in-vg_resource_attach.patch \
-           file://0004-vhost-user-gpu-fix-memory-leak-while-calling-vg_reso.patch \
-           file://0005-vhost-user-gpu-fix-memory-leak-in-virgl_cmd_resource.patch \
-           file://0006-vhost-user-gpu-fix-memory-leak-in-virgl_resource_att.patch \
-           file://0007-vhost-user-gpu-fix-OOB-write-in-virgl_cmd_get_capset.patch \
-           file://0001-linux-user-Tag-vsx-with-ieee128-fpbits.patch \
-           file://CVE-2021-3527-1.patch \
-           file://CVE-2021-3527-2.patch \
-           "
-
-SRC_URI = "file://qemu-6.1.0-rc1.tar.xz \
-           file://powerpc_rom.bin \
-           file://run-ptest \
+           file://0001-target-riscv-rvb-Carry-less-multiply-instruction.patch \
+           file://0002-target-riscv-rvb-add-cmix-cmov-instruction.patch \
+           file://0003-target-riscv-rvb-add-funnel-shfit-instruction.patch \
+           file://0004-target-riscv-rvb-add-generalized-shuffle.patch \
+           file://0005-target-riscv-rvb-add-crossbar-permutation-instructio.patch \
+           file://0006-target-riscv-rvb-add-bfp-bfpw-instructions.patch \
+           file://0007-target-riscv-rvb-modified-some-errors-on-some-rv64-o.patch \
+           file://0008-target-riscv-rvb-add-bcompress-bdecompress-instructi.patch \
+           file://0009-target-riscv-rvb-add-CRC-bit-matrix-instructions.patch \
+           file://0010-target-riscv-rvb-modified-srow-error.patch \
+           file://0011-support-b-extention-on-default-config.patch \
 	   "
 
 UPSTREAM_CHECK_REGEX = "qemu-(?P<pver>\d+(\.\d+)+)\.tar"
