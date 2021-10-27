@@ -16,7 +16,7 @@ inherit cmake pkgconfig
 
 PROVIDES += "llvm${PV}"
 
-MAJOR_VERSION = "12"
+MAJOR_VERSION = "14"
 MINOR_VERSION = "0"
 PATCH_VERSION = "0"
 
@@ -25,9 +25,8 @@ PV = "${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
 LLVM_RELEASE = "${PV}"
 LLVM_DIR = "llvm${LLVM_RELEASE}"
 
-BRANCH = "release/${MAJOR_VERSION}.x"
-#JY SRCREV = "ef32c611aa214dea855364efd7ba451ec5ec3f74"
-SRCREV = "d28af7c654d8db0b68c175db5ce212d74fb5e9bc"
+BRANCH = "main"
+SRCREV = "6b715e9c4d9cc00f59906d48cd57f4c767229093"
 SRC_URI = "git://github.com/llvm/llvm-project.git;branch=${BRANCH} \
           "
 

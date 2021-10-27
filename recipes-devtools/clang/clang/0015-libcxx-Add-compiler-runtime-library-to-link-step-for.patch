@@ -1,0 +1,43 @@
+From d596b3bcd348b21d523e23e60f50541f9b0e40be Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Fri, 22 Oct 2021 11:39:25 +0800
+Subject: [PATCH] libcxx: Add compiler runtime library to link step for libcxx
+
+This corrects "undefined reference to __divti3"
+
+Upstream-Status: Inappropriate [configuration]
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Jeremy Puhlman <jpuhlman@mvista.com>
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ libcxx/src/CMakeLists.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libcxx/src/CMakeLists.txt b/libcxx/src/CMakeLists.txt
+index b5a870a5a499..d864080561d0 100644
+--- a/libcxx/src/CMakeLists.txt
++++ b/libcxx/src/CMakeLists.txt
+@@ -197,7 +197,7 @@ split_list(LIBCXX_LINK_FLAGS)
+ if (LIBCXX_ENABLE_SHARED)
+   add_library(cxx_shared SHARED ${exclude_from_all} ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
+   target_link_libraries(cxx_shared PUBLIC cxx-headers
+-                                   PRIVATE ${LIBCXX_LIBRARIES})
++                                   PRIVATE ${LIBCXX_LIBRARIES} "$$($$CC --print-libgcc-file-name)")
+   set_target_properties(cxx_shared
+     PROPERTIES
+       COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
+@@ -275,7 +275,7 @@ set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+ if (LIBCXX_ENABLE_STATIC)
+   add_library(cxx_static STATIC ${exclude_from_all} ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
+   target_link_libraries(cxx_static PUBLIC cxx-headers
+-                                   PRIVATE ${LIBCXX_LIBRARIES})
++                                   PRIVATE ${LIBCXX_LIBRARIES} "$$($$CC --print-libgcc-file-name)")
+   set_target_properties(cxx_static
+     PROPERTIES
+       COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
+-- 
+2.33.0
+
