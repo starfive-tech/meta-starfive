@@ -1,0 +1,32 @@
+From 718c3eae9b25018221379210a0b14bb5e84d8cda Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 27 Oct 2021 23:06:15 -0700
+Subject: [PATCH 12/15] replace x_riscv_bitmanip_subext with
+ x_riscv_bitmanip_subext
+
+---
+ gcc/common/config/riscv/riscv-common.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index a00b20e065a..569cea68461 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -913,10 +913,10 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
+   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
+ 
+-  {"zba", &gcc_options::x_riscv_bitmanip_subext, MASK_ZBA},
+-  {"zbb", &gcc_options::x_riscv_bitmanip_subext, MASK_ZBB},
+-  {"zbs", &gcc_options::x_riscv_bitmanip_subext, MASK_ZBS},
+-  {"zbc", &gcc_options::x_riscv_bitmanip_subext, MASK_ZBC},
++  {"zba", &gcc_options::riscv_zb_subext, MASK_ZBA},
++  {"zbb", &gcc_options::riscv_zb_subext, MASK_ZBB},
++  {"zbs", &gcc_options::riscv_zb_subext, MASK_ZBS},
++  {"zbc", &gcc_options::riscv_zb_subext, MASK_ZBC},
+   {NULL, NULL, 0}
+ };
+ 
+-- 
+2.33.1
+

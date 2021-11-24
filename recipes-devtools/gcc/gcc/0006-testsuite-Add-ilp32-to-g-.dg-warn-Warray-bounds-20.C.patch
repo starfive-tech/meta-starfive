@@ -1,0 +1,25 @@
+From 5964b5cd72721186ea2195a7be8d40cfe6554023 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Wed, 23 Jun 2021 11:14:27 +0800
+Subject: [PATCH 06/15] testsuite: Add !ilp32 to g++.dg/warn/Warray-bounds-20.C
+
+---
+ gcc/testsuite/g++.dg/warn/Warray-bounds-20.C | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/g++.dg/warn/Warray-bounds-20.C b/gcc/testsuite/g++.dg/warn/Warray-bounds-20.C
+index e142ea16787..ab42ede0340 100644
+--- a/gcc/testsuite/g++.dg/warn/Warray-bounds-20.C
++++ b/gcc/testsuite/g++.dg/warn/Warray-bounds-20.C
+@@ -27,7 +27,7 @@ struct D1: virtual B, virtual C
+      to the opening brace.  */
+   D1 ()
+   {                           // { dg-warning "\\\[-Warray-bounds" "brace" }
+-    ci = 0;                   // { dg-warning "\\\[-Warray-bounds" "assign" { xfail *-*-* } }
++    ci = 0;                   // { dg-warning "\\\[-Warray-bounds" "assign" { xfail { ! ilp32 } } }
+   }
+ };
+ 
+-- 
+2.33.1
+

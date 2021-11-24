@@ -1,0 +1,24 @@
+From de7fa1850d5ae66372033951a59750fab96e4465 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Fri, 15 Oct 2021 01:06:59 -0700
+Subject: [PATCH 04/11] set v ext version to 1.0 draft
+
+---
+ gas/config/tc-riscv.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index 2fb613467e..cb8d8ef79e 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -155,6 +155,7 @@ static const struct riscv_ext_version ext_version_table[] =
+   {"zvamo",   ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zvlsseg", ISA_SPEC_CLASS_NONE, 1, 0},
+ 
++  {"v", ISA_SPEC_CLASS_DRAFT, 1, 0},
+   /* Terminate the list.  */
+   {NULL, 0, 0, 0}
+ };
+-- 
+2.33.1
+
