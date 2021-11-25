@@ -1,7 +1,8 @@
-From 24deb7ba16e914132713f1ea7dae9b4b089870e9 Mon Sep 17 00:00:00 2001
+From d7480a67f7ee5ed3fdb8c5c847ffb5ed33efea80 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:31:50 +0800
-Subject: [PATCH] clang: Look inside the target sysroot for compiler runtime
+Date: Tue, 9 Nov 2021 10:13:08 +0800
+Subject: [PATCH 10/34] clang: Look inside the target sysroot for compiler
+ runtime
 
 In OE compiler-rt and libc++ are built and staged into target
 sysroot and not into resourcedir which is relative to clang
@@ -18,11 +19,11 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
-index df205c37f063..28e16ef5dc81 100644
+index 7272cc29cc7c..bbc50233e01b 100644
 --- a/clang/lib/Driver/ToolChain.cpp
 +++ b/clang/lib/Driver/ToolChain.cpp
 @@ -13,6 +13,7 @@
- #include "ToolChains/InterfaceStubs.h"
+ #include "ToolChains/Flang.h"
  #include "clang/Basic/ObjCRuntime.h"
  #include "clang/Basic/Sanitizers.h"
 +#include "clang/Basic/Version.h"
@@ -42,5 +43,5 @@ index df205c37f063..28e16ef5dc81 100644
      llvm::sys::path::append(Path, "lib");
    } else {
 -- 
-2.33.0
+2.33.1
 

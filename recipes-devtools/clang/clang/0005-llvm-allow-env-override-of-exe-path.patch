@@ -1,7 +1,7 @@
-From 6191588e2da0460225c00491c6a14394aa932dae Mon Sep 17 00:00:00 2001
+From fbfaab8d1dfa23aff4e4adb0e92dd4ff6467e453 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:23:08 +0800
-Subject: [PATCH] llvm: allow env override of exe path
+Date: Tue, 9 Nov 2021 10:05:00 +0800
+Subject: [PATCH 05/34] llvm: allow env override of exe path
 
 When using a native llvm-config from inside a sysroot, we need llvm-config to
 return the libraries, include directories, etc. from inside the sysroot rather
@@ -18,7 +18,7 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/llvm/tools/llvm-config/llvm-config.cpp b/llvm/tools/llvm-config/llvm-config.cpp
-index 8afd3593272f..02260c7eb4cf 100644
+index 1a2f04552d13..019d8f2b5c5e 100644
 --- a/llvm/tools/llvm-config/llvm-config.cpp
 +++ b/llvm/tools/llvm-config/llvm-config.cpp
 @@ -247,6 +247,13 @@ Typical components:\n\
@@ -36,5 +36,5 @@ index 8afd3593272f..02260c7eb4cf 100644
    // allow taking the address of ::main however.
    void *P = (void *)(intptr_t)GetExecutablePath;
 -- 
-2.33.0
+2.33.1
 

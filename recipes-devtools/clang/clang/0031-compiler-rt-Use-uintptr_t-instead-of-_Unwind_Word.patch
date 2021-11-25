@@ -1,7 +1,7 @@
-From 3c285c6071bf73a279c058dfc250faaab422602e Mon Sep 17 00:00:00 2001
+From 978029dc7aabc1bda62f4c9c9c4633c2d147a491 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:13:05 +0800
-Subject: [PATCH] compiler-rt: Use uintptr_t instead of _Unwind_Word
+Date: Tue, 9 Nov 2021 10:59:58 +0800
+Subject: [PATCH 31/34] compiler-rt: Use uintptr_t instead of _Unwind_Word
 
 _Unwind_Word is defined in compiler specific unwind.h but not in
 libunwind provided unwind.h header, it works in most cases because
@@ -37,5 +37,5 @@ index 169e7876cb58..6ed1da335428 100644
  extern "C" SANITIZER_INTERFACE_ATTRIBUTE _Unwind_Reason_Code
  __hwasan_personality_wrapper(int version, _Unwind_Action actions,
 -- 
-2.33.0
+2.33.1
 

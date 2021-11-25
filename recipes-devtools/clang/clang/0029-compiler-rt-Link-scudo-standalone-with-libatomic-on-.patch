@@ -1,12 +1,11 @@
-From 711f43f7cec85e5c21f4a76c65695a838d84c1fa Mon Sep 17 00:00:00 2001
+From 8a90723b07823ee86223da375f0e31740d6747eb Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:09:32 +0800
-Subject: [PATCH] compiler-rt: Link scudo standalone with libatomic on mips
+Date: Tue, 9 Nov 2021 10:56:37 +0800
+Subject: [PATCH 29/34] compiler-rt: Link scudo standalone with libatomic on
+ mips
 
 clang on mips generate atomic built-ins which should be provided by
 libatomic
-
-Upstream-Status: Pending
 
 Rebased to LLVM 14.0.0 by Jun Yuan Tan
 
@@ -32,5 +31,5 @@ index 739f131bdefd..5862545b842b 100644
    add_compiler_rt_object_libraries(RTScudoStandalone
      ARCHS ${SCUDO_STANDALONE_SUPPORTED_ARCH}
 -- 
-2.33.0
+2.33.1
 

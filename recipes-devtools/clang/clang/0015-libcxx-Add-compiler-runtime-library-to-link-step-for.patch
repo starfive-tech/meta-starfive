@@ -1,7 +1,8 @@
-From d596b3bcd348b21d523e23e60f50541f9b0e40be Mon Sep 17 00:00:00 2001
+From a096db3cc09b352c027799ae05feeca468a0e6e2 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:39:25 +0800
-Subject: [PATCH] libcxx: Add compiler runtime library to link step for libcxx
+Date: Tue, 9 Nov 2021 10:24:03 +0800
+Subject: [PATCH 15/34] libcxx: Add compiler runtime library to link step for
+ libcxx
 
 This corrects "undefined reference to __divti3"
 
@@ -17,10 +18,10 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/libcxx/src/CMakeLists.txt b/libcxx/src/CMakeLists.txt
-index b5a870a5a499..d864080561d0 100644
+index 0bcfb1776271..488206d8324d 100644
 --- a/libcxx/src/CMakeLists.txt
 +++ b/libcxx/src/CMakeLists.txt
-@@ -197,7 +197,7 @@ split_list(LIBCXX_LINK_FLAGS)
+@@ -196,7 +196,7 @@ split_list(LIBCXX_LINK_FLAGS)
  if (LIBCXX_ENABLE_SHARED)
    add_library(cxx_shared SHARED ${exclude_from_all} ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
    target_link_libraries(cxx_shared PUBLIC cxx-headers
@@ -29,7 +30,7 @@ index b5a870a5a499..d864080561d0 100644
    set_target_properties(cxx_shared
      PROPERTIES
        COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
-@@ -275,7 +275,7 @@ set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+@@ -274,7 +274,7 @@ set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
  if (LIBCXX_ENABLE_STATIC)
    add_library(cxx_static STATIC ${exclude_from_all} ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
    target_link_libraries(cxx_static PUBLIC cxx-headers
@@ -39,5 +40,5 @@ index b5a870a5a499..d864080561d0 100644
      PROPERTIES
        COMPILE_FLAGS "${LIBCXX_COMPILE_FLAGS}"
 -- 
-2.33.0
+2.33.1
 

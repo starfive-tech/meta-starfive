@@ -1,7 +1,7 @@
-From 8ff2f565e0ddf0ce7913d33eafaa7f3b8951039f Mon Sep 17 00:00:00 2001
+From 1545fd910e641757705cb580a15ba6cd511be72e Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:33:23 +0800
-Subject: [PATCH] clang: Define / releative gcc installation dir
+Date: Tue, 9 Nov 2021 10:15:04 +0800
+Subject: [PATCH 11/34] clang: Define / releative gcc installation dir
 
 This is required for OE gcc installation to work.
 Without this its not able to find the paths for libgcc
@@ -17,10 +17,10 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
-index 5436317cde35..308f0d963311 100644
+index 278064d9edca..31d1c5c756fd 100644
 --- a/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ b/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -2523,19 +2523,19 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
+@@ -2534,19 +2534,19 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
      // Whether this library suffix is relevant for the triple.
      bool Active;
    } Suffixes[] = {
@@ -48,5 +48,5 @@ index 5436317cde35..308f0d963311 100644
    for (auto &Suffix : Suffixes) {
      if (!Suffix.Active)
 -- 
-2.33.0
+2.33.1
 

@@ -1,7 +1,7 @@
-From 2e93c0280148283e2d3d525972ad8a2a54861c5f Mon Sep 17 00:00:00 2001
+From 39f88370fb0d09b3ff544265076c70e8476014ee Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:43:42 +0800
-Subject: [PATCH] clang,llvm: cmake: Fix configure for packages using
+Date: Tue, 9 Nov 2021 10:31:46 +0800
+Subject: [PATCH 16/34] clang,llvm: cmake: Fix configure for packages using 
  find_package()
 
 Currently, when a package (i.e. bcc [https://github.com/iovisor/bcc.git])
@@ -55,10 +55,10 @@ index 5752f4277444..f40ea35faf46 100644
  endmacro()
  
 diff --git a/llvm/cmake/modules/AddLLVM.cmake b/llvm/cmake/modules/AddLLVM.cmake
-index 6e1f97a8bbc0..e29bdee0aaa3 100644
+index c5a9e0209f13..c824e69ba066 100644
 --- a/llvm/cmake/modules/AddLLVM.cmake
 +++ b/llvm/cmake/modules/AddLLVM.cmake
-@@ -1244,7 +1244,6 @@ macro(add_llvm_tool name)
+@@ -1241,7 +1241,6 @@ macro(add_llvm_tool name)
      if( LLVM_BUILD_TOOLS )
        get_target_export_arg(${name} LLVM export_to_llvmexports)
        install(TARGETS ${name}
@@ -66,7 +66,7 @@ index 6e1f97a8bbc0..e29bdee0aaa3 100644
                RUNTIME DESTINATION ${LLVM_TOOLS_INSTALL_DIR}
                COMPONENT ${name})
  
-@@ -1255,9 +1254,6 @@ macro(add_llvm_tool name)
+@@ -1252,9 +1251,6 @@ macro(add_llvm_tool name)
        endif()
      endif()
    endif()
@@ -76,7 +76,7 @@ index 6e1f97a8bbc0..e29bdee0aaa3 100644
    set_target_properties(${name} PROPERTIES FOLDER "Tools")
  endmacro(add_llvm_tool name)
  
-@@ -1297,7 +1293,6 @@ macro(add_llvm_utility name)
+@@ -1294,7 +1290,6 @@ macro(add_llvm_utility name)
      if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
        get_target_export_arg(${name} LLVM export_to_llvmexports)
        install(TARGETS ${name}
@@ -84,7 +84,7 @@ index 6e1f97a8bbc0..e29bdee0aaa3 100644
                RUNTIME DESTINATION ${LLVM_UTILS_INSTALL_DIR}
                COMPONENT ${name})
  
-@@ -1306,7 +1301,6 @@ macro(add_llvm_utility name)
+@@ -1303,7 +1298,6 @@ macro(add_llvm_utility name)
                                   DEPENDS ${name}
                                   COMPONENT ${name})
        endif()
@@ -118,5 +118,5 @@ index 5e9e2674405e..3c72df35b308 100644
 -  set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${target})
  endmacro()
 -- 
-2.33.0
+2.33.1
 

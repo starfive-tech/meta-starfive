@@ -1,7 +1,7 @@
-From 529df058387bae6a015b55b3d504f46775c085d4 Mon Sep 17 00:00:00 2001
+From 5dacb904357c6474808aa0ee44615168d4f2da39 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:10:15 +0800
-Subject: [PATCH] lldb: Add -lxml2 to linker cmdline of xml is found
+Date: Tue, 9 Nov 2021 09:56:36 +0800
+Subject: [PATCH 01/34] lldb: Add -lxml2 to linker cmdline of xml is found
 
 When cross compiling for systems where static libs
 for libxml are not available cmake's detection mechanism
@@ -17,7 +17,7 @@ Fixes
 | /usr/src/debug/lldb/5.0.0+gitAUTOINC+69edad7913_08d6b47db9_cf6c5b3386-r0/git/tools/lldb/source/Host/common/XML.cpp:29: undefined reference to `xmlFreeDoc'
 | /usr/src/debug/lldb/5.0.0+gitAUTOINC+69edad7913_08d6b47db9_cf6c5b3386-r0/git/tools/lldb/source/Host/common/XML.cpp:29: undefined reference to `xmlFreeDoc'
 
-Rebased to LLVM 14.0.0 by Jun Yuan Tan
+Rebased to 14.0.0 by Jun Yuan Tan
 
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
@@ -26,18 +26,18 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/lldb/source/Host/CMakeLists.txt b/lldb/source/Host/CMakeLists.txt
-index 4374abca0506..6a802089d3b3 100644
+index a018fd6c183d..936bdd461350 100644
 --- a/lldb/source/Host/CMakeLists.txt
 +++ b/lldb/source/Host/CMakeLists.txt
-@@ -136,7 +136,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
+@@ -137,7 +137,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
    list(APPEND EXTRA_LIBS kvm)
  endif()
  if (LLDB_ENABLE_LIBXML2)
--  list(APPEND EXTRA_LIBS LibXml2::LibXml2)
+-  list(APPEND EXTRA_LIBS ${LIBXML2_LIBRARIES})
 +  list(APPEND EXTRA_LIBS xml2)
  endif()
  if (HAVE_LIBDL)
    list(APPEND EXTRA_LIBS ${CMAKE_DL_LIBS})
 -- 
-2.33.0
+2.33.1
 

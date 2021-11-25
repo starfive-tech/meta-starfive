@@ -1,10 +1,10 @@
-From 34e4284dc6f57ecc69e29538bc244df5c803c7ec Mon Sep 17 00:00:00 2001
+From 9a405fbda01e40e18677207c7bbf32a549b0b32d Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:11:57 +0800
-Subject: [PATCH] libunwind: Added unw_backtrace method
+Date: Tue, 9 Nov 2021 10:58:30 +0800
+Subject: [PATCH 30/34] libunwind: Added unw_backtrace method
 
 Source: https://github.com/ClickHouse-Extras/libunwind/commit/52f0f7861926cbfaef7e6c97d8a6d7ba2a1f6747#diff-a82fc885e2e4facf4b92d26171c13aa4aa5db296f77e1158ba2f8664e3bd1f5c
-Upstream-Status: Pending
+
 Rebased to LLVM 14.0.0 by Jun Yuan Tan
 
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
@@ -57,5 +57,5 @@ index 93e1bc131f0c..7ae1a10092ab 100644
  // Add logging hooks in Debug builds only
  #ifndef NDEBUG
 -- 
-2.33.0
+2.33.1
 

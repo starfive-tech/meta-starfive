@@ -1,7 +1,7 @@
-From daade280c104f13b2508e9e55d4af56629907495 Mon Sep 17 00:00:00 2001
+From b1d28891098dc4dc5066aede6e20d4e5bd58bed5 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:25:45 +0800
-Subject: [PATCH] clang: driver: Check sysroot for ldso path
+Date: Tue, 9 Nov 2021 10:07:13 +0800
+Subject: [PATCH 06/34] clang: driver: Check sysroot for ldso path
 
 OE does not necessarily follow the default path for the dynamic linker,
 therefore adjust it for OE. Check for the default path, and if it isn't
@@ -17,7 +17,7 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 16 insertions(+)
 
 diff --git a/clang/lib/Driver/ToolChains/Linux.cpp b/clang/lib/Driver/ToolChains/Linux.cpp
-index 20ed697fecbc..3d49248d7343 100644
+index a80b8ad4e7ed..b7165be9a7a6 100644
 --- a/clang/lib/Driver/ToolChains/Linux.cpp
 +++ b/clang/lib/Driver/ToolChains/Linux.cpp
 @@ -480,11 +480,19 @@ std::string Linux::getDynamicLinker(const ArgList &Args) const {
@@ -63,5 +63,5 @@ index 20ed697fecbc..3d49248d7343 100644
    }
    case llvm::Triple::ve:
 -- 
-2.33.0
+2.33.1
 

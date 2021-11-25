@@ -1,7 +1,7 @@
-From 72a96fefcafb5aa677c2e9ec8dd36f30855f3398 Mon Sep 17 00:00:00 2001
+From 1c5c90696fc4edb612157536bad3447370172584 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:57:22 +0800
-Subject: [PATCH] llvm: Do not use find_library for ncurses
+Date: Tue, 9 Nov 2021 10:44:53 +0800
+Subject: [PATCH 22/34] llvm: Do not use find_library for ncurses
 
 This ensures that it lets OE to decide which lib to link
 otherwise it adds absolute paths to linker cmdline and confuses it
@@ -20,10 +20,10 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/compiler-rt/cmake/config-ix.cmake b/compiler-rt/cmake/config-ix.cmake
-index e2985dccc645..ffe090910bd7 100644
+index 62685f5d6c33..6461735c9dcb 100644
 --- a/compiler-rt/cmake/config-ix.cmake
 +++ b/compiler-rt/cmake/config-ix.cmake
-@@ -152,7 +152,7 @@ else()
+@@ -149,7 +149,7 @@ else()
    set(MAYBE_REQUIRED)
  endif()
  if(LLVM_ENABLE_TERMINFO)
@@ -33,10 +33,10 @@ index e2985dccc645..ffe090910bd7 100644
  if(COMPILER_RT_TERMINFO_LIB)
    set(LLVM_ENABLE_TERMINFO 1)
 diff --git a/llvm/cmake/config-ix.cmake b/llvm/cmake/config-ix.cmake
-index c81b7e47ac78..09491a65d12f 100644
+index 3569c2d1389a..8a725d13343f 100644
 --- a/llvm/cmake/config-ix.cmake
 +++ b/llvm/cmake/config-ix.cmake
-@@ -197,7 +197,7 @@ if(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
+@@ -176,7 +176,7 @@ if(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
        set(MAYBE_REQUIRED)
      endif()
      if(LLVM_ENABLE_TERMINFO)
@@ -46,5 +46,5 @@ index c81b7e47ac78..09491a65d12f 100644
      if(TERMINFO_LIB)
        set(LLVM_ENABLE_TERMINFO 1)
 -- 
-2.33.0
+2.33.1
 

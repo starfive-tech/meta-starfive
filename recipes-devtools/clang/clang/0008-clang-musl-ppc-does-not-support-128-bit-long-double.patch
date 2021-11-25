@@ -1,7 +1,7 @@
-From 5e60a031126fa4adbe67976b26d3ab8712d080df Mon Sep 17 00:00:00 2001
+From 45ada900078b1a0b8d428766f5f429912e8eb521 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:28:21 +0800
-Subject: [PATCH] clang: musl/ppc does not support 128-bit long double
+Date: Tue, 9 Nov 2021 10:09:14 +0800
+Subject: [PATCH 08/34] clang: musl/ppc does not support 128-bit long double
 
 Rebased to LLVM 14.0.0 by Jun Yuan Tan
 
@@ -12,10 +12,10 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 4 insertions(+)
 
 diff --git a/clang/lib/Basic/Targets/PPC.h b/clang/lib/Basic/Targets/PPC.h
-index f19d3ebbc066..97861fb0b78d 100644
+index 89034682a90e..43d8828dc0ff 100644
 --- a/clang/lib/Basic/Targets/PPC.h
 +++ b/clang/lib/Basic/Targets/PPC.h
-@@ -395,6 +395,10 @@ public:
+@@ -394,6 +394,10 @@ public:
        LongDoubleFormat = &llvm::APFloat::IEEEdouble();
      }
  
@@ -27,5 +27,5 @@ index f19d3ebbc066..97861fb0b78d 100644
      MaxAtomicPromoteWidth = MaxAtomicInlineWidth = 32;
    }
 -- 
-2.33.0
+2.33.1
 

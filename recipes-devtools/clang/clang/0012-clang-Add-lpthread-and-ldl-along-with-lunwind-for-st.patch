@@ -1,8 +1,8 @@
-From 0ff61cb900ac870458ffa5a0b49755c3eb0367e1 Mon Sep 17 00:00:00 2001
+From d687ffafecd9eab2e78cd8cce4b35b303e9fe482 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:35:03 +0800
-Subject: [PATCH] clang: Add -lpthread and -ldl along with -lunwind for static
- linking
+Date: Tue, 9 Nov 2021 10:16:16 +0800
+Subject: [PATCH 12/34] clang: Add -lpthread and -ldl along with -lunwind for
+ static linking
 
 When doing static liking with --unwindlib=libunwind -static we encounter
 undefined symbols
@@ -23,10 +23,10 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 2 insertions(+)
 
 diff --git a/clang/lib/Driver/ToolChains/CommonArgs.cpp b/clang/lib/Driver/ToolChains/CommonArgs.cpp
-index c3abdf446cfa..99dac6d394f8 100644
+index 9f1895466c98..2682a9df9e1c 100644
 --- a/clang/lib/Driver/ToolChains/CommonArgs.cpp
 +++ b/clang/lib/Driver/ToolChains/CommonArgs.cpp
-@@ -1450,6 +1450,8 @@ static void AddUnwindLibrary(const ToolChain &TC, const Driver &D,
+@@ -1449,6 +1449,8 @@ static void AddUnwindLibrary(const ToolChain &TC, const Driver &D,
          CmdArgs.push_back("-lunwind");
      } else if (LGT == LibGccType::StaticLibGcc) {
        CmdArgs.push_back("-l:libunwind.a");
@@ -36,5 +36,5 @@ index c3abdf446cfa..99dac6d394f8 100644
        if (LGT == LibGccType::SharedLibGcc)
          CmdArgs.push_back("-l:libunwind.dll.a");
 -- 
-2.33.0
+2.33.1
 
