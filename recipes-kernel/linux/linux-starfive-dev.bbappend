@@ -1,7 +1,7 @@
 FORK = "starfive-tech"
-BRANCH = "starfive-5.14"
+BRANCH = "starfive-5.15-dev"
 
-LINUX_VERSION ?= "5.14.0"
+LINUX_VERSION = "5.15.0"
 LINUX_VERSION_EXTENSION_append = "-starlight"
 
 FILESEXTRAPATHS_prepend := "${THISDIR}/files:"

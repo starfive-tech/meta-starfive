@@ -5,7 +5,7 @@ SUMMARY = "BeagleV dev kernel recipe"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 KERNEL_VERSION_SANITY_SKIP = "1"
 
-SRCREV = "df274f896002ba26ab4fac799f09cac34cca6820"
+SRCREV = "2f7a93e8fd6d795699d541cbb8a26bba03515d71"
 FORK ?= "starfive-tech"
 BRANCH ?= "esmil_starlight"
 SRC_URI = "git://github.com/${FORK}/linux.git;protocol=git;branch=${BRANCH} \
