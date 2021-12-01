@@ -79,6 +79,17 @@ SRC_URI = "\
            file://0013-remove-b-gcc-options.patch \
            file://0014-fix-incorrect-subext-name.patch \
            file://0015-add-builtin-orc.b-clmul-clmulr-clmulh.patch \
+           file://0016-merge-sifve-change-for-bitmanip.patch \
+           file://0017-Implement-instruction-patterns-for-ZBA-extension.patch \
+           file://0018-Cost-model-for-zba-extension.patch \
+           file://0019-Implement-instruction-patterns-for-ZBB-extension.patch \
+           file://0020-Cost-model-for-zbb-extension.patch \
+           file://0021-Use-li-and-rori-to-load-constants.patch \
+           file://0022-Implement-instruction-patterns-for-ZBS-extension.patch \
+           file://0023-Cost-model-for-ZBS-extension.patch \
+           file://0024-RISC-V-costs-handle-BSWAP.patch \
+           file://0025-RISC-V-costs-support-shift-and-add-in-strength-reduc.patch \
+           file://0026-RISC-V-bitmanip-fix-constant-loading-for-1ULL-31-in-.patch \
            file://0001-Yocto-patch-for-arch-canonicalize-to-use-python3.patch \
 "
 SRC_URI[sha256sum] = "4c4a6fb8a8396059241c2e674b85b351c26a5d678274007f076957afa1cc9ddf"
