@@ -1,0 +1,38 @@
+From 7a3e8e23b4cf1422ec48e9d4b4009337a05a635d Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Thu, 3 Jun 2021 17:52:22 +0800
+Subject: [PATCH 103/107] linux-user/elfload: Implement ELF_HWCAP for RISC-V
+
+RISC-V define the hwcap as same as content of misa, but it only take lower
+26-bits.
+
+Signed-off-by: Kito Cheng <kito.cheng@sifive.com>
+---
+ linux-user/elfload.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/linux-user/elfload.c b/linux-user/elfload.c
+index c6731013fd..fe8d36e097 100644
+--- a/linux-user/elfload.c
++++ b/linux-user/elfload.c
+@@ -1398,6 +1398,17 @@ static inline void init_thread(struct target_pt_regs *regs, struct image_info *i
+ #define ELF_CLASS ELFCLASS64
+ #endif
+ 
++#define ELF_HWCAP get_elf_hwcap()
++
++static uint32_t get_elf_hwcap(void)
++{
++    RISCVCPU *cpu = RISCV_CPU(thread_cpu);
++    /* Take lower 26 bits from misa.  */
++    uint32_t hwcap = cpu->env.misa & 0x3ffffff;
++
++    return hwcap;
++}
++
+ static inline void init_thread(struct target_pt_regs *regs,
+                                struct image_info *infop)
+ {
+-- 
+2.33.1
+
