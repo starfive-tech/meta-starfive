@@ -1,7 +1,7 @@
-From fcc2ba4ad05bd5427f2bef62d034a047a3312ae5 Mon Sep 17 00:00:00 2001
+From d42554b552128fad6ffe80ee72b0f1b6dc2cbccd Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:14:20 +0800
-Subject: [PATCH] compiler-rt: Do not force thumb mode directive
+Date: Tue, 9 Nov 2021 11:01:27 +0800
+Subject: [PATCH 32/34] compiler-rt: Do not force thumb mode directive
 
 .thumb_func was not switching mode until [1]
 so it did not show up but now that .thumb_func (without argument) is
@@ -48,5 +48,5 @@ index 7a26170741ad..d914f9d3a109 100644
    DMB;                                                                         \
    mov r12, r0;                                                                 \
 -- 
-2.33.0
+2.33.1
 

@@ -1,8 +1,8 @@
-From 3ed15d0ff104f4faada259a26d48e9bea2443e3b Mon Sep 17 00:00:00 2001
+From 1752b43655f7ff5319e3b6c7abfbca965b3ff48c Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:16:47 +0800
-Subject: [PATCH] compiler-rt: Simplify cross-compilation. Don't use
- native-compiled llvm-config
+Date: Tue, 9 Nov 2021 10:00:32 +0800
+Subject: [PATCH 03/34] compiler-rt: Simplify cross-compilation. Don't use
+ native-compiled llvm-config.
 
     Note: AddLLVM.cmake does not expose the LLVM source directory.
     So if you want to run the test suite, you need to either:
@@ -19,18 +19,17 @@ Signed-off-by: Greg Fitzgerald <gregf@codeaurora.org>
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
 ---
- compiler-rt/CMakeLists.txt | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ compiler-rt/CMakeLists.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/compiler-rt/CMakeLists.txt b/compiler-rt/CMakeLists.txt
-index 17d7e4ffbdeb..690d8e171e77 100644
+index 4bbcf9aca4e8..bef42018877a 100644
 --- a/compiler-rt/CMakeLists.txt
 +++ b/compiler-rt/CMakeLists.txt
-@@ -82,7 +82,16 @@ set(COMPILER_RT_BAREMETAL_BUILD OFF CACHE BOOL
-   "Build for a bare-metal target.")
+@@ -81,6 +81,16 @@ set(COMPILER_RT_BAREMETAL_BUILD OFF CACHE BOOL
  
  if (COMPILER_RT_STANDALONE_BUILD)
--  load_llvm_config()
+   load_llvm_config()
 +  find_package(LLVM REQUIRED)
 +  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 +
@@ -45,5 +44,5 @@ index 17d7e4ffbdeb..690d8e171e77 100644
      # Loading the llvm config causes this target to be imported so place it
      # under the appropriate folder in an IDE.
 -- 
-2.33.0
+2.33.1
 

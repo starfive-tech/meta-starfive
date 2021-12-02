@@ -1,0 +1,29 @@
+From f204001c9478facc466400be5089ed8bf1a77ce8 Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Fri, 29 Oct 2021 10:42:16 +0800
+Subject: [PATCH] dhrystone: Edit compiler flags
+
+This patch is needed for adding compiler flags for Dhrystone
+
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 6fb3e5a..6640037 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,10 +1,10 @@
+ DHRY-LFLAGS =
+ 
+ DHRY-CFLAGS := -O3 -DTIME -DNOENUM -Wno-implicit -save-temps
+-DHRY-CFLAGS += -fno-builtin-printf -fno-common -falign-functions=4
++DHRY-CFLAGS += -mabi=lp64d -O3 -fno-common -funroll-loops -fno-inline -funroll-all-loops -falign-jumps=8 -falign-loops=8 -finline-limit=1000 -falign-functions=8 -ffast-math -fno-tree-loop-distribute-patterns --param fsm-scale-path-stmts=3 -mcmodel=medany -fno-builtin-printf -lrt
+ 
+ #Uncomment below for FPGA run, default DHRY_ITERS is 2000 for RTL
+-#DHRY-CFLAGS += -DDHRY_ITERS=20000000
++DHRY-CFLAGS += -DDHRY_ITERS=20000000
+ 
+ SRC = dhry_1.c dhry_2.c strcmp.S
+ HDR = dhry.h

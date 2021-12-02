@@ -1,0 +1,1177 @@
+From aff71be69f74519436b9c03ebe17da66934c9b4c Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Mon, 27 Sep 2021 16:15:42 +0800
+Subject: [PATCH 1/2] merge riscv bitmapip b0p94 version
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ target/riscv/bitmanip_helper.c          | 492 +++++++++++++++++++++++-
+ target/riscv/cpu.c                      |   2 +-
+ target/riscv/helper.h                   |  31 ++
+ target/riscv/insn32-64.decode           |  21 +-
+ target/riscv/insn32.decode              |  63 ++-
+ target/riscv/insn_trans/trans_rvb.c.inc | 211 +++++++++-
+ target/riscv/translate.c                | 126 +++++-
+ 7 files changed, 913 insertions(+), 33 deletions(-)
+
+diff --git a/target/riscv/bitmanip_helper.c b/target/riscv/bitmanip_helper.c
+index 389b52eccd..f8de197a67 100644
+--- a/target/riscv/bitmanip_helper.c
++++ b/target/riscv/bitmanip_helper.c
+@@ -90,13 +90,499 @@ target_ulong HELPER(gorc)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_gorc(rs1, rs2, TARGET_LONG_BITS);
+ }
+-
+ /* RV64-only instruction */
+ #ifdef TARGET_RISCV64
+-
+ target_ulong HELPER(gorcw)(target_ulong rs1, target_ulong rs2)
+ {
+     return do_gorc(rs1, rs2, 32);
+ }
+-
+ #endif
++
++#define DO_CLMULA(NAME, NUM, BODY)                          \
++static target_ulong do_##NAME(target_ulong rs1,             \
++                              target_ulong rs2,             \
++                              int bits)                     \
++{                                                           \
++    target_ulong x = 0;                                     \
++    int i;                                                  \
++                                                            \
++    for(i = NUM; i < bits; i++)                             \
++        if ((rs2 >> i) & 1)                                 \
++            x ^= BODY;                                      \
++                                                            \
++    return x;                                               \
++}
++
++DO_CLMULA(clmul, 0, (rs1 << i))
++DO_CLMULA(clmulh, 1, (rs1 >> (bits - i)))
++DO_CLMULA(clmulr, 0, (rs1 >> (bits - i - 1)))
++
++target_ulong HELPER(clmul)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmul(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(clmulh)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmulh(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(clmulr)(target_ulong rs1, target_ulong rs2)
++{
++    return do_clmulr(rs1, rs2, TARGET_LONG_BITS);
++}
++
++static target_ulong do_cmov(target_ulong rs1,
++                            target_ulong rs2,
++                            target_ulong rs3)
++{
++    return rs2 ? rs1 : rs3;
++}
++
++target_ulong HELPER(cmov)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_cmov(rs1, rs2, rs3);
++}
++
++static target_ulong do_fsl(target_ulong rs1,
++                           target_ulong rs2,
++                           target_ulong rs3,
++                           int bits)
++{
++    int shamt = rs2 & (2*bits - 1);
++    target_ulong a = rs1, b = rs3;
++
++    if (shamt >= bits) {
++        shamt -= bits;
++        a = rs3;
++        b = rs1;
++    }
++
++    return shamt ? (a << shamt) | (b >> (bits - shamt)) : a;
++}
++
++target_ulong HELPER(fsl)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fsl(rs1, rs2, rs3, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(fsr)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fsl(rs1, -rs2, rs3, TARGET_LONG_BITS);
++}
++
++static target_ulong do_fslw(target_ulong rs1,
++                            target_ulong rs2,
++                            target_ulong rs3)
++{
++    int shamt = rs2 & 63;
++    target_ulong a = rs1, b = rs3;
++
++    if (shamt >= 32) {
++        shamt -= 32;
++        a = rs3;
++        b = rs1;
++    }
++
++    return shamt ? (a << shamt) | ((b & 0xffffffff) >> (32 - shamt)) : a;
++}
++
++target_ulong HELPER(fslw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fslw(rs1, rs2, rs3);
++}
++
++target_ulong HELPER(fsrw)(target_ulong rs1, target_ulong rs2, target_ulong rs3)
++{
++    return do_fslw(rs1, -rs2, rs3);
++}
++
++static target_ulong do_shfl(target_ulong rs1,
++                            target_ulong rs2,
++                            int bits)
++{
++    target_ulong x = rs1;
++    int shamt = rs2 & ((bits-1) >> 1);
++    if (shamt & 16)
++        x = (x & 0xFFFF00000000FFFFLL) |
++            ((x & 0x0000FFFF00000000LL) >> 16) |
++            ((x & 0x00000000FFFF0000LL) << 16);
++    if (shamt &  8)
++        x = (x & 0xFF0000FFFF0000FFLL) |
++            ((x & 0x00FF000000FF0000LL) >>  8) |
++            ((x & 0x0000FF000000FF00LL) <<  8);
++    if (shamt &  4)
++        x = (x & 0xF00FF00FF00FF00FLL) |
++            ((x & 0x0F000F000F000F00LL) >>  4) |
++            ((x & 0x00F000F000F000F0LL) <<  4);
++    if (shamt &  2)
++        x = (x & 0xC3C3C3C3C3C3C3C3LL) |
++            ((x & 0x3030303030303030LL) >>  2) |
++            ((x & 0x0C0C0C0C0C0C0C0CLL) <<  2);
++    if (shamt &  1)
++        x = (x & 0x9999999999999999LL) |
++            ((x & 0x4444444444444444LL) >>  1) |
++            ((x & 0x2222222222222222LL) <<  1);
++
++    return x;
++}
++
++static target_ulong do_unshfl(target_ulong rs1,
++                              target_ulong rs2,
++                              int bits)
++{
++    target_ulong x = rs1;
++
++    int shamt = rs2 & ((bits-1) >> 1);
++    if (shamt &  1)
++        x = (x & 0x9999999999999999LL) |
++            ((x & 0x4444444444444444LL) >>  1) |
++            ((x & 0x2222222222222222LL) <<  1);
++    if (shamt &  2)
++        x = (x & 0xC3C3C3C3C3C3C3C3LL) |
++            ((x & 0x3030303030303030LL) >>  2) |
++            ((x & 0x0C0C0C0C0C0C0C0CLL) <<  2);
++    if (shamt &  4)
++        x = (x & 0xF00FF00FF00FF00FLL) |
++            ((x & 0x0F000F000F000F00LL) >>  4) |
++            ((x & 0x00F000F000F000F0LL) <<  4);
++    if (shamt &  8)
++        x = (x & 0xFF0000FFFF0000FFLL) |
++            ((x & 0x00FF000000FF0000LL) >>  8) |
++            ((x & 0x0000FF000000FF00LL) <<  8);
++    if (shamt & 16)
++        x = (x & 0xFFFF00000000FFFFLL) |
++            ((x & 0x0000FFFF00000000LL) >> 16) |
++            ((x & 0x00000000FFFF0000LL) << 16);
++
++    return x;
++}
++
++static target_ulong do_shflw(target_ulong rs1,
++                             target_ulong rs2)
++{
++    target_ulong x = rs1;
++    int shamt = rs2 & 15;
++    if (shamt & 8)
++        x = (x & 0xFF0000FFFF0000FFLL) |
++            ((x & 0x00FF000000FF0000LL) >>  8) |
++            ((x & 0x0000FF000000FF00LL) <<  8);
++    if (shamt & 4)
++        x = (x & 0xF00FF00FF00FF00FLL) |
++            ((x & 0x0F000F000F000F00LL) >>  4) |
++            ((x & 0x00F000F000F000F0LL) <<  4);
++    if (shamt & 2)
++        x = (x & 0xC3C3C3C3C3C3C3C3LL) |
++            ((x & 0x3030303030303030LL) >>  2) |
++            ((x & 0x0C0C0C0C0C0C0C0CLL) <<  2);
++    if (shamt & 1)
++        x = (x & 0x9999999999999999LL) |
++            ((x & 0x4444444444444444LL) >>  1) |
++            ((x & 0x2222222222222222LL) <<  1);
++
++    return x;
++}
++
++static target_ulong do_unshflw(target_ulong rs1,
++                               target_ulong rs2)
++{
++    target_ulong x = rs1;
++    int shamt = rs2 & 15;
++    if (shamt & 1)
++        x = (x & 0x9999999999999999LL) |
++            ((x & 0x4444444444444444LL) >>  1) |
++            ((x & 0x2222222222222222LL) <<  1);
++    if (shamt & 2)
++        x = (x & 0xC3C3C3C3C3C3C3C3LL) |
++            ((x & 0x3030303030303030LL) >>  2) |
++            ((x & 0x0C0C0C0C0C0C0C0CLL) <<  2);
++    if (shamt & 4)
++        x = (x & 0xF00FF00FF00FF00FLL) |
++            ((x & 0x0F000F000F000F00LL) >>  4) |
++            ((x & 0x00F000F000F000F0LL) <<  4);
++    if (shamt & 8)
++        x = (x & 0xFF0000FFFF0000FFLL) |
++            ((x & 0x00FF000000FF0000LL) >>  8) |
++            ((x & 0x0000FF000000FF00LL) <<  8);
++
++    return x;
++}
++
++target_ulong HELPER(shfl)(target_ulong rs1, target_ulong rs2)
++{
++    return do_shfl(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(unshfl)(target_ulong rs1, target_ulong rs2)
++{
++    return do_unshfl(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(shflw)(target_ulong rs1, target_ulong rs2)
++{
++    return do_shflw(rs1, rs2);
++}
++
++target_ulong HELPER(unshflw)(target_ulong rs1, target_ulong rs2)
++{
++    return do_unshflw(rs1, rs2);
++}
++
++static target_ulong do_xperm(target_ulong rs1,
++                             target_ulong rs2,
++                             int sz_log2,
++                             int bits)
++{
++    target_ulong pos = 0;
++    target_ulong r = 0;
++    target_ulong sz = 1LL << sz_log2;
++    target_ulong mask = (1LL << sz) - 1;
++    int i;
++    for (i = 0; i < bits; i += sz) {
++        pos = ((rs2 >> i) & mask) << sz_log2;
++        if (pos < bits)
++            r |= ((rs1 >> pos) & mask) << i;
++    }
++
++    return r;
++}
++
++target_ulong HELPER(xperm_n)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_b)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 3, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_h)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 4, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(xperm_w)(target_ulong rs1, target_ulong rs2)
++{
++    return do_xperm(rs1, rs2, 5, TARGET_LONG_BITS);
++}
++
++static target_ulong do_bfp(target_ulong rs1,
++                           target_ulong rs2,
++                           int bits)
++{
++    target_ulong cfg = rs2 >> (bits/2);
++    if ((cfg >> 30) == 2)
++        cfg = cfg >> 16;
++    int len = (cfg >> 8) & (bits/2 - 1);
++    int off = cfg & (bits - 1);
++    len = len ? len : bits/2;
++    target_ulong mask = ~(~(target_ulong)0 << len) << off;
++    target_ulong data = rs2 << off;
++
++    return (data & mask) | (rs1 & ~mask);
++}
++
++static target_ulong do_bfpw(target_ulong rs1,
++                            target_ulong rs2)
++{
++    target_ulong cfg = rs2 >> 16;
++    int len = (cfg >> 8) & 15;
++    int off = cfg & 31;
++    len = len ? len : 16;
++    target_ulong mask = ~(~(target_ulong)(0) << len) << off;
++    target_ulong data = rs2 << off;
++
++    return (data & mask) | (rs1 & ~mask);
++}
++
++target_ulong HELPER(bfp)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bfp(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bfpw)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bfpw(rs1, rs2);
++}
++
++static target_ulong do_bcompress(target_ulong rs1,
++                                 target_ulong rs2,
++                                 int bits)
++{
++    target_ulong r = 0;
++    int i, j = 0;
++    for (i = 0; i < bits; i++) {
++        if ((rs2 >> i) & 1) {
++            if ((rs1 >> i) & 1)
++                r |= (target_ulong)1 << j;
++            j++;
++        }
++    }
++
++    return r;
++}
++
++static target_ulong do_bdecompress(target_ulong rs1,
++                                   target_ulong rs2,
++                                   int bits)
++{
++    target_ulong r = 0;
++    int i, j = 0;
++    for (i = 0; i < bits; i++) {
++        if ((rs2 >> i) & 1) {
++            if ((rs1 >> j) & 1)
++                r |= (target_ulong)1 << i;
++            j++;
++        }
++    }
++
++    return r;
++}
++
++target_ulong HELPER(bcompress)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bcompress(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bdecompress)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bdecompress(rs1, rs2, TARGET_LONG_BITS);
++}
++
++#define DO_CRC(NAME, VALUE)                             \
++static target_ulong do_##NAME(target_ulong rs1,         \
++                             int nbits)                 \
++{                                                       \
++    int i;                                              \
++    target_ulong x = rs1;                               \
++    for (i = 0; i < nbits; i++)                         \
++       x = (x >> 1) ^ ((VALUE) & ~((x&1)-1));           \
++    return x;                                           \
++}
++
++DO_CRC(crc32, 0xEDB88320)
++DO_CRC(crc32c, 0x82F63B78)
++
++target_ulong HELPER(crc32_b)(target_ulong rs1)
++{
++    return do_crc32(rs1, 8);
++}
++
++target_ulong HELPER(crc32_h)(target_ulong rs1)
++{
++    return do_crc32(rs1, 16);
++}
++
++target_ulong HELPER(crc32_w)(target_ulong rs1)
++{
++    return do_crc32(rs1, 32);
++}
++
++target_ulong HELPER(crc32_d)(target_ulong rs1)
++{
++    return do_crc32(rs1, 64);
++}
++
++target_ulong HELPER(crc32c_b)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 8);
++}
++
++target_ulong HELPER(crc32c_h)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 16);
++}
++
++target_ulong HELPER(crc32c_w)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 32);
++}
++
++target_ulong HELPER(crc32c_d)(target_ulong rs1)
++{
++    return do_crc32c(rs1, 64);
++}
++
++static inline uint64_t popcount(uint64_t val)
++{
++    val = (val & 0x5555555555555555U) + ((val >>  1) & 0x5555555555555555U);
++    val = (val & 0x3333333333333333U) + ((val >>  2) & 0x3333333333333333U);
++    val = (val & 0x0f0f0f0f0f0f0f0fU) + ((val >>  4) & 0x0f0f0f0f0f0f0f0fU);
++    val = (val & 0x00ff00ff00ff00ffU) + ((val >>  8) & 0x00ff00ff00ff00ffU);
++    val = (val & 0x0000ffff0000ffffU) + ((val >> 16) & 0x0000ffff0000ffffU);
++    val = (val & 0x00000000ffffffffU) + ((val >> 32) & 0x00000000ffffffffU);
++    return val;
++}
++
++static target_ulong do_bmatflip(target_ulong rs1,
++                                int bits)
++{
++    target_ulong x = rs1;
++    for (int i = 0; i < 3; i++)
++        x = do_shfl(x, 31, bits);
++    return x;
++}
++
++static target_ulong do_bmatxor(target_ulong rs1,
++                               target_ulong rs2,
++                               int bits)
++{
++    int i;
++    uint8_t u[8];
++    uint8_t v[8];
++    uint64_t x = 0;
++
++    target_ulong rs2t = do_bmatflip(rs2, bits);
++
++    for (i = 0; i < 8; i++) {
++        u[i] = rs1 >> (i * 8);
++        v[i] = rs2t >> (i * 8);
++    }
++
++    for (int i = 0; i < 64; i++) {
++        if (popcount(u[i / 8] & v[i % 8]) & 1)
++            x |= 1LL << i;
++    }
++
++    return x;
++}
++
++static target_ulong do_bmator(target_ulong rs1,
++                              target_ulong rs2,
++                              int bits)
++{
++    int i;
++    uint8_t u[8];
++    uint8_t v[8];
++    uint64_t x = 0;
++
++    target_ulong rs2t = do_bmatflip(rs2, bits);
++
++    for (i = 0; i < 8; i++) {
++        u[i] = rs1 >> (i * 8);
++        v[i] = rs2t >> (i * 8);
++    }
++
++    for (int i = 0; i < 64; i++) {
++        if ((u[i / 8] & v[i % 8]) != 0)
++            x |= 1LL << i;
++    }
++
++    return x;
++}
++
++target_ulong HELPER(bmatflip)(target_ulong rs1)
++{
++    return do_bmatflip(rs1, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bmatxor)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bmatxor(rs1, rs2, TARGET_LONG_BITS);
++}
++
++target_ulong HELPER(bmator)(target_ulong rs1, target_ulong rs2)
++{
++    return do_bmator(rs1, rs2, TARGET_LONG_BITS);
++}
+diff --git a/target/riscv/cpu.c b/target/riscv/cpu.c
+index b6713855d6..1b22fb0f3a 100644
+--- a/target/riscv/cpu.c
++++ b/target/riscv/cpu.c
+@@ -152,7 +152,7 @@ static void set_resetvec(CPURISCVState *env, int resetvec)
+ static void riscv_any_cpu_init(Object *obj)
+ {
+     CPURISCVState *env = &RISCV_CPU(obj)->env;
+-    set_misa(env, RVXLEN | RVI | RVM | RVA | RVF | RVD | RVC | RVU);
++    set_misa(env, RVXLEN | RVI | RVM | RVA | RVF | RVD | RVC | RVB | RVU);
+     set_priv_version(env, PRIV_VERSION_1_11_0);
+ }
+ 
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index 9bbf93d47e..9f0abef25f 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -100,6 +100,37 @@ DEF_HELPER_FLAGS_2(gorc, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(grevw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ DEF_HELPER_FLAGS_2(gorcw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
+ #endif
++DEF_HELPER_FLAGS_2(clmul, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(clmulh, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(clmulr, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(shfl, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(unshfl, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(shflw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(unshflw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_n, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_b, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_h, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(xperm_w, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bfp, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bfpw, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bcompress, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bdecompress, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bmatxor, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_2(bmator, TCG_CALL_NO_RWG_SE, tl, tl, tl)
++DEF_HELPER_FLAGS_1(bmatflip, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_b, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_h, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_w, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32_d, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_b, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_h, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_w, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_1(crc32c_d, TCG_CALL_NO_RWG_SE, tl, tl)
++DEF_HELPER_FLAGS_3(cmov, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsl, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsr, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fslw, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
++DEF_HELPER_FLAGS_3(fsrw, TCG_CALL_NO_RWG_SE, tl, tl, tl, tl)
+ 
+ /* Special functions */
+ DEF_HELPER_3(csrrw, tl, env, tl, tl)
+diff --git a/target/riscv/insn32-64.decode b/target/riscv/insn32-64.decode
+index 2c3313531f..b5ab197edc 100644
+--- a/target/riscv/insn32-64.decode
++++ b/target/riscv/insn32-64.decode
+@@ -21,7 +21,11 @@
+ 
+ %sh5    20:5
+ 
+-@sh5     .......  ..... .....  ... ..... ....... &shift  shamt=%sh5      %rs1 %rd
++
++# Formats 64:
++@sh      ......  ...... .....  ... ..... ....... &shift  shamt=%sh7     %rs1 %rd
++@sh5     .......  ..... .....  ... ..... ....... &shift  shamt=%sh5     %rs1 %rd
++@r3w_imm ..... .  ...... ..... ... ..... ....... &r3i %rs3 imm=%sh5 	%rs1 %rd
+ 
+ # *** RV64I Base Instruction Set (in addition to RV32I) ***
+ lwu      ............   ..... 110 ..... 0000011 @i
+@@ -93,11 +97,17 @@ fcvt_lu_h  1100010  00011 ..... ... ..... 1010011 @r2_rm
+ fcvt_h_l   1101010  00010 ..... ... ..... 1010011 @r2_rm
+ fcvt_h_lu  1101010  00011 ..... ... ..... 1010011 @r2_rm
+ 
++
+ # *** RV64B Standard Extension (in addition to RV32B) ***
+ clzw       0110000 00000 ..... 001 ..... 0011011 @r2
+ ctzw       0110000 00001 ..... 001 ..... 0011011 @r2
+ cpopw      0110000 00010 ..... 001 ..... 0011011 @r2
++crc32_d    0110000 10011 ..... 001 ..... 0010011 @r2
++crc32c_d   0110000 11011 ..... 001 ..... 0010011 @r2
++bmatflip   011000 000011 ..... 001 ..... 0010011 @r2
+ 
++bmator     0000100 .......... 011 ..... 0110011 @r
++bmatxor    0100100 .......... 011 ..... 0110011 @r
+ packw      0000100 .......... 100 ..... 0111011 @r
+ packuw     0100100 .......... 100 ..... 0111011 @r
+ bsetw      0010100 .......... 001 ..... 0111011 @r
+@@ -114,7 +124,16 @@ sh1add_uw  0010000 .......... 010 ..... 0111011 @r
+ sh2add_uw  0010000 .......... 100 ..... 0111011 @r
+ sh3add_uw  0010000 .......... 110 ..... 0111011 @r
+ add_uw     0000100 .......... 000 ..... 0111011 @r
++shflw      0000100 .......... 001 ..... 0111011 @r
++unshflw    0000100 .......... 101 ..... 0111011 @r
++xperm_w    0010100 .......... 000 ..... 0110011 @r
++bfpw       0100100 .......... 111 ..... 0111011 @r
++fslw       .....10 .......... 001 ..... 0111011 @r3
++fsrw       .....10 .......... 101 ..... 0111011 @r3
++bcompressw   0000100 .......... 110 ..... 0111011 @r
++bdecompressw 0100100 .......... 110 ..... 0111011 @r
+ 
++fsriw      .....10 .......... 101 ..... 0011011 @r3w_imm
+ bsetiw     0010100 .......... 001 ..... 0011011 @sh5
+ bclriw     0100100 .......... 001 ..... 0011011 @sh5
+ binviw     0110100 .......... 001 ..... 0011011 @sh5
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index 9a45f2265b..f4b030747c 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -23,6 +23,7 @@
+ %rd        7:5
+ 
+ %sh7    20:7
++%sh6    20:6
+ %csr    20:12
+ %rm     12:3
+ %nf     29:3                     !function=ex_plus_1
+@@ -41,6 +42,8 @@
+ &j    imm rd
+ &r    rd rs1 rs2
+ &r2   rd rs1
++&r3   rd rs1 rs2 rs3
++&r3i  rd rs1 imm rs3
+ &s    imm rs1 rs2
+ &u    imm rd
+ &shift     shamt rs1 rd
+@@ -59,12 +62,16 @@
+ @u       ....................      ..... ....... &u      imm=%imm_u          %rd
+ @j       ....................      ..... ....... &j      imm=%imm_j          %rd
+ 
+-@sh      ......  ...... .....  ... ..... ....... &shift  shamt=%sh7     %rs1 %rd
++
++@sh6     ......  ...... .....  ... ..... ....... &shift  shamt=%sh6     %rs1 %rd
+ @csr     ............   .....  ... ..... .......               %csr     %rs1 %rd
+ 
+ @atom_ld ..... aq:1 rl:1 ..... ........ ..... ....... &atomic rs2=0     %rs1 %rd
+ @atom_st ..... aq:1 rl:1 ..... ........ ..... ....... &atomic %rs2      %rs1 %rd
+ 
++@r3      ..... ..  ..... ..... ... ..... ....... &r3 %rs3 %rs2 %rs1 %rd
++@r3_imm  ..... .  ...... ..... ... ..... ....... &r3i %rs3 imm=%sh6 %rs1 %rd
++
+ @r4_rm   ..... ..  ..... ..... ... ..... ....... %rs3 %rs2 %rs1 %rm %rd
+ @r_rm    .......   ..... ..... ... ..... ....... %rs2 %rs1 %rm %rd
+ @r2_rm   .......   ..... ..... ... ..... ....... %rs1 %rm %rd
+@@ -124,9 +131,9 @@ sltiu    ............     ..... 011 ..... 0010011 @i
+ xori     ............     ..... 100 ..... 0010011 @i
+ ori      ............     ..... 110 ..... 0010011 @i
+ andi     ............     ..... 111 ..... 0010011 @i
+-slli     00000. ......    ..... 001 ..... 0010011 @sh
+-srli     00000. ......    ..... 101 ..... 0010011 @sh
+-srai     01000. ......    ..... 101 ..... 0010011 @sh
++slli     000000 ......    ..... 001 ..... 0010011 @sh6
++srli     000000 ......    ..... 101 ..... 0010011 @sh6
++srai     010000 ......    ..... 101 ..... 0010011 @sh6
+ add      0000000 .....    ..... 000 ..... 0110011 @r
+ sub      0100000 .....    ..... 000 ..... 0110011 @r
+ sll      0000000 .....    ..... 001 ..... 0110011 @r
+@@ -694,8 +701,17 @@ fmv_h_x    1111010  00000 ..... 000 ..... 1010011 @r2
+ clz        011000 000000 ..... 001 ..... 0010011 @r2
+ ctz        011000 000001 ..... 001 ..... 0010011 @r2
+ cpop       011000 000010 ..... 001 ..... 0010011 @r2
++
+ sext_b     011000 000100 ..... 001 ..... 0010011 @r2
+ sext_h     011000 000101 ..... 001 ..... 0010011 @r2
++crc32_b    0110000 10000 ..... 001 ..... 0010011 @r2
++crc32_h    0110000 10001 ..... 001 ..... 0010011 @r2
++crc32_w    0110000 10010 ..... 001 ..... 0010011 @r2
++
++crc32c_b   0110000 11000 ..... 001 ..... 0010011 @r2
++crc32c_h   0110000 11001 ..... 001 ..... 0010011 @r2
++crc32c_w   0110000 11010 ..... 001 ..... 0010011 @r2
++
+ 
+ andn       0100000 .......... 111 ..... 0110011 @r
+ orn        0100000 .......... 110 ..... 0110011 @r
+@@ -720,13 +736,34 @@ gorc       0010100 .......... 101 ..... 0110011 @r
+ sh1add     0010000 .......... 010 ..... 0110011 @r
+ sh2add     0010000 .......... 100 ..... 0110011 @r
+ sh3add     0010000 .......... 110 ..... 0110011 @r
++clmul      0000101 .......... 001 ..... 0110011 @r
++clmulh     0000101 .......... 011 ..... 0110011 @r
++clmulr     0000101 .......... 010 ..... 0110011 @r
++shfl       0000100 .......... 001 ..... 0110011 @r
++unshfl     0000100 .......... 101 ..... 0110011 @r
++xperm_n    0010100 .......... 010 ..... 0110011 @r
++xperm_b    0010100 .......... 100 ..... 0110011 @r
++xperm_h    0010100 .......... 110 ..... 0110011 @r
++bfp        0100100 .......... 111 ..... 0110011 @r
++cmix       .....11 .......... 001 ..... 0110011 @r3
++cmov       .....11 .......... 101 ..... 0110011 @r3
++fsl        .....10 .......... 001 ..... 0110011 @r3
++fsr        .....10 .......... 101 ..... 0110011 @r3
++bcompress    0000100 .......... 110 ..... 0110011 @r
++bdecompress  0100100 .......... 110 ..... 0110011 @r
++
++
++fsri       .....1 ........... 101 ..... 0010011 @r3_imm
++bseti      001010 ........... 001 ..... 0010011 @sh6
++bclri      010010 ........... 001 ..... 0010011 @sh6
++binvi      011010 ........... 001 ..... 0010011 @sh6
++bexti      010010 ........... 101 ..... 0010011 @sh6
++sloi       001000 ........... 001 ..... 0010011 @sh6
++sroi       001000 ........... 101 ..... 0010011 @sh6
++rori       011000 ........... 101 ..... 0010011 @sh6
++grevi      011010 ........... 101 ..... 0010011 @sh6
++gorci      001010 ........... 101 ..... 0010011 @sh6
++shfli      000010 ........... 001 ..... 0010011 @sh6
++unshfli    000010 ........... 101 ..... 0010011 @sh6
++
+ 
+-bseti      00101. ........... 001 ..... 0010011 @sh
+-bclri      01001. ........... 001 ..... 0010011 @sh
+-binvi      01101. ........... 001 ..... 0010011 @sh
+-bexti      01001. ........... 101 ..... 0010011 @sh
+-sloi       00100. ........... 001 ..... 0010011 @sh
+-sroi       00100. ........... 101 ..... 0010011 @sh
+-rori       01100. ........... 101 ..... 0010011 @sh
+-grevi      01101. ........... 101 ..... 0010011 @sh
+-gorci      00101. ........... 101 ..... 0010011 @sh
+diff --git a/target/riscv/insn_trans/trans_rvb.c.inc b/target/riscv/insn_trans/trans_rvb.c.inc
+index d69bda2f7b..394277b02f 100644
+--- a/target/riscv/insn_trans/trans_rvb.c.inc
++++ b/target/riscv/insn_trans/trans_rvb.c.inc
+@@ -237,8 +237,210 @@ GEN_TRANS_SHADD(1)
+ GEN_TRANS_SHADD(2)
+ GEN_TRANS_SHADD(3)
+ 
++
++#define GEN_TRANS_CLMUL(NAME)                                             \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)                \
++{                                                                         \
++    REQUIRE_EXT(ctx, RVB);                                                \
++    return gen_arith(ctx, a, gen_helper_##NAME);                          \
++}
++
++GEN_TRANS_CLMUL(clmul)
++GEN_TRANS_CLMUL(clmulh)
++GEN_TRANS_CLMUL(clmulr)
++
++static bool trans_shfl(DisasContext *ctx, arg_shfl *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_shfl);
++}
++
++static bool trans_unshfl(DisasContext *ctx, arg_unshfl *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_unshfl);
++}
++
++static bool trans_shfli(DisasContext *ctx, arg_shfli *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    if (a->shamt >= (TARGET_LONG_BITS / 2)) {
++        return false;
++    }
++    return gen_shifti(ctx, a, gen_helper_shfl);
++}
++
++static bool trans_unshfli(DisasContext *ctx, arg_unshfli *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    if (a->shamt >= (TARGET_LONG_BITS / 2)) {
++        return false;
++    }
++    return gen_shifti(ctx, a, gen_helper_unshfl);
++}
++
++#define GEN_TRANS_XPERM(NAME)                                   \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)      \
++{                                                               \
++    REQUIRE_EXT(ctx, RVB);                                      \
++    return gen_arith(ctx, a, gen_helper_##NAME);                \
++}
++
++GEN_TRANS_XPERM(xperm_n)
++GEN_TRANS_XPERM(xperm_b)
++GEN_TRANS_XPERM(xperm_h)
++
++static bool trans_bfp(DisasContext *ctx, arg_bfp *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bfp);
++}
++
++static bool trans_bcompress(DisasContext *ctx, arg_bcompress *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bcompress);
++}
++
++static bool trans_bdecompress(DisasContext *ctx, arg_bdecompress *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bdecompress);
++}
++
++static bool trans_cmix(DisasContext *ctx, arg_cmix *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_cmix);
++}
++
++static bool trans_cmov(DisasContext *ctx, arg_cmov *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_cmov);
++}
++
++static bool trans_fsl(DisasContext *ctx, arg_fsl *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsl);
++}
++
++static bool trans_fsr(DisasContext *ctx, arg_fsr *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_helper_fsr);
++}
++
++static bool trans_fsri(DisasContext *ctx, arg_fsri *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++
++    if (a->imm >= 64) {
++        return false;
++    }
++
++    return gen_quati(ctx, a, gen_helper_fsr);
++}
++
++/* RV64-only instructions */
++#ifdef TARGET_RISCV64
++static bool trans_shflw(DisasContext *ctx, arg_shflw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_shflw);
++}
++
++static bool trans_unshflw(DisasContext *ctx, arg_unshflw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_unshflw);
++}
++
++static bool trans_xperm_w(DisasContext *ctx, arg_xperm_w *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_xperm_w);
++}
++
++static bool trans_bfpw(DisasContext *ctx, arg_bfpw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_bfpw);
++}
++
++static bool trans_fslw(DisasContext *ctx, arg_fslw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_fslw);
++}
++
++static bool trans_fsrw(DisasContext *ctx, arg_fsrw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_quat(ctx, a, gen_fsrw);
++}
++
++static bool trans_fsriw(DisasContext *ctx, arg_fsri *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++
++    if (a->imm >= 32) {
++        return false;
++    }
++
++    return gen_quati(ctx, a, gen_fsrw);
++}
++
++static bool trans_bcompressw(DisasContext *ctx, arg_bcompressw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_bcompressw);
++}
++
++static bool trans_bdecompressw(DisasContext *ctx, arg_bdecompressw *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_bdecompressw);
++}
++#endif
++
++#define GEN_TRANS_CRC(NAME)                                     \
++static bool trans_##NAME(DisasContext *ctx, arg_##NAME *a)      \
++{                                                               \
++    REQUIRE_EXT(ctx, RVB);                                      \
++    return gen_unary(ctx, a, gen_helper_##NAME);                \
++}                                                               \
++
++GEN_TRANS_CRC(crc32_b)
++GEN_TRANS_CRC(crc32_h)
++GEN_TRANS_CRC(crc32_w)
++
++GEN_TRANS_CRC(crc32c_b)
++GEN_TRANS_CRC(crc32c_h)
++GEN_TRANS_CRC(crc32c_w)
+ /* RV64-only instructions */
+ #ifdef TARGET_RISCV64
++GEN_TRANS_CRC(crc32c_d)
++GEN_TRANS_CRC(crc32_d)
++
++static bool trans_bmatflip(DisasContext *ctx, arg_bmatflip *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_unary(ctx, a, gen_helper_bmatflip);
++}
++
++static bool trans_bmatxor(DisasContext *ctx, arg_bmatxor *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bmatxor);
++}
++
++static bool trans_bmator(DisasContext *ctx, arg_bmatxor *a)
++{
++    REQUIRE_EXT(ctx, RVB);
++    return gen_arith(ctx, a, gen_helper_bmator);
++}
+ 
+ static bool trans_clzw(DisasContext *ctx, arg_clzw *a)
+ {
+@@ -327,13 +529,13 @@ static bool trans_sloiw(DisasContext *ctx, arg_sloiw *a)
+ static bool trans_srow(DisasContext *ctx, arg_srow *a)
+ {
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_shiftw(ctx, a, gen_sro);
++    return gen_shiftw(ctx, a, gen_srow);
+ }
+ 
+ static bool trans_sroiw(DisasContext *ctx, arg_sroiw *a)
+ {
+     REQUIRE_EXT(ctx, RVB);
+-    return gen_shiftiw(ctx, a, gen_sro);
++    return gen_shiftiw(ctx, a, gen_srow);
+ }
+ 
+ static bool trans_rorw(DisasContext *ctx, arg_rorw *a)
+@@ -404,14 +606,13 @@ static bool trans_slli_uw(DisasContext *ctx, arg_slli_uw *a)
+     gen_get_gpr(source1, a->rs1);
+ 
+     if (a->shamt < 32) {
+-        tcg_gen_deposit_z_i64(source1, source1, a->shamt, 32);
++        tcg_gen_deposit_z_tl(source1, source1, a->shamt, 32);
+     } else {
+-        tcg_gen_shli_i64(source1, source1, a->shamt);
++        tcg_gen_shli_tl(source1, source1, a->shamt);
+     }
+ 
+     gen_set_gpr(a->rd, source1);
+     tcg_temp_free(source1);
+     return true;
+ }
+-
+ #endif
+diff --git a/target/riscv/translate.c b/target/riscv/translate.c
+index 744b4ffaa7..8c581d1ccf 100644
+--- a/target/riscv/translate.c
++++ b/target/riscv/translate.c
+@@ -731,15 +731,15 @@ GEN_SHADD(3)
+ 
+ static void gen_ctzw(TCGv ret, TCGv arg1)
+ {
+-    tcg_gen_ori_i64(ret, arg1, MAKE_64BIT_MASK(32, 32));
+-    tcg_gen_ctzi_i64(ret, ret, 64);
++    tcg_gen_ori_tl(ret, arg1, (target_ulong)MAKE_64BIT_MASK(32, 32));
++    tcg_gen_ctzi_tl(ret, ret, 64);
+ }
+ 
+ static void gen_clzw(TCGv ret, TCGv arg1)
+ {
+-    tcg_gen_ext32u_i64(ret, arg1);
+-    tcg_gen_clzi_i64(ret, ret, 64);
+-    tcg_gen_subi_i64(ret, ret, 32);
++    tcg_gen_ext32u_tl(ret, arg1);
++    tcg_gen_clzi_tl(ret, ret, 64);
++    tcg_gen_subi_tl(ret, ret, 32);
+ }
+ 
+ static void gen_cpopw(TCGv ret, TCGv arg1)
+@@ -751,17 +751,17 @@ static void gen_cpopw(TCGv ret, TCGv arg1)
+ static void gen_packw(TCGv ret, TCGv arg1, TCGv arg2)
+ {
+     TCGv t = tcg_temp_new();
+-    tcg_gen_ext16s_i64(t, arg2);
+-    tcg_gen_deposit_i64(ret, arg1, t, 16, 48);
++    tcg_gen_ext16s_tl(t, arg2);
++    tcg_gen_deposit_tl(ret, arg1, t, 16, 48);
+     tcg_temp_free(t);
+ }
+ 
+ static void gen_packuw(TCGv ret, TCGv arg1, TCGv arg2)
+ {
+     TCGv t = tcg_temp_new();
+-    tcg_gen_shri_i64(t, arg1, 16);
+-    tcg_gen_deposit_i64(ret, arg2, t, 0, 16);
+-    tcg_gen_ext32s_i64(ret, ret);
++    tcg_gen_shri_tl(t, arg1, 16);
++    tcg_gen_deposit_tl(ret, arg2, t, 0, 16);
++    tcg_gen_ext32s_tl(ret, ret);
+     tcg_temp_free(t);
+ }
+ 
+@@ -801,6 +801,26 @@ static void gen_rolw(TCGv ret, TCGv arg1, TCGv arg2)
+     tcg_temp_free_i32(t2);
+ }
+ 
++static void gen_srow(TCGv ret, TCGv arg1, TCGv arg2)
++{
++    TCGv_i32 t1 = tcg_temp_new_i32();
++    TCGv_i32 t2 = tcg_temp_new_i32();
++
++    /* truncate to 32-bits */
++    tcg_gen_trunc_tl_i32(t1, arg1);
++    tcg_gen_trunc_tl_i32(t2, arg2);
++
++    tcg_gen_not_i32(t1, t1);
++    tcg_gen_shr_i32(t1, t1, t2);
++    tcg_gen_not_i32(t1, t1);
++
++    /* sign-extend 64-bits */
++    tcg_gen_ext_i32_tl(ret, t1);
++
++    tcg_temp_free_i32(t1);
++    tcg_temp_free_i32(t2);
++}
++
+ static void gen_grevw(TCGv ret, TCGv arg1, TCGv arg2)
+ {
+     tcg_gen_ext32u_tl(arg1, arg1);
+@@ -836,6 +856,42 @@ static void gen_add_uw(TCGv ret, TCGv arg1, TCGv arg2)
+     tcg_gen_add_tl(ret, arg1, arg2);
+ }
+ 
++#define GEN_RV64ONLY_INSN_3(NAME)                                   \
++static void gen_##NAME(TCGv ret, TCGv arg1, TCGv arg2, TCGv arg3)   \
++{                                                                   \
++    gen_helper_##NAME(ret, arg1, arg2, arg3);                       \
++    tcg_gen_ext32s_tl(ret, ret);                                    \
++}                                                                   \
++
++GEN_RV64ONLY_INSN_3(fslw)
++GEN_RV64ONLY_INSN_3(fsrw)
++
++#define GEN_RV64ONLY_INSN_2(NAME)                                   \
++static void gen_##NAME(TCGv ret, TCGv arg1, TCGv arg2)              \
++{                                                                   \
++    gen_helper_##NAME(ret, arg1, arg2);                             \
++    tcg_gen_ext32s_tl(ret, ret);                                    \
++}                                                                   \
++
++GEN_RV64ONLY_INSN_2(shflw)
++GEN_RV64ONLY_INSN_2(unshflw)
++GEN_RV64ONLY_INSN_2(bfpw)
++
++static void gen_bcompressw(TCGv ret, TCGv arg1, TCGv arg2)
++{
++    tcg_gen_ext32u_tl(arg1, arg1);
++    tcg_gen_ext32u_tl(arg2, arg2);
++    gen_helper_bcompress(ret, arg1, arg2);
++    tcg_gen_ext32s_tl(ret, ret);
++}
++
++static void gen_bdecompressw(TCGv ret, TCGv arg1, TCGv arg2)
++{
++    tcg_gen_ext32u_tl(arg1, arg1);
++    tcg_gen_ext32u_tl(arg2, arg2);
++    gen_helper_bdecompress(ret, arg1, arg2);
++    tcg_gen_ext32s_tl(ret, ret);
++}
+ #endif
+ 
+ static bool gen_arith(DisasContext *ctx, arg_r *a,
+@@ -856,6 +912,35 @@ static bool gen_arith(DisasContext *ctx, arg_r *a,
+     return true;
+ }
+ 
++static void gen_cmix(TCGv ret, TCGv arg1, TCGv arg2, TCGv arg3)
++{
++    tcg_gen_and_tl(arg1, arg1, arg2);
++    tcg_gen_not_tl(arg2, arg2);
++    tcg_gen_and_tl(arg3, arg3, arg2);
++    tcg_gen_or_tl(ret, arg1, arg3);
++}
++
++static bool gen_quat(DisasContext *ctx, arg_r3 *a,
++                     void(*func)(TCGv, TCGv, TCGv, TCGv))
++{
++    TCGv source1, source2, source3;
++    source1 = tcg_temp_new();
++    source2 = tcg_temp_new();
++    source3 = tcg_temp_new();
++
++    gen_get_gpr(source1, a->rs1);
++    gen_get_gpr(source2, a->rs2);
++    gen_get_gpr(source3, a->rs3);
++
++    (*func)(source1, source1, source2, source3);
++
++    gen_set_gpr(a->rd, source1);
++    tcg_temp_free(source1);
++    tcg_temp_free(source2);
++    tcg_temp_free(source3);
++    return true;
++}
++
+ static bool gen_shift(DisasContext *ctx, arg_r *a,
+                         void(*func)(TCGv, TCGv, TCGv))
+ {
+@@ -874,6 +959,27 @@ static bool gen_shift(DisasContext *ctx, arg_r *a,
+     return true;
+ }
+ 
++static bool gen_quati(DisasContext *ctx, arg_r3i *a,
++                      void(*func)(TCGv, TCGv, TCGv, TCGv))
++{
++    TCGv source1, source2, source3;
++    source1 = tcg_temp_new();
++    source2 = tcg_temp_new();
++    source3 = tcg_temp_new();
++
++    gen_get_gpr(source1, a->rs1);
++    tcg_gen_movi_tl(source2, a->imm);
++    gen_get_gpr(source3, a->rs3);
++
++    (*func)(source1, source1, source2, source3);
++
++    gen_set_gpr(a->rd, source1);
++    tcg_temp_free(source1);
++    tcg_temp_free(source2);
++    tcg_temp_free(source3);
++    return true;
++}
++
+ static uint32_t opcode_at(DisasContextBase *dcbase, target_ulong pc)
+ {
+     DisasContext *ctx = container_of(dcbase, DisasContext, base);
+-- 
+2.33.1
+

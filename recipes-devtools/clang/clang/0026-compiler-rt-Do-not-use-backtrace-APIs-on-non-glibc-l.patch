@@ -1,11 +1,10 @@
-From 011c8d4ffe4b8f5cf27ca9a7181359f1c0c43ae3 Mon Sep 17 00:00:00 2001
+From 3c6139afa9d15fac7ace71763c2d557e52e39510 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:06:04 +0800
-Subject: [PATCH] compiler-rt: Do not use backtrace APIs on non-glibc linux
+Date: Tue, 9 Nov 2021 10:53:27 +0800
+Subject: [PATCH 26/34] compiler-rt: Do not use backtrace APIs on non-glibc
+ linux
 
 musl e.g. does not provide backtrace APIs
-
-Upstream-Status: Pending
 
 Rebased to LLVM 14.0.0 by Jun Yuan Tan
 
@@ -71,5 +70,5 @@ index ea8e72be287d..0344074dd254 100644
  } // anonymous namespace
  
 -- 
-2.33.0
+2.33.1
 

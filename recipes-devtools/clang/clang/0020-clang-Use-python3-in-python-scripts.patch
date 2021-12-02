@@ -1,12 +1,13 @@
-From d3fd767d2857cf423dd59ba7fd9d8f8682b08061 Mon Sep 17 00:00:00 2001
+From 873aa64ba616b471c81db436dfb4d267d036895b Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:54:10 +0800
-Subject: [PATCH] clang: Use python3 in python scripts
+Date: Tue, 9 Nov 2021 10:42:04 +0800
+Subject: [PATCH 20/34] clang: Use python3 in python scripts
 
 Some scripts ask for python, but they work fine with python3
 and in OE python symlink is not exposed to build, only python3 is
 
 Upstream-Status: Pending
+
 Rebased to LLVM 14.0.0 by Jun Yuan Tan
 
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
@@ -33,7 +34,7 @@ index 8655af137bb2..e95ba59a421c 100755
  #=- run-find-all-symbols.py - Parallel find-all-symbols runner -*- python  -*-=#
  #
 diff --git a/clang-tools-extra/clang-tidy/add_new_check.py b/clang-tools-extra/clang-tidy/add_new_check.py
-index a3554b095975..1429a387ea86 100755
+index 0312c04e047c..29db06683bee 100755
 --- a/clang-tools-extra/clang-tidy/add_new_check.py
 +++ b/clang-tools-extra/clang-tidy/add_new_check.py
 @@ -1,4 +1,4 @@
@@ -73,7 +74,7 @@ index acd1ed6979c0..12bd7f9c7dc3 100755
  #===- run-clang-tidy.py - Parallel clang-tidy runner --------*- python -*--===#
  #
 diff --git a/clang/tools/clang-format/git-clang-format b/clang/tools/clang-format/git-clang-format
-index c7e15eb7b483..ea29131fc5ad 100755
+index 0233ceb3a868..16bc55f98762 100755
 --- a/clang/tools/clang-format/git-clang-format
 +++ b/clang/tools/clang-format/git-clang-format
 @@ -1,4 +1,4 @@
@@ -103,5 +104,5 @@ index e647cde6bc46..7ed2fdf674b1 100755
  
  import json
 -- 
-2.33.0
+2.33.1
 

@@ -1,7 +1,8 @@
-From 9de37866a9a16ca9ba511ad846dd2c4ae37a2371 Mon Sep 17 00:00:00 2001
+From fe6bb5b096ac5855495fceefb534808dc0295a4b Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:08:37 +0800
-Subject: [PATCH] compiler-rt: Link scudo with SANITIZER_CXX_ABI_LIBRARIES
+Date: Tue, 9 Nov 2021 10:55:41 +0800
+Subject: [PATCH 28/34] compiler-rt: Link scudo with
+ SANITIZER_CXX_ABI_LIBRARIES
 
 If SANITIZER_CXX_ABI_LIBRARIES is set then link scudo with it, this
 fixes build time errors like
@@ -30,5 +31,5 @@ index 995e853e2a4d..25b79a8d17e8 100644
                 SCUDO_CFLAGS)
  
 -- 
-2.33.0
+2.33.1
 

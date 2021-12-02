@@ -1,7 +1,7 @@
-From 40af4d126a4266d4bea0e7cf4a51224e96f4258c Mon Sep 17 00:00:00 2001
+From 15b98f6759a7f27367c2450c4aebd894468dd8b8 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 12:00:51 +0800
-Subject: [PATCH] compiler-rt: Use mcr based barrier on armv6
+Date: Tue, 9 Nov 2021 10:49:26 +0800
+Subject: [PATCH 24/34] compiler-rt: Use mcr based barrier on armv6
 
 dsb is an armv7 instruction and wont work when we are building for armv6.
 
@@ -74,5 +74,5 @@ index 9c015059af5a..aec4ff59beb7 100644
  #define WIDE(op) op.w
  #else
 -- 
-2.33.0
+2.33.1
 

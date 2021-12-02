@@ -1,8 +1,8 @@
-From 219dd48b4a4adf5bee26eae3557b352732aca7fe Mon Sep 17 00:00:00 2001
+From b9349e316a179b7a37a119dbfeddbd4d382941b4 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:48:23 +0800
-Subject: [PATCH] clang: driver: Add dyld-prefix when checking sysroot for ldso
- path
+Date: Tue, 9 Nov 2021 10:38:17 +0800
+Subject: [PATCH 19/34] clang: driver: Add dyld-prefix when checking sysroot
+ for ldso path
 
  * the dyld-prefix shall be taken into account when the default
    path for the dynamic linker has to be checked.
@@ -21,7 +21,7 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/clang/lib/Driver/ToolChains/Linux.cpp b/clang/lib/Driver/ToolChains/Linux.cpp
-index e4bb78876fa0..2c49a2669d5a 100644
+index 9fe4e5230045..abaab04c8266 100644
 --- a/clang/lib/Driver/ToolChains/Linux.cpp
 +++ b/clang/lib/Driver/ToolChains/Linux.cpp
 @@ -480,8 +480,8 @@ std::string Linux::getDynamicLinker(const ArgList &Args) const {
@@ -69,5 +69,5 @@ index e4bb78876fa0..2c49a2669d5a 100644
      }
      break;
 -- 
-2.33.0
+2.33.1
 

@@ -1,7 +1,7 @@
-From a1d6263590cc88211e48cc174347c8cc058c87c6 Mon Sep 17 00:00:00 2001
+From 94cf62bdf4a9e74ec4613f3df8ae1e7e925e95ba Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:45:59 +0800
-Subject: [PATCH] fix path to libffi
+Date: Tue, 9 Nov 2021 10:34:47 +0800
+Subject: [PATCH 18/34] fix path to libffi
 
 FFI_LIBRARY_PATH is the full path to libffi so when building something that links to
 libLLVMInterpreter, we were looking for libffi in clang's recipe-sysroot instead of
@@ -28,5 +28,5 @@ index 976219830d5e..9930e01559e9 100644
 +  target_link_libraries( LLVMInterpreter PRIVATE ffi )
  endif()
 -- 
-2.33.0
+2.33.1
 

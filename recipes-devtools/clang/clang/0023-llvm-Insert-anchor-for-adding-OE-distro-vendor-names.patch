@@ -1,7 +1,7 @@
-From a067f57d6e782aaee39c5bd8e818c4b3cc1d4333 Mon Sep 17 00:00:00 2001
+From 2cfdb7d3c7f932be6befc9a47f128806cc5c4847 Mon Sep 17 00:00:00 2001
 From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Fri, 22 Oct 2021 11:58:39 +0800
-Subject: [PATCH] llvm: Insert anchor for adding OE distro vendor names
+Date: Tue, 9 Nov 2021 10:47:18 +0800
+Subject: [PATCH 23/34] llvm: Insert anchor for adding OE distro vendor names
 
 This helps in making right detection for OE built gcc toolchains
 
@@ -21,7 +21,7 @@ Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/llvm/lib/Support/Triple.cpp b/llvm/lib/Support/Triple.cpp
-index ec055869adfa..e89d7b15b68e 100644
+index 88311546354b..8b2745deae88 100644
 --- a/llvm/lib/Support/Triple.cpp
 +++ b/llvm/lib/Support/Triple.cpp
 @@ -496,7 +496,7 @@ static Triple::VendorType parseVendor(StringRef VendorName) {
@@ -34,5 +34,5 @@ index ec055869adfa..e89d7b15b68e 100644
  }
  
 -- 
-2.33.0
+2.33.1
 
