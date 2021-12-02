@@ -1,0 +1,46 @@
+From 24deb7ba16e914132713f1ea7dae9b4b089870e9 Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Fri, 22 Oct 2021 11:31:50 +0800
+Subject: [PATCH] clang: Look inside the target sysroot for compiler runtime
+
+In OE compiler-rt and libc++ are built and staged into target
+sysroot and not into resourcedir which is relative to clang
+driver installation where the libraries are not instlled
+
+Specific to cross compiling the way yocto/OE works
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ clang/lib/Driver/ToolChain.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/clang/lib/Driver/ToolChain.cpp b/clang/lib/Driver/ToolChain.cpp
+index df205c37f063..28e16ef5dc81 100644
+--- a/clang/lib/Driver/ToolChain.cpp
++++ b/clang/lib/Driver/ToolChain.cpp
+@@ -13,6 +13,7 @@
+ #include "ToolChains/InterfaceStubs.h"
+ #include "clang/Basic/ObjCRuntime.h"
+ #include "clang/Basic/Sanitizers.h"
++#include "clang/Basic/Version.h"
+ #include "clang/Config/config.h"
+ #include "clang/Driver/Action.h"
+ #include "clang/Driver/Driver.h"
+@@ -410,7 +411,10 @@ StringRef ToolChain::getOSLibName() const {
+ }
+ 
+ std::string ToolChain::getCompilerRTPath() const {
+-  SmallString<128> Path(getDriver().ResourceDir);
++  SmallString<128> Path(getDriver().SysRoot);
++  StringRef ClangLibdirSuffix(CLANG_LIBDIR_SUFFIX);
++  llvm::sys::path::append(Path, "/usr/", Twine("lib") + ClangLibdirSuffix, "clang",
++                            CLANG_VERSION_STRING);
+   if (Triple.isOSUnknown()) {
+     llvm::sys::path::append(Path, "lib");
+   } else {
+-- 
+2.33.0
+

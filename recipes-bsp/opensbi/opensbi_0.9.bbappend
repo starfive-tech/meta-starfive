@@ -1,5 +1,5 @@
-SRC_URI = "git://github.com/starfive-tech/opensbi.git;protocol=git;branch=starfive-dubhe"
-SRCREV = "4ad25b455be55b31f38404e82225e6d757704e26"
+SRC_URI = "git://git@192.168.110.45/starfive-tech/opensbi;protocol=ssh;branch=starfive-dubhe"
+SRCREV = "b44fd539c9ac9a53f248986a5cb4c9becf84e08d"
 
 INSANE_SKIP_${PN}-dev = "ldflags"
 INSANE_SKIP_${PN} = "ldflags"

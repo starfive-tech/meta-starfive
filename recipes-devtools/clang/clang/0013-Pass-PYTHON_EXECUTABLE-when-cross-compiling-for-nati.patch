@@ -1,0 +1,29 @@
+From 25948f78aeb54b5103b593af57c0f50dea744bbf Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Fri, 22 Oct 2021 11:36:29 +0800
+Subject: [PATCH] Pass PYTHON_EXECUTABLE when cross compiling for native build
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Anuj Mittal <anuj.mittal@intel.com>
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ llvm/cmake/modules/CrossCompile.cmake | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/llvm/cmake/modules/CrossCompile.cmake b/llvm/cmake/modules/CrossCompile.cmake
+index 179d183ed2b7..d555eb1f2da1 100644
+--- a/llvm/cmake/modules/CrossCompile.cmake
++++ b/llvm/cmake/modules/CrossCompile.cmake
+@@ -79,6 +79,7 @@ function(llvm_create_cross_target project_name target_name toolchain buildtype)
+         -DLLVM_EXTERNAL_PROJECTS="${llvm_external_projects_arg}"
+         ${external_project_source_dirs}
+         -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN="${LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN}"
++	-DPYTHON_EXECUTABLE="${PYTHON_EXECUTABLE}"
+         ${build_type_flags} ${linker_flag} ${external_clang_dir}
+         ${ARGN}
+     WORKING_DIRECTORY ${${project_name}_${target_name}_BUILD}
+-- 
+2.33.0
+

@@ -1,0 +1,74 @@
+From b81d3b0aeef54a3e38b5fa89961e468d6019d772 Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Fri, 22 Oct 2021 12:17:09 +0800
+Subject: [PATCH] Drop the 'git' suffix from various version variables
+
+Upstream-Status: Backport [cherry-picked from branch 12.0.0]
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Changqing Li <changqing.li@windriver.com>
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ libcxx/CMakeLists.txt                                           | 2 +-
+ libcxxabi/CMakeLists.txt                                        | 2 +-
+ libunwind/CMakeLists.txt                                        | 2 +-
+ .../llvm-project-overlay/llvm/include/llvm/Config/llvm-config.h | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/libcxx/CMakeLists.txt b/libcxx/CMakeLists.txt
+index 51951e50e16a..46964f5e2a1c 100644
+--- a/libcxx/CMakeLists.txt
++++ b/libcxx/CMakeLists.txt
+@@ -29,7 +29,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBCXX_STANDALONE_BUIL
+   project(libcxx CXX C)
+ 
+   set(PACKAGE_NAME libcxx)
+-  set(PACKAGE_VERSION 14.0.0git)
++  set(PACKAGE_VERSION 14.0.0)
+   set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
+   set(PACKAGE_BUGREPORT "llvm-bugs@lists.llvm.org")
+ 
+diff --git a/libcxxabi/CMakeLists.txt b/libcxxabi/CMakeLists.txt
+index 91174d19bca7..6196a5c3a416 100644
+--- a/libcxxabi/CMakeLists.txt
++++ b/libcxxabi/CMakeLists.txt
+@@ -30,7 +30,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBCXXABI_STANDALONE_B
+   project(libcxxabi CXX C)
+ 
+   set(PACKAGE_NAME libcxxabi)
+-  set(PACKAGE_VERSION 11.0.0git)
++  set(PACKAGE_VERSION 11.0.0)
+   set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
+   set(PACKAGE_BUGREPORT "llvm-bugs@lists.llvm.org")
+ 
+diff --git a/libunwind/CMakeLists.txt b/libunwind/CMakeLists.txt
+index 59d489b909e4..942220cbafca 100644
+--- a/libunwind/CMakeLists.txt
++++ b/libunwind/CMakeLists.txt
+@@ -26,7 +26,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBUNWIND_STANDALONE_B
+   project(libunwind LANGUAGES C CXX ASM)
+ 
+   set(PACKAGE_NAME libunwind)
+-  set(PACKAGE_VERSION 14.0.0git)
++  set(PACKAGE_VERSION 14.0.0)
+   set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
+   set(PACKAGE_BUGREPORT "llvm-bugs@lists.llvm.org")
+ 
+diff --git a/utils/bazel/llvm-project-overlay/llvm/include/llvm/Config/llvm-config.h b/utils/bazel/llvm-project-overlay/llvm/include/llvm/Config/llvm-config.h
+index 6b64c9a06005..11cc1c227fbf 100644
+--- a/utils/bazel/llvm-project-overlay/llvm/include/llvm/Config/llvm-config.h
++++ b/utils/bazel/llvm-project-overlay/llvm/include/llvm/Config/llvm-config.h
+@@ -83,7 +83,7 @@
+ #define LLVM_VERSION_PATCH 0
+ 
+ /* LLVM version string */
+-#define LLVM_VERSION_STRING "14.0.0git"
++#define LLVM_VERSION_STRING "14.0.0"
+ 
+ /* Whether LLVM records statistics for use with GetStatistics(),
+  * PrintStatistics() or PrintStatisticsJSON()
+-- 
+2.33.0
+
