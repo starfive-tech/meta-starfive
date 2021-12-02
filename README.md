@@ -4,7 +4,7 @@ Guide to use meta-starfive using Yocto
 ## Dependencies
 First, you need to download the essential Yocto dependencies:
 ```
-$ sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib build-essential chrpath socat
+$ sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib build-essential chrpath socat essential chrpath socat libsdl1.2-dev xterm libelf-dev
 ```
 
 #### Repo
@@ -36,7 +36,7 @@ $ git config -global user.name “your username”
 
 ```
 $ mkdir starfive-yocto && cd starfive-yocto
-$ repo init -u git://gitlab.starfivetech.com/starfive-tech/meta-starfive.git -b hardknott-dev -m tools/manifests/starfive.xml
+$ repo init -u git://github.com/starfive-tech/meta-starfive -b starfive-hardknott -m tools/manifests/starfive.xml
 $ repo sync
 $ repo start work --all
 ```
@@ -63,7 +63,7 @@ In meta-starfive, there are two different buildable machines that you can build 
 
 To build the image for starfive-dubhe machine:
 ```
-$ MACHINE=starfive-dubhe bitbake dubhe-image-initramfs
+$ MACHINE=starfive-dubhe bitbake qspi-image
 ```
 _NOTE: For your first build, it may take several hours to build the image._
 
@@ -101,7 +101,7 @@ Once you are happy with the changes, you can go to the source folder and commit 
 ### Rebuilding the Image
 To rebuild your image, the steps include:
 ```
-$ MACHINE=starfive-dubhe bitbake dubhe-image-initramfs
+$ MACHINE=starfive-dubhe bitbake qspi-image
 ```
 Rebuilding will take less time as the sstate-cache is saved during your first build.
 
