@@ -48,6 +48,7 @@ bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-networking
 bitbake-layers add-layer ../meta-riscv
 bitbake-layers add-layer ../meta-starfive
+bitbake-layers add-layer ../meta-clang
 
 # fix the configuration
 echo "Creating auto.conf"
@@ -63,10 +64,10 @@ MACHINE ?= "${MACHINE}"
 # rootfs for debugging
 #IMAGE_GEN_DEBUGFS = "1"
 #IMAGE_FSTYPES_DEBUGFS = "tar.gz"
-#EXTRA_IMAGE_FEATURES_append = " ssh-server-dropbear"
-EXTRA_IMAGE_FEATURES_append = " package-management"
-PACKAGECONFIG_append_pn-qemu-native = " sdl"
-PACKAGECONFIG_append_pn-nativesdk-qemu = " sdl"
+#EXTRA_IMAGE_FEATURES:append = " ssh-server-dropbear"
+EXTRA_IMAGE_FEATURES:append = " package-management"
+PACKAGECONFIG:append:pn-qemu-native = " sdl"
+PACKAGECONFIG:append:pn-nativesdk-qemu = " sdl"
 USER_CLASSES ?= "buildstats buildhistory buildstats-summary image-prelink"
 
 require conf/distro/include/no-static-libs.inc
@@ -75,12 +76,12 @@ require conf/distro/include/security_flags.inc
 
 INHERIT += "uninative"
 
-DISTRO_FEATURES_append = " largefile opengl ptest multiarch wayland pam  systemd "
+DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam  systemd "
 DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
 VIRTUAL-RUNTIME_init_manager = "systemd"
 ##VIRTUAL-RUNTIME_initscripts = ""
 ##VIRTUAL-RUNTIME_syslog = ""
-HOSTTOOLS_NONFATAL_append = " ssh"
+HOSTTOOLS_NONFATAL:append = " ssh"
 
 DISTRO_NAME = "StarFive Linux SDK"
 #DISTRO_VERSION = ""
