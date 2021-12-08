@@ -1,20 +1,17 @@
 FORK = "starfive-tech"
-BRANCH = "beaglev"
+BRANCH = "starfive-5.13"
+SRCREV = "8cb8c83456bff1938d95b88de4b5eb248e8475d8"
 
-LINUX_VERSION ?= "5.13.0"
-LINUX_VERSION_EXTENSION_append = "-starlight"
+LINUX_VERSION = "5.13.0"
+LINUX_VERSION_EXTENSION:append = "-starlight"
 
-FILESEXTRAPATHS_prepend := "${THISDIR}/files:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SRC_URI = "git://github.com/starfive-tech/linux/;protocol=git;branch=${BRANCH}"
+SRC_URI = "git://github.com/starfive-tech/linux/;protocol=https;branch=${BRANCH} \
+	   file://defconfig \
+	   "
 
 INITRAMFS_IMAGE_BUNDLE = "1"
-
-SRC_URI_append := " \
-    file://defconfig \
-    "
-
-#INITRAMFS_IMAGE = "riscv-initramfs-image"
 INITRAMFS_IMAGE = "dubhe-image-initramfs"
 
 #KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
