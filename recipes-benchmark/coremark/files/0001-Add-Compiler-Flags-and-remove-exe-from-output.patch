@@ -1,0 +1,39 @@
+From d535a7032b73eaa1d5128e571323de724e4eef3a Mon Sep 17 00:00:00 2001
+From: junyuantan <junyuan.tan@starfivetech.com>
+Date: Mon, 16 Aug 2021 17:38:27 +0800
+Subject: [PATCH] Add Compiler Flags and remove exe from output
+
+This patch is required for adding compiler flags and change output format
+
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ Makefile                | 2 +-
+ linux64/core_portme.mak | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 51760d1..b90e0ca 100644
+--- a/Makefile
++++ b/Makefile
+@@ -60,7 +60,7 @@ CORE_FILES = core_list_join core_main core_matrix core_state core_util
+ ORIG_SRCS = $(addsuffix .c,$(CORE_FILES))
+ SRCS = $(ORIG_SRCS) $(PORT_SRCS)
+ OBJS = $(addprefix $(OPATH),$(addsuffix $(OEXT),$(CORE_FILES)) $(PORT_OBJS))
+-OUTNAME = coremark$(EXE)
++OUTNAME = coremark
+ OUTFILE = $(OPATH)$(OUTNAME)
+ LOUTCMD = $(OFLAG) $(OUTFILE) $(LFLAGS_END)
+ OUTCMD = $(OUTFLAG) $(OUTFILE) $(LFLAGS_END)
+diff --git a/linux64/core_portme.mak b/linux64/core_portme.mak
+index 3276f40..b85bd52 100755
+--- a/linux64/core_portme.mak
++++ b/linux64/core_portme.mak
+@@ -24,7 +24,7 @@ OUTFLAG= -o
+ CC = gcc
+ # Flag: CFLAGS
+ #	Use this flag to define compiler options. Note, you can add compiler options from the command line using XCFLAGS="other flags"
+-PORT_CFLAGS = -O2 -fno-common -funroll-loops -finline-functions --param max-inline-insns-auto=20 -falign-functions=4 -falign-jumps=4 -falign-loops=4 --param inline-min-speedup=10
++PORT_CFLAGS = -mabi=lp64d -O3 -fno-common -funroll-loops -finline-functions -funroll-all-loops -falign-jumps=8 -falign-loops=8 -finline-limit=1000 -falign-functions=8 -ffast-math -fno-tree-loop-distribute-patterns --param fsm-scale-path-stmts=3 -mcmodel=medany -fno-builtin-printf
+ FLAGS_STR = "$(PORT_CFLAGS) $(XCFLAGS) $(XLFLAGS) $(LFLAGS_END)"
+ CFLAGS = $(PORT_CFLAGS) -I$(PORT_DIR) -I. -DFLAGS_STR=\"$(FLAGS_STR)\"
+ #Flag: LFLAGS_END
