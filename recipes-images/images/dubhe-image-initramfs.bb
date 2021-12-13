@@ -8,6 +8,7 @@ INITRAMFS_SCRIPTS ?= "\
                      "
 PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} helloworld coremark dhrystone"
 
+
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""
 
@@ -26,3 +27,7 @@ EXTRA_IMAGEDEPENDS ?= ""
 
 # Use the same restriction as initramfs-module-install
 COMPATIBLE_HOST = '(x86_64.*|i.86.*|arm.*|aarch64.*|riscv64.*|rv64.*)-(linux.*|freebsd.*)'
+
+# Override this as the qspi-image will populate the sdk_ext
+do_populate_sdk_ext () {
+}
