@@ -1,0 +1,35 @@
+From 8a90723b07823ee86223da375f0e31740d6747eb Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Tue, 9 Nov 2021 10:56:37 +0800
+Subject: [PATCH 29/34] compiler-rt: Link scudo standalone with libatomic on
+ mips
+
+clang on mips generate atomic built-ins which should be provided by
+libatomic
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ compiler-rt/lib/scudo/standalone/CMakeLists.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/compiler-rt/lib/scudo/standalone/CMakeLists.txt b/compiler-rt/lib/scudo/standalone/CMakeLists.txt
+index 739f131bdefd..5862545b842b 100644
+--- a/compiler-rt/lib/scudo/standalone/CMakeLists.txt
++++ b/compiler-rt/lib/scudo/standalone/CMakeLists.txt
+@@ -137,6 +137,10 @@ append_list_if(COMPILER_RT_HAS_LIBPTHREAD -pthread SCUDO_LINK_FLAGS)
+ 
+ append_list_if(FUCHSIA zircon SCUDO_LINK_LIBS)
+ 
++if (CMAKE_SYSTEM_PROCESSOR MATCHES "mips" AND CMAKE_SYSTEM_NAME MATCHES "Linux")
++    list(APPEND SCUDO_LINK_LIBS atomic)
++endif()
++
+ if(COMPILER_RT_HAS_SCUDO_STANDALONE)
+   add_compiler_rt_object_libraries(RTScudoStandalone
+     ARCHS ${SCUDO_STANDALONE_SUPPORTED_ARCH}
+-- 
+2.33.1
+

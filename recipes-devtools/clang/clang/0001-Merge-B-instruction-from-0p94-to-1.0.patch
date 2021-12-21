@@ -1,0 +1,207 @@
+From fb2eb2b94ec405ee159ef7615d3745aa6178bff6 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Mon, 25 Oct 2021 17:04:21 +0800
+Subject: [PATCH 1/3] Merge B instruction from 0p94 to 1.0
+
+---
+ .arcconfig                                    |  0
+ .arclint                                      |  0
+ .clang-format                                 |  0
+ .clang-tidy                                   |  0
+ .git-blame-ignore-revs                        |  0
+ .github/lockdown.yml                          |  0
+ .github/workflows/README.md                   |  0
+ .gitignore                                    |  0
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp    | 14 ++++-------
+ .../Target/RISCV/AsmParser/RISCVAsmParser.cpp | 24 +++++++++----------
+ .../MCTargetDesc/RISCVTargetStreamer.cpp      | 24 +++++++++----------
+ llvm/lib/Target/RISCV/RISCV.td                |  8 +------
+ 12 files changed, 30 insertions(+), 40 deletions(-)
+ mode change 100644 => 100755 .arcconfig
+ mode change 100644 => 100755 .arclint
+ mode change 100644 => 100755 .clang-format
+ mode change 100644 => 100755 .clang-tidy
+ mode change 100644 => 100755 .git-blame-ignore-revs
+ mode change 100644 => 100755 .github/lockdown.yml
+ mode change 100644 => 100755 .github/workflows/README.md
+ mode change 100644 => 100755 .gitignore
+
+diff --git a/.arcconfig b/.arcconfig
+old mode 100644
+new mode 100755
+diff --git a/.arclint b/.arclint
+old mode 100644
+new mode 100755
+diff --git a/.clang-format b/.clang-format
+old mode 100644
+new mode 100755
+diff --git a/.clang-tidy b/.clang-tidy
+old mode 100644
+new mode 100755
+diff --git a/.git-blame-ignore-revs b/.git-blame-ignore-revs
+old mode 100644
+new mode 100755
+diff --git a/.github/lockdown.yml b/.github/lockdown.yml
+old mode 100644
+new mode 100755
+diff --git a/.github/workflows/README.md b/.github/workflows/README.md
+old mode 100644
+new mode 100755
+diff --git a/.gitignore b/.gitignore
+old mode 100644
+new mode 100755
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index ade93d6881a7..f54ac5b166d4 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -59,9 +59,11 @@ static StringRef getExtensionType(StringRef Ext) {
+ static Optional<RISCVExtensionVersion>
+ isExperimentalExtension(StringRef Ext) {
+   if (Ext == "b" || Ext == "zba" || Ext == "zbb" || Ext == "zbc" ||
+-      Ext == "zbe" || Ext == "zbf" || Ext == "zbm" || Ext == "zbp" ||
+-      Ext == "zbr" || Ext == "zbs" || Ext == "zbt" || Ext == "zbproposedc")
+-    return RISCVExtensionVersion{"0", "93"};
++      Ext == "zbs")
++    return RISCVExtensionVersion{"1", "0"};
++  if (Ext == "zbe" || Ext == "zbf" || Ext == "zbm" || Ext == "zbp" ||
++      Ext == "zbr" || Ext == "zbt" || Ext == "zbproposedc")
++    return RISCVExtensionVersion{"0", "94"};
+   if (Ext == "v" || Ext == "zvamo" || Ext == "zvlsseg")
+     return RISCVExtensionVersion{"0", "10"};
+   if (Ext == "zfh")
+@@ -422,13 +424,7 @@ static bool getArchFeatures(const Driver &D, StringRef MArch,
+       Features.push_back("+experimental-zba");
+       Features.push_back("+experimental-zbb");
+       Features.push_back("+experimental-zbc");
+-      Features.push_back("+experimental-zbe");
+-      Features.push_back("+experimental-zbf");
+-      Features.push_back("+experimental-zbm");
+-      Features.push_back("+experimental-zbp");
+-      Features.push_back("+experimental-zbr");
+       Features.push_back("+experimental-zbs");
+-      Features.push_back("+experimental-zbt");
+       break;
+     case 'v':
+       Features.push_back("+experimental-v");
+diff --git a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+index ddf07b808d03..17548b7141a3 100644
+--- a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
++++ b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+@@ -2192,33 +2192,33 @@ bool RISCVAsmParser::parseDirectiveAttribute() {
+       if (getFeatureBits(RISCV::FeatureStdExtC))
+         formalArchStr = (Twine(formalArchStr) + "_c2p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtB))
+-        formalArchStr = (Twine(formalArchStr) + "_b0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_b1p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtV))
+         formalArchStr = (Twine(formalArchStr) + "_v0p10").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZfh))
+         formalArchStr = (Twine(formalArchStr) + "_zfh0p1").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZba))
+-        formalArchStr = (Twine(formalArchStr) + "_zba0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zba1p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbb))
+-        formalArchStr = (Twine(formalArchStr) + "_zbb0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbb1p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbc))
+-        formalArchStr = (Twine(formalArchStr) + "_zbc0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbc1p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbe))
+-        formalArchStr = (Twine(formalArchStr) + "_zbe0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbe0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbf))
+-        formalArchStr = (Twine(formalArchStr) + "_zbf0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbf0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbm))
+-        formalArchStr = (Twine(formalArchStr) + "_zbm0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbm0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbp))
+-        formalArchStr = (Twine(formalArchStr) + "_zbp0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbp0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbproposedc))
+-        formalArchStr = (Twine(formalArchStr) + "_zbproposedc0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbproposedc0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbr))
+-        formalArchStr = (Twine(formalArchStr) + "_zbr0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbr0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbs))
+-        formalArchStr = (Twine(formalArchStr) + "_zbs0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbs1p0").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZbt))
+-        formalArchStr = (Twine(formalArchStr) + "_zbt0p93").str();
++        formalArchStr = (Twine(formalArchStr) + "_zbt0p94").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZvamo))
+         formalArchStr = (Twine(formalArchStr) + "_zvamo0p10").str();
+       if (getFeatureBits(RISCV::FeatureStdExtZvlsseg))
+diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
+index fd6e49d02c22..14b54fb83097 100644
+--- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
++++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVTargetStreamer.cpp
+@@ -61,33 +61,33 @@ void RISCVTargetStreamer::emitTargetAttributes(const MCSubtargetInfo &STI) {
+   if (STI.hasFeature(RISCV::FeatureStdExtC))
+     Arch += "_c2p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtB))
+-    Arch += "_b0p93";
++    Arch += "_b1p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtV))
+     Arch += "_v0p10";
+   if (STI.hasFeature(RISCV::FeatureStdExtZfh))
+     Arch += "_zfh0p1";
+   if (STI.hasFeature(RISCV::FeatureStdExtZba))
+-    Arch += "_zba0p93";
++    Arch += "_zba1p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbb))
+-    Arch += "_zbb0p93";
++    Arch += "_zbb1p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbc))
+-    Arch += "_zbc0p93";
++    Arch += "_zbc1p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbe))
+-    Arch += "_zbe0p93";
++    Arch += "_zbe0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbf))
+-    Arch += "_zbf0p93";
++    Arch += "_zbf0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbm))
+-    Arch += "_zbm0p93";
++    Arch += "_zbm0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbp))
+-    Arch += "_zbp0p93";
++    Arch += "_zbp0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbproposedc))
+-    Arch += "_zbproposedc0p93";
++    Arch += "_zbproposedc0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbr))
+-    Arch += "_zbr0p93";
++    Arch += "_zbr0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbs))
+-    Arch += "_zbs0p93";
++    Arch += "_zbs1p0";
+   if (STI.hasFeature(RISCV::FeatureStdExtZbt))
+-    Arch += "_zbt0p93";
++    Arch += "_zbt0p94";
+   if (STI.hasFeature(RISCV::FeatureStdExtZvamo))
+     Arch += "_zvamo0p10";
+   if (STI.hasFeature(RISCV::FeatureStdExtZvlsseg))
+diff --git a/llvm/lib/Target/RISCV/RISCV.td b/llvm/lib/Target/RISCV/RISCV.td
+index ae6c6b252d22..93f6acd53147 100644
+--- a/llvm/lib/Target/RISCV/RISCV.td
++++ b/llvm/lib/Target/RISCV/RISCV.td
+@@ -148,13 +148,7 @@ def FeatureStdExtB
+                        [FeatureStdExtZba,
+                         FeatureStdExtZbb,
+                         FeatureStdExtZbc,
+-                        FeatureStdExtZbe,
+-                        FeatureStdExtZbf,
+-                        FeatureStdExtZbm,
+-                        FeatureStdExtZbp,
+-                        FeatureStdExtZbr,
+-                        FeatureStdExtZbs,
+-                        FeatureStdExtZbt]>;
++                        FeatureStdExtZbs]>;
+ def HasStdExtB : Predicate<"Subtarget->hasStdExtB()">,
+                            AssemblerPredicate<(all_of FeatureStdExtB),
+                            "'B' (Bit Manipulation Instructions)">;
+-- 
+2.33.1
+

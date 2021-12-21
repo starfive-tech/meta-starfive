@@ -1,0 +1,48 @@
+From 1752b43655f7ff5319e3b6c7abfbca965b3ff48c Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Tue, 9 Nov 2021 10:00:32 +0800
+Subject: [PATCH 03/34] compiler-rt: Simplify cross-compilation. Don't use
+ native-compiled llvm-config.
+
+    Note: AddLLVM.cmake does not expose the LLVM source directory.
+    So if you want to run the test suite, you need to either:
+
+    1) set LLVM_MAIN_SRC_DIR explicitly (to find lit.py)
+    2) change AddLLVM.cmake to point to an installed 'lit'.
+    3) add_subdirectory(compiler-rt/test) from clang instead of compiler-rt.
+
+https://us.codeaurora.org/patches/quic/llvm/50683/compiler-rt-cross-compilation.patch
+
+Rebased to LLVM 14.0.0 by Jun Yuan Tan
+
+Signed-off-by: Greg Fitzgerald <gregf@codeaurora.org>
+Signed-off-by: Khem Raj <raj.khem@gmail.com>
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ compiler-rt/CMakeLists.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/compiler-rt/CMakeLists.txt b/compiler-rt/CMakeLists.txt
+index 4bbcf9aca4e8..bef42018877a 100644
+--- a/compiler-rt/CMakeLists.txt
++++ b/compiler-rt/CMakeLists.txt
+@@ -81,6 +81,16 @@ set(COMPILER_RT_BAREMETAL_BUILD OFF CACHE BOOL
+ 
+ if (COMPILER_RT_STANDALONE_BUILD)
+   load_llvm_config()
++  find_package(LLVM REQUIRED)
++  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
++
++  # Variables that AddLLVM.cmake depends on (included by AddCompilerRT)
++  set(LLVM_TOOLS_BINARY_DIR "${LLVM_INSTALL_PREFIX}/bin")
++  set(LLVM_LIBRARY_DIR "${LLVM_INSTALL_PREFIX}/lib")
++
++  set(LLVM_LIBRARY_OUTPUT_INTDIR
++    ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib${LLVM_LIBDIR_SUFFIX})
++
+   if (TARGET intrinsics_gen)
+     # Loading the llvm config causes this target to be imported so place it
+     # under the appropriate folder in an IDE.
+-- 
+2.33.1
+
