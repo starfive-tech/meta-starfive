@@ -1,0 +1,88 @@
+From 254eef43b7f99cc3308d02343c603286ba121816 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Thu, 18 Nov 2021 16:13:59 +0800
+Subject: [PATCH 23/26] Cost model for ZBS extension
+
+---
+ gcc/config/riscv/riscv.c | 47 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/riscv/riscv.c b/gcc/config/riscv/riscv.c
+index 0978666a366..61666b8b2f6 100644
+--- a/gcc/config/riscv/riscv.c
++++ b/gcc/config/riscv/riscv.c
+@@ -1830,8 +1830,25 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
+ 	    *total = COSTS_N_INSNS (1);
+ 	    return true;
+ 	}
+-      gcc_fallthrough ();
++      /* bclri pattern for zbs.  */
++      if (TARGET_ZBS
++	  && not_single_bit_mask_operand (XEXP (x, 1), VOIDmode))
++	{
++	  *total = COSTS_N_INSNS (1);
++	  return true;
++	}
++      /* bclr pattern for zbs.  */
++      if (TARGET_ZBS
++	  && REG_P (XEXP (x, 1))
++	  && GET_CODE (XEXP (x, 0)) == ROTATE
++	  && CONST_INT_P (XEXP ((XEXP (x, 0)), 0))
++	  && INTVAL (XEXP ((XEXP (x, 0)), 0)) == -2)
++	{
++	  *total = COSTS_N_INSNS (1);
++	  return true;
++	}
+ 
++      gcc_fallthrough ();
+     case IOR:
+     case XOR:
+       /* orn, andn and xorn pattern for zbb.  */
+@@ -1842,6 +1859,17 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
+ 	  return true;
+ 	}
+ 
++      /* bset[i] and binv[i] pattern for zbs.  */
++      if ((GET_CODE (x) == IOR || GET_CODE (x) == XOR)
++	  && TARGET_ZBS
++	  && ((GET_CODE (XEXP (x, 0)) == ASHIFT
++	      && CONST_INT_P (XEXP (XEXP (x, 0), 0)))
++	      || single_bit_mask_operand (XEXP (x, 1), VOIDmode)))
++	{
++	  *total = COSTS_N_INSNS (1);
++	  return true;
++	}
++
+       /* Double-word operations use two single-word operations.  */
+       *total = riscv_binary_cost (x, 1, 2);
+       return false;
+@@ -1857,9 +1885,26 @@ riscv_rtx_costs (rtx x, machine_mode mode, int outer_code, int opno ATTRIBUTE_UN
+ 	  *total = COSTS_N_INSNS (SINGLE_SHIFT_COST);
+ 	  return true;
+ 	}
++      /* bext pattern for zbs.  */
++      if (TARGET_ZBS && outer_code == SET
++	  && GET_CODE (XEXP (x, 1)) == CONST_INT
++	  && INTVAL (XEXP (x, 1)) == 1)
++	{
++	  *total = COSTS_N_INSNS (SINGLE_SHIFT_COST);
++	  return true;
++	}
+       return false;
+ 
+     case ASHIFT:
++      /* bset pattern for zbs.  */
++      if (TARGET_ZBS
++	  && CONST_INT_P (XEXP (x, 0))
++	  && INTVAL (XEXP (x, 0)) == 1)
++	{
++	  *total = COSTS_N_INSNS (1);
++	  return true;
++	}
++      gcc_fallthrough ();
+     case ASHIFTRT:
+     case LSHIFTRT:
+       *total = riscv_binary_cost (x, SINGLE_SHIFT_COST,
+-- 
+2.33.1
+

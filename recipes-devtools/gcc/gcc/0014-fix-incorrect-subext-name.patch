@@ -1,0 +1,31 @@
+From 2b5f08aa28efa2ee545eb1f49d147b0d39b4b695 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Thu, 28 Oct 2021 16:54:05 -0700
+Subject: [PATCH 14/15] fix incorrect subext name
+
+---
+ gcc/common/config/riscv/riscv-common.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.c b/gcc/common/config/riscv/riscv-common.c
+index 6a3bda64e68..0927554d506 100644
+--- a/gcc/common/config/riscv/riscv-common.c
++++ b/gcc/common/config/riscv/riscv-common.c
+@@ -912,10 +912,10 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
+   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
+ 
+-  {"zba", &gcc_options::riscv_zb_subext, MASK_ZBA},
+-  {"zbb", &gcc_options::riscv_zb_subext, MASK_ZBB},
+-  {"zbs", &gcc_options::riscv_zb_subext, MASK_ZBS},
+-  {"zbc", &gcc_options::riscv_zb_subext, MASK_ZBC},
++  {"zba", &gcc_options::x_riscv_zb_subext, MASK_ZBA},
++  {"zbb", &gcc_options::x_riscv_zb_subext, MASK_ZBB},
++  {"zbs", &gcc_options::x_riscv_zb_subext, MASK_ZBS},
++  {"zbc", &gcc_options::x_riscv_zb_subext, MASK_ZBC},
+   {NULL, NULL, 0}
+ };
+ 
+-- 
+2.33.1
+

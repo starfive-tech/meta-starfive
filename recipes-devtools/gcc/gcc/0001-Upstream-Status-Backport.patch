@@ -1,0 +1,96 @@
+From b93236bd8cd749196e787a9d36bcd09e673b3604 Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Mon, 22 Nov 2021 00:13:28 +0800
+Subject: [PATCH 1/1] Upstream-Status: Backport Signed-off-by: Ross Burton
+ <ross.burton@arm.com>
+
+From ad4c21f0f59b52357019148ec94d767aa2acd8f2 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 1 Jun 2021 11:00:16 +0100
+Subject: [PATCH] libstdc++: Fix installation of python hooks [PR 99453]
+
+When no shared library is installed, the new code to determine the name
+of the -gdb.py file yields an empty string. Use the name of the static
+library in that case.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/99453
+	* python/Makefile.am: Use archive name for printer hook if no
+	dynamic library name is available.
+	* python/Makefile.in: Regenerate.
+
+(cherry picked from commit 9f7bc160b4a0f27dce248d1226e3ae7104b0e67b)
+
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ libstdc++-v3/python/Makefile.am | 24 ++++++++----------------
+ libstdc++-v3/python/Makefile.in | 18 ++++++------------
+ 2 files changed, 14 insertions(+), 28 deletions(-)
+
+diff --git a/libstdc++-v3/python/Makefile.am b/libstdc++-v3/python/Makefile.am
+index 01517a2a522..8efefa5725c 100644
+--- a/libstdc++-v3/python/Makefile.am
++++ b/libstdc++-v3/python/Makefile.am
+@@ -44,21 +44,13 @@ gdb.py: hook.in Makefile
+ install-data-local: gdb.py
+ 	@$(mkdir_p) $(DESTDIR)$(toolexeclibdir)
+ ## We want to install gdb.py as SOMETHING-gdb.py.  SOMETHING is the
+-## full name of the final library.  We want to ignore symlinks, the
+-## .la file, and any previous -gdb.py file.  This is inherently
+-## fragile, but there does not seem to be a better option, because
+-## libtool hides the real names from us.
+-	@here=`pwd`; cd $(DESTDIR)$(toolexeclibdir); \
+-	  for file in libstdc++.*; do \
+-	    case $$file in \
+-	      *-gdb.py) ;; \
+-	      *.la) ;; \
+-	      *) if test -h $$file; then \
+-	           continue; \
+-	         fi; \
+-	         libname=$$file;; \
+-	    esac; \
+-	  done; \
+-	cd $$here; \
++## full name of the final library.  We use the libtool .la file to get
++## the correct name.
++	@libname=`sed -ne "/^library_names=/{s/.*='//;s/'$$//;s/ .*//;p;}" \
++	          $(DESTDIR)$(toolexeclibdir)/libstdc++.la`; \
++	if [ -z "$$libname" ]; then \
++	  libname=`sed -ne "/^old_library=/{s/.*='//;s/'$$//;s/ .*//;p;}" \
++		  $(DESTDIR)$(toolexeclibdir)/libstdc++.la`; \
++	fi; \
+ 	echo " $(INSTALL_DATA) gdb.py $(DESTDIR)$(toolexeclibdir)/$$libname-gdb.py"; \
+ 	$(INSTALL_DATA) gdb.py $(DESTDIR)$(toolexeclibdir)/$$libname-gdb.py
+diff --git a/libstdc++-v3/python/Makefile.in b/libstdc++-v3/python/Makefile.in
+index c35dbe55961..9904a9197de 100644
+--- a/libstdc++-v3/python/Makefile.in
++++ b/libstdc++-v3/python/Makefile.in
+@@ -607,18 +607,12 @@ gdb.py: hook.in Makefile
+ 
+ install-data-local: gdb.py
+ 	@$(mkdir_p) $(DESTDIR)$(toolexeclibdir)
+-	@here=`pwd`; cd $(DESTDIR)$(toolexeclibdir); \
+-	  for file in libstdc++.*; do \
+-	    case $$file in \
+-	      *-gdb.py) ;; \
+-	      *.la) ;; \
+-	      *) if test -h $$file; then \
+-	           continue; \
+-	         fi; \
+-	         libname=$$file;; \
+-	    esac; \
+-	  done; \
+-	cd $$here; \
++	@libname=`sed -ne "/^library_names=/{s/.*='//;s/'$$//;s/ .*//;p;}" \
++	          $(DESTDIR)$(toolexeclibdir)/libstdc++.la`; \
++	if [ -z "$$libname" ]; then \
++	  libname=`sed -ne "/^old_library=/{s/.*='//;s/'$$//;s/ .*//;p;}" \
++		  $(DESTDIR)$(toolexeclibdir)/libstdc++.la`; \
++	fi; \
+ 	echo " $(INSTALL_DATA) gdb.py $(DESTDIR)$(toolexeclibdir)/$$libname-gdb.py"; \
+ 	$(INSTALL_DATA) gdb.py $(DESTDIR)$(toolexeclibdir)/$$libname-gdb.py
+ 
+-- 
+2.33.1
+
