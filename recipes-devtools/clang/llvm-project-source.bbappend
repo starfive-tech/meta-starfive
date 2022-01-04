@@ -47,4 +47,5 @@ SRC_URI = "\
     file://0032-compiler-rt-Do-not-force-thumb-mode-directive.patch \
     file://0033-clang-Do-not-use-install-relative-libc-headers.patch \
     file://0034-clang-Fix-how-driver-finds-GCC-installation-path-on.patch \
+    file://0001-Revert-CMake-Enable-LLVM_ENABLE_PER_TARGET_RUN.patch \
     "

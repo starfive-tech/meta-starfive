@@ -1,0 +1,37 @@
+From 8f4548f457c19fbef4e3a6b2a8e5e91c66f3f6ef Mon Sep 17 00:00:00 2001
+From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+Date: Mon, 3 Jan 2022 01:36:30 +0800
+Subject: [PATCH] Revert "[CMake] Enable
+ LLVM_ENABLE_PER_TARGET_RUNTIME_DIR by  default on Linux"
+
+See original review https://reviews.llvm.org/D107799
+
+This reverts commit f9dbca68d48e705f6d45df8f58d6b2ee88bce76c.
+
+Cherry-picked from c93da7d9cf161ffda2366a96eb060c3b824cb549 commit.
+
+Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
+---
+ llvm/CMakeLists.txt | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/llvm/CMakeLists.txt b/llvm/CMakeLists.txt
+index cdf62cb54727..f6b4c61313cc 100644
+--- a/llvm/CMakeLists.txt
++++ b/llvm/CMakeLists.txt
+@@ -681,12 +681,7 @@ endif()
+ set(LLVM_TARGET_TRIPLE_ENV CACHE STRING "The name of environment variable to override default target. Disabled by blank.")
+ mark_as_advanced(LLVM_TARGET_TRIPLE_ENV)
+
+-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+-  set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default ON)
+-else()
+-  set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default OFF)
+-endif()
+-set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR ${LLVM_ENABLE_PER_TARGET_RUNTIME_DIR_default} CACHE BOOL
++set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR OFF CACHE BOOL
+   "Enable per-target runtimes directory")
+
+ set(LLVM_PROFDATA_FILE "" CACHE FILEPATH
+--
+2.33.1
