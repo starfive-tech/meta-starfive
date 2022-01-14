@@ -4,7 +4,7 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/PD;md5=b3597d1
 
 INHIBIT_PACKAGE_STRIP = "1"
 
-SRC_URI = "git://github.com/sifive/benchmark-dhrystone.git \
+SRC_URI = "git://github.com/sifive/benchmark-dhrystone.git;protocol=https \
            file://0001-dhrystone-Edit-compiler-flags.patch \
            "
 SRCREV = "0ddff533cc9052c524990d5ace4560372053314b"

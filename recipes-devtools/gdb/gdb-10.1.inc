@@ -9,7 +9,7 @@ BRANCH = "fsf-gdb-10.1-with-sim"
 
 S = "${WORKDIR}/git"
 
-SRC_URI = "git://github.com/riscv/riscv-binutils-gdb.git;branch=${BRANCH} \
+SRC_URI = "git://github.com/riscv/riscv-binutils-gdb.git;branch=${BRANCH};protocol=https \
            file://0001-add-b-v-extension-support.patch \
            file://0001-make-man-install-relative-to-DESTDIR.patch \
            file://0002-mips-linux-nat-Define-_ABIO32-if-not-defined.patch \
