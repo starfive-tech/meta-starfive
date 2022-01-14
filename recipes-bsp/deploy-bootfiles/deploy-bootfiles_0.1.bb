@@ -1,5 +1,5 @@
-SUMMARY = "QSPI Image Creator"
-DESCRIPTION = "Recipe to create a QSPI Image"
+SUMMARY = "Deploy Boot files recipe"
+DESCRIPTION = "Recipe to deploy boot files to the deploy directory"
 LICENSE = "CLOSED"
 
 LIC_FILES_CHKSUM = ""
