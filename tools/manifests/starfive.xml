@@ -7,7 +7,7 @@
   <remote name="starfive" fetch="git://github.com/starfive-tech/" />
   <remote name="kraj" fetch="git://github.com/kraj" />
 
-  <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="master" />
+  <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="honister" />
   <project name="openembedded-core" remote="openembedded" path="openembedded-core" revision="honister" />
   <project name="bitbake" remote="openembedded" path="openembedded-core/bitbake" revision="1.52" />
   <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="honister" />
