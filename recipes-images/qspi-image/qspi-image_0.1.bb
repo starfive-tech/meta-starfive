@@ -11,6 +11,9 @@ LIC_FILES_CHKSUM = ""
 IMAGE_FSTYPES = "qspi"
 
 do_rootfs[depends] += "dubhe-image-initramfs:do_rootfs"
+do_image[depends] += " deploy-bootfiles:do_deploy"
+do_image[depends] += " opensbi:do_deploy"
+do_image[depends] += " virtual/kernel:do_deploy"
 
 IMAGE_CMD:qspi () {
 	dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=1 seek=0 count=4096
