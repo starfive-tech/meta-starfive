@@ -1,0 +1,243 @@
+From 20fe3cece92e9a3b53b09970fe18857ae95a7ca0 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Mon, 17 Jan 2022 18:02:26 +0800
+Subject: [PATCH 3/3] RISC-V: Hypervisor ext: support Privileged Spec 1.12
+
+  - Hypervisor Memory-Management Instructions
+    HFENCE.VVMA, HFENCE.GVMA,
+
+  - Hypervisor Virtual Machine Load and Store Instructions
+    HLV.B, HLV.BU,          HSV.B,
+    HLV.H, HLV.HU, HLVX.HU, HSB.H,
+    HLV.W, HLV.WU, HLVX.WU, HSV.W,
+    HLV.D,                  HSV.D
+
+  - Hypervisor CSRs (some new, some address changed)
+    hstatus, hedeleg, hideleg, hie, hcounteren, hgeie, htval, hip, hvip,
+    htinst, hgeip, henvcfg, henvcfgh, hgatp, hcontext, htimedelta, htimedeltah,
+    vsstatus, vsie, vstvec, vsscratch, vsepc, vscause, vstval, vsip, vsatp
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ bfd/cpu-riscv.c            |  1 +
+ gas/config/tc-riscv.c      |  3 ++
+ include/opcode/riscv-opc.h | 95 +++++++++++++++++++++++++++++++++++++-
+ include/opcode/riscv.h     |  2 +
+ opcodes/riscv-opc.c        | 23 +++++++++
+ 5 files changed, 123 insertions(+), 1 deletion(-)
+
+diff --git a/bfd/cpu-riscv.c b/bfd/cpu-riscv.c
+index 2e9e9eb9d2..b7d7e11c70 100644
+--- a/bfd/cpu-riscv.c
++++ b/bfd/cpu-riscv.c
+@@ -40,6 +40,7 @@ static const struct priv_spec_t priv_specs[] =
+   {"1.9.1", PRIV_SPEC_CLASS_1P9P1},
+   {"1.10",  PRIV_SPEC_CLASS_1P10},
+   {"1.11",  PRIV_SPEC_CLASS_1P11},
++  {"1.12",  PRIV_SPEC_CLASS_1P12},
+ 
+ /* Terminate the list.  */
+   {NULL, 0}
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index e1bf3992a6..cae279b647 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -254,6 +254,9 @@ riscv_multi_subset_supports (enum riscv_insn_class insn_class)
+ 		  || riscv_subset_supports ("zvamo")));
+     case INSN_CLASS_V_OR_ZVLSSEG:
+       return riscv_subset_supports ("v") || riscv_subset_supports ("zvlsseg");
++    case INSN_CLASS_H:
++      return riscv_subset_supports ("i");
++
+     default:
+       as_fatal ("Unreachable");
+       return FALSE;
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index eea10e1ebc..b919720d75 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2612,6 +2612,27 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define MATCH_VFDOTVV   0xe4001057
+ #define MASK_VFDOTVV    0xfc00707f
+ /* END RVV */
++#define MASK_HLV      0xfff0707f
++#define MATCH_HLVB    0x60004073
++#define MATCH_HLVBU   0x60104073
++#define MATCH_HLVH    0x64004073
++#define MATCH_HLVHU   0x64104073
++#define MATCH_HLVXHU  0x64304073
++#define MATCH_HLVW    0x68004073
++#define MATCH_HLVXWU  0x68304073
++#define MATCH_HLVWU   0x68104073
++#define MATCH_HLVD    0x6c004073
++
++#define MASK_HSV      0xfe007fff
++#define MATCH_HSVB    0x62004073
++#define MATCH_HSVH    0x66004073
++#define MATCH_HSVW    0x6a004073
++#define MATCH_HSVD    0x6e004073
++
++#define MASK_HFENCE_VVMA  0xfe007fff
++#define MATCH_HFENCE_VVMA 0x22000073
++#define MASK_HFENCE_GVMA  0xfe007fff
++#define MATCH_HFENCE_GVMA 0x62000073
+ 
+ #define MATCH_CUSTOM0 0xb
+ #define MASK_CUSTOM0  0x707f
+@@ -2874,6 +2895,33 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define CSR_MHPMEVENT29 0x33d
+ #define CSR_MHPMEVENT30 0x33e
+ #define CSR_MHPMEVENT31 0x33f
++/* Hypervisor Extension v1.0 (Privileged spec 1.12). */
++#define CSR_HSTATUS     0x600
++#define CSR_HEDELEG     0x602
++#define CSR_HIDELEG     0x603
++#define CSR_HIE         0x604
++#define CSR_HCOUNTEREN  0x606
++#define CSR_HGEIE       0x607
++#define CSR_HTVAL       0x643
++#define CSR_HIP         0x644
++#define CSR_HVIP        0x645
++#define CSR_HTINST      0x64a
++#define CSR_HGEIP       0xe12
++#define CSR_HENVCFG     0x60a
++#define CSR_HENVCFGH    0x61a
++#define CSR_HGATP       0x680
++#define CSR_HCONTEXT    0x6a8
++#define CSR_HTIMEDELTA  0x605
++#define CSR_HTIMEDELTAH 0x615
++#define CSR_VSSTATUS    0x200
++#define CSR_VSIE        0x204
++#define CSR_VSTVEC      0x205
++#define CSR_VSSCRATCH   0x240
++#define CSR_VSEPC       0x241
++#define CSR_VSCAUSE     0x242
++#define CSR_VSTVAL      0x243
++#define CSR_VSIP        0x244
++#define CSR_VSATP       0x280
+ #define CSR_MBASE 0x380
+ #define CSR_MBOUND 0x381
+ #define CSR_MIBASE 0x382
+@@ -3023,6 +3071,22 @@ DECLARE_INSN(dret, MATCH_DRET, MASK_DRET)
+ DECLARE_INSN(sfence_vm, MATCH_SFENCE_VM, MASK_SFENCE_VM)
+ DECLARE_INSN(sfence_vma, MATCH_SFENCE_VMA, MASK_SFENCE_VMA)
+ DECLARE_INSN(wfi, MATCH_WFI, MASK_WFI)
++DECLARE_INSN(hfence_vvma, MATCH_HFENCE_VVMA, MASK_HFENCE_VVMA)
++DECLARE_INSN(hfence_gvma, MATCH_HFENCE_GVMA, MASK_HFENCE_GVMA)
++DECLARE_INSN(hlv_b,   MATCH_HLVB,   MASK_HLV)
++DECLARE_INSN(hlv_h,   MATCH_HLVH,   MASK_HLV)
++DECLARE_INSN(hlv_w,   MATCH_HLVW,   MASK_HLV)
++DECLARE_INSN(hlv_d,   MATCH_HLVD,   MASK_HLV)
++DECLARE_INSN(hlv_bu,  MATCH_HLVBU,  MASK_HLV)
++DECLARE_INSN(hlv_hu,  MATCH_HLVHU,  MASK_HLV)
++DECLARE_INSN(hlv_wu,  MATCH_HLVWU,  MASK_HLV)
++DECLARE_INSN(hlvx_hu, MATCH_HLVXHU, MASK_HLV)
++DECLARE_INSN(hlvx_wu, MATCH_HLVXWU, MASK_HLV)
++DECLARE_INSN(hsv_b,   MATCH_HSVB,   MASK_HSV)
++DECLARE_INSN(hsv_h,   MATCH_HSVH,   MASK_HSV)
++DECLARE_INSN(hsv_w,   MATCH_HSVW,   MASK_HSV)
++DECLARE_INSN(hsv_d,   MATCH_HSVD,   MASK_HSV)
++
+ /* Custom CSRs instruction */
+ DECLARE_INSN(cflush_d_l1, MATCH_CFLUSH_D_L1, MASK_CFLUSH_D_L1)
+ DECLARE_INSN(cdiscard_d_l1, MATCH_CDISCARD_D_L1, MASK_CDISCARD_D_L1)
+@@ -3515,6 +3579,35 @@ DECLARE_CSR(mhpmevent28, CSR_MHPMEVENT28, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PR
+ DECLARE_CSR(mhpmevent29, CSR_MHPMEVENT29, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PRIV_SPEC_CLASS_DRAFT)
+ DECLARE_CSR(mhpmevent30, CSR_MHPMEVENT30, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PRIV_SPEC_CLASS_DRAFT)
+ DECLARE_CSR(mhpmevent31, CSR_MHPMEVENT31, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PRIV_SPEC_CLASS_DRAFT)
++/* Hypervisor Ext v1.0 (Privileged spec 1.12).  */
++/* TODO: Fix to CSR_CLASS_H when explicit h-ext arch string is introduced.  */
++DECLARE_CSR(hstatus,     CSR_HSTATUS,     CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hedeleg,     CSR_HEDELEG,     CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hideleg,     CSR_HIDELEG,     CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hie,         CSR_HIE,         CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hcounteren,  CSR_HCOUNTEREN,  CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hgeie,       CSR_HGEIE,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(htval,       CSR_HTVAL,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hip,         CSR_HIP,         CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hvip,        CSR_HVIP,        CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(htinst,      CSR_HTINST,      CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hgeip,       CSR_HGEIP,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(henvcfg,     CSR_HENVCFG,     CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(henvcfgh,    CSR_HENVCFGH,    CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hgatp,       CSR_HGATP,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(hcontext,    CSR_HCONTEXT,    CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(htimedelta,  CSR_HTIMEDELTA,  CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(htimedeltah, CSR_HTIMEDELTAH, CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsstatus,    CSR_VSSTATUS,    CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsie,        CSR_VSIE,        CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vstvec,      CSR_VSTVEC,      CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsscratch,   CSR_VSSCRATCH,   CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsepc,       CSR_VSEPC,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vscause,     CSR_VSCAUSE,     CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vstval,      CSR_VSTVAL,      CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsip,        CSR_VSIP,        CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++DECLARE_CSR(vsatp,       CSR_VSATP,       CSR_CLASS_I, PRIV_SPEC_CLASS_1P12, PRIV_SPEC_CLASS_DRAFT)
++
+ /* Dropped.  */
+ DECLARE_CSR(mbase, CSR_MBASE, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PRIV_SPEC_CLASS_1P10)
+ DECLARE_CSR(mbound, CSR_MBOUND, CSR_CLASS_I, PRIV_SPEC_CLASS_1P9P1, PRIV_SPEC_CLASS_1P10)
+@@ -3561,4 +3654,4 @@ DECLARE_CSR_ALIAS(itrigger, CSR_TDATA1, CSR_CLASS_DEBUG, PRIV_SPEC_CLASS_NONE, P
+ DECLARE_CSR_ALIAS(etrigger, CSR_TDATA1, CSR_CLASS_DEBUG, PRIV_SPEC_CLASS_NONE, PRIV_SPEC_CLASS_NONE)
+ DECLARE_CSR_ALIAS(textra32, CSR_TDATA3, CSR_CLASS_DEBUG, PRIV_SPEC_CLASS_NONE, PRIV_SPEC_CLASS_NONE)
+ DECLARE_CSR_ALIAS(textra64, CSR_TDATA3, CSR_CLASS_DEBUG, PRIV_SPEC_CLASS_NONE, PRIV_SPEC_CLASS_NONE)
+-#endif /* DECLARE_CSR_ALIAS.  */
+\ No newline at end of file
++#endif /* DECLARE_CSR_ALIAS.  */
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index ee0d277031..ac48eca67d 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -398,6 +398,7 @@ enum riscv_insn_class
+    INSN_CLASS_V_AND_F,
+    INSN_CLASS_V_OR_ZVAMO,
+    INSN_CLASS_V_OR_ZVLSSEG,
++   INSN_CLASS_H,
+   };
+ 
+ /* This structure holds information for a particular instruction.  */
+@@ -476,6 +477,7 @@ enum riscv_priv_spec_class
+   PRIV_SPEC_CLASS_1P9P1,
+   PRIV_SPEC_CLASS_1P10,
+   PRIV_SPEC_CLASS_1P11,
++  PRIV_SPEC_CLASS_1P12,
+   PRIV_SPEC_CLASS_DRAFT
+ };
+ 
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index ffa817cc65..a7c697a938 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -2209,6 +2209,29 @@ const struct riscv_opcode riscv_insn_types[] =
+ {"cb",      0, INSN_CLASS_F_AND_C,  "O2,CF3,CS,Cp",       0,    0,  match_opcode, 0 },
+ 
+ {"cj",      0, INSN_CLASS_C,  "O2,CF3,Ca",          0,    0,  match_opcode, 0 },
++
++/* Svinval instructions + Hypervisor Ext v1.0.  */
++{"hfence.vvma",     0, INSN_CLASS_H, "s,t", MATCH_HFENCE_VVMA, MASK_HFENCE_VVMA, match_opcode, 0 },
++{"hfence.gvma",     0, INSN_CLASS_H, "",    MATCH_HFENCE_GVMA, MASK_HFENCE_GVMA|MASK_RS1|MASK_RS2, match_opcode, 0 },
++{"hfence.gvma",     0, INSN_CLASS_H, "s",   MATCH_HFENCE_GVMA, MASK_HFENCE_GVMA|MASK_RS2, match_opcode, 0 },
++{"hfence.gvma",     0, INSN_CLASS_H, "s,t", MATCH_HFENCE_GVMA, MASK_HFENCE_GVMA, match_opcode, 0 },
++
++/* Hypervisor Ext v1.0 (Privileged spec 1.12).  */
++{"hlv.b",       0, INSN_CLASS_H, "d,0(s)", MATCH_HLVB,   MASK_HLV, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"hlv.bu",      0, INSN_CLASS_H, "d,0(s)", MATCH_HLVBU,  MASK_HLV, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"hlv.h",       0, INSN_CLASS_H, "d,0(s)", MATCH_HLVH,   MASK_HLV, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"hlv.hu",      0, INSN_CLASS_H, "d,0(s)", MATCH_HLVHU,  MASK_HLV, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"hlvx.hu",     0, INSN_CLASS_H, "d,0(s)", MATCH_HLVXHU, MASK_HLV, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"hlv.w",       0, INSN_CLASS_H, "d,0(s)", MATCH_HLVW,   MASK_HLV, match_opcode, INSN_DREF|INSN_4_BYTE },
++{"hlv.wu",     64, INSN_CLASS_H, "d,0(s)", MATCH_HLVWU,  MASK_HLV, match_opcode, INSN_DREF|INSN_4_BYTE },
++{"hlvx.wu",     0, INSN_CLASS_H, "d,0(s)", MATCH_HLVXWU, MASK_HLV, match_opcode, INSN_DREF|INSN_4_BYTE },
++{"hlv.d",      64, INSN_CLASS_H, "d,0(s)", MATCH_HLVD,   MASK_HLV, match_opcode, INSN_DREF|INSN_8_BYTE },
++
++{"hsv.b",       0, INSN_CLASS_H, "t,0(s)", MATCH_HSVB,   MASK_HSV, match_opcode, INSN_DREF|INSN_1_BYTE },
++{"hsv.h",       0, INSN_CLASS_H, "t,0(s)", MATCH_HSVH,   MASK_HSV, match_opcode, INSN_DREF|INSN_2_BYTE },
++{"hsv.w",       0, INSN_CLASS_H, "t,0(s)", MATCH_HSVW,   MASK_HSV, match_opcode, INSN_DREF|INSN_4_BYTE },
++{"hsv.d",      64, INSN_CLASS_H, "t,0(s)", MATCH_HSVD,   MASK_HSV, match_opcode, INSN_DREF|INSN_8_BYTE },
++
+ /* Terminate the list.  */
+ {0, 0, INSN_CLASS_NONE, 0, 0, 0, 0, 0}
+ };
+-- 
+2.33.1
+
