@@ -1,0 +1,79 @@
+From 77b3694016a9b418b3d1cb6e0ff5d13954f7e798 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 19 Jan 2022 19:46:15 -0800
+Subject: [PATCH 32/32] fix the c++ sources building failure issue
+
+---
+ libstdc++-v3/libsupc++/Makefile.am | 22 ++++++++++++++++++++++
+ libstdc++-v3/libsupc++/Makefile.in | 22 ++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
+
+diff --git a/libstdc++-v3/libsupc++/Makefile.am b/libstdc++-v3/libsupc++/Makefile.am
+index 10ac4bb0124..cf41fb45101 100644
+--- a/libstdc++-v3/libsupc++/Makefile.am
++++ b/libstdc++-v3/libsupc++/Makefile.am
+@@ -128,6 +128,28 @@ cp-demangle.lo: cp-demangle.c
+ cp-demangle.o: cp-demangle.c
+ 	$(C_COMPILE) -DIN_GLIBCPP_V3 -Wno-error -c $<
+ 
++# Use special rules for the C++17 sources so that the proper flags are passed.
++new_opa.lo: new_opa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opant.lo: new_opant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opva.lo: new_opva.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opvant.lo: new_opvant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opa.lo: del_opa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opant.lo: del_opant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opsa.lo: del_opsa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opva.lo: del_opva.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opvant.lo: del_opvant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opvsa.lo: del_opvsa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++
+ atomicity_file = ${glibcxx_srcdir}/$(ATOMICITY_SRCDIR)/atomicity.h
+ atomicity.cc: ${atomicity_file}
+ 	$(LN_S) ${atomicity_file} ./atomicity.cc || true
+diff --git a/libstdc++-v3/libsupc++/Makefile.in b/libstdc++-v3/libsupc++/Makefile.in
+index 5776a56282b..c8524e808bb 100644
+--- a/libstdc++-v3/libsupc++/Makefile.in
++++ b/libstdc++-v3/libsupc++/Makefile.in
+@@ -965,6 +965,28 @@ cp-demangle.o: cp-demangle.c
+ atomicity.cc: ${atomicity_file}
+ 	$(LN_S) ${atomicity_file} ./atomicity.cc || true
+ 
++# Use special rules for the C++17 sources so that the proper flags are passed.
++new_opa.lo: new_opa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opant.lo: new_opant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opva.lo: new_opva.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++new_opvant.lo: new_opvant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opa.lo: del_opa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opant.lo: del_opant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opsa.lo: del_opsa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opva.lo: del_opva.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opvant.lo: del_opvant.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++del_opvsa.lo: del_opvsa.cc
++	$(LTCXXCOMPILE) -std=gnu++1z -c $<
++	
+ install-stdHEADERS: $(std_HEADERS)
+ 	@$(NORMAL_INSTALL)
+ 	$(mkinstalldirs) $(DESTDIR)$(stddir)
+-- 
+2.33.1
+

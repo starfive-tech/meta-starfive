@@ -91,6 +91,13 @@ SRC_URI = "\
            file://0024-RISC-V-costs-handle-BSWAP.patch \
            file://0025-RISC-V-costs-support-shift-and-add-in-strength-reduc.patch \
            file://0026-RISC-V-bitmanip-fix-constant-loading-for-1ULL-31-in-.patch \
+	   file://0027-enable-ifunc-for-riscv.patch \
+	   file://0028-define-__riscv_vector-macro.patch \
+	   file://0029-fix-libcc-compiling-error.patch \
+	   file://0030-add-multilib-support-for-v-b.patch \
+	   file://0031-Revert-c-Change-the-default-dialect-to-C-17.patch \
+	   file://0032-fix-the-c-sources-building-failure-issue.patch \
+	   file://0033-merge-Kito-Cheng-s-patch-Handle-different-sigcontext.patch \
            file://0001-Yocto-patch-for-arch-canonicalize-to-use-python3.patch \
 "
 SRC_URI[sha256sum] = "4c4a6fb8a8396059241c2e674b85b351c26a5d678274007f076957afa1cc9ddf"
