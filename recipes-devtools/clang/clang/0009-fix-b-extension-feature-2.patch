@@ -1,0 +1,35 @@
+From f2cb4d850becf9c89cca294187d7e160c16eb085 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Wed, 5 Jan 2022 22:22:30 -0800
+Subject: [PATCH 09/24] fix b extension feature (2)
+
+---
+ llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp b/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
+index 3e9e19d27278..8a0215b273e2 100644
+--- a/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
++++ b/llvm/lib/Target/RISCV/RISCVISelDAGToDAG.cpp
+@@ -496,7 +496,7 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
+   }
+   case ISD::SRL: {
+     // We don't need this transform if zext.h is supported.
+-    if (Subtarget->hasStdExtZbb() || Subtarget->hasStdExtZbp())
++    if (Subtarget->hasStdExtZbb())
+       break;
+     // Optimize (srl (and X, 0xffff), C) ->
+     //          (srli (slli X, (XLen-16), (XLen-16) + C)
+@@ -551,8 +551,7 @@ void RISCVDAGToDAGISel::Select(SDNode *Node) {
+ 
+     // Keep track of whether this is a andi, zext.h, or zext.w.
+     bool ZExtOrANDI = isInt<12>(N1C->getSExtValue());
+-    if (C1 == UINT64_C(0xFFFF) &&
+-        (Subtarget->hasStdExtZbb() || Subtarget->hasStdExtZbp()))
++    if (C1 == UINT64_C(0xFFFF) && Subtarget->hasStdExtZbb())
+       ZExtOrANDI = true;
+     if (C1 == UINT64_C(0xFFFFFFFF) && Subtarget->hasStdExtZba())
+       ZExtOrANDI = true;
+-- 
+2.33.1
+

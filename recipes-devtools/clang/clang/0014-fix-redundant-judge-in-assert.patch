@@ -1,0 +1,27 @@
+From 15767f4fb6622237ef02d3b28090a9813ae1a5b8 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Tue, 11 Jan 2022 23:09:32 -0800
+Subject: [PATCH 14/24] fix redundant judge in assert
+
+---
+ llvm/lib/Target/RISCV/RISCVISelLowering.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/llvm/lib/Target/RISCV/RISCVISelLowering.cpp b/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+index 55b592ecec58..52f7840f41d7 100644
+--- a/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
++++ b/llvm/lib/Target/RISCV/RISCVISelLowering.cpp
+@@ -5656,8 +5656,8 @@ void RISCVTargetLowering::ReplaceNodeResults(SDNode *N,
+   }
+   case ISD::FSHL:
+   case ISD::FSHR: {
+-    assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() &&
+-           Subtarget.hasStdExtZbt() && "Unexpected custom legalisation");
++    assert(N->getValueType(0) == MVT::i32 && Subtarget.is64Bit() 
++           && "Unexpected custom legalisation");
+     SDValue NewOp0 =
+         DAG.getNode(ISD::ANY_EXTEND, DL, MVT::i64, N->getOperand(0));
+     SDValue NewOp1 =
+-- 
+2.33.1
+

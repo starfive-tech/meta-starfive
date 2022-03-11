@@ -14,6 +14,43 @@ SRC_URI = "\
     file://0001-Merge-B-instruction-from-0p94-to-1.0.patch \
     file://0002-update-B-instruction-to-1.0-and-Merge-four-Custom-CS.patch \
     file://0003-add-pref-instruction.patch \
+    file://0004-remove-v-b-experimental-version-check.patch \
+    file://0005-fix-b-extension-version.patch \
+    file://0006-fix-b-extension-feature.patch \
+    file://0007-ignore-b-v-version-check-if-version-is-empty.patch \
+    file://0008-add-multilib-v-b-support-for-baremetal-toolchain.patch \
+    file://0009-fix-b-extension-feature-2.patch \
+    file://0010-remove-zvlsseg-if-not-explicitly-enable-zvlsseg.patch \
+    file://0011-set-default-march-to-rv64imafcd_zba_zbb_zbc_zbs-and-.patch \
+    file://0012-fix-incorrect-v-version.patch \
+    file://0013-fix-incorrect-v-extension-in-assembler.patch \
+    file://0014-fix-redundant-judge-in-assert.patch \
+    file://0015-spport-H-extension-in-MC-layer.patch \
+    file://0016-fix-redundant-judge-in-assert-2.patch \
+    file://0017-use-GPRMemZeroOffset-instead-of-zeroimm-for-hypervis.patch \
+    file://0018-delete-no-supported-b-testcase.patch \
+    file://0019-fix-v-zvamo-zvlsseg-version-information.patch \
+    file://0020-update-b-v-arch-test.patch \
+    file://0021-delete-no-supported-b-testcase-2.patch \
+    file://0022-update-b-arch-test-2.patch \
+    file://0023-update-b-v-arch-test-2.patch \
+    file://0024-auto-enable-zvlsseg-if-v-is-enabled.patch \
+    file://0025-2-2-Add-the-tail-policy-argument-to-builtins-intrins.patch \
+    file://0026-Update-to-vlm.v-and-vsm.v-according-to-v1.0-rc1.patch \
+    file://0027-Add-doxygen-comment-for-hasFp-in-RISCVFrameLowering..patch \
+    file://0028-Handle-vector-of-pointer-in-getTgtMemIntrinsic-for-s.patch \
+    file://0029-Correct-FileCheck-prefixes-in-rv32zbc-intrinsic.ll-a.patch \
+    file://0030-Add-more-tests-of-add-mul-r-c0-c1.patch \
+    file://0031-Require-tail-policy-argument-to-builtins-to-be-an-in.patch \
+    file://0032-Add-more-tests-of-immediate-materialisation.patch \
+    file://0033-Update-test-cases-through-update_cc_test_checks.py.patch \
+    file://0034-Define-_m-intrinsics-as-builtins-instead-of-macros.patch \
+    file://0035-Rename-assembler-mnemonic-of-unordered-floating-poin.patch \
+    file://0036-Fix-RISCV-vector-header-comment.patch \
+    file://0037-Revert-RISCV-Define-_m-intrinsics-as-builtins-instea.patch \
+    file://0038-Revert-RISCV-2-2-Add-the-tail-policy-argument-to-bui.patch \
+    file://0039-After-reverting-_mt-builtins-add-ta-argument-for-LLV.patch \
+    file://0040-fixed-riscv-vector-test-error.patch \
     file://0001-lldb-Add-lxml2-to-linker-cmdline-of-xml-is-found.patch \
     file://0002-libcxxabi-Find-libunwind-headers-when.patch \
     file://0004-llvm-TargetLibraryInfo-Undefine-libc-functions-if-th.patch \

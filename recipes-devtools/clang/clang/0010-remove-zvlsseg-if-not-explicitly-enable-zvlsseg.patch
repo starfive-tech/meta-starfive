@@ -1,0 +1,25 @@
+From 8346b085f68e255012a66a345d9863aaaa2604f4 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 6 Jan 2022 15:45:22 +0800
+Subject: [PATCH 10/24] remove 'zvlsseg' if not explicitly enable 'zvlsseg'
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index 03997225cf38..68512c81b08e 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -436,7 +436,6 @@ static bool getArchFeatures(const Driver &D, StringRef MArch,
+       break;
+     case 'v':
+       Features.push_back("+experimental-v");
+-      Features.push_back("+experimental-zvlsseg");
+       break;
+     }
+ 
+-- 
+2.33.1
+

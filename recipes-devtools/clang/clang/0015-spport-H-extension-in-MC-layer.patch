@@ -1,0 +1,870 @@
+From ec6a98afbfb67bd5d21ecc035b54c73f831cdf25 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Wed, 12 Jan 2022 10:18:59 +0800
+Subject: [PATCH 15/24] spport H-extension in MC layer
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td       |  78 +++-
+ llvm/lib/Target/RISCV/RISCVInstrInfoC.td      |   5 -
+ llvm/lib/Target/RISCV/RISCVSystemOperands.td  |  56 +++
+ llvm/test/MC/RISCV/hypervisor-csr-names.s     | 370 ++++++++++++++++++
+ llvm/test/MC/RISCV/priv-aliases-valid.s       |  50 +++
+ llvm/test/MC/RISCV/priv-invalid.s             |  58 ++-
+ llvm/test/MC/RISCV/priv-rv64-valid.s          |  21 +
+ llvm/test/MC/RISCV/priv-valid.s               |  56 +++
+ .../test/MC/RISCV/rv32-hypervisor-csr-names.s |  40 ++
+ 9 files changed, 723 insertions(+), 11 deletions(-)
+ create mode 100644 llvm/test/MC/RISCV/hypervisor-csr-names.s
+ create mode 100644 llvm/test/MC/RISCV/priv-aliases-valid.s
+ create mode 100644 llvm/test/MC/RISCV/priv-rv64-valid.s
+ create mode 100644 llvm/test/MC/RISCV/rv32-hypervisor-csr-names.s
+
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index 9850f10913f4..ac10dc775498 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -201,6 +201,11 @@ def simm8 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<8>(Imm);}]> {
+   let OperandNamespace = "RISCVOp";
+ }
+ 
++def immzero : Operand<XLenVT>,
++              ImmLeaf<XLenVT, [{return (Imm == 0);}]> {
++  let ParserMatchClass = ImmZeroAsmOperand;
++}
++
+ def simm12 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<12>(Imm);}]> {
+   let ParserMatchClass = SImmAsmOperand<12>;
+   let EncoderMethod = "getImmOpValue";
+@@ -428,20 +433,39 @@ class BranchCC_rri<bits<3> funct3, string opcodestr>
+   let isTerminator = 1;
+ }
+ 
+-let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
++let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in {
+ class Load_ri<bits<3> funct3, string opcodestr>
+     : RVInstI<funct3, OPC_LOAD, (outs GPR:$rd), (ins GPR:$rs1, simm12:$imm12),
+               opcodestr, "$rd, ${imm12}(${rs1})">;
+ 
++class HLoad_ri<bits<7> funct7, bits<3> funct3, string opcodestr>
++    : RVInstI<0b100, OPC_SYSTEM, (outs GPR:$rd), (ins GPR:$rs1, immzero:$imm2),
++              opcodestr, "$rd, ${imm2}(${rs1})">, Sched<[]> {
++  bits<2> imm2;
++  let Inst{31-25} = funct7;
++  let Inst{24-23} = imm2;
++  let Inst{22-20} = funct3;
++}
++}
++
+ // Operands for stores are in the order srcreg, base, offset rather than
+ // reflecting the order these fields are specified in the instruction
+ // encoding.
+-let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
++let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in {
+ class Store_rri<bits<3> funct3, string opcodestr>
+     : RVInstS<funct3, OPC_STORE, (outs),
+               (ins GPR:$rs2, GPR:$rs1, simm12:$imm12),
+               opcodestr, "$rs2, ${imm12}(${rs1})">;
+ 
++class HStore_ri<bits<7> funct7, string opcodestr>
++    : RVInstR<funct7, 0b100, OPC_SYSTEM, (outs),
++              (ins GPR:$rs2, GPR:$rs1, immzero:$imm5),
++               opcodestr, "$rs2, ${imm5}(${rs1})">, Sched<[]> {
++  bits<5> imm5;
++  let Inst{11-7} = imm5;
++}
++}
++
+ let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+ class ALU_ri<bits<3> funct3, string opcodestr>
+     : RVInstI<funct3, OPC_OP_IMM, (outs GPR:$rd), (ins GPR:$rs1, simm12:$imm12),
+@@ -696,11 +720,52 @@ def WFI : Priv<"wfi", 0b0001000>, Sched<[]> {
+   let rs2 = 0b00101;
+ }
+ 
+-let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
++let hasSideEffects = 1, mayLoad = 0, mayStore = 0, rd = 0 in {
+ def SFENCE_VMA : RVInstR<0b0001001, 0b000, OPC_SYSTEM, (outs),
+                          (ins GPR:$rs1, GPR:$rs2),
+-                         "sfence.vma", "$rs1, $rs2">, Sched<[]> {
+-  let rd = 0;
++                         "sfence.vma", "$rs1, $rs2">, Sched<[]>;
++
++def HFENCE_VVMA : RVInstR<0b0010001, 0b000, OPC_SYSTEM, (outs),
++                         (ins GPR:$rs1, GPR:$rs2),
++                         "hfence.vvma", "$rs1, $rs2">, Sched<[]>;
++
++def HFENCE_GVMA : RVInstR<0b0110001, 0b000, OPC_SYSTEM, (outs),
++                         (ins GPR:$rs1, GPR:$rs2),
++                         "hfence.gvma", "$rs1, $rs2">, Sched<[]>;
++}
++
++def HLV_B : HLoad_ri<0b0110000, 0b000, "hlv.b">;
++def HLV_BU : HLoad_ri<0b0110000, 0b001, "hlv.bu">;
++def HLV_H : HLoad_ri<0b0110010, 0b000, "hlv.h">;
++def HLV_HU : HLoad_ri<0b0110010, 0b001, "hlv.hu">;
++def HLVX_HU : HLoad_ri<0b0110010, 0b011, "hlvx.hu">;
++def HLV_W : HLoad_ri<0b0110100, 0b000, "hlv.w">;
++def HLVX_WU : HLoad_ri<0b0110100, 0b011, "hlvx.wu">;
++let Predicates = [IsRV64] in {
++def HLV_WU : HLoad_ri<0b0110100, 0b001, "hlv.wu">;
++def HLV_D : HLoad_ri<0b0110110, 0b000, "hlv.d">;
++}
++
++def HSV_B : HStore_ri<0b0110001, "hsv.b">;
++def HSV_H : HStore_ri<0b0110011, "hsv.h">;
++def HSV_W : HStore_ri<0b0110101, "hsv.w">;
++let Predicates = [IsRV64] in
++def HSV_D : HStore_ri<0b0110111, "hsv.d">;
++
++let EmitPriority = 0 in {
++def : InstAlias<"hlv.b $rd, (${rs1})", (HLV_B GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.bu $rd, (${rs1})", (HLV_BU GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.h $rd, (${rs1})", (HLV_H GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.hu $rd, (${rs1})", (HLV_HU GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlvx.hu $rd, (${rs1})", (HLVX_HU GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.w $rd, (${rs1})", (HLV_W GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.wu $rd, (${rs1})", (HLV_WU GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlvx.wu $rd, (${rs1})", (HLVX_WU GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hlv.d $rd, (${rs1})", (HLV_D GPR:$rd, GPR:$rs1, 0)>;
++def : InstAlias<"hsv.b $rs2, (${rs1})", (HSV_B GPR:$rs2, GPR:$rs1, 0)>;
++def : InstAlias<"hsv.h $rs2, (${rs1})", (HSV_H GPR:$rs2, GPR:$rs1, 0)>;
++def : InstAlias<"hsv.w $rs2, (${rs1})", (HSV_W GPR:$rs2, GPR:$rs1, 0)>;
++def : InstAlias<"hsv.d $rs2, (${rs1})", (HSV_D GPR:$rs2, GPR:$rs1, 0)>;
+ }
+ 
+ //===----------------------------------------------------------------------===//
+@@ -842,6 +907,9 @@ def : InstAlias<"csrrc $rd, $csr, $imm", (CSRRCI GPR:$rd, csr_sysreg:$csr, uimm5
+ def : InstAlias<"sfence.vma",     (SFENCE_VMA      X0, X0)>;
+ def : InstAlias<"sfence.vma $rs", (SFENCE_VMA GPR:$rs, X0)>;
+ 
++def : InstAlias<"hfence.gvma",     (HFENCE_GVMA      X0, X0)>;
++def : InstAlias<"hfence.gvma $rs", (HFENCE_GVMA GPR:$rs, X0)>;
++
+ let EmitPriority = 0 in {
+ def : InstAlias<"lb $rd, (${rs1})",
+                 (LB  GPR:$rd, GPR:$rs1, 0)>;
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfoC.td b/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
+index 86f96c1529b1..0fff2a03396a 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
+@@ -61,11 +61,6 @@ def simm6nonzero : Operand<XLenVT>,
+   }];
+ }
+ 
+-def immzero : Operand<XLenVT>,
+-              ImmLeaf<XLenVT, [{return (Imm == 0);}]> {
+-  let ParserMatchClass = ImmZeroAsmOperand;
+-}
+-
+ def CLUIImmAsmOperand : AsmOperandClass {
+   let Name = "CLUIImm";
+   let RenderMethod = "addImmOperands";
+diff --git a/llvm/lib/Target/RISCV/RISCVSystemOperands.td b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+index a561772b650b..064a077ea4c4 100644
+--- a/llvm/lib/Target/RISCV/RISCVSystemOperands.td
++++ b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+@@ -194,6 +194,62 @@ def : SysReg<"sip", 0x144>;
+ let DeprecatedName = "sptbr" in
+ def : SysReg<"satp", 0x180>;
+ 
++//===--------------------------
++// Hypervisor Trap Setup
++//===--------------------------
++def : SysReg<"hstatus", 0x600>;
++def : SysReg<"hedeleg", 0x602>;
++def : SysReg<"hideleg", 0x603>;
++def : SysReg<"hie", 0x604>;
++def : SysReg<"hcounteren", 0x606>;
++def : SysReg<"hgeie", 0x607>;
++
++//===--------------------------
++// Hypervisor Trap Handling
++//===--------------------------
++def : SysReg<"htval", 0x643>;
++def : SysReg<"hip", 0x644>;
++def : SysReg<"hvip", 0x645>;
++def : SysReg<"htinst", 0x64A>;
++def : SysReg<"hgeip", 0xE12>;
++
++//===--------------------------
++// Hypervisor Configuration
++//===--------------------------
++def : SysReg<"henvcfg", 0x60A>;
++let isRV32Only = 1 in
++def : SysReg<"henvcfgh", 0x61A>;
++
++//===-------------------------------------
++// Hypervisor Protection and Translation
++//===-------------------------------------
++def : SysReg<"hgatp", 0x680>;
++
++//===--------------------------
++// Debug/Trace Registers
++//===--------------------------
++def : SysReg<"hcontext", 0x6A8>;
++
++//===-------------------------------------------------
++// Hypervisor Counter/Timer Virtualization Registers
++//===-------------------------------------------------
++def : SysReg<"htimedelta", 0x605>;
++let isRV32Only = 1 in
++def : SysReg<"htimedeltah", 0x615>;
++
++//===-----------------------------
++// Virtual Supervisor Registers
++//===-----------------------------
++def : SysReg<"vsstatus", 0x200>;
++def : SysReg<"vsie", 0x204>;
++def : SysReg<"vstvec", 0x205>;
++def : SysReg<"vsscratch", 0x240>;
++def : SysReg<"vsepc", 0x241>;
++def : SysReg<"vscause", 0x242>;
++def : SysReg<"vstval", 0x243>;
++def : SysReg<"vsip", 0x244>;
++def : SysReg<"vsatp", 0x280>;
++
+ //===-----------------------------
+ // Machine Information Registers
+ //===-----------------------------
+diff --git a/llvm/test/MC/RISCV/hypervisor-csr-names.s b/llvm/test/MC/RISCV/hypervisor-csr-names.s
+new file mode 100644
+index 000000000000..188c9d18ff43
+--- /dev/null
++++ b/llvm/test/MC/RISCV/hypervisor-csr-names.s
+@@ -0,0 +1,370 @@
++# RUN: llvm-mc %s -triple=riscv32 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK-INST,CHECK-ENC %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 < %s \
++# RUN:     | llvm-objdump -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST-ALIAS %s
++#
++# RUN: llvm-mc %s -triple=riscv64 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK-INST,CHECK-ENC %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 < %s \
++# RUN:     | llvm-objdump -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST-ALIAS %s
++
++##################################
++# Hypervisor Trap Setup
++##################################
++
++# hstatus
++# name
++# CHECK-INST: csrrs t1, hstatus, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x00,0x60]
++# CHECK-INST-ALIAS: csrr t1, hstatus
++# uimm12
++# CHECK-INST: csrrs t2, hstatus, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x00,0x60]
++# CHECK-INST-ALIAS: csrr t2, hstatus
++# name
++csrrs t1, hstatus, zero
++# uimm12
++csrrs t2, 0x600, zero
++
++# hedeleg
++# name
++# CHECK-INST: csrrs t1, hedeleg, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x20,0x60]
++# CHECK-INST-ALIAS: csrr t1, hedeleg
++# uimm12
++# CHECK-INST: csrrs t2, hedeleg, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x20,0x60]
++# CHECK-INST-ALIAS: csrr t2, hedeleg
++# name
++csrrs t1, hedeleg, zero
++# uimm12
++csrrs t2, 0x602, zero
++
++# hideleg
++# name
++# CHECK-INST: csrrs t1, hideleg, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x30,0x60]
++# CHECK-INST-ALIAS: csrr t1, hideleg
++# uimm12
++# CHECK-INST: csrrs t2, hideleg, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x30,0x60]
++# CHECK-INST-ALIAS: csrr t2, hideleg
++# name
++csrrs t1, hideleg, zero
++# uimm12
++csrrs t2, 0x603, zero
++
++# hie
++# name
++# CHECK-INST: csrrs t1, hie, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x40,0x60]
++# CHECK-INST-ALIAS: csrr t1, hie
++# uimm12
++# CHECK-INST: csrrs t2, hie, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x40,0x60]
++# CHECK-INST-ALIAS: csrr t2, hie
++# name
++csrrs t1, hie, zero
++# uimm12
++csrrs t2, 0x604, zero
++
++# hcounteren
++# name
++# CHECK-INST: csrrs t1, hcounteren, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x60,0x60]
++# CHECK-INST-ALIAS: csrr t1, hcounteren
++# uimm12
++# CHECK-INST: csrrs t2, hcounteren, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x60,0x60]
++# CHECK-INST-ALIAS: csrr t2, hcounteren
++# name
++csrrs t1, hcounteren, zero
++# uimm12
++csrrs t2, 0x606, zero
++
++# hgeie
++# name
++# CHECK-INST: csrrs t1, hgeie, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x70,0x60]
++# CHECK-INST-ALIAS: csrr t1, hgeie
++# uimm12
++# CHECK-INST: csrrs t2, hgeie, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x70,0x60]
++# CHECK-INST-ALIAS: csrr t2, hgeie
++# name
++csrrs t1, hgeie, zero
++# uimm12
++csrrs t2, 0x607, zero
++
++##################################
++# Hypervisor Trap Handling
++##################################
++# htval
++# name
++# CHECK-INST: csrrs t1, htval, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x30,0x64]
++# CHECK-INST-ALIAS: csrr t1, htval 
++# uimm12
++# CHECK-INST: csrrs t2, htval, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x30,0x64]
++# CHECK-INST-ALIAS: csrr t2, htval
++# name
++csrrs t1, htval, zero
++# uimm12
++csrrs t2, 0x643, zero
++
++# hip
++# name
++# CHECK-INST: csrrs t1, hip, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x40,0x64]
++# CHECK-INST-ALIAS: csrr t1, hip 
++# uimm12
++# CHECK-INST: csrrs t2, hip, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x40,0x64]
++# CHECK-INST-ALIAS: csrr t2, hip 
++# name
++csrrs t1, hip, zero
++# uimm12
++csrrs t2, 0x644, zero
++
++# hvip 
++# name
++# CHECK-INST: csrrs t1, hvip, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x50,0x64]
++# CHECK-INST-ALIAS: csrr t1, hvip 
++# uimm12
++# CHECK-INST: csrrs t2, hvip, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x50,0x64]
++# CHECK-INST-ALIAS: csrr t2, hvip 
++# name
++csrrs t1, hvip, zero
++# uimm12
++csrrs t2, 0x645, zero
++
++# htinst
++# name
++# CHECK-INST: csrrs t1, htinst, zero
++# CHECK-ENC: encoding: [0x73,0x23,0xa0,0x64]
++# CHECK-INST-ALIAS: csrr t1, htinst 
++# uimm12
++# CHECK-INST: csrrs t2, htinst, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0xa0,0x64]
++# CHECK-INST-ALIAS: csrr t2, htinst
++# name
++csrrs t1, htinst, zero
++# uimm12
++csrrs t2, 0x64A, zero
++
++# hgeip
++# name
++# CHECK-INST: csrrs t1, hgeip, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x20,0xe1]
++# CHECK-INST-ALIAS: csrr t1, hgeip
++# uimm12
++# CHECK-INST: csrrs t2, hgeip, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x20,0xe1]
++# CHECK-INST-ALIAS: csrr t2, hgeip 
++# name
++csrrs t1, hgeip, zero
++# uimm12
++csrrs t2, 0xE12, zero
++
++######################################
++# Hypervisor Configuration
++######################################
++# Tests for henvcfgh in rv32-hypervisor-csr-names.s
++
++# henvcfg
++# name
++# CHECK-INST: csrrs t1, henvcfg, zero
++# CHECK-ENC: encoding: [0x73,0x23,0xa0,0x60]
++# CHECK-INST-ALIAS: csrr t1, henvcfg
++# uimm12
++# CHECK-INST: csrrs t2, henvcfg, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0xa0,0x60]
++# CHECK-INST-ALIAS: csrr t2, henvcfg
++# name
++csrrs t1, henvcfg, zero
++# uimm12
++csrrs t2, 0x60A, zero
++
++#########################################
++# Hypervisor Protection and Translation
++#########################################
++# hgatp
++# name
++# CHECK-INST: csrrs t1, hgatp, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x00,0x68]
++# CHECK-INST-ALIAS: csrr t1, hgatp
++# uimm12
++# CHECK-INST: csrrs t2, hgatp, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x00,0x68]
++# CHECK-INST-ALIAS: csrr t2, hgatp
++# name
++csrrs t1, hgatp, zero
++# uimm12
++csrrs t2, 0x680, zero
++
++######################################
++# Debug/Trace Registers
++######################################
++# hcontext
++# name
++# CHECK-INST: csrrs t1, hcontext, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x80,0x6a]
++# CHECK-INST-ALIAS: csrr t1, hcontext
++# uimm12
++# CHECK-INST: csrrs t2, hcontext, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x80,0x6a]
++# CHECK-INST-ALIAS: csrr t2, hcontext
++csrrs t1, hcontext, zero
++# uimm12
++csrrs t2, 0x6A8, zero
++
++#####################################################
++# Hypervisor Counter/Timer Virtualization Registers
++#####################################################
++# htimedelta
++# name
++# CHECK-INST: csrrs t1, htimedelta, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x50,0x60]
++# CHECK-INST-ALIAS: csrr t1, htimedelta 
++# uimm12
++# CHECK-INST: csrrs t2, htimedelta, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x50,0x60]
++# CHECK-INST-ALIAS: csrr t2, htimedelta
++# name
++csrrs t1, htimedelta, zero
++# uimm12
++csrrs t2, 0x605, zero
++
++
++######################################
++# Virtual Supervisor Registers
++######################################
++# vsstatus
++# name
++# CHECK-INST: csrrs t1, vsstatus, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x00,0x20]
++# CHECK-INST-ALIAS: csrr t1, vsstatus
++# uimm12
++# CHECK-INST: csrrs t2, vsstatus, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x00,0x20]
++# CHECK-INST-ALIAS: csrr t2, vsstatus 
++# name
++csrrs t1, vsstatus, zero
++# uimm12
++csrrs t2, 0x200, zero
++
++# vsie 
++# name
++# CHECK-INST: csrrs t1, vsie, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x40,0x20]
++# CHECK-INST-ALIAS: csrr t1, vsie
++# uimm12
++# CHECK-INST: csrrs t2, vsie, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x40,0x20]
++# CHECK-INST-ALIAS: csrr t2, vsie
++# name
++csrrs t1, vsie, zero
++# uimm12
++csrrs t2, 0x204, zero
++
++# vstvec 
++# name
++# CHECK-INST: csrrs t1, vstvec, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x50,0x20]
++# CHECK-INST-ALIAS: csrr t1, vstvec
++# uimm12
++# CHECK-INST: csrrs t2, vstvec, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x50,0x20]
++# CHECK-INST-ALIAS: csrr t2, vstvec 
++csrrs t1, vstvec, zero
++# uimm12
++csrrs t2, 0x205, zero
++
++# vsscratch 
++# name
++# CHECK-INST: csrrs t1, vsscratch, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x00,0x24]
++# CHECK-INST-ALIAS: csrr t1, vsscratch
++# uimm12
++# CHECK-INST: csrrs t2, vsscratch, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x00,0x24]
++# CHECK-INST-ALIAS: csrr t2, vsscratch
++# name
++csrrs t1, vsscratch, zero
++# uimm12
++csrrs t2, 0x240, zero
++
++# vsepc 
++# name
++# CHECK-INST: csrrs t1, vsepc, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x10,0x24]
++# CHECK-INST-ALIAS: csrr t1, vsepc
++# uimm12
++# CHECK-INST: csrrs t2, vsepc, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x10,0x24]
++# CHECK-INST-ALIAS: csrr t2, vsepc
++# name
++csrrs t1, vsepc, zero
++# uimm12
++csrrs t2, 0x241, zero
++
++# vscause 
++# name
++# CHECK-INST: csrrs t1, vscause, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x20,0x24]
++# CHECK-INST-ALIAS: csrr t1, vscause
++# uimm12
++# CHECK-INST: csrrs t2, vscause, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x20,0x24]
++# CHECK-INST-ALIAS: csrr t2, vscause
++# name
++csrrs t1, vscause, zero
++# uimm12
++csrrs t2, 0x242, zero
++
++# vstval
++# name
++# CHECK-INST: csrrs t1, vstval, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x30,0x24]
++# CHECK-INST-ALIAS: csrr t1, vstval
++# uimm12
++# CHECK-INST: csrrs t2, vstval, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x30,0x24]
++# CHECK-INST-ALIAS: csrr t2, vstval
++# name
++csrrs t1, vstval, zero
++# uimm12
++csrrs t2, 0x243, zero
++
++# vsip
++# name
++# CHECK-INST: csrrs t1, vsip, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x40,0x24]
++# CHECK-INST-ALIAS: csrr t1, vsip
++# uimm12
++# CHECK-INST: csrrs t2, vsip, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x40,0x24]
++# CHECK-INST-ALIAS: csrr t2, vsip
++# name
++csrrs t1, vsip, zero
++# uimm12
++csrrs t2, 0x244, zero
++
++# vsatp
++# name
++# CHECK-INST: csrrs t1, vsatp, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x00,0x28]
++# CHECK-INST-ALIAS: csrr t1, vsatp
++# uimm12
++# CHECK-INST: csrrs t2, vsatp, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x00,0x28]
++# CHECK-INST-ALIAS: csrr t2, vsatp
++# name
++csrrs t1, vsatp, zero
++# uimm12
++csrrs t2, 0x280, zero
+diff --git a/llvm/test/MC/RISCV/priv-aliases-valid.s b/llvm/test/MC/RISCV/priv-aliases-valid.s
+new file mode 100644
+index 000000000000..e26b99b194aa
+--- /dev/null
++++ b/llvm/test/MC/RISCV/priv-aliases-valid.s
+@@ -0,0 +1,50 @@
++# RUN: llvm-mc %s -triple=riscv32 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK,CHECK-INST %s
++# RUN: llvm-mc %s -triple=riscv64 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK,CHECK-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 < %s \
++# RUN:     | llvm-objdump -M no-aliases -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 < %s \
++# RUN:     | llvm-objdump -M no-aliases -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST %s
++
++# CHECK-INST: hlv.b a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x05,0x60]
++hlv.b   a0, (a1)
++
++# CHECK-INST: hlv.bu a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x15,0x60]
++hlv.bu  a0, (a1)
++
++# CHECK-INST: hlv.h a1, 0(a2)
++# CHECK: encoding: [0xf3,0x45,0x06,0x64]
++hlv.h   a1, (a2)
++
++# CHECK-INST: hlv.hu a1, 0(a1)
++# CHECK: encoding: [0xf3,0xc5,0x15,0x64]
++hlv.hu  a1, (a1)
++
++# CHECK-INST: hlvx.hu a1, 0(a2)
++# CHECK: encoding: [0xf3,0x45,0x36,0x64]
++hlvx.hu a1, (a2)
++
++# CHECK-INST: hlv.w a2, 0(a2)
++# CHECK: encoding: [0x73,0x46,0x06,0x68]
++hlv.w   a2, (a2)
++
++# CHECK-INST: hlvx.wu a2, 0(a3)
++# CHECK: encoding: [0x73,0xc6,0x36,0x68]
++hlvx.wu a2, (a3)
++
++# CHECK-INST: hsv.b a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x62]
++hsv.b   a0, (a1)
++
++# CHECK-INST: hsv.h a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x66]
++hsv.h   a0, (a1)
++
++# CHECK-INST: hsv.w a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x6a] 
++hsv.w   a0, (a1)
+diff --git a/llvm/test/MC/RISCV/priv-invalid.s b/llvm/test/MC/RISCV/priv-invalid.s
+index 8f421e471f93..0280314a3ac7 100644
+--- a/llvm/test/MC/RISCV/priv-invalid.s
++++ b/llvm/test/MC/RISCV/priv-invalid.s
+@@ -1,7 +1,63 @@
+-# RUN: not llvm-mc -triple riscv32 < %s 2>&1 | FileCheck %s
++# RUN: not llvm-mc -triple riscv64 < %s 2>&1 | FileCheck %s
+ 
+ mret 0x10 # CHECK: :[[@LINE]]:6: error: invalid operand for instruction
+ 
+ sfence.vma zero, a1, a2 # CHECK: :[[@LINE]]:22: error: invalid operand for instruction
+ 
+ sfence.vma a0, 0x10 # CHECK: :[[@LINE]]:16: error: invalid operand for instruction
++
++hfence.vvma zero, a1, a2 # CHECK: :[[@LINE]]:23: error: invalid operand for instruction
++
++hfence.vvma a0, 0x10 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
++
++hfence.gvma zero, a1, a2 # CHECK: :[[@LINE]]:23: error: invalid operand for instruction
++
++hfence.gvma a0, 0x10 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
++
++hlv.b a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.bu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlv.bu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlv.h a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.hu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlv.hu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlvx.hu a0, 0x10 # CHECK: :[[@LINE]]:13: error: immediate must be zero
++
++hlvx.hu a0, 1(a1) # CHECK: :[[@LINE]]:13: error: immediate must be zero
++
++hlv.w a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.wu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlv.wu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++
++hlv.d a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hlv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.b a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.h a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.w a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.d a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++
++hsv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
+diff --git a/llvm/test/MC/RISCV/priv-rv64-valid.s b/llvm/test/MC/RISCV/priv-rv64-valid.s
+new file mode 100644
+index 000000000000..cfd050225681
+--- /dev/null
++++ b/llvm/test/MC/RISCV/priv-rv64-valid.s
+@@ -0,0 +1,21 @@
++# RUN: llvm-mc %s -triple=riscv64 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK,CHECK-INST %s
++# RUN: llvm-mc -filetype=obj -triple riscv64 < %s \
++# RUN:     | llvm-objdump -M no-aliases -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST %s
++
++# CHECK-INST: hlv.wu a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x15,0x68]
++hlv.wu   a0, (a1)
++
++# CHECK-INST: hlv.wu a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x15,0x68]
++hlv.wu   a0, 0(a1)
++
++# CHECK-INST: hlv.d a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x05,0x6c]
++hlv.d  a0, (a1)
++
++# CHECK-INST: hsv.d a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x6e]
++hsv.d   a0, (a1)
+diff --git a/llvm/test/MC/RISCV/priv-valid.s b/llvm/test/MC/RISCV/priv-valid.s
+index 4c79dc41a46d..4fb2aa0f21e5 100644
+--- a/llvm/test/MC/RISCV/priv-valid.s
++++ b/llvm/test/MC/RISCV/priv-valid.s
+@@ -32,3 +32,59 @@ sfence.vma zero, zero
+ # CHECK-INST: sfence.vma a0, a1
+ # CHECK: encoding: [0x73,0x00,0xb5,0x12]
+ sfence.vma a0, a1
++
++# CHECK-INST: hfence.vvma zero, zero
++# CHECK: encoding: [0x73,0x00,0x00,0x22]
++hfence.vvma zero, zero
++
++# CHECK-INST: hfence.vvma a0, a1
++# CHECK: encoding: [0x73,0x00,0xb5,0x22]
++hfence.vvma a0, a1
++
++# CHECK-INST: hfence.gvma zero, zero
++# CHECK: encoding: [0x73,0x00,0x00,0x62]
++hfence.gvma zero, zero
++
++# CHECK-INST: hfence.gvma a0, a1
++# CHECK: encoding: [0x73,0x00,0xb5,0x62]
++hfence.gvma a0, a1
++
++# CHECK-INST: hlv.b a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x05,0x60]
++hlv.b   a0, 0(a1)
++
++# CHECK-INST: hlv.bu a0, 0(a1)
++# CHECK: encoding: [0x73,0xc5,0x15,0x60]
++hlv.bu  a0, 0(a1)
++
++# CHECK-INST: hlv.h a1, 0(a2)
++# CHECK: encoding: [0xf3,0x45,0x06,0x64]
++hlv.h   a1, 0(a2)
++
++# CHECK-INST: hlv.hu a1, 0(a1)
++# CHECK: encoding: [0xf3,0xc5,0x15,0x64]
++hlv.hu  a1, 0(a1)
++
++# CHECK-INST: hlvx.hu a1, 0(a2)
++# CHECK: encoding: [0xf3,0x45,0x36,0x64]
++hlvx.hu a1, 0(a2)
++
++# CHECK-INST: hlv.w a2, 0(a2)
++# CHECK: encoding: [0x73,0x46,0x06,0x68]
++hlv.w   a2, 0(a2)
++
++# CHECK-INST: hlvx.wu a2, 0(a3)
++# CHECK: encoding: [0x73,0xc6,0x36,0x68]
++hlvx.wu a2, 0(a3)
++
++# CHECK-INST: hsv.b a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x62]
++hsv.b   a0, 0(a1)
++
++# CHECK-INST: hsv.h a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x66]
++hsv.h   a0, 0(a1)
++
++# CHECK-INST: hsv.w a0, 0(a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x6a]
++hsv.w   a0, 0(a1)
+diff --git a/llvm/test/MC/RISCV/rv32-hypervisor-csr-names.s b/llvm/test/MC/RISCV/rv32-hypervisor-csr-names.s
+new file mode 100644
+index 000000000000..e76e54e64831
+--- /dev/null
++++ b/llvm/test/MC/RISCV/rv32-hypervisor-csr-names.s
+@@ -0,0 +1,40 @@
++# RUN: llvm-mc %s -triple=riscv32 -riscv-no-aliases -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK-INST,CHECK-ENC %s
++# RUN: llvm-mc -filetype=obj -triple riscv32 < %s \
++# RUN:     | llvm-objdump -d - \
++# RUN:     | FileCheck -check-prefix=CHECK-INST-ALIAS %s
++
++######################################
++# Hypervisor Configuration
++######################################
++
++# henvcfgh 
++# name
++# CHECK-INST: csrrs t1, henvcfgh, zero
++# CHECK-ENC: encoding: [0x73,0x23,0xa0,0x61]
++# CHECK-INST-ALIAS: csrr t1, henvcfgh
++# uimm12
++# CHECK-INST: csrrs t2, henvcfgh, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0xa0,0x61]
++# CHECK-INST-ALIAS: csrr t2, henvcfgh
++# name
++csrrs t1, henvcfgh, zero
++# uimm12
++csrrs t2, 0x61A, zero
++
++#####################################################
++# Hypervisor Counter/Timer Virtualization Registers
++#####################################################
++# htimedeltah 
++# name
++# CHECK-INST: csrrs t1, htimedeltah, zero
++# CHECK-ENC: encoding: [0x73,0x23,0x50,0x61]
++# CHECK-INST-ALIAS: csrr t1, htimedeltah 
++# uimm12
++# CHECK-INST: csrrs t2, htimedeltah, zero
++# CHECK-ENC: encoding: [0xf3,0x23,0x50,0x61]
++# CHECK-INST-ALIAS: csrr t2, htimedeltah
++# name
++csrrs t1, htimedeltah, zero
++# uimm12
++csrrs t2, 0x615, zero
+-- 
+2.33.1
+
