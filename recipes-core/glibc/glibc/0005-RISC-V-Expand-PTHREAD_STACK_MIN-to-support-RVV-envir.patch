@@ -1,0 +1,93 @@
+From 200ea75b0643350a162a22d3a7fa1f1a056337c1 Mon Sep 17 00:00:00 2001
+From: Vincent Chen <vincent.chen@sifive.com>
+Date: Mon, 13 Sep 2021 09:41:18 +0800
+Subject: [PATCH 5/8] RISC-V: Expand PTHREAD_STACK_MIN to support RVV
+ environment
+
+In order to support all pthread operations in the RVV environment, here
+PTHREAD_STACK_MIN is set to 4 times GLRO(dl_minsigstacksize), and the
+default PTHREAD_STACK_MIN is expanded to 20K bytes.
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ .../sysv/linux/riscv/bits/pthread_stack_min.h | 21 ++++++++++
+ .../linux/riscv/sysconf-pthread_stack_min.h   | 39 +++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h b/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+new file mode 100644
+index 0000000000..83585b39f3
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+@@ -0,0 +1,21 @@
++/* Definition of PTHREAD_STACK_MIN.  Linux/riscv version.
++   Copyright (C) 2021 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Minimum size for a thread.  We are free to choose a reasonable value.  */
++#define PTHREAD_STACK_MIN	20480
+diff --git a/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h b/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+new file mode 100644
+index 0000000000..53ba6a1142
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+@@ -0,0 +1,39 @@
++/* __get_pthread_stack_min ().  Linux version.
++   Copyright (C) 2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Return sysconf (_SC_THREAD_STACK_MIN).  */
++
++static inline long int
++__get_pthread_stack_min (void)
++{
++  /* sysconf (_SC_THREAD_STACK_MIN) >= sysconf (_SC_MINSIGSTKSZ).  */
++  long int pthread_stack_min = GLRO(dl_minsigstacksize) * 4;
++  assert (pthread_stack_min != 0);
++  _Static_assert (__builtin_constant_p (PTHREAD_STACK_MIN),
++		  "PTHREAD_STACK_MIN is constant");
++  /* Return MAX (PTHREAD_STACK_MIN, pthread_stack_min).  */
++  if (pthread_stack_min < PTHREAD_STACK_MIN)
++    pthread_stack_min = PTHREAD_STACK_MIN;
++  /* We have a private interface, __pthread_get_minstack@GLIBC_PRIVATE
++     which returns a larger size that includes the required TLS variable
++     space which has been determined at startup.  For sysconf here we are
++     conservative and don't include the space required for TLS access.
++     Eventually the TLS variable space will not be part of the stack
++     (Bug 11787).  */
++  return pthread_stack_min;
++}
+-- 
+2.33.1
+

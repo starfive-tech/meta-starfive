@@ -1,0 +1,49 @@
+From b20b70ad45a75c817b2320bed6c8f463e230c20e Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 14 Feb 2022 15:40:51 -0800
+Subject: [PATCH 12/12] add hwcap.h header file
+
+---
+ sysdeps/unix/sysv/linux/riscv/bits/hwcap.h | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h b/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+new file mode 100644
+index 0000000000..a90e7bb070
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+@@ -0,0 +1,30 @@
++/* Defines for bits in AT_HWCAP.  RISC-V Linux version.
++   Copyright (C) 2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#if !defined (_SYS_AUXV_H) && !defined (_LINUX_RISCV_SYSDEP_H)
++# error "Never include <bits/hwcap.h> directly; use <sys/auxv.h> instead."
++#endif
++
++/* The following must match the kernel's <asm/hwcap.h>.  */
++#define HWCAP_ISA_I      0x100		//(1 << ('I' - 'A'))
++#define HWCAP_ISA_M      0x1000 	//(1 << ('M' - 'A'))
++#define HWCAP_ISA_A      0x1		//(1 << ('A' - 'A'))
++#define HWCAP_ISA_F      0x20		//(1 << ('F' - 'A'))
++#define HWCAP_ISA_D      0x8		//(1 << ('D' - 'A'))
++#define HWCAP_ISA_C      0x4		//(1 << ('C' - 'A'))
++#define HWCAP_ISA_V      0x200000	//(1 << ('V' - 'A'))
+-- 
+2.33.1
+

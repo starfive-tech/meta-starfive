@@ -1,0 +1,137 @@
+From fac8b2beac5d568ca0ed7f5e04a347befda44f58 Mon Sep 17 00:00:00 2001
+From: Hsiangkai Wang <kai.wang@sifive.com>
+Date: Tue, 18 Jan 2022 12:31:59 +0800
+Subject: [PATCH 11/12] riscv: Resolve symbols directly for symbols with
+ STO_RISCV_VARIANT_CC.
+
+In some cases, we do not want to go through the resolver for function
+calls. For example, functions with vector arguments will use vector
+registers to pass arguments. In the resolver, we do not save/restore the
+vector argument registers for lazy binding efficiency. To avoid ruining
+the vector arguments, functions with vector arguments will not go
+through the resolver.
+
+To achieve the goal, we will annotate the function symbols with
+STO_RISCV_VARIANT_CC flag and add DT_RISCV_VARIANT_CC tag in the dynamic
+section. In the first pass on PLT relocations, we do not set up to call
+_dl_runtime_resolve. Instead, we resolve the functions directly.
+
+Signed-off-by: Hsiangkai Wang <kai.wang@sifive.com>
+Signed-off-by: Vincent Chen <vincent.chen@sifive.com>
+---
+ elf/elf.h                    |  7 +++++++
+ manual/platform.texi         |  6 ++++++
+ sysdeps/riscv/dl-dtprocnum.h | 21 +++++++++++++++++++++
+ sysdeps/riscv/dl-machine.h   | 26 ++++++++++++++++++++++++++
+ 4 files changed, 60 insertions(+)
+ create mode 100644 sysdeps/riscv/dl-dtprocnum.h
+
+diff --git a/elf/elf.h b/elf/elf.h
+index 27f46afa27..cc62deca0d 100644
+--- a/elf/elf.h
++++ b/elf/elf.h
+@@ -3907,6 +3907,13 @@ enum
+ 
+ #define R_TILEGX_NUM		130
+ 
++/* RISC-V specific values for the Dyn d_tag field.  */
++#define DT_RISCV_VARIANT_CC	(DT_LOPROC + 1)
++#define DT_RISCV_NUM		2
++
++/* RISC-V specific values for the st_other field.  */
++#define STO_RISCV_VARIANT_CC 0x80
++
+ /* RISC-V ELF Flags */
+ #define EF_RISCV_RVC 			0x0001
+ #define EF_RISCV_FLOAT_ABI 		0x0006
+diff --git a/manual/platform.texi b/manual/platform.texi
+index d5fdc5bd05..a1a740f381 100644
+--- a/manual/platform.texi
++++ b/manual/platform.texi
+@@ -121,6 +121,12 @@ when it is not allowed, the priority is set to medium.
+ @node RISC-V
+ @appendixsec RISC-V-specific Facilities
+ 
++Functions that are lazily bound must be compatible with the standard calling
++convention. When a function is annotated with STO_RISCV_VARIANT_CC, it means
++this function is not compatible with the standard calling convention. The
++dynamic linker will directly resolve it instead of using the lazy binding
++mechanism.
++
+ Cache management facilities specific to RISC-V systems that implement the Linux
+ ABI are declared in @file{sys/cachectl.h}.
+ 
+diff --git a/sysdeps/riscv/dl-dtprocnum.h b/sysdeps/riscv/dl-dtprocnum.h
+new file mode 100644
+index 0000000000..f189fd700a
+--- /dev/null
++++ b/sysdeps/riscv/dl-dtprocnum.h
+@@ -0,0 +1,21 @@
++/* Configuration of lookup functions.  RISC-V version.
++   Copyright (C) 2019-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Number of extra dynamic section entries for this architecture.  By
++   default there are none.  */
++#define DT_THISPROCNUM	DT_RISCV_NUM
+diff --git a/sysdeps/riscv/dl-machine.h b/sysdeps/riscv/dl-machine.h
+index ce2b3c3875..22e3c81706 100644
+--- a/sysdeps/riscv/dl-machine.h
++++ b/sysdeps/riscv/dl-machine.h
+@@ -53,6 +53,9 @@
+      || (__WORDSIZE == 64 && (type) == R_RISCV_TLS_TPREL64)))	\
+    | (ELF_RTYPE_CLASS_COPY * ((type) == R_RISCV_COPY)))
+ 
++//* Translate a processor specific dynamic tag to the index in l_info array.  */
++#define DT_RISCV(x) (DT_RISCV_##x - DT_LOPROC + DT_NUM)
++
+ /* Return nonzero iff ELF header is compatible with the running host.  */
+ static inline int __attribute_used__
+ elf_machine_matches_host (const ElfW(Ehdr) *ehdr)
+@@ -299,6 +302,29 @@ elf_machine_lazy_rel (struct link_map *map, struct r_scope_elem *scope[],
+   /* Check for unexpected PLT reloc type.  */
+   if (__glibc_likely (r_type == R_RISCV_JUMP_SLOT))
+     {
++      if (__glibc_unlikely (map->l_info[DT_RISCV (VARIANT_CC)] != NULL))
++	{
++          /* Check the symbol table for variant CC symbols.  */
++          const Elf_Symndx symndx = ELFW(R_SYM) (reloc->r_info);
++          const ElfW(Sym) *symtab =
++            (const void *)D_PTR (map, l_info[DT_SYMTAB]);
++          const ElfW(Sym) *sym = &symtab[symndx];
++          if (__glibc_unlikely (sym->st_other & STO_RISCV_VARIANT_CC))
++            {
++              /* Avoid lazy resolution of variant CC symbols.  */
++              const struct r_found_version *version = NULL;
++              if (map->l_info[VERSYMIDX (DT_VERSYM)] != NULL)
++                {
++                  const ElfW(Half) *vernum =
++                    (const void *)D_PTR (map, l_info[VERSYMIDX (DT_VERSYM)]);
++                  version = &map->l_versions[vernum[symndx] & 0x7fff];
++                }
++              elf_machine_rela (map, scope, reloc, sym, version, reloc_addr,
++                                skip_ifunc);
++              return;
++            }
++	}
++
+       if (__glibc_unlikely (map->l_mach.plt == 0))
+ 	{
+ 	  if (l_addr)
+-- 
+2.33.1
+

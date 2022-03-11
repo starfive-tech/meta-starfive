@@ -56,6 +56,19 @@ SRC_URI =  "${GLIBC_GIT_URI};branch=${SRCBRANCH};name=glibc \
            file://0029-wordsize.h-Unify-the-header-between-arm-and-aarch64.patch \
            file://0030-powerpc-Do-not-ask-compiler-for-finding-arch.patch \
            file://0001-fix-create-thread-failed-in-unprivileged-process-BZ-.patch \
+           file://0001-RISC-V-Remove-riscv-specific-sigcontext.h.patch \
+           file://0002-RISC-V-Reserve-about-5K-space-in-mcontext_t-to-suppo.patch \
+           file://0003-RISC-V-Save-and-restore-VCSR-when-doing-user-context.patch \
+           file://0004-RISC-V-Extend-MINSIGSTKSZ-and-SIGSTKSZ-to-backup-RVV.patch \
+           file://0005-RISC-V-Expand-PTHREAD_STACK_MIN-to-support-RVV-envir.patch \
+           file://0006-add-vector-support-for-memset-memcmp-memmove-memcpy-.patch \
+           file://0007-add-NT_RISCV_VECTOR-macro-definition-to-align-with-l.patch \
+           file://0008-fix-the-bcmp-unrecognized-issue.patch \
+           file://0009-Revert-RISC-V-Reserve-about-5K-space-in-mcontext_t-t.patch  \
+           file://0010-Revert-RISC-V-Save-and-restore-VCSR-when-doing-user-.patch  \
+           file://0011-riscv-Resolve-symbols-directly-for-symbols-with-STO_.patch  \
+           file://0012-add-hwcap.h-header-file.patch  \
+           file://0013-change-memcpy_vector-LMUL-to-m8.patch \
            "
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build-${TARGET_SYS}"
