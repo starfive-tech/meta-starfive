@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <manifest>
-  <remote name="openembedded" fetch="git://github.com/openembedded/" />
-  <remote name="riscv" fetch="git://github.com/riscv/" />
+  <remote name="openembedded" fetch="https://github.com/openembedded/" />
+  <remote name="riscv" fetch="https://github.com/riscv/" />
   <default remote="openembedded" revision="master" />
-  <remote name="starfive" fetch="git://github.com/starfive-tech/" />
-  <remote name="kraj" fetch="git://github.com/kraj" />
+  <remote name="starfive" fetch="https://github.com/starfive-tech" />
+  <remote name="kraj" fetch="https://github.com/kraj" />
 
   <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="honister" />
   <project name="openembedded-core" remote="openembedded" path="openembedded-core" revision="honister" />
