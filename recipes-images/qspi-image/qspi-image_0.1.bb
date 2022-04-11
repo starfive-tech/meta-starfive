@@ -2,7 +2,7 @@ SUMMARY = "QSPI Image Creator"
 DESCRIPTION = "Recipe to create a QSPI Image"
 LICENSE = "CLOSED"
 
-inherit image
+inherit core-image
 
 DEPENDS = "opensbi deploy-bootfiles"
 
@@ -16,8 +16,8 @@ do_image[depends] += " opensbi:do_deploy"
 do_image[depends] += " virtual/kernel:do_deploy"
 
 IMAGE_CMD:qspi () {
-	dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=1 seek=0 count=4096
-	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=1 seek=4096 count=32
-	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=1 seek=4128 count=4064
-	dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=1 seek=8192 count=134209536
+	dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=0 count=4096
+	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=4096 count=32
+	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=4128 count=8160
+	dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=12288
 }

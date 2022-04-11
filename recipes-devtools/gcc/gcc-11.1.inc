@@ -109,8 +109,6 @@ SSP ?= "--disable-libssp"
 SSP:mingw32 = "--enable-libssp"
 
 EXTRA_OECONF_BASE = "\
-    ${SSP} \
-    --enable-libitm \
     --enable-lto \
     --disable-bootstrap \
     --with-system-zlib \
