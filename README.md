@@ -25,21 +25,7 @@ $ sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential chrp
 ```
 
 #### Installing Repo
-Next, you will need to install repo from https://source.android.com/setup/develop#installing-repo.
-
-Dependencies of repo include:
-```
-$ sudo apt install curl python python3-distutils
-```
-
-The steps to install repo are as below:
-```
-$ mkdir ~/bin
-$ PATH=~/bin:$PATH
-$ curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-$ chmod a+x ~/bin/repo
-```
-
+Next, you will need to install the [`repo` command from Google](https://source.android.com/setup/develop#installing-repo).
 
 ## Setup
 
@@ -48,7 +34,7 @@ Now, we will be creating a workspace and retrieve the latest layers needed for o
 
 ```
 $ mkdir starfive-yocto && cd starfive-yocto
-$ repo init -u git://github.com/starfive-tech/meta-starfive -b starfive-honister -m tools/manifests/starfive.xml
+$ repo init -u https://github.com/starfive-tech/meta-starfive -b starfive-honister -m tools/manifests/starfive.xml
 $ repo sync
 $ repo start work --all
 ```
