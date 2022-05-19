@@ -1,0 +1,35 @@
+From 89cf714ef1580a32159b4f4df426bafcdc3ef21a Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 6 Mar 2022 15:48:51 -0800
+Subject: [PATCH 15/15] fix incorrect pref address range
+
+---
+ gas/config/tc-riscv.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index fca5c8949d..13524e585d 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -2691,14 +2691,14 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+       case '+':
+ 	      my_getExpression (imm_expr, s);
+ 	      check_absolute_expr (ip, imm_expr, FALSE);
+-	      if ((unsigned long) imm_expr->X_add_number > 0xff)
+-		as_bad (_("Improper pref offset value (%lu)"),
+-			(unsigned long) imm_expr->X_add_number);
++	      if (imm_expr->X_add_number > 127 || imm_expr->X_add_number < -128)
++		as_bad (_("Improper pref offset value (%d)"),
++			(long) imm_expr->X_add_number);
+ 	      INSERT_OPERAND (PREF_OFFSET, *ip, imm_expr->X_add_number);
+ 	      imm_expr->X_op = O_absent;
+ 	      s = expr_end;
+ 	      continue;
+-
++        
+ 	    case 'E': /* Control register.  */
+ 	      insn_with_csr = true;
+ 	      explicit_priv_attr = true;
+-- 
+2.33.1
+

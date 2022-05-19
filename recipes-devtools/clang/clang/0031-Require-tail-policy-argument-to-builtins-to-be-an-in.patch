@@ -1,0 +1,29 @@
+From 9a203536b945cfb07f48512b80cb778534012d64 Mon Sep 17 00:00:00 2001
+From: Craig Topper <craig.topper@sifive.com>
+Date: Mon, 11 Oct 2021 09:43:51 -0700
+Subject: [PATCH 31/40] Require tail policy argument to builtins to be an
+ integer constant expression
+
+The IR intrinsics use ImmArg for the policy operand so this needs to be enforced as a constant in the frontend.
+
+Differential Revision: https://reviews.llvm.org/D110779
+---
+ clang/utils/TableGen/RISCVVEmitter.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/clang/utils/TableGen/RISCVVEmitter.cpp b/clang/utils/TableGen/RISCVVEmitter.cpp
+index 152500610a29..f71df8b3063a 100644
+--- a/clang/utils/TableGen/RISCVVEmitter.cpp
++++ b/clang/utils/TableGen/RISCVVEmitter.cpp
+@@ -1184,7 +1184,7 @@ void RVVEmitter::createRVVIntrinsics(
+     }
+ 
+     if (HasPolicy) {
+-      ProtoMaskSeq.push_back("z");
++      ProtoMaskSeq.push_back("Kz");
+     }
+ 
+     // Create Intrinsics for each type and LMUL.
+-- 
+2.33.1
+

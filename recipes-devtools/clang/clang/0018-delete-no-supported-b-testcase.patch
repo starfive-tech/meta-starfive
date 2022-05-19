@@ -1,0 +1,1565 @@
+From 8d11260995a9814569d9d80b9073a51f99a54267 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Fri, 11 Feb 2022 13:55:07 +0800
+Subject: [PATCH 18/24] delete no supported b testcase
+
+---
+ llvm/test/MC/RISCV/rv32b-aliases-valid.s | 260 ----------------
+ llvm/test/MC/RISCV/rv32zbbp-only-valid.s |  27 --
+ llvm/test/MC/RISCV/rv32zbbp-valid.s      |  60 ----
+ llvm/test/MC/RISCV/rv32zbe-invalid.s     |   8 -
+ llvm/test/MC/RISCV/rv32zbe-valid.s       |  30 --
+ llvm/test/MC/RISCV/rv32zbf-invalid.s     |   5 -
+ llvm/test/MC/RISCV/rv32zbf-valid.s       |  27 --
+ llvm/test/MC/RISCV/rv32zbp-invalid.s     |  51 ---
+ llvm/test/MC/RISCV/rv32zbp-only-valid.s  |  22 --
+ llvm/test/MC/RISCV/rv32zbp-valid.s       |  70 -----
+ llvm/test/MC/RISCV/rv32zbr-invalid.s     |  16 -
+ llvm/test/MC/RISCV/rv32zbr-valid.s       |  32 --
+ llvm/test/MC/RISCV/rv32zbt-invalid.s     |  18 --
+ llvm/test/MC/RISCV/rv32zbt-valid.s       |  39 ---
+ llvm/test/MC/RISCV/rv64b-aliases-valid.s | 378 -----------------------
+ llvm/test/MC/RISCV/rv64zbbp-invalid.s    |  15 -
+ llvm/test/MC/RISCV/rv64zbbp-valid.s      |  39 ---
+ llvm/test/MC/RISCV/rv64zbe-invalid.s     |   6 -
+ llvm/test/MC/RISCV/rv64zbe-valid.s       |  20 --
+ llvm/test/MC/RISCV/rv64zbf-invalid.s     |   4 -
+ llvm/test/MC/RISCV/rv64zbf-valid.s       |  17 -
+ llvm/test/MC/RISCV/rv64zbm-invalid.s     |   8 -
+ llvm/test/MC/RISCV/rv64zbm-valid.s       |  23 --
+ llvm/test/MC/RISCV/rv64zbp-invalid.s     |  22 --
+ llvm/test/MC/RISCV/rv64zbp-valid.s       |  49 ---
+ llvm/test/MC/RISCV/rv64zbr-invalid.s     |   6 -
+ llvm/test/MC/RISCV/rv64zbr-valid.s       |  38 ---
+ llvm/test/MC/RISCV/rv64zbt-invalid.s     |   9 -
+ llvm/test/MC/RISCV/rv64zbt-valid.s       |  23 --
+ 29 files changed, 1322 deletions(-)
+ delete mode 100644 llvm/test/MC/RISCV/rv32b-aliases-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbbp-only-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbbp-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbe-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbe-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbf-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbf-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbp-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbp-only-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbp-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbr-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbr-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbt-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv32zbt-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64b-aliases-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbbp-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbbp-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbe-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbe-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbf-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbf-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbm-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbm-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbp-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbp-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbr-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbr-valid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbt-invalid.s
+ delete mode 100644 llvm/test/MC/RISCV/rv64zbt-valid.s
+
+diff --git a/llvm/test/MC/RISCV/rv32b-aliases-valid.s b/llvm/test/MC/RISCV/rv32b-aliases-valid.s
+deleted file mode 100644
+index a5e4c92ee06b..000000000000
+--- a/llvm/test/MC/RISCV/rv32b-aliases-valid.s
++++ /dev/null
+@@ -1,260 +0,0 @@
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -riscv-no-aliases \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ-NOALIAS %s
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump -d -r -M no-aliases --mattr=+experimental-b - \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ-NOALIAS %s
+-# RUN: llvm-mc -filetype=obj -triple riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump -d -r --mattr=+experimental-b - \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ %s
+-
+-# The following check prefixes are used in this test:
+-# CHECK-S-OBJ            Match both the .s and objdumped object output with
+-#                        aliases enabled
+-# CHECK-S-OBJ-NOALIAS    Match both the .s and objdumped object output with
+-#                        aliases disabled
+-
+-# CHECK-S-OBJ-NOALIAS: andi t0, t1, 255
+-# CHECK-S-OBJ: andi t0, t1, 255
+-zext.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: zext.h t0, t1
+-# CHECK-S-OBJ: zext.h t0, t1
+-zext.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 1
+-# CHECK-S-OBJ: rev.p t0, t1
+-rev.p x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 2
+-# CHECK-S-OBJ: rev2.n t0, t1
+-rev2.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 3
+-# CHECK-S-OBJ: rev.n t0, t1
+-rev.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 4
+-# CHECK-S-OBJ: rev4.b t0, t1
+-rev4.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 6
+-# CHECK-S-OBJ: rev2.b t0, t1
+-rev2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 7
+-# CHECK-S-OBJ: rev.b t0, t1
+-rev.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 8
+-# CHECK-S-OBJ: rev8.h t0, t1
+-rev8.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 12
+-# CHECK-S-OBJ: rev4.h t0, t1
+-rev4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 14
+-# CHECK-S-OBJ: rev2.h t0, t1
+-rev2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 15
+-# CHECK-S-OBJ: rev.h t0, t1
+-rev.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 16
+-# CHECK-S-OBJ: rev16 t0, t1
+-rev16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: rev8 t0, t1
+-# CHECK-S-OBJ: rev8 t0, t1
+-rev8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 28
+-# CHECK-S-OBJ: rev4 t0, t1
+-rev4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 30
+-# CHECK-S-OBJ: rev2 t0, t1
+-rev2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 31
+-# CHECK-S-OBJ: rev t0, t1
+-rev x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 1
+-# CHECK-S-OBJ: zip.n t0, t1
+-zip.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 1
+-# CHECK-S-OBJ: unzip.n t0, t1
+-unzip.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 2
+-# CHECK-S-OBJ: zip2.b t0, t1
+-zip2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 2
+-# CHECK-S-OBJ: unzip2.b t0, t1
+-unzip2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 3
+-# CHECK-S-OBJ: zip.b t0, t1
+-zip.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 3
+-# CHECK-S-OBJ: unzip.b t0, t1
+-unzip.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 4
+-# CHECK-S-OBJ: zip4.h t0, t1
+-zip4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 4
+-# CHECK-S-OBJ: unzip4.h t0, t1
+-unzip4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 6
+-# CHECK-S-OBJ: zip2.h t0, t1
+-zip2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 6
+-# CHECK-S-OBJ: unzip2.h t0, t1
+-unzip2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 7
+-# CHECK-S-OBJ: zip.h t0, t1
+-zip.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 7
+-# CHECK-S-OBJ: unzip.h t0, t1
+-unzip.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 8
+-# CHECK-S-OBJ: zip8 t0, t1
+-zip8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 8
+-# CHECK-S-OBJ: unzip8 t0, t1
+-unzip8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 12
+-# CHECK-S-OBJ: zip4 t0, t1
+-zip4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 12
+-# CHECK-S-OBJ: unzip4 t0, t1
+-unzip4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 14
+-# CHECK-S-OBJ: zip2 t0, t1
+-zip2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 14
+-# CHECK-S-OBJ: unzip2 t0, t1
+-unzip2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 15
+-# CHECK-S-OBJ: zip t0, t1
+-zip x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 15
+-# CHECK-S-OBJ: unzip t0, t1
+-unzip x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 1
+-# CHECK-S-OBJ: orc.p t0, t1
+-orc.p x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 2
+-# CHECK-S-OBJ: orc2.n t0, t1
+-orc2.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 3
+-# CHECK-S-OBJ: orc.n t0, t1
+-orc.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 4
+-# CHECK-S-OBJ: orc4.b t0, t1
+-orc4.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 6
+-# CHECK-S-OBJ: orc2.b t0, t1
+-orc2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: orc.b t0, t1
+-# CHECK-S-OBJ: orc.b t0, t1
+-orc.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 8
+-# CHECK-S-OBJ: orc8.h t0, t1
+-orc8.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 12
+-# CHECK-S-OBJ: orc4.h t0, t1
+-orc4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 14
+-# CHECK-S-OBJ: orc2.h t0, t1
+-orc2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 15
+-# CHECK-S-OBJ: orc.h t0, t1
+-orc.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 16
+-# CHECK-S-OBJ: orc16 t0, t1
+-orc16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 24
+-# CHECK-S-OBJ: orc8 t0, t1
+-orc8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 28
+-# CHECK-S-OBJ: orc4 t0, t1
+-orc4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 30
+-# CHECK-S-OBJ: orc2 t0, t1
+-orc2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 31
+-# CHECK-S-OBJ: orc t0, t1
+-orc x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: rori t0, t1, 8
+-# CHECK-S-OBJ: rori t0, t1, 8
+-ror x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bseti t0, t1, 8
+-# CHECK-S-OBJ: bseti t0, t1, 8
+-bset x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bclri t0, t1, 8
+-# CHECK-S-OBJ: bclri t0, t1, 8
+-bclr x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: binvi t0, t1, 8
+-# CHECK-S-OBJ: binvi t0, t1, 8
+-binv x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bexti t0, t1, 8
+-# CHECK-S-OBJ: bexti t0, t1, 8
+-bext x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 13
+-# CHECK-S-OBJ: grevi t0, t1, 13
+-grev x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 13
+-# CHECK-S-OBJ: gorci t0, t1, 13
+-gorc x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 13
+-# CHECK-S-OBJ: shfli t0, t1, 13
+-shfl x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 13
+-# CHECK-S-OBJ: unshfli t0, t1, 13
+-unshfl x5, x6, 13
+diff --git a/llvm/test/MC/RISCV/rv32zbbp-only-valid.s b/llvm/test/MC/RISCV/rv32zbbp-only-valid.s
+deleted file mode 100644
+index 68f8337b2196..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbbp-only-valid.s
++++ /dev/null
+@@ -1,27 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip base extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbb -riscv-no-aliases -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbb < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbb -M no-aliases -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: zext.h t0, t1
+-# CHECK-ASM: encoding: [0xb3,0x42,0x03,0x08]
+-zext.h t0, t1
+-# CHECK-ASM-AND-OBJ: rev8 t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x83,0x69]
+-rev8 t0, t1
+diff --git a/llvm/test/MC/RISCV/rv32zbbp-valid.s b/llvm/test/MC/RISCV/rv32zbbp-valid.s
+deleted file mode 100644
+index f2ff7e452b60..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbbp-valid.s
++++ /dev/null
+@@ -1,60 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip base extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbb -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbb -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbb < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbb -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbb < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbb -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: andn t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x72,0x73,0x40]
+-andn t0, t1, t2
+-# CHECK-ASM-AND-OBJ: orn t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x62,0x73,0x40]
+-orn t0, t1, t2
+-# CHECK-ASM-AND-OBJ: xnor t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x42,0x73,0x40]
+-xnor t0, t1, t2
+-# CHECK-ASM-AND-OBJ: rol t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x12,0x73,0x60]
+-rol t0, t1, t2
+-# CHECK-ASM-AND-OBJ: ror t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x52,0x73,0x60]
+-ror t0, t1, t2
+-# CHECK-ASM-AND-OBJ: rori t0, t1, 31
+-# CHECK-ASM: encoding: [0x93,0x52,0xf3,0x61]
+-rori t0, t1, 31
+-# CHECK-ASM-AND-OBJ: rori t0, t1, 0
+-# CHECK-ASM: encoding: [0x93,0x52,0x03,0x60]
+-rori t0, t1, 0
+-# CHECK-ASM-AND-OBJ: orc.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x73,0x28]
+-orc.b t0, t1
+diff --git a/llvm/test/MC/RISCV/rv32zbe-invalid.s b/llvm/test/MC/RISCV/rv32zbe-invalid.s
+deleted file mode 100644
+index 4d4124778f13..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbe-invalid.s
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# RUN: not llvm-mc -triple riscv32 -mattr=+experimental-b,experimental-zbe < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-bdecompress t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-bcompress t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-bdecompressw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-bcompressw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+diff --git a/llvm/test/MC/RISCV/rv32zbe-valid.s b/llvm/test/MC/RISCV/rv32zbe-valid.s
+deleted file mode 100644
+index ad6ddf0a4548..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbe-valid.s
++++ /dev/null
+@@ -1,30 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip extract/deposit extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbe -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbe -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbe < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbe -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbe < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbe -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: bdecompress t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x62,0x73,0x48]
+-bdecompress t0, t1, t2
+-# CHECK-ASM-AND-OBJ: bcompress t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x62,0x73,0x08]
+-bcompress t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv32zbf-invalid.s b/llvm/test/MC/RISCV/rv32zbf-invalid.s
+deleted file mode 100644
+index c701e2559869..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbf-invalid.s
++++ /dev/null
+@@ -1,5 +0,0 @@
+-# RUN: not llvm-mc -triple riscv32 -mattr=+experimental-b,experimental-zbf < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-bfp t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-bfpw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+diff --git a/llvm/test/MC/RISCV/rv32zbf-valid.s b/llvm/test/MC/RISCV/rv32zbf-valid.s
+deleted file mode 100644
+index 6d181be25c80..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbf-valid.s
++++ /dev/null
+@@ -1,27 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bit-Field extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbf -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbf -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbf < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbf -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbf < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbf -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: bfp t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x72,0x73,0x48]
+-bfp t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv32zbp-invalid.s b/llvm/test/MC/RISCV/rv32zbp-invalid.s
+deleted file mode 100644
+index 11e7e8338377..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbp-invalid.s
++++ /dev/null
+@@ -1,51 +0,0 @@
+-# RUN: not llvm-mc -triple riscv32 -mattr=+experimental-b,experimental-zbp < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-gorc t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-grev t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-gorci t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-gorci t0, t1, 32 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-gorci t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-# Too few operands
+-grevi t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-grevi t0, t1, 32 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-grevi t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-# Too few operands
+-shfl t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-unshfl t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-shfli t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-shfli t0, t1, 16 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 15]
+-shfli t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 15]
+-# Too few operands
+-unshfli t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-unshfli t0, t1, 16 # CHECK: :[[@LINE]]:17: error: immediate must be an integer in the range [0, 15]
+-unshfli t0, t1, -1 # CHECK: :[[@LINE]]:17: error: immediate must be an integer in the range [0, 15]
+-# Too few operands
+-pack t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-packu t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-packh t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-xperm.n t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-xperm.b t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-xperm.h t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-gorcw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-grevw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-gorciw t0, t1, 0 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-greviw t0, t1, 0 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-shflw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-unshflw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-packw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-packuw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-xperm.w t0, t1, t2 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+diff --git a/llvm/test/MC/RISCV/rv32zbp-only-valid.s b/llvm/test/MC/RISCV/rv32zbp-only-valid.s
+deleted file mode 100644
+index d2f11872172b..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbp-only-valid.s
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefix=CHECK-ASM %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefix=CHECK-ASM %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-OBJ %s
+-
+-# CHECK-ASM: pack t0, t1, zero
+-# CHECK-OBJ: zext.h t0, t1
+-# CHECK-ASM: encoding: [0xb3,0x42,0x03,0x08]
+-pack t0, t1, x0
+-# CHECK-ASM: grevi t0, t1, 24
+-# CHECK-OBJ: rev8 t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x83,0x69]
+-grevi t0, t1, 24
+diff --git a/llvm/test/MC/RISCV/rv32zbp-valid.s b/llvm/test/MC/RISCV/rv32zbp-valid.s
+deleted file mode 100644
+index 0d7fc033c6a8..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbp-valid.s
++++ /dev/null
+@@ -1,70 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: gorc t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x52,0x73,0x28]
+-gorc t0, t1, t2
+-# CHECK-ASM-AND-OBJ: grev t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x52,0x73,0x68]
+-grev t0, t1, t2
+-# CHECK-ASM-AND-OBJ: gorci t0, t1, 0
+-# CHECK-ASM: encoding: [0x93,0x52,0x03,0x28]
+-gorci t0, t1, 0
+-# CHECK-ASM-AND-OBJ: grevi t0, t1, 0
+-# CHECK-ASM: encoding: [0x93,0x52,0x03,0x68]
+-grevi t0, t1, 0
+-# CHECK-ASM-AND-OBJ: shfl t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x12,0x73,0x08]
+-shfl t0, t1, t2
+-# CHECK-ASM-AND-OBJ: unshfl t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x52,0x73,0x08]
+-unshfl t0, t1, t2
+-# CHECK-ASM-AND-OBJ: shfli t0, t1, 0
+-# CHECK-ASM: encoding: [0x93,0x12,0x03,0x08]
+-shfli t0, t1, 0
+-# CHECK-ASM-AND-OBJ: unshfli t0, t1, 0
+-# CHECK-ASM: encoding: [0x93,0x52,0x03,0x08]
+-unshfli t0, t1, 0
+-# CHECK-ASM-AND-OBJ: pack t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x42,0x73,0x08]
+-pack t0, t1, t2
+-# CHECK-ASM-AND-OBJ: packu t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x42,0x73,0x48]
+-packu t0, t1, t2
+-# CHECK-ASM-AND-OBJ: packh t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x72,0x73,0x08]
+-packh t0, t1, t2
+-# CHECK-ASM: gorci t0, t1, 7
+-# CHECK-OBJ: orc.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x73,0x28]
+-gorci t0, t1, 7
+-# CHECK-ASM-AND-OBJ: xperm.n t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x22,0x73,0x28]
+-xperm.n t0, t1, t2
+-# CHECK-ASM-AND-OBJ: xperm.b t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x42,0x73,0x28]
+-xperm.b t0, t1, t2
+-# CHECK-ASM-AND-OBJ: xperm.h t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x62,0x73,0x28
+-xperm.h t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv32zbr-invalid.s b/llvm/test/MC/RISCV/rv32zbr-invalid.s
+deleted file mode 100644
+index 9a6a6b5fbf40..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbr-invalid.s
++++ /dev/null
+@@ -1,16 +0,0 @@
+-# RUN: not llvm-mc -triple riscv32 -mattr=+experimental-b,experimental-zbr < %s 2>&1 | FileCheck %s
+-
+-# Too many operands
+-crc32.b	t0, t1, t2 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
+-# Too many operands
+-crc32.h	t0, t1, t2 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
+-# Too many operands
+-crc32.w	t0, t1, t2 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
+-# Too many operands
+-crc32c.b t0, t1, t2 # CHECK: :[[@LINE]]:18: error: invalid operand for instruction
+-# Too many operands
+-crc32c.h t0, t1, t2 # CHECK: :[[@LINE]]:18: error: invalid operand for instruction
+-# Too many operands
+-crc32c.w t0, t1, t2 # CHECK: :[[@LINE]]:18: error: invalid operand for instruction
+-crc32.d t0, t1 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-crc32c.d t0, t1 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+diff --git a/llvm/test/MC/RISCV/rv32zbr-valid.s b/llvm/test/MC/RISCV/rv32zbr-valid.s
+deleted file mode 100644
+index cb45af84b5ad..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbr-valid.s
++++ /dev/null
+@@ -1,32 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip CRC extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbr -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbr < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbr -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: crc32.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x03,0x61]
+-crc32.b	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32.h t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x13,0x61]
+-crc32.h	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32.w t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x23,0x61]
+-crc32.w	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x83,0x61]
+-crc32c.b t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.h t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x93,0x61]
+-crc32c.h t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.w t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0xa3,0x61]
+-crc32c.w t0, t1
+diff --git a/llvm/test/MC/RISCV/rv32zbt-invalid.s b/llvm/test/MC/RISCV/rv32zbt-invalid.s
+deleted file mode 100644
+index 2d81463572f7..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbt-invalid.s
++++ /dev/null
+@@ -1,18 +0,0 @@
+-# RUN: not llvm-mc -triple riscv32 -mattr=+experimental-b,experimental-zbt < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-cmix t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-cmov t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-fsl t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-fsr t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-fsri t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-fsri t0, t1, t2, 32 # CHECK: :[[@LINE]]:18: error: immediate must be an integer in the range [0, 31]
+-fsri t0, t1, t2, -1 # CHECK: :[[@LINE]]:18: error: immediate must be an integer in the range [0, 31]
+-fslw t0, t1, t2, t3 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-fsrw t0, t1, t2, t3 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+-fsriw t0, t1, t2, 0 # CHECK: :[[@LINE]]:1: error: instruction requires the following: RV64I Base Instruction Set
+diff --git a/llvm/test/MC/RISCV/rv32zbt-valid.s b/llvm/test/MC/RISCV/rv32zbt-valid.s
+deleted file mode 100644
+index 7a039bc05185..000000000000
+--- a/llvm/test/MC/RISCV/rv32zbt-valid.s
++++ /dev/null
+@@ -1,39 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip ternary extension:
+-# RUN: llvm-mc %s -triple=riscv32 -mattr=+experimental-zbt -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbt -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv32 -mattr=+experimental-zbt < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbt -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbt < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbt -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: cmix t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xb3,0x92,0x63,0xe6]
+-cmix t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: cmov t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xb3,0xd2,0x63,0xe6]
+-cmov t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: fsl t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xb3,0x12,0xc3,0x3d]
+-fsl t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: fsr t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xb3,0x52,0xc3,0x3d]
+-fsr t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: fsri t0, t1, t2, 0
+-# CHECK-ASM: encoding: [0x93,0x52,0x03,0x3c]
+-fsri t0, t1, t2, 0
+diff --git a/llvm/test/MC/RISCV/rv64b-aliases-valid.s b/llvm/test/MC/RISCV/rv64b-aliases-valid.s
+deleted file mode 100644
+index 97585d32079c..000000000000
+--- a/llvm/test/MC/RISCV/rv64b-aliases-valid.s
++++ /dev/null
+@@ -1,378 +0,0 @@
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -riscv-no-aliases \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ-NOALIAS %s
+-# RUN: llvm-mc %s  -triple=riscv64 -mattr=+experimental-b \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump -d -r -M no-aliases --mattr=+experimental-b - \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ-NOALIAS %s
+-# RUN: llvm-mc -filetype=obj -triple riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump -d -r --mattr=+experimental-b - \
+-# RUN:     | FileCheck -check-prefixes=CHECK-S-OBJ %s
+-
+-# The following check prefixes are used in this test:
+-# CHECK-S-OBJ            Match both the .s and objdumped object output with
+-#                        aliases enabled
+-# CHECK-S-OBJ-NOALIAS    Match both the .s and objdumped object output with
+-#                        aliases disabled
+-
+-# CHECK-S-OBJ-NOALIAS: andi t0, t1, 255
+-# CHECK-S-OBJ: andi t0, t1, 255
+-zext.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: zext.h t0, t1
+-# CHECK-S-OBJ: zext.h t0, t1
+-zext.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: add.uw t0, t1, zero
+-# CHECK-S-OBJ: zext.w t0, t1
+-zext.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 1
+-# CHECK-S-OBJ: rev.p t0, t1
+-rev.p x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 2
+-# CHECK-S-OBJ: rev2.n t0, t1
+-rev2.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 3
+-# CHECK-S-OBJ: rev.n t0, t1
+-rev.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 4
+-# CHECK-S-OBJ: rev4.b t0, t1
+-rev4.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 6
+-# CHECK-S-OBJ: rev2.b t0, t1
+-rev2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 7
+-# CHECK-S-OBJ: rev.b t0, t1
+-rev.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 8
+-# CHECK-S-OBJ: rev8.h t0, t1
+-rev8.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 12
+-# CHECK-S-OBJ: rev4.h t0, t1
+-rev4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 14
+-# CHECK-S-OBJ: rev2.h t0, t1
+-rev2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 15
+-# CHECK-S-OBJ: rev.h t0, t1
+-rev.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 16
+-# CHECK-S-OBJ: rev16.w t0, t1
+-rev16.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 24
+-# CHECK-S-OBJ: rev8.w t0, t1
+-rev8.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 28
+-# CHECK-S-OBJ: rev4.w t0, t1
+-rev4.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 30
+-# CHECK-S-OBJ: rev2.w t0, t1
+-rev2.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 31
+-# CHECK-S-OBJ: rev.w t0, t1
+-rev.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 32
+-# CHECK-S-OBJ: rev32 t0, t1
+-rev32 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 48
+-# CHECK-S-OBJ: rev16 t0, t1
+-rev16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: rev8 t0, t1
+-# CHECK-S-OBJ: rev8 t0, t1
+-rev8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 60
+-# CHECK-S-OBJ: rev4 t0, t1
+-rev4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 62
+-# CHECK-S-OBJ: rev2 t0, t1
+-rev2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 63
+-# CHECK-S-OBJ: rev t0, t1
+-rev x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 1
+-# CHECK-S-OBJ: zip.n t0, t1
+-zip.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 1
+-# CHECK-S-OBJ: unzip.n t0, t1
+-unzip.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 2
+-# CHECK-S-OBJ: zip2.b t0, t1
+-zip2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 2
+-# CHECK-S-OBJ: unzip2.b t0, t1
+-unzip2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 3
+-# CHECK-S-OBJ: zip.b t0, t1
+-zip.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 3
+-# CHECK-S-OBJ: unzip.b t0, t1
+-unzip.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 4
+-# CHECK-S-OBJ: zip4.h t0, t1
+-zip4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 4
+-# CHECK-S-OBJ: unzip4.h t0, t1
+-unzip4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 6
+-# CHECK-S-OBJ: zip2.h t0, t1
+-zip2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 6
+-# CHECK-S-OBJ: unzip2.h t0, t1
+-unzip2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 7
+-# CHECK-S-OBJ: zip.h t0, t1
+-zip.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 7
+-# CHECK-S-OBJ: unzip.h t0, t1
+-unzip.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 8
+-# CHECK-S-OBJ: zip8.w t0, t1
+-zip8.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 8
+-# CHECK-S-OBJ: unzip8.w t0, t1
+-unzip8.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 12
+-# CHECK-S-OBJ: zip4.w t0, t1
+-zip4.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 12
+-# CHECK-S-OBJ: unzip4.w t0, t1
+-unzip4.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 14
+-# CHECK-S-OBJ: zip2.w t0, t1
+-zip2.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 14
+-# CHECK-S-OBJ: unzip2.w t0, t1
+-unzip2.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 15
+-# CHECK-S-OBJ: zip.w t0, t1
+-zip.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 15
+-# CHECK-S-OBJ: unzip.w t0, t1
+-unzip.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 16
+-# CHECK-S-OBJ: zip16 t0, t1
+-zip16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 16
+-# CHECK-S-OBJ: unzip16 t0, t1
+-unzip16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 24
+-# CHECK-S-OBJ: zip8 t0, t1
+-zip8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 24
+-# CHECK-S-OBJ: unzip8 t0, t1
+-unzip8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 28
+-# CHECK-S-OBJ: zip4 t0, t1
+-zip4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 28
+-# CHECK-S-OBJ: unzip4 t0, t1
+-unzip4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 30
+-# CHECK-S-OBJ: zip2 t0, t1
+-zip2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 30
+-# CHECK-S-OBJ: unzip2 t0, t1
+-unzip2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 31
+-# CHECK-S-OBJ: zip t0, t1
+-zip x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 31
+-# CHECK-S-OBJ: unzip t0, t1
+-unzip x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 1
+-# CHECK-S-OBJ: orc.p t0, t1
+-orc.p x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 2
+-# CHECK-S-OBJ: orc2.n t0, t1
+-orc2.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 3
+-# CHECK-S-OBJ: orc.n t0, t1
+-orc.n x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 4
+-# CHECK-S-OBJ: orc4.b t0, t1
+-orc4.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 6
+-# CHECK-S-OBJ: orc2.b t0, t1
+-orc2.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: orc.b t0, t1
+-# CHECK-S-OBJ: orc.b t0, t1
+-orc.b x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 8
+-# CHECK-S-OBJ: orc8.h t0, t1
+-orc8.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 12
+-# CHECK-S-OBJ: orc4.h t0, t1
+-orc4.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 14
+-# CHECK-S-OBJ: orc2.h t0, t1
+-orc2.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 15
+-# CHECK-S-OBJ: orc.h t0, t1
+-orc.h x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 16
+-# CHECK-S-OBJ: orc16.w t0, t1
+-orc16.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 24
+-# CHECK-S-OBJ: orc8.w t0, t1
+-orc8.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 28
+-# CHECK-S-OBJ: orc4.w t0, t1
+-orc4.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 30
+-# CHECK-S-OBJ: orc2.w t0, t1
+-orc2.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 31
+-# CHECK-S-OBJ: orc.w t0, t1
+-orc.w x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 32
+-# CHECK-S-OBJ: orc32 t0, t1
+-orc32 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 48
+-# CHECK-S-OBJ: orc16 t0, t1
+-orc16 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 56
+-# CHECK-S-OBJ: orc8 t0, t1
+-orc8 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 60
+-# CHECK-S-OBJ: orc4 t0, t1
+-orc4 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 62
+-# CHECK-S-OBJ: orc2 t0, t1
+-orc2 x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 63
+-# CHECK-S-OBJ: orc t0, t1
+-orc x5, x6
+-
+-# CHECK-S-OBJ-NOALIAS: rori t0, t1, 8
+-# CHECK-S-OBJ: rori t0, t1, 8
+-ror x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: roriw t0, t1, 8
+-# CHECK-S-OBJ: roriw t0, t1, 8
+-rorw x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bseti t0, t1, 8
+-# CHECK-S-OBJ: bseti t0, t1, 8
+-bset x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bclri t0, t1, 8
+-# CHECK-S-OBJ: bclri t0, t1, 8
+-bclr x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: binvi t0, t1, 8
+-# CHECK-S-OBJ: binvi t0, t1, 8
+-binv x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: bexti t0, t1, 8
+-# CHECK-S-OBJ: bexti t0, t1, 8
+-bext x5, x6, 8
+-
+-# CHECK-S-OBJ-NOALIAS: grevi t0, t1, 13
+-# CHECK-S-OBJ: grevi t0, t1, 13
+-grev x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: gorci t0, t1, 13
+-# CHECK-S-OBJ: gorci t0, t1, 13
+-gorc x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: shfli t0, t1, 13
+-# CHECK-S-OBJ: shfli t0, t1, 13
+-shfl x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: unshfli t0, t1, 13
+-# CHECK-S-OBJ: unshfli t0, t1, 13
+-unshfl x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: greviw t0, t1, 13
+-# CHECK-S-OBJ: greviw t0, t1, 13
+-grevw x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: gorciw t0, t1, 13
+-# CHECK-S-OBJ: gorciw t0, t1, 13
+-gorcw x5, x6, 13
+-
+-# CHECK-S-OBJ-NOALIAS: addi t1, zero, -2
+-# CHECK-S-OBJ-NOALIAS-NEXT: add.uw t1, t1, zero
+-# CHECK-S-OBJ: addi t1, zero, -2
+-# CHECK-S-OBJ-NEXT: zext.w t1, t1
+-li x6, 0xfffffffe
+-
+-# CHECK-S-OBJ-NOALIAS: lui t2, 699051
+-# CHECK-S-OBJ-NOALIAS-NEXT: addiw t2, t2, -1366
+-# CHECK-S-OBJ-NOALIAS-NEXT: add.uw t2, t2, zero
+-# CHECK-S-OBJ: lui t2, 699051
+-# CHECK-S-OBJ-NEXT: addiw t2, t2, -1366
+-# CHECK-S-OBJ-NEXT: zext.w t2, t2
+-li x7, 0xaaaaaaaa
+diff --git a/llvm/test/MC/RISCV/rv64zbbp-invalid.s b/llvm/test/MC/RISCV/rv64zbbp-invalid.s
+deleted file mode 100644
+index 78d827a1856c..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbbp-invalid.s
++++ /dev/null
+@@ -1,15 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbb,experimental-zbp < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-rolw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-rorw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-roriw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-roriw t0, t1, 32 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-roriw t0, t1, -1 # CHECK: :[[@LINE]]:15: error: immediate must be an integer in the range [0, 31]
+-# Too few operands
+-packw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-packuw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbbp-valid.s b/llvm/test/MC/RISCV/rv64zbbp-valid.s
+deleted file mode 100644
+index 969806828c1b..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbbp-valid.s
++++ /dev/null
+@@ -1,39 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip base extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbb -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbb < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbb -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: rolw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x12,0x73,0x60]
+-rolw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: rorw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x52,0x73,0x60]
+-rorw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: roriw t0, t1, 31
+-# CHECK-ASM: encoding: [0x9b,0x52,0xf3,0x61]
+-roriw t0, t1, 31
+-# CHECK-ASM-AND-OBJ: roriw t0, t1, 0
+-# CHECK-ASM: encoding: [0x9b,0x52,0x03,0x60]
+-roriw t0, t1, 0
+-# CHECK-ASM-AND-OBJ: zext.h t0, t1
+-# CHECK-ASM: encoding: [0xbb,0x42,0x03,0x08]
+-zext.h t0, t1
+-# CHECK-ASM-AND-OBJ: rev8 t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x83,0x6b]
+-rev8 t0, t1
+diff --git a/llvm/test/MC/RISCV/rv64zbe-invalid.s b/llvm/test/MC/RISCV/rv64zbe-invalid.s
+deleted file mode 100644
+index 00c9001f39d9..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbe-invalid.s
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbe < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-bdecompressw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-bcompressw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbe-valid.s b/llvm/test/MC/RISCV/rv64zbe-valid.s
+deleted file mode 100644
+index 6ebba3ea3990..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbe-valid.s
++++ /dev/null
+@@ -1,20 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip extract/deposit extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbe -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbe < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbe -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: bdecompressw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x62,0x73,0x48]
+-bdecompressw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: bcompressw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x62,0x73,0x08]
+-bcompressw t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv64zbf-invalid.s b/llvm/test/MC/RISCV/rv64zbf-invalid.s
+deleted file mode 100644
+index 0eb91cf0c0a9..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbf-invalid.s
++++ /dev/null
+@@ -1,4 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbf < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-bfpw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbf-valid.s b/llvm/test/MC/RISCV/rv64zbf-valid.s
+deleted file mode 100644
+index 1a2a41a33d05..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbf-valid.s
++++ /dev/null
+@@ -1,17 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bit-Field extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbf -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbf < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbf -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: bfpw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x72,0x73,0x48]
+-bfpw t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv64zbm-invalid.s b/llvm/test/MC/RISCV/rv64zbm-invalid.s
+deleted file mode 100644
+index 2a750074896c..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbm-invalid.s
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbm < %s 2>&1 | FileCheck %s
+-
+-# Too many operands
+-bmatflip t0, t1, t2 # CHECK: :[[@LINE]]:18: error: invalid operand for instruction
+-# Too few operands
+-bmator t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-bmatxor t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbm-valid.s b/llvm/test/MC/RISCV/rv64zbm-valid.s
+deleted file mode 100644
+index c1d1410651c7..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbm-valid.s
++++ /dev/null
+@@ -1,23 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip matix extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbm -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbm < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbm -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: bmatflip t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x33,0x60]
+-bmatflip t0, t1
+-# CHECK-ASM-AND-OBJ: bmator t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x32,0x73,0x08]
+-bmator t0, t1, t2
+-# CHECK-ASM-AND-OBJ: bmatxor t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x32,0x73,0x48]
+-bmatxor t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv64zbp-invalid.s b/llvm/test/MC/RISCV/rv64zbp-invalid.s
+deleted file mode 100644
+index d5b37b2f8dab..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbp-invalid.s
++++ /dev/null
+@@ -1,22 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbp < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-gorcw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-grevw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-gorciw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-gorciw t0, t1, 32 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+-gorciw t0, t1, -1 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+-# Too few operands
+-greviw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-greviw t0, t1, 32 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+-greviw t0, t1, -1 # CHECK: :[[@LINE]]:16: error: immediate must be an integer in the range [0, 31]
+-# Too few operands
+-shflw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-unshflw t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-xperm.w t0, t1 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbp-valid.s b/llvm/test/MC/RISCV/rv64zbp-valid.s
+deleted file mode 100644
+index 6647927c7150..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbp-valid.s
++++ /dev/null
+@@ -1,49 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip permutation extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbp -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbp < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbp -d -r - \
+-# RUN:     | FileCheck --check-prefixes=CHECK-OBJ,CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: gorcw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x52,0x73,0x28]
+-gorcw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: grevw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x52,0x73,0x68]
+-grevw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: gorciw t0, t1, 0
+-# CHECK-ASM: encoding: [0x9b,0x52,0x03,0x28]
+-gorciw t0, t1, 0
+-# CHECK-ASM-AND-OBJ: greviw t0, t1, 0
+-# CHECK-ASM: encoding: [0x9b,0x52,0x03,0x68]
+-greviw t0, t1, 0
+-# CHECK-ASM-AND-OBJ: shflw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x12,0x73,0x08]
+-shflw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: unshflw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x52,0x73,0x08]
+-unshflw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: packw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x42,0x73,0x08]
+-packw t0, t1, t2
+-# CHECK-ASM-AND-OBJ: packuw t0, t1, t2
+-# CHECK-ASM: encoding: [0xbb,0x42,0x73,0x48]
+-packuw t0, t1, t2
+-# CHECK-ASM: packw t0, t1, zero
+-# CHECK-OBJ: zext.h t0, t1
+-# CHECK-ASM: encoding: [0xbb,0x42,0x03,0x08]
+-packw t0, t1, x0
+-# CHECK-ASM: grevi t0, t1, 56
+-# CHECK-OBJ: rev8 t0, t1
+-# CHECK-ASM: encoding: [0x93,0x52,0x83,0x6b]
+-grevi t0, t1, 56
+-# CHECK-ASM-AND-OBJ: xperm.w t0, t1, t2
+-# CHECK-ASM: encoding: [0xb3,0x02,0x73,0x28]
+-xperm.w t0, t1, t2
+diff --git a/llvm/test/MC/RISCV/rv64zbr-invalid.s b/llvm/test/MC/RISCV/rv64zbr-invalid.s
+deleted file mode 100644
+index a5e6897c2530..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbr-invalid.s
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbr < %s 2>&1 | FileCheck %s
+-
+-# Too many operands
+-crc32.d t0, t1, t2 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
+-# Too many operands
+-crc32c.d t0, t1, t2 # CHECK: :[[@LINE]]:18: error: invalid operand for instruction
+diff --git a/llvm/test/MC/RISCV/rv64zbr-valid.s b/llvm/test/MC/RISCV/rv64zbr-valid.s
+deleted file mode 100644
+index f1ff120c9d83..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbr-valid.s
++++ /dev/null
+@@ -1,38 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip CRC extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbr -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbr < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbr -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: crc32.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x03,0x61]
+-crc32.b	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32.h t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x13,0x61]
+-crc32.h	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32.w t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x23,0x61]
+-crc32.w	t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.b t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x83,0x61]
+-crc32c.b t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.h t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x93,0x61]
+-crc32c.h t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.w t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0xa3,0x61]
+-crc32c.w t0, t1
+-# CHECK-ASM-AND-OBJ: crc32.d t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0x33,0x61]
+-crc32.d t0, t1
+-# CHECK-ASM-AND-OBJ: crc32c.d t0, t1
+-# CHECK-ASM: encoding: [0x93,0x12,0xb3,0x61]
+-crc32c.d t0, t1
+diff --git a/llvm/test/MC/RISCV/rv64zbt-invalid.s b/llvm/test/MC/RISCV/rv64zbt-invalid.s
+deleted file mode 100644
+index 57f36b9af30c..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbt-invalid.s
++++ /dev/null
+@@ -1,9 +0,0 @@
+-# RUN: not llvm-mc -triple riscv64 -mattr=+experimental-b,experimental-zbt < %s 2>&1 | FileCheck %s
+-
+-# Too few operands
+-fslw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Too few operands
+-fsrw t0, t1, t2 # CHECK: :[[@LINE]]:1: error: too few operands for instruction
+-# Immediate operand out of range
+-fsriw t0, t1, t2, 32 # CHECK: :[[@LINE]]:19: error: immediate must be an integer in the range [0, 31]
+-fsriw t0, t1, t2, -1 # CHECK: :[[@LINE]]:19: error: immediate must be an integer in the range [0, 31]
+diff --git a/llvm/test/MC/RISCV/rv64zbt-valid.s b/llvm/test/MC/RISCV/rv64zbt-valid.s
+deleted file mode 100644
+index 7db0c8d3dbb9..000000000000
+--- a/llvm/test/MC/RISCV/rv64zbt-valid.s
++++ /dev/null
+@@ -1,23 +0,0 @@
+-# With B extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-b -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-b < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-b -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# With Bitmanip ternary extension:
+-# RUN: llvm-mc %s -triple=riscv64 -mattr=+experimental-zbt -show-encoding \
+-# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
+-# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+experimental-zbt < %s \
+-# RUN:     | llvm-objdump --mattr=+experimental-zbt -d -r - \
+-# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
+-
+-# CHECK-ASM-AND-OBJ: fslw t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xbb,0x12,0xc3,0x3d]
+-fslw t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: fsrw t0, t1, t2, t3
+-# CHECK-ASM: encoding: [0xbb,0x52,0xc3,0x3d]
+-fsrw t0, t1, t2, t3
+-# CHECK-ASM-AND-OBJ: fsriw t0, t1, t2, 0
+-# CHECK-ASM: encoding: [0x9b,0x52,0x03,0x3c]
+-fsriw t0, t1, t2, 0
+-- 
+2.33.1
+

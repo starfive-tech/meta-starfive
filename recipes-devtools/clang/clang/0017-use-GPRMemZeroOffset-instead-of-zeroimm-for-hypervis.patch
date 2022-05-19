@@ -1,0 +1,559 @@
+From 933b000960b45761e7314b6f53853d17606a8771 Mon Sep 17 00:00:00 2001
+From: Eric Tang <eric.tang@starfivetech.com>
+Date: Fri, 21 Jan 2022 13:32:47 +0800
+Subject: [PATCH 17/24] use GPRMemZeroOffset instead of zeroimm for hypervisor
+ instruction
+
+Signed-off-by: Eric Tang <eric.tang@starfivetech.com>
+---
+ .../Target/RISCV/AsmParser/RISCVAsmParser.cpp | 11 +--
+ .../RISCV/MCTargetDesc/RISCVInstPrinter.cpp   |  8 +-
+ .../RISCV/MCTargetDesc/RISCVInstPrinter.h     |  2 +-
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td       | 81 ++++++++-----------
+ llvm/lib/Target/RISCV/RISCVInstrInfoA.td      | 22 +----
+ llvm/lib/Target/RISCV/RISCVInstrInfoC.td      |  4 +
+ llvm/test/MC/RISCV/priv-aliases-valid.s       | 42 +++++-----
+ llvm/test/MC/RISCV/priv-invalid.s             | 78 ++++++++++++------
+ llvm/test/MC/RISCV/priv-rv64-valid.s          | 16 +++-
+ llvm/test/MC/RISCV/priv-valid.s               | 40 ++++-----
+ 10 files changed, 159 insertions(+), 145 deletions(-)
+
+diff --git a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+index d873d528146a..7449fb85172b 100644
+--- a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
++++ b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+@@ -156,7 +156,7 @@ class RISCVAsmParser : public MCTargetAsmParser {
+   OperandMatchResultTy parseRegister(OperandVector &Operands,
+                                      bool AllowParens = false);
+   OperandMatchResultTy parseMemOpBaseReg(OperandVector &Operands);
+-  OperandMatchResultTy parseAtomicMemOp(OperandVector &Operands);
++  OperandMatchResultTy parseZeroOffsetMemOp(OperandVector &Operands);
+   OperandMatchResultTy parseOperandWithModifier(OperandVector &Operands);
+   OperandMatchResultTy parseBareSymbol(OperandVector &Operands);
+   OperandMatchResultTy parseCallSymbol(OperandVector &Operands);
+@@ -1707,7 +1707,8 @@ RISCVAsmParser::parseMemOpBaseReg(OperandVector &Operands) {
+   return MatchOperand_Success;
+ }
+ 
+-OperandMatchResultTy RISCVAsmParser::parseAtomicMemOp(OperandVector &Operands) {
++OperandMatchResultTy
++RISCVAsmParser::parseZeroOffsetMemOp(OperandVector &Operands) {
+   // Atomic operations such as lr.w, sc.w, and amo*.w accept a "memory operand"
+   // as one of their register operands, such as `(a0)`. This just denotes that
+   // the register (in this case `a0`) contains a memory address.
+@@ -1723,9 +1724,9 @@ OperandMatchResultTy RISCVAsmParser::parseAtomicMemOp(OperandVector &Operands) {
+   // offset if it is zero; require (and discard) parentheses; and add only the
+   // parsed register operand to `Operands`.
+   //
+-  // These operands are printed with RISCVInstPrinter::printAtomicMemOp, which
+-  // will only print the register surrounded by parentheses (which GNU as also
+-  // uses as its canonical representation for these operands).
++  // These operands are printed with RISCVInstPrinter::printZeroOffsetMemOp,
++  // which will only print the register surrounded by parentheses (which GNU as
++  // also uses as its canonical representation for these operands).
+   std::unique_ptr<RISCVOperand> OptionalImmOp;
+ 
+   if (getLexer().isNot(AsmToken::LParen)) {
+diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.cpp b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.cpp
+index d1979b5456ce..6f077aa2f9ea 100644
+--- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.cpp
++++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.cpp
+@@ -156,12 +156,12 @@ void RISCVInstPrinter::printFRMArg(const MCInst *MI, unsigned OpNo,
+   O << RISCVFPRndMode::roundingModeToString(FRMArg);
+ }
+ 
+-void RISCVInstPrinter::printAtomicMemOp(const MCInst *MI, unsigned OpNo,
+-                                        const MCSubtargetInfo &STI,
+-                                        raw_ostream &O) {
++void RISCVInstPrinter::printZeroOffsetMemOp(const MCInst *MI, unsigned OpNo,
++                                            const MCSubtargetInfo &STI,
++                                            raw_ostream &O) {
+   const MCOperand &MO = MI->getOperand(OpNo);
+ 
+-  assert(MO.isReg() && "printAtomicMemOp can only print register operands");
++  assert(MO.isReg() && "printZeroOffsetMemOp can only print register operands");
+   O << "(";
+   printRegName(O, MO.getReg());
+   O << ")";
+diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.h b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.h
+index d078ead2c8ad..84701ab2fb1a 100644
+--- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.h
++++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVInstPrinter.h
+@@ -40,7 +40,7 @@ public:
+                      const MCSubtargetInfo &STI, raw_ostream &O);
+   void printFRMArg(const MCInst *MI, unsigned OpNo, const MCSubtargetInfo &STI,
+                    raw_ostream &O);
+-  void printAtomicMemOp(const MCInst *MI, unsigned OpNo,
++  void printZeroOffsetMemOp(const MCInst *MI, unsigned OpNo,
+                         const MCSubtargetInfo &STI, raw_ostream &O);
+   void printVTypeI(const MCInst *MI, unsigned OpNo, const MCSubtargetInfo &STI,
+                    raw_ostream &O);
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index ac10dc775498..b6768d0cfdad 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -113,6 +113,20 @@ class UImmAsmOperand<int width, string suffix = "">
+     : ImmAsmOperand<"U", width, suffix> {
+ }
+ 
++// A parse method for (${gpr}) or 0(${gpr}), where the 0 is be silently ignored.
++// Used for GNU as Compatibility.
++def ZeroOffsetMemOpOperand : AsmOperandClass {
++  let Name = "ZeroOffsetMemOpOperand";
++  let RenderMethod = "addRegOperands";
++  let PredicateMethod = "isGPR";
++  let ParserMethod = "parseZeroOffsetMemOp";
++}
++
++def GPRMemZeroOffset : RegisterOperand<GPR> {
++  let ParserMatchClass = ZeroOffsetMemOpOperand;
++  let PrintMethod = "printZeroOffsetMemOp";
++}
++
+ def FenceArg : AsmOperandClass {
+   let Name = "FenceArg";
+   let RenderMethod = "addFenceArgOperands";
+@@ -201,11 +215,6 @@ def simm8 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<8>(Imm);}]> {
+   let OperandNamespace = "RISCVOp";
+ }
+ 
+-def immzero : Operand<XLenVT>,
+-              ImmLeaf<XLenVT, [{return (Imm == 0);}]> {
+-  let ParserMatchClass = ImmZeroAsmOperand;
+-}
+-
+ def simm12 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<12>(Imm);}]> {
+   let ParserMatchClass = SImmAsmOperand<12>;
+   let EncoderMethod = "getImmOpValue";
+@@ -438,13 +447,10 @@ class Load_ri<bits<3> funct3, string opcodestr>
+     : RVInstI<funct3, OPC_LOAD, (outs GPR:$rd), (ins GPR:$rs1, simm12:$imm12),
+               opcodestr, "$rd, ${imm12}(${rs1})">;
+ 
+-class HLoad_ri<bits<7> funct7, bits<3> funct3, string opcodestr>
+-    : RVInstI<0b100, OPC_SYSTEM, (outs GPR:$rd), (ins GPR:$rs1, immzero:$imm2),
+-              opcodestr, "$rd, ${imm2}(${rs1})">, Sched<[]> {
+-  bits<2> imm2;
+-  let Inst{31-25} = funct7;
+-  let Inst{24-23} = imm2;
+-  let Inst{22-20} = funct3;
++class HLoad_r<bits<7> funct7, bits<5> funct5, string opcodestr>
++    : RVInstR<funct7, 0b100, OPC_SYSTEM, (outs GPR:$rd),
++              (ins GPRMemZeroOffset:$rs1), opcodestr, "$rd, $rs1"> {
++  let rs2 = funct5;
+ }
+ }
+ 
+@@ -457,12 +463,11 @@ class Store_rri<bits<3> funct3, string opcodestr>
+               (ins GPR:$rs2, GPR:$rs1, simm12:$imm12),
+               opcodestr, "$rs2, ${imm12}(${rs1})">;
+ 
+-class HStore_ri<bits<7> funct7, string opcodestr>
++class HStore_r<bits<7> funct7, string opcodestr>
+     : RVInstR<funct7, 0b100, OPC_SYSTEM, (outs),
+-              (ins GPR:$rs2, GPR:$rs1, immzero:$imm5),
+-               opcodestr, "$rs2, ${imm5}(${rs1})">, Sched<[]> {
+-  bits<5> imm5;
+-  let Inst{11-7} = imm5;
++              (ins GPR:$rs2, GPRMemZeroOffset:$rs1),
++              opcodestr, "$rs2, $rs1"> {
++  let rd = 0;
+ }
+ }
+ 
+@@ -734,39 +739,23 @@ def HFENCE_GVMA : RVInstR<0b0110001, 0b000, OPC_SYSTEM, (outs),
+                          "hfence.gvma", "$rs1, $rs2">, Sched<[]>;
+ }
+ 
+-def HLV_B : HLoad_ri<0b0110000, 0b000, "hlv.b">;
+-def HLV_BU : HLoad_ri<0b0110000, 0b001, "hlv.bu">;
+-def HLV_H : HLoad_ri<0b0110010, 0b000, "hlv.h">;
+-def HLV_HU : HLoad_ri<0b0110010, 0b001, "hlv.hu">;
+-def HLVX_HU : HLoad_ri<0b0110010, 0b011, "hlvx.hu">;
+-def HLV_W : HLoad_ri<0b0110100, 0b000, "hlv.w">;
+-def HLVX_WU : HLoad_ri<0b0110100, 0b011, "hlvx.wu">;
++def HLV_B : HLoad_r<0b0110000, 0b00000, "hlv.b">, Sched<[]>;
++def HLV_BU : HLoad_r<0b0110000, 0b00001, "hlv.bu">, Sched<[]>;
++def HLV_H : HLoad_r<0b0110010, 0b00000, "hlv.h">, Sched<[]>;
++def HLV_HU : HLoad_r<0b0110010, 0b00001, "hlv.hu">, Sched<[]>;
++def HLVX_HU : HLoad_r<0b0110010, 0b00011, "hlvx.hu">, Sched<[]>;
++def HLV_W : HLoad_r<0b0110100, 0b00000, "hlv.w">, Sched<[]>;
++def HLVX_WU : HLoad_r<0b0110100, 0b00011, "hlvx.wu">, Sched<[]>;
+ let Predicates = [IsRV64] in {
+-def HLV_WU : HLoad_ri<0b0110100, 0b001, "hlv.wu">;
+-def HLV_D : HLoad_ri<0b0110110, 0b000, "hlv.d">;
++def HLV_WU : HLoad_r<0b0110100, 0b00001, "hlv.wu">, Sched<[]>;
++def HLV_D : HLoad_r<0b0110110, 0b00000, "hlv.d">, Sched<[]>;
+ }
+ 
+-def HSV_B : HStore_ri<0b0110001, "hsv.b">;
+-def HSV_H : HStore_ri<0b0110011, "hsv.h">;
+-def HSV_W : HStore_ri<0b0110101, "hsv.w">;
++def HSV_B : HStore_r<0b0110001, "hsv.b">, Sched<[]>;
++def HSV_H : HStore_r<0b0110011, "hsv.h">, Sched<[]>;
++def HSV_W : HStore_r<0b0110101, "hsv.w">, Sched<[]>;
+ let Predicates = [IsRV64] in
+-def HSV_D : HStore_ri<0b0110111, "hsv.d">;
+-
+-let EmitPriority = 0 in {
+-def : InstAlias<"hlv.b $rd, (${rs1})", (HLV_B GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.bu $rd, (${rs1})", (HLV_BU GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.h $rd, (${rs1})", (HLV_H GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.hu $rd, (${rs1})", (HLV_HU GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlvx.hu $rd, (${rs1})", (HLVX_HU GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.w $rd, (${rs1})", (HLV_W GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.wu $rd, (${rs1})", (HLV_WU GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlvx.wu $rd, (${rs1})", (HLVX_WU GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hlv.d $rd, (${rs1})", (HLV_D GPR:$rd, GPR:$rs1, 0)>;
+-def : InstAlias<"hsv.b $rs2, (${rs1})", (HSV_B GPR:$rs2, GPR:$rs1, 0)>;
+-def : InstAlias<"hsv.h $rs2, (${rs1})", (HSV_H GPR:$rs2, GPR:$rs1, 0)>;
+-def : InstAlias<"hsv.w $rs2, (${rs1})", (HSV_W GPR:$rs2, GPR:$rs1, 0)>;
+-def : InstAlias<"hsv.d $rs2, (${rs1})", (HSV_D GPR:$rs2, GPR:$rs1, 0)>;
+-}
++def HSV_D : HStore_r<0b0110111, "hsv.d">, Sched<[]>;
+ 
+ //===----------------------------------------------------------------------===//
+ // Debug instructions
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfoA.td b/llvm/lib/Target/RISCV/RISCVInstrInfoA.td
+index ee10c3a54b2f..f915dbd8a29f 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfoA.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfoA.td
+@@ -11,24 +11,6 @@
+ //
+ //===----------------------------------------------------------------------===//
+ 
+-//===----------------------------------------------------------------------===//
+-// Operand and SDNode transformation definitions.
+-//===----------------------------------------------------------------------===//
+-
+-// A parse method for (${gpr}) or 0(${gpr}), where the 0 is be silently ignored.
+-// Used for GNU as Compatibility.
+-def AtomicMemOpOperand : AsmOperandClass {
+-  let Name = "AtomicMemOpOperand";
+-  let RenderMethod = "addRegOperands";
+-  let PredicateMethod = "isGPR";
+-  let ParserMethod = "parseAtomicMemOp";
+-}
+-
+-def GPRMemAtomic : RegisterOperand<GPR> {
+-  let ParserMatchClass = AtomicMemOpOperand;
+-  let PrintMethod = "printAtomicMemOp";
+-}
+-
+ //===----------------------------------------------------------------------===//
+ // Instruction class templates
+ //===----------------------------------------------------------------------===//
+@@ -36,7 +18,7 @@ def GPRMemAtomic : RegisterOperand<GPR> {
+ let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+ class LR_r<bit aq, bit rl, bits<3> funct3, string opcodestr>
+     : RVInstRAtomic<0b00010, aq, rl, funct3, OPC_AMO,
+-                    (outs GPR:$rd), (ins GPRMemAtomic:$rs1),
++                    (outs GPR:$rd), (ins GPRMemZeroOffset:$rs1),
+                     opcodestr, "$rd, $rs1"> {
+   let rs2 = 0;
+ }
+@@ -51,7 +33,7 @@ multiclass LR_r_aq_rl<bits<3> funct3, string opcodestr> {
+ let hasSideEffects = 0, mayLoad = 1, mayStore = 1 in
+ class AMO_rr<bits<5> funct5, bit aq, bit rl, bits<3> funct3, string opcodestr>
+     : RVInstRAtomic<funct5, aq, rl, funct3, OPC_AMO,
+-                    (outs GPR:$rd), (ins GPRMemAtomic:$rs1, GPR:$rs2),
++                    (outs GPR:$rd), (ins GPRMemZeroOffset:$rs1, GPR:$rs2),
+                     opcodestr, "$rd, $rs2, $rs1">;
+ 
+ multiclass AMO_rr_aq_rl<bits<5> funct5, bits<3> funct3, string opcodestr> {
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfoC.td b/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
+index 0fff2a03396a..e94698f8b43c 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfoC.td
+@@ -67,6 +67,10 @@ def CLUIImmAsmOperand : AsmOperandClass {
+   let DiagnosticType = !strconcat("Invalid", Name);
+ }
+ 
++def immzero : Operand<XLenVT>,
++              ImmLeaf<XLenVT, [{return (Imm == 0);}]> {
++  let ParserMatchClass = ImmZeroAsmOperand;
++}
+ 
+ // c_lui_imm checks the immediate range is in [1, 31] or [0xfffe0, 0xfffff].
+ // The RISC-V ISA describes the constraint as [1, 63], with that value being
+diff --git a/llvm/test/MC/RISCV/priv-aliases-valid.s b/llvm/test/MC/RISCV/priv-aliases-valid.s
+index e26b99b194aa..0f3b2c04643c 100644
+--- a/llvm/test/MC/RISCV/priv-aliases-valid.s
++++ b/llvm/test/MC/RISCV/priv-aliases-valid.s
+@@ -9,42 +9,42 @@
+ # RUN:     | llvm-objdump -M no-aliases -d - \
+ # RUN:     | FileCheck -check-prefix=CHECK-INST %s
+ 
+-# CHECK-INST: hlv.b a0, 0(a1)
++# CHECK-INST: hlv.b a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x05,0x60]
+-hlv.b   a0, (a1)
++hlv.b   a0, 0(a1)
+ 
+-# CHECK-INST: hlv.bu a0, 0(a1)
++# CHECK-INST: hlv.bu a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x15,0x60]
+-hlv.bu  a0, (a1)
++hlv.bu  a0, 0(a1)
+ 
+-# CHECK-INST: hlv.h a1, 0(a2)
++# CHECK-INST: hlv.h a1, (a2)
+ # CHECK: encoding: [0xf3,0x45,0x06,0x64]
+-hlv.h   a1, (a2)
++hlv.h   a1, 0(a2)
+ 
+-# CHECK-INST: hlv.hu a1, 0(a1)
++# CHECK-INST: hlv.hu a1, (a1)
+ # CHECK: encoding: [0xf3,0xc5,0x15,0x64]
+-hlv.hu  a1, (a1)
++hlv.hu  a1, 0(a1)
+ 
+-# CHECK-INST: hlvx.hu a1, 0(a2)
++# CHECK-INST: hlvx.hu a1, (a2)
+ # CHECK: encoding: [0xf3,0x45,0x36,0x64]
+-hlvx.hu a1, (a2)
++hlvx.hu a1, 0(a2)
+ 
+-# CHECK-INST: hlv.w a2, 0(a2)
++# CHECK-INST: hlv.w a2, (a2)
+ # CHECK: encoding: [0x73,0x46,0x06,0x68]
+-hlv.w   a2, (a2)
++hlv.w   a2, 0(a2)
+ 
+-# CHECK-INST: hlvx.wu a2, 0(a3)
++# CHECK-INST: hlvx.wu a2, (a3)
+ # CHECK: encoding: [0x73,0xc6,0x36,0x68]
+-hlvx.wu a2, (a3)
++hlvx.wu a2, 0(a3)
+ 
+-# CHECK-INST: hsv.b a0, 0(a1)
++# CHECK-INST: hsv.b a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x62]
+-hsv.b   a0, (a1)
++hsv.b   a0, 0(a1)
+ 
+-# CHECK-INST: hsv.h a0, 0(a1)
++# CHECK-INST: hsv.h a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x66]
+-hsv.h   a0, (a1)
++hsv.h   a0, 0(a1)
+ 
+-# CHECK-INST: hsv.w a0, 0(a1)
+-# CHECK: encoding: [0x73,0xc0,0xa5,0x6a] 
+-hsv.w   a0, (a1)
++# CHECK-INST: hsv.w a0, (a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x6a]
++hsv.w   a0, 0(a1)
+diff --git a/llvm/test/MC/RISCV/priv-invalid.s b/llvm/test/MC/RISCV/priv-invalid.s
+index 0280314a3ac7..7f87b1a451bb 100644
+--- a/llvm/test/MC/RISCV/priv-invalid.s
++++ b/llvm/test/MC/RISCV/priv-invalid.s
+@@ -14,50 +14,80 @@ hfence.gvma zero, a1, a2 # CHECK: :[[@LINE]]:23: error: invalid operand for inst
+ 
+ hfence.gvma a0, 0x10 # CHECK: :[[@LINE]]:17: error: invalid operand for instruction
+ 
+-hlv.b a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.b a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
+ 
+-hlv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.b a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
+ 
+-hlv.bu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
+ 
+-hlv.bu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlv.bu a0, 0x10 # CHECK: :[[@LINE]]:17: error: expected '(' after optional integer offset
+ 
+-hlv.h a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.bu a0, a1 # CHECK: :[[@LINE]]:12: error: expected '(' or optional integer offset
+ 
+-hlv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.bu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: optional integer offset must be 0
+ 
+-hlv.hu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlv.h a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
+ 
+-hlv.hu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlv.h a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
+ 
+-hlvx.hu a0, 0x10 # CHECK: :[[@LINE]]:13: error: immediate must be zero
++hlv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
+ 
+-hlvx.hu a0, 1(a1) # CHECK: :[[@LINE]]:13: error: immediate must be zero
++hlv.hu a0, 0x10 # CHECK: :[[@LINE]]:17: error: expected '(' after optional integer offset
+ 
+-hlv.w a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.hu a0, a1 # CHECK: :[[@LINE]]:12: error: expected '(' or optional integer offset
+ 
+-hlv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.hu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: optional integer offset must be 0
+ 
+-hlv.wu a0, 0x10 # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlvx.hu a0, 0x10 # CHECK: :[[@LINE]]:18: error: expected '(' after optional integer offset
++    
++hlvx.hu a0, a1 # CHECK: :[[@LINE]]:13: error: expected '(' or optional integer offset
++    
++hlvx.hu a0, 1(a1) # CHECK: :[[@LINE]]:13: error: optional integer offset must be 0
+ 
+-hlv.wu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: immediate must be zero
++hlv.w a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
+ 
+-hlv.d a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.w a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
+ 
+-hlv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
+ 
+-hsv.b a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.wu a0, 0x10 # CHECK: :[[@LINE]]:17: error: expected '(' after optional integer offset
+ 
+-hsv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.wu a0, a1 # CHECK: :[[@LINE]]:12: error: expected '(' or optional integer offset
+ 
+-hsv.h a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.wu a0, 1(a1) # CHECK: :[[@LINE]]:12: error: optional integer offset must be 0
+ 
+-hsv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlvx.wu a0, 0x10 # CHECK: :[[@LINE]]:18: error: expected '(' after optional integer offset
+ 
+-hsv.w a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlvx.wu a0, a1 # CHECK: :[[@LINE]]:13: error: expected '(' or optional integer offset
+ 
+-hsv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlvx.wu a0, 1(a1) # CHECK: :[[@LINE]]:13: error: optional integer offset must be 0
+ 
+-hsv.d a0, 0x10 # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.d a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
+ 
+-hsv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: immediate must be zero
++hlv.d a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
++
++hlv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
++
++hsv.b a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
++
++hsv.b a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
++
++hsv.b a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
++
++hsv.h a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
++
++hsv.h a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
++
++hsv.h a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
++
++hsv.w a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
++
++hsv.w a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
++
++hsv.w a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
++
++hsv.d a0, 0x10 # CHECK: :[[@LINE]]:16: error: expected '(' after optional integer offset
++
++hsv.d a0, a1 # CHECK: :[[@LINE]]:11: error: expected '(' or optional integer offset
++
++hsv.d a0, 1(a1) # CHECK: :[[@LINE]]:11: error: optional integer offset must be 0
+diff --git a/llvm/test/MC/RISCV/priv-rv64-valid.s b/llvm/test/MC/RISCV/priv-rv64-valid.s
+index cfd050225681..236da124fda9 100644
+--- a/llvm/test/MC/RISCV/priv-rv64-valid.s
++++ b/llvm/test/MC/RISCV/priv-rv64-valid.s
+@@ -4,18 +4,26 @@
+ # RUN:     | llvm-objdump -M no-aliases -d - \
+ # RUN:     | FileCheck -check-prefix=CHECK-INST %s
+ 
+-# CHECK-INST: hlv.wu a0, 0(a1)
++# CHECK-INST: hlv.wu a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x15,0x68]
+ hlv.wu   a0, (a1)
+ 
+-# CHECK-INST: hlv.wu a0, 0(a1)
++# CHECK-INST: hlv.wu a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x15,0x68]
+ hlv.wu   a0, 0(a1)
+ 
+-# CHECK-INST: hlv.d a0, 0(a1)
++# CHECK-INST: hlv.d a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x05,0x6c]
+ hlv.d  a0, (a1)
+ 
+-# CHECK-INST: hsv.d a0, 0(a1)
++# CHECK-INST: hlv.d a0, (a1)
++# CHECK: encoding: [0x73,0xc5,0x05,0x6c]
++hlv.d  a0, 0(a1)
++
++# CHECK-INST: hsv.d a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x6e]
+ hsv.d   a0, (a1)
++
++# CHECK-INST: hsv.d a0, (a1)
++# CHECK: encoding: [0x73,0xc0,0xa5,0x6e]
++hsv.d   a0, 0(a1)
+diff --git a/llvm/test/MC/RISCV/priv-valid.s b/llvm/test/MC/RISCV/priv-valid.s
+index 4fb2aa0f21e5..2fb2a2bdd383 100644
+--- a/llvm/test/MC/RISCV/priv-valid.s
++++ b/llvm/test/MC/RISCV/priv-valid.s
+@@ -49,42 +49,42 @@ hfence.gvma zero, zero
+ # CHECK: encoding: [0x73,0x00,0xb5,0x62]
+ hfence.gvma a0, a1
+ 
+-# CHECK-INST: hlv.b a0, 0(a1)
++# CHECK-INST: hlv.b a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x05,0x60]
+-hlv.b   a0, 0(a1)
++hlv.b   a0, (a1)
+ 
+-# CHECK-INST: hlv.bu a0, 0(a1)
++# CHECK-INST: hlv.bu a0, (a1)
+ # CHECK: encoding: [0x73,0xc5,0x15,0x60]
+-hlv.bu  a0, 0(a1)
++hlv.bu  a0, (a1)
+ 
+-# CHECK-INST: hlv.h a1, 0(a2)
++# CHECK-INST: hlv.h a1, (a2)
+ # CHECK: encoding: [0xf3,0x45,0x06,0x64]
+-hlv.h   a1, 0(a2)
++hlv.h   a1, (a2)
+ 
+-# CHECK-INST: hlv.hu a1, 0(a1)
++# CHECK-INST: hlv.hu a1, (a1)
+ # CHECK: encoding: [0xf3,0xc5,0x15,0x64]
+-hlv.hu  a1, 0(a1)
++hlv.hu  a1, (a1)
+ 
+-# CHECK-INST: hlvx.hu a1, 0(a2)
++# CHECK-INST: hlvx.hu a1, (a2)
+ # CHECK: encoding: [0xf3,0x45,0x36,0x64]
+-hlvx.hu a1, 0(a2)
++hlvx.hu a1, (a2)
+ 
+-# CHECK-INST: hlv.w a2, 0(a2)
++# CHECK-INST: hlv.w a2, (a2)
+ # CHECK: encoding: [0x73,0x46,0x06,0x68]
+-hlv.w   a2, 0(a2)
++hlv.w   a2, (a2)
+ 
+-# CHECK-INST: hlvx.wu a2, 0(a3)
++# CHECK-INST: hlvx.wu a2, (a3)
+ # CHECK: encoding: [0x73,0xc6,0x36,0x68]
+-hlvx.wu a2, 0(a3)
++hlvx.wu a2, (a3)
+ 
+-# CHECK-INST: hsv.b a0, 0(a1)
++# CHECK-INST: hsv.b a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x62]
+-hsv.b   a0, 0(a1)
++hsv.b   a0, (a1)
+ 
+-# CHECK-INST: hsv.h a0, 0(a1)
++# CHECK-INST: hsv.h a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x66]
+-hsv.h   a0, 0(a1)
++hsv.h   a0, (a1)
+ 
+-# CHECK-INST: hsv.w a0, 0(a1)
++# CHECK-INST: hsv.w a0, (a1)
+ # CHECK: encoding: [0x73,0xc0,0xa5,0x6a]
+-hsv.w   a0, 0(a1)
++hsv.w   a0, (a1)
+-- 
+2.33.1
+

@@ -1,0 +1,74 @@
+From 5771cefd7b63e8d80fc010eb691f5676bce68f72 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 16 Feb 2022 20:09:03 -0800
+Subject: [PATCH 33/33] merge Kito Cheng's patch "Handle different sigcontext
+ struct layout"
+
+---
+ libgcc/config/riscv/linux-unwind.h | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/libgcc/config/riscv/linux-unwind.h b/libgcc/config/riscv/linux-unwind.h
+index 0710bdad1a7..3dc488acf9b 100644
+--- a/libgcc/config/riscv/linux-unwind.h
++++ b/libgcc/config/riscv/linux-unwind.h
+@@ -29,6 +29,25 @@
+ #define ECALL    0x00000073
+ 
+ #define MD_FALLBACK_FRAME_STATE_FOR riscv_fallback_frame_state
++/* RISC-V Glibc has removed its own sigcontext.h and use the linux kernel's
++   one, however the struct layout is little different between those two
++   version, fortunately they have identical layout, so we just need a
++   magical way to detect which one we are used.  */
++#ifdef _ASM_RISCV_SIGCONTEXT_H
++#define SIGCONTEXT_PC(SC) (SC)->sc_regs.pc
++#else
++#define SIGCONTEXT_PC(SC) (SC)->gregs[0]
++#endif
++
++/* RISC-V Glibc has removed its own sigcontext.h and use the linux kernel's
++   one, however the struct layout is little different between those two
++   version, fortunately they have identical layout, so we just need a
++   magical way to detect which one we are used.  */
++#ifdef _ASM_RISCV_SIGCONTEXT_H
++#define SIGCONTEXT_PC(SC) (SC)->sc_regs.pc
++#else
++#define SIGCONTEXT_PC(SC) (SC)->gregs[0]
++#endif
+ 
+ static _Unwind_Reason_Code
+ riscv_fallback_frame_state (struct _Unwind_Context *context,
+@@ -51,6 +70,8 @@ riscv_fallback_frame_state (struct _Unwind_Context *context,
+   struct sigcontext *sc;
+   int i;
+   _Unwind_Ptr reg_ptr;
++  /* Get regsister offest from register size.  */
++  _Unwind_Ptr reg_offset = __riscv_xlen / 8;
+ 
+   /* A signal frame will have a return address pointing to
+      __default_sa_restorer. This code is hardwired as:
+@@ -76,16 +97,18 @@ riscv_fallback_frame_state (struct _Unwind_Context *context,
+   for (i = 0; i < 32; i++)
+     {
+       fs->regs.reg[i].how = REG_SAVED_OFFSET;
+-      fs->regs.reg[i].loc.offset = (_Unwind_Ptr) (reg_ptr + i) - new_cfa;
++      fs->regs.reg[i].loc.offset = 
++        (_Unwind_Ptr) &SIGCONTEXT_PC (sc) + (i * reg_offset) - new_cfa;     
+     }
+ 
+   fs->signal_frame = 1;
+   fs->retaddr_column = __LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__;
+   fs->regs.reg[fs->retaddr_column].how = REG_SAVED_VAL_OFFSET;
+   fs->regs.reg[fs->retaddr_column].loc.offset =
+-    (_Unwind_Ptr) sc->sc_regs.pc - new_cfa;
++    (_Unwind_Ptr) SIGCONTEXT_PC (sc) - new_cfa;
+ 
+   return _URC_NO_REASON;
+ }
+ 
++#undef SIGCONTEXT_PC
+ #endif
+\ No newline at end of file
+-- 
+2.33.1
+

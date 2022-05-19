@@ -1,0 +1,252 @@
+From cb00a50ff70844b2c8b9e0ced7d14a6b892970d8 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 17 Jan 2022 00:19:44 -0800
+Subject: [PATCH 31/32] Revert "c++: Change the default dialect to C++17."
+
+This reverts commit 0801f419440c14f6772b28f763ad7d40f7f7a580.
+---
+ gcc/c-family/c-opts.c                          |  4 ++--
+ gcc/doc/invoke.texi                            |  2 +-
+ gcc/doc/standards.texi                         |  4 ++--
+ .../c-c++-common/torture/vector-subscript-3.c  |  3 ---
+ .../g++.dg/cpp1z/attributes-enum-1a.C          |  3 +--
+ gcc/testsuite/g++.dg/cpp1z/fold7a.C            |  3 +--
+ gcc/testsuite/g++.dg/cpp1z/nontype3a.C         |  3 +--
+ gcc/testsuite/g++.dg/cpp1z/utf8-2a.C           |  3 +--
+ gcc/testsuite/g++.dg/parse/error11.C           | 18 +++++++-----------
+ gcc/testsuite/g++.dg/torture/pr34850.C         |  2 +-
+ gcc/testsuite/g++.dg/torture/pr49394.C         |  2 --
+ gcc/testsuite/g++.dg/torture/pr82154.C         |  3 +--
+ gcc/testsuite/lib/target-supports.exp          |  2 +-
+ gcc/testsuite/obj-c++.dg/try-catch-9.mm        |  2 +-
+ libgomp/testsuite/libgomp.c++/atomic-3.C       |  3 +--
+ 15 files changed, 21 insertions(+), 36 deletions(-)
+
+diff --git a/gcc/c-family/c-opts.c b/gcc/c-family/c-opts.c
+index 89e05a4c551..5d466e29e18 100644
+--- a/gcc/c-family/c-opts.c
++++ b/gcc/c-family/c-opts.c
+@@ -258,9 +258,9 @@ c_common_init_options (unsigned int decoded_options_count,
+ 	  }
+     }
+ 
+-  /* Set C++ standard to C++17 if not specified on the command line.  */
++  /* Set C++ standard to C++14 if not specified on the command line.  */
+   if (c_dialect_cxx ())
+-    set_std_cxx17 (/*ISO*/false);
++    set_std_cxx14 (/*ISO*/false);
+ 
+   global_dc->colorize_source_p = true;
+ }
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 4a87b9ef8e8..bd4d538b4af 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -2407,6 +2407,7 @@ The name @samp{c++1y} is deprecated.
+ @item gnu++14
+ @itemx gnu++1y
+ GNU dialect of @option{-std=c++14}.
++This is the default for C++ code.
+ The name @samp{gnu++1y} is deprecated.
+ 
+ @item c++17
+@@ -2417,7 +2418,6 @@ The name @samp{c++1z} is deprecated.
+ @item gnu++17
+ @itemx gnu++1z
+ GNU dialect of @option{-std=c++17}.
+-This is the default for C++ code.
+ The name @samp{gnu++1z} is deprecated.
+ 
+ @item c++20
+diff --git a/gcc/doc/standards.texi b/gcc/doc/standards.texi
+index 0f88333eec6..14506bfd22a 100644
+--- a/gcc/doc/standards.texi
++++ b/gcc/doc/standards.texi
+@@ -130,7 +130,7 @@ select an extended version of the C language explicitly with
+ extensions).  
+ 
+ The default, if no C language dialect options are given,
+-is @option{-std=gnu17}.
++is @option{-std=gnu11}.  
+ 
+ The ISO C standard defines (in clause 4) two classes of conforming
+ implementation.  A @dfn{conforming hosted implementation} supports the
+@@ -254,7 +254,7 @@ select an extended version of the C++ language explicitly with
+ @option{-std=gnu++20} (for C++20 with GNU extensions).
+ 
+ The default, if
+-no C++ language dialect options are given, is @option{-std=gnu++17}.
++no C++ language dialect options are given, is @option{-std=gnu++14}.
+ 
+ @section Objective-C and Objective-C++ Languages
+ @cindex Objective-C
+diff --git a/gcc/testsuite/c-c++-common/torture/vector-subscript-3.c b/gcc/testsuite/c-c++-common/torture/vector-subscript-3.c
+index 05d24f49011..bb5c91485d7 100644
+--- a/gcc/testsuite/c-c++-common/torture/vector-subscript-3.c
++++ b/gcc/testsuite/c-c++-common/torture/vector-subscript-3.c
+@@ -10,9 +10,6 @@ struct vec_s {
+     vector short member;
+ };
+ 
+-#if defined(__cplusplus) && __cplusplus >= 201703L
+-#define register /* nothing */
+-#endif
+ 
+ int main () {
+   register short vector v0 = {1,2,3,4,5,6,7};
+diff --git a/gcc/testsuite/g++.dg/cpp1z/attributes-enum-1a.C b/gcc/testsuite/g++.dg/cpp1z/attributes-enum-1a.C
+index 20f0b1d8876..aacfac875b1 100644
+--- a/gcc/testsuite/g++.dg/cpp1z/attributes-enum-1a.C
++++ b/gcc/testsuite/g++.dg/cpp1z/attributes-enum-1a.C
+@@ -1,5 +1,4 @@
+-// { dg-do compile { target c++14_down } }
+-// This macro should not be defined without c++17.
++// This macro should not be defined without -std=c++17.
+ 
+ #ifdef __cpp_enumerator_attributes
+ #error __cpp_enumerator_attributes defined
+diff --git a/gcc/testsuite/g++.dg/cpp1z/fold7a.C b/gcc/testsuite/g++.dg/cpp1z/fold7a.C
+index 8cca8792709..5c782ff0969 100644
+--- a/gcc/testsuite/g++.dg/cpp1z/fold7a.C
++++ b/gcc/testsuite/g++.dg/cpp1z/fold7a.C
+@@ -1,5 +1,4 @@
+-// { dg-do compile { target c++14_down } }
+-// This macro should not be defined without c++17.
++// This macro should not be defined without -std=c++17.
+ 
+ #ifdef __cpp_fold_expressions
+ #error __cpp_fold_expressions defined
+diff --git a/gcc/testsuite/g++.dg/cpp1z/nontype3a.C b/gcc/testsuite/g++.dg/cpp1z/nontype3a.C
+index b3ffe037904..a704e5045b6 100644
+--- a/gcc/testsuite/g++.dg/cpp1z/nontype3a.C
++++ b/gcc/testsuite/g++.dg/cpp1z/nontype3a.C
+@@ -1,5 +1,4 @@
+-// { dg-do compile { target c++14_down } }
+-// This macro should not be defined without c++17.
++// This macro should not be defined without -std=c++17.
+ 
+ #ifdef __cpp_nontype_template_args
+ #error __cpp_nontype_template_args defined
+diff --git a/gcc/testsuite/g++.dg/cpp1z/utf8-2a.C b/gcc/testsuite/g++.dg/cpp1z/utf8-2a.C
+index b2a99a99023..0e243d68a75 100644
+--- a/gcc/testsuite/g++.dg/cpp1z/utf8-2a.C
++++ b/gcc/testsuite/g++.dg/cpp1z/utf8-2a.C
+@@ -1,5 +1,4 @@
+-// { dg-do compile { target c++14_down } }
+-// This macro should not be 201411 without c++17.
++// This macro should not be 201411 without -std=c++17.
+ 
+ #if __cpp_unicode_characters == 201411
+ #error Wrong value for __cpp_unicode_characters
+diff --git a/gcc/testsuite/g++.dg/parse/error11.C b/gcc/testsuite/g++.dg/parse/error11.C
+index 4baf97e531d..1a49d6edb12 100644
+--- a/gcc/testsuite/g++.dg/parse/error11.C
++++ b/gcc/testsuite/g++.dg/parse/error11.C
+@@ -1,5 +1,5 @@
+ // { dg-do compile }
+-// { dg-options "-fshow-column" }
++// { dg-options "-fshow-column" }"
+ // Origin: Giovanni Bajo <giovannibajo at gcc dot gnu dot org>
+ // Try to find out when the digraph '<:' is used as a mistake, and parse it
+ //  correctly to avoid cascaded errors.
+@@ -50,16 +50,12 @@ void func(void)
+   //  the special error message.
+   Foo<: :B> k2;     // { dg-bogus "cannot begin|alternate spelling" "smart error should not be triggered here" }
+   Foo[:B> k1;       // { dg-bogus "cannot begin|alternate spelling" "smart error should not be triggered here" } 
+-// { dg-error "6:missing template arguments before" "template" { target c++14_down } .-2 }
+-// { dg-error "9:expected primary-expression before ':' token" "primary" { target c++14_down } .-3 }
+-// { dg-error "8:expected '\]' before ':' token" "backslash" { target c++14_down } .-4 }
+-// { dg-error "6:missing template arguments before" "template" { target c++14_down } .-4 }
+-// { dg-error "7:expected primary-expression before ':' token" "primary" { target c++14_down } .-5 }
+-// { dg-error "7:expected '\]' before ':' token" "backslash" { target c++14_down } .-6 }
+-// { dg-error "9:expected identifier" "" { target c++17 } .-8 }
+-// { dg-error "8:expected" "" { target c++17 } .-9 }
+-// { dg-error "7:expected identifier" "" { target c++17 } .-9 }
+-// { dg-error "7:expected" "" { target c++17 } .-10 }
++// { dg-error "6:missing template arguments before" "template" { target *-*-* } 51 }
++// { dg-error "9:expected primary-expression before ':' token" "primary" { target *-*-* } 51 }
++// { dg-error "8:expected '\]' before ':' token" "backslash" { target *-*-* } 51 }
++// { dg-error "6:missing template arguments before" "template" { target *-*-* } 52 }
++// { dg-error "7:expected primary-expression before ':' token" "primary" { target *-*-* } 52 }
++// { dg-error "7:expected '\]' before ':' token" "backslash" { target *-*-* } 52 }
+ //
+   int Foo[2];
+   Foo[::value] = 0;
+diff --git a/gcc/testsuite/g++.dg/torture/pr34850.C b/gcc/testsuite/g++.dg/torture/pr34850.C
+index 59dd5dfde7d..c4d808c5a0d 100644
+--- a/gcc/testsuite/g++.dg/torture/pr34850.C
++++ b/gcc/testsuite/g++.dg/torture/pr34850.C
+@@ -1,6 +1,6 @@
+ /* { dg-do compile } */
+ /* { dg-skip-if "" { *-*-* } { "-O0" } { "" } } */
+-/* { dg-options "-ffat-lto-objects -Wno-return-type -Wno-attribute-warning" } */
++/* { dg-options "-ffat-lto-objects -Wno-return-type" } */
+ 
+ typedef unsigned char uint8_t;
+ typedef unsigned int uint32_t;
+diff --git a/gcc/testsuite/g++.dg/torture/pr49394.C b/gcc/testsuite/g++.dg/torture/pr49394.C
+index 75901a5d668..7bd8fd4dc72 100644
+--- a/gcc/testsuite/g++.dg/torture/pr49394.C
++++ b/gcc/testsuite/g++.dg/torture/pr49394.C
+@@ -7,8 +7,6 @@ struct Mutex
+   ~Mutex ()
+ #if __cplusplus <= 201402L
+   throw(int)			// { dg-warning "deprecated" "" { target { c++11 && { ! c++17 } } } }
+-#else
+-  noexcept(false)
+ #endif
+   {
+     if (locked)
+diff --git a/gcc/testsuite/g++.dg/torture/pr82154.C b/gcc/testsuite/g++.dg/torture/pr82154.C
+index 698340d8c65..e229c3e640e 100644
+--- a/gcc/testsuite/g++.dg/torture/pr82154.C
++++ b/gcc/testsuite/g++.dg/torture/pr82154.C
+@@ -1,6 +1,5 @@
+ // { dg-do compile }
+-// { dg-additional-options "-std=c++14 -Wno-deprecated" }
+-// C++17 does not allow dynamic exception specification.
++// { dg-additional-options "-Wno-deprecated" }
+ 
+ namespace a {
+ int b;
+diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
+index ad323107f2e..d7558020af9 100644
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -9473,7 +9473,7 @@ proc check_effective_target_c++ { } {
+  return 0
+ }
+ 
+-set cxx_default "c++17"
++set cxx_default "c++14"
+ # Check whether the current active language standard supports the features
+ # of C++11/C++14 by checking for the presence of one of the -std flags.
+ # This assumes that the default for the compiler is $cxx_default, and that
+diff --git a/gcc/testsuite/obj-c++.dg/try-catch-9.mm b/gcc/testsuite/obj-c++.dg/try-catch-9.mm
+index b2dc61b9989..73c7c991709 100644
+--- a/gcc/testsuite/obj-c++.dg/try-catch-9.mm
++++ b/gcc/testsuite/obj-c++.dg/try-catch-9.mm
+@@ -6,7 +6,7 @@
+ /* { dg-xfail-run-if "PR23616" { *-*-* } { "-fgnu-runtime" } { "-fnext-runtime" } } */
+ /* { dg-xfail-if "Needs OBJC2 ABI" { *-*-darwin* && { lp64 && { ! objc2 } } } { "-fnext-runtime" "-fgnu-runtime" } { "" } } 
+ /* { dg-prune-output ".*internal compiler error.*" } */
+-/* { dg-options "-fobjc-exceptions -O2 -Wno-register" } */
++/* { dg-options "-fobjc-exceptions -O2" } */
+ 
+ #include "../objc-obj-c++-shared/TestsuiteObject.m"
+ #include <stdlib.h>
+diff --git a/libgomp/testsuite/libgomp.c++/atomic-3.C b/libgomp/testsuite/libgomp.c++/atomic-3.C
+index c02532d3206..f957b2fece5 100644
+--- a/libgomp/testsuite/libgomp.c++/atomic-3.C
++++ b/libgomp/testsuite/libgomp.c++/atomic-3.C
+@@ -1,6 +1,5 @@
+ // { dg-do run }
+-// C++17 forbids ++ on bool.
+-// { dg-options "-Wno-deprecated -std=gnu++14" }
++// { dg-options "-Wno-deprecated" }
+ 
+ extern "C" void abort (void);
+ bool v, x1, x2, x3, x4, x5, x6;
+-- 
+2.33.1
+

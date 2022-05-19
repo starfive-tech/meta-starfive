@@ -1,0 +1,28 @@
+From ec43c73a96ccda441077ee8c84ad223ee6d8bb99 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Tue, 18 Jan 2022 10:21:45 +0800
+Subject: [PATCH 14/14] fixed a compiled error when enable gdb
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ include/opcode/riscv-opc.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index ee3d4aa51f..8963216302 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -3071,8 +3071,8 @@ DECLARE_INSN(dret, MATCH_DRET, MASK_DRET)
+ DECLARE_INSN(sfence_vm, MATCH_SFENCE_VM, MASK_SFENCE_VM)
+ DECLARE_INSN(sfence_vma, MATCH_SFENCE_VMA, MASK_SFENCE_VMA)
+ DECLARE_INSN(wfi, MATCH_WFI, MASK_WFI)
+-DECLARE_INSN(hfence_vvma, MATCH_HFENCE_VVMA, MASK_HFENCE)
+-DECLARE_INSN(hfence_gvma, MATCH_HFENCE_GVMA, MASK_HFENCE)
++DECLARE_INSN(hfence_vvma, MATCH_HFENCE_VVMA, MASK_HFENCE_VVMA)
++DECLARE_INSN(hfence_gvma, MATCH_HFENCE_GVMA, MASK_HFENCE_GVMA)
+ DECLARE_INSN(hlv_b,   MATCH_HLVB,   MASK_HLV)
+ DECLARE_INSN(hlv_h,   MATCH_HLVH,   MASK_HLV)
+ DECLARE_INSN(hlv_w,   MATCH_HLVW,   MASK_HLV)
+-- 
+2.33.1
+

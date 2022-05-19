@@ -109,4 +109,5 @@ SRC_URI += "file://0001-softfloat-add-APIs-to-handle-alternative-sNaN-propag.pat
            file://0107-target-riscv-Force-to-set-mstatus_hs.-SD-VS-bits-in-.patch \
            file://0001-merge-riscv-bitmapip-b0p94-version.patch \
            file://0002-Add-four-cache-csr-instruction.patch \
+           file://0003-Fix-cache-instruction-bug.patch \
            "

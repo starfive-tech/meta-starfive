@@ -1,7 +1,7 @@
 From 05cd9526d2438fab6b4b671d682445aae38b5438 Mon Sep 17 00:00:00 2001
 From: "yilun.xie" <yilun.xie@starfivetech.com>
 Date: Fri, 29 Oct 2021 10:16:06 +0800
-Subject: [PATCH 2/3] update B instruction to 1.0 and Merge four Custom CSR
+Subject: [PATCH 02/24] update B instruction to 1.0 and Merge four Custom CSR
  cache instruction
 
 ---

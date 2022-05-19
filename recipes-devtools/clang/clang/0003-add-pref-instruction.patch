@@ -1,7 +1,7 @@
 From 3339a8b15327d7d7bafdf08aad66056fa9ab36b3 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sun, 7 Nov 2021 23:01:41 -0800
-Subject: [PATCH 3/3] add pref instruction
+Subject: [PATCH 03/24] add pref instruction
 
 ---
  .../Target/RISCV/AsmParser/RISCVAsmParser.cpp | 18 ++++++++++++

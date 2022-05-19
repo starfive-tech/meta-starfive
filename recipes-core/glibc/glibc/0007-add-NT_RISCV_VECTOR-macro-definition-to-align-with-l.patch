@@ -1,0 +1,25 @@
+From 4ca3f0f9517885ab7b6c60d9ec4e3a15b83d8d82 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 21 Dec 2021 18:39:15 -0800
+Subject: [PATCH 7/8] add NT_RISCV_VECTOR macro definition to align with linux
+ elf.h
+
+---
+ elf/elf.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/elf/elf.h b/elf/elf.h
+index 50f87baceb..27f46afa27 100644
+--- a/elf/elf.h
++++ b/elf/elf.h
+@@ -822,6 +822,7 @@ typedef struct
+ #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers.  */
+ #define NT_MIPS_FP_MODE	0x801		/* MIPS floating-point mode.  */
+ #define NT_MIPS_MSA	0x802		/* MIPS SIMD registers.  */
++#define NT_RISCV_VECTOR	0x900		/* RISC-V vector registers */
+ 
+ /* Legal values for the note segment descriptor types for object files.  */
+ 
+-- 
+2.33.1
+

@@ -16,4 +16,8 @@ SRC_URI += "\
      file://0009-Delete-redundant-b0.94-instructions.patch \
      file://0010-change-vle1.v-vse1.v-to-vlm.v-vsm.v-according-rvv-1..patch \
      file://0011-enable-l2-cache-prefetch.patch \
+     file://0012-RISC-V-Hypervisor-ext-drop-Privileged-Spec-1.9.1.patch \
+     file://0013-RISC-V-Hypervisor-ext-support-Privileged-Spec-1.12.patch \
+     file://0014-fixed-a-compiled-error-when-enable-gdb.patch \
+     file://0015-fix-incorrect-pref-address-range.patch \
 "

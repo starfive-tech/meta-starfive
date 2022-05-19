@@ -1,0 +1,131 @@
+From 8bd8d2fdb89eb2209a61d422ccf74dc54adc4a54 Mon Sep 17 00:00:00 2001
+From: Craig Topper <craig.topper@sifive.com>
+Date: Thu, 7 Oct 2021 11:27:07 -0700
+Subject: [PATCH 29/40] Correct FileCheck prefixes in rv32zbc-intrinsic.ll and
+ rv64zbc-intrinsic.ll. NFC
+
+Zbc RUN lines should use ZBC instead of BC in their prefix.
+---
+ llvm/test/CodeGen/RISCV/rv32zbc-intrinsic.ll | 26 ++++++++++----------
+ llvm/test/CodeGen/RISCV/rv64zbc-intrinsic.ll | 26 ++++++++++----------
+ 2 files changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/llvm/test/CodeGen/RISCV/rv32zbc-intrinsic.ll b/llvm/test/CodeGen/RISCV/rv32zbc-intrinsic.ll
+index 97ba9da5e0b0..cc72253e160a 100644
+--- a/llvm/test/CodeGen/RISCV/rv32zbc-intrinsic.ll
++++ b/llvm/test/CodeGen/RISCV/rv32zbc-intrinsic.ll
+@@ -2,7 +2,7 @@
+ ; RUN: llc -mtriple=riscv32 -mattr=+experimental-b -verify-machineinstrs < %s \
+ ; RUN:   | FileCheck %s -check-prefix=RV32B
+ ; RUN: llc -mtriple=riscv32 -mattr=+experimental-zbc -verify-machineinstrs < %s \
+-; RUN:   | FileCheck %s -check-prefix=RV32BC
++; RUN:   | FileCheck %s -check-prefix=RV32ZBC
+ 
+ declare i32 @llvm.riscv.clmul.i32(i32 %a, i32 %b)
+ 
+@@ -12,10 +12,10 @@ define i32 @clmul32(i32 %a, i32 %b) nounwind {
+ ; RV32B-NEXT:    clmul a0, a0, a1
+ ; RV32B-NEXT:    ret
+ ;
+-; RV32BC-LABEL: clmul32:
+-; RV32BC:       # %bb.0:
+-; RV32BC-NEXT:    clmul a0, a0, a1
+-; RV32BC-NEXT:    ret
++; RV32ZBC-LABEL: clmul32:
++; RV32ZBC:       # %bb.0:
++; RV32ZBC-NEXT:    clmul a0, a0, a1
++; RV32ZBC-NEXT:    ret
+   %tmp = call i32 @llvm.riscv.clmul.i32(i32 %a, i32 %b)
+  ret i32 %tmp
+ }
+@@ -28,10 +28,10 @@ define i32 @clmul32h(i32 %a, i32 %b) nounwind {
+ ; RV32B-NEXT:    clmulh a0, a0, a1
+ ; RV32B-NEXT:    ret
+ ;
+-; RV32BC-LABEL: clmul32h:
+-; RV32BC:       # %bb.0:
+-; RV32BC-NEXT:    clmulh a0, a0, a1
+-; RV32BC-NEXT:    ret
++; RV32ZBC-LABEL: clmul32h:
++; RV32ZBC:       # %bb.0:
++; RV32ZBC-NEXT:    clmulh a0, a0, a1
++; RV32ZBC-NEXT:    ret
+   %tmp = call i32 @llvm.riscv.clmulh.i32(i32 %a, i32 %b)
+  ret i32 %tmp
+ }
+@@ -44,10 +44,10 @@ define i32 @clmul32r(i32 %a, i32 %b) nounwind {
+ ; RV32B-NEXT:    clmulr a0, a0, a1
+ ; RV32B-NEXT:    ret
+ ;
+-; RV32BC-LABEL: clmul32r:
+-; RV32BC:       # %bb.0:
+-; RV32BC-NEXT:    clmulr a0, a0, a1
+-; RV32BC-NEXT:    ret
++; RV32ZBC-LABEL: clmul32r:
++; RV32ZBC:       # %bb.0:
++; RV32ZBC-NEXT:    clmulr a0, a0, a1
++; RV32ZBC-NEXT:    ret
+   %tmp = call i32 @llvm.riscv.clmulr.i32(i32 %a, i32 %b)
+  ret i32 %tmp
+ }
+diff --git a/llvm/test/CodeGen/RISCV/rv64zbc-intrinsic.ll b/llvm/test/CodeGen/RISCV/rv64zbc-intrinsic.ll
+index 485b41a8122f..7f78b1945b6a 100644
+--- a/llvm/test/CodeGen/RISCV/rv64zbc-intrinsic.ll
++++ b/llvm/test/CodeGen/RISCV/rv64zbc-intrinsic.ll
+@@ -2,7 +2,7 @@
+ ; RUN: llc -mtriple=riscv64 -mattr=+experimental-b -verify-machineinstrs < %s \
+ ; RUN:   | FileCheck %s -check-prefix=RV64B
+ ; RUN: llc -mtriple=riscv64 -mattr=+experimental-zbc -verify-machineinstrs < %s \
+-; RUN:   | FileCheck %s -check-prefix=RV64BC
++; RUN:   | FileCheck %s -check-prefix=RV64ZBC
+ 
+ declare i64 @llvm.riscv.clmul.i64(i64 %a, i64 %b)
+ 
+@@ -12,10 +12,10 @@ define i64 @clmul64(i64 %a, i64 %b) nounwind {
+ ; RV64B-NEXT:    clmul a0, a0, a1
+ ; RV64B-NEXT:    ret
+ ;
+-; RV64BC-LABEL: clmul64:
+-; RV64BC:       # %bb.0:
+-; RV64BC-NEXT:    clmul a0, a0, a1
+-; RV64BC-NEXT:    ret
++; RV64ZBC-LABEL: clmul64:
++; RV64ZBC:       # %bb.0:
++; RV64ZBC-NEXT:    clmul a0, a0, a1
++; RV64ZBC-NEXT:    ret
+   %tmp = call i64 @llvm.riscv.clmul.i64(i64 %a, i64 %b)
+  ret i64 %tmp
+ }
+@@ -28,10 +28,10 @@ define i64 @clmul64h(i64 %a, i64 %b) nounwind {
+ ; RV64B-NEXT:    clmulh a0, a0, a1
+ ; RV64B-NEXT:    ret
+ ;
+-; RV64BC-LABEL: clmul64h:
+-; RV64BC:       # %bb.0:
+-; RV64BC-NEXT:    clmulh a0, a0, a1
+-; RV64BC-NEXT:    ret
++; RV64ZBC-LABEL: clmul64h:
++; RV64ZBC:       # %bb.0:
++; RV64ZBC-NEXT:    clmulh a0, a0, a1
++; RV64ZBC-NEXT:    ret
+   %tmp = call i64 @llvm.riscv.clmulh.i64(i64 %a, i64 %b)
+  ret i64 %tmp
+ }
+@@ -44,10 +44,10 @@ define i64 @clmul64r(i64 %a, i64 %b) nounwind {
+ ; RV64B-NEXT:    clmulr a0, a0, a1
+ ; RV64B-NEXT:    ret
+ ;
+-; RV64BC-LABEL: clmul64r:
+-; RV64BC:       # %bb.0:
+-; RV64BC-NEXT:    clmulr a0, a0, a1
+-; RV64BC-NEXT:    ret
++; RV64ZBC-LABEL: clmul64r:
++; RV64ZBC:       # %bb.0:
++; RV64ZBC-NEXT:    clmulr a0, a0, a1
++; RV64ZBC-NEXT:    ret
+   %tmp = call i64 @llvm.riscv.clmulr.i64(i64 %a, i64 %b)
+  ret i64 %tmp
+ }
+-- 
+2.33.1
+

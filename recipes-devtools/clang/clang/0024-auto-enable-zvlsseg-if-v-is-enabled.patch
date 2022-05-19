@@ -1,0 +1,24 @@
+From 30fe4ba2e1930bc7f20a213feb741c81fa704c1d Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Thu, 24 Feb 2022 01:17:16 -0800
+Subject: [PATCH 24/24] auto enable zvlsseg if v is enabled
+
+---
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index a24b1fc9f673..ed45e3123eae 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -438,6 +438,7 @@ static bool getArchFeatures(const Driver &D, StringRef MArch,
+       break;
+     case 'v':
+       Features.push_back("+experimental-v");
++      Features.push_back("+experimental-zvlsseg");
+       break;
+     }
+ 
+-- 
+2.33.1
+

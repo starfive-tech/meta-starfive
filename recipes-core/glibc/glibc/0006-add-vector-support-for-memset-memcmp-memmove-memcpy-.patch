@@ -1,0 +1,1529 @@
+From c4c3986117a0d2b5c4e093872f471b2b5b882cee Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 21 Dec 2021 17:42:04 -0800
+Subject: [PATCH 6/8] add vector support for
+ memset/memcmp/memmove/memcpy/memchr/strlen/strcmp
+
+---
+ sysdeps/riscv/riscv-ifunc.h                   |  34 ++++++
+ sysdeps/riscv/rv64/multiarch/Makefile         |   5 +
+ sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c   |   2 +
+ sysdeps/riscv/rv64/multiarch/ifunc-common.h   |  30 +++++
+ .../riscv/rv64/multiarch/ifunc-impl-list.c    |  65 ++++++++++
+ sysdeps/riscv/rv64/multiarch/memchr.c         |  32 +++++
+ sysdeps/riscv/rv64/multiarch/memchr_as.S      |  88 ++++++++++++++
+ sysdeps/riscv/rv64/multiarch/memchr_riscv.S   |  25 ++++
+ sysdeps/riscv/rv64/multiarch/memchr_vector.S  |  53 ++++++++
+ sysdeps/riscv/rv64/multiarch/memcmp.c         |  32 +++++
+ sysdeps/riscv/rv64/multiarch/memcmp_riscv.c   |  29 +++++
+ sysdeps/riscv/rv64/multiarch/memcmp_vector.S  |  56 +++++++++
+ sysdeps/riscv/rv64/multiarch/memcpy.c         |  33 +++++
+ sysdeps/riscv/rv64/multiarch/memcpy_as.S      | 114 ++++++++++++++++++
+ sysdeps/riscv/rv64/multiarch/memcpy_riscv.S   |  25 ++++
+ sysdeps/riscv/rv64/multiarch/memcpy_vector.S  |  54 +++++++++
+ sysdeps/riscv/rv64/multiarch/memmove.c        |  32 +++++
+ sysdeps/riscv/rv64/multiarch/memmove_riscv.c  |  29 +++++
+ sysdeps/riscv/rv64/multiarch/memmove_vector.S |  56 +++++++++
+ sysdeps/riscv/rv64/multiarch/memset.c         |  33 +++++
+ sysdeps/riscv/rv64/multiarch/memset_riscv.c   |  29 +++++
+ sysdeps/riscv/rv64/multiarch/memset_vector.S  |  45 +++++++
+ sysdeps/riscv/rv64/multiarch/rtld-memchr.S    |   1 +
+ sysdeps/riscv/rv64/multiarch/rtld-memcmp.c    |   1 +
+ sysdeps/riscv/rv64/multiarch/rtld-memcpy.S    |   1 +
+ sysdeps/riscv/rv64/multiarch/rtld-memmove.c   |  19 +++
+ sysdeps/riscv/rv64/multiarch/rtld-memset.c    |   1 +
+ sysdeps/riscv/rv64/multiarch/rtld-strcmp.S    |   1 +
+ sysdeps/riscv/rv64/multiarch/rtld-strlen.c    |   1 +
+ sysdeps/riscv/rv64/multiarch/strcmp.c         |  33 +++++
+ sysdeps/riscv/rv64/multiarch/strcmp_.S        |  39 ++++++
+ sysdeps/riscv/rv64/multiarch/strcmp_riscv.S   |   9 ++
+ sysdeps/riscv/rv64/multiarch/strcmp_vector.S  |  54 +++++++++
+ sysdeps/riscv/rv64/multiarch/strlen.c         |  32 +++++
+ sysdeps/riscv/rv64/multiarch/strlen_riscv.c   |  29 +++++
+ sysdeps/riscv/rv64/multiarch/strlen_vector.S  |  46 +++++++
+ sysdeps/riscv/sysdep.h                        |  24 ++++
+ sysdeps/unix/sysv/linux/riscv/sysdep.h        |   2 +-
+ 38 files changed, 1193 insertions(+), 1 deletion(-)
+ create mode 100644 sysdeps/riscv/riscv-ifunc.h
+ create mode 100644 sysdeps/riscv/rv64/multiarch/Makefile
+ create mode 100644 sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/ifunc-common.h
+ create mode 100644 sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memchr.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memchr_as.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memchr_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcmp.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcpy.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcpy_as.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memcpy_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memmove.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memmove_riscv.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memmove_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memset.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memset_riscv.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/memset_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-memchr.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-memcpy.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-memmove.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-memset.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strcmp.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strcmp.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strcmp_.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strcmp_vector.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strlen.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strlen_vector.S
+ create mode 100644 sysdeps/riscv/sysdep.h
+
+diff --git a/sysdeps/riscv/riscv-ifunc.h b/sysdeps/riscv/riscv-ifunc.h
+new file mode 100644
+index 0000000000..6b4ea24758
+--- /dev/null
++++ b/sysdeps/riscv/riscv-ifunc.h
+@@ -0,0 +1,34 @@
++/* Common definition for ifunc resolvers.  Linux/RISCV version.
++   This file is part of the GNU C Library.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++#include <ifunc-init.h>
++
++#define INIT_ARCH()
++
++#define riscv_libc_ifunc_redirected(redirected_name, name, expr)	\
++  __ifunc (redirected_name, name, expr(hwcap), int hwcap, INIT_ARCH)
++
++#if defined SHARED
++# define riscv_libc_ifunc_hidden_def(redirect_name, name) \
++  __hidden_ver1 (name, __GI_##name, redirect_name) \
++    __attribute__ ((visibility ("hidden"))) \
++    __attribute_copy__ (name)
++#else
++# define riscv_libc_ifunc_hidden_def(redirect_name, name)
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/Makefile b/sysdeps/riscv/rv64/multiarch/Makefile
+new file mode 100644
+index 0000000000..3349bf4888
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/Makefile
+@@ -0,0 +1,5 @@
++ifeq ($(subdir),string)
++sysdep_routines += memcpy_vector memcpy_riscv memchr_riscv memchr_vector memcmp_riscv \
++                 memcmp_vector strcmp_riscv strcmp_vector strlen_riscv strlen_vector \
++                 memmove_vector memmove_riscv memset_vector memset_riscv
++endif
+diff --git a/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c b/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
+new file mode 100644
+index 0000000000..2054d18261
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
+@@ -0,0 +1,2 @@
++/* Empty file to override sysdeps/riscv version. See memcpy.S for definitions
++   of these functions.  */
+diff --git a/sysdeps/riscv/rv64/multiarch/ifunc-common.h b/sysdeps/riscv/rv64/multiarch/ifunc-common.h
+new file mode 100644
+index 0000000000..8c4c95371f
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/ifunc-common.h
+@@ -0,0 +1,30 @@
++/* Common definition for memcmp resolver.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sys/auxv.h>
++
++__typeof (REDIRECT_NAME) OPTIMIZE (riscv) attribute_hidden;
++__typeof (REDIRECT_NAME) OPTIMIZE (vector) attribute_hidden;
++
++static inline void *
++IFUNC_SELECTOR (int hwcap)
++{
++  if (hwcap & HWCAP_ISA_V)
++    return OPTIMIZE (vector);
++  return OPTIMIZE (riscv);
++}
+diff --git a/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+new file mode 100644
+index 0000000000..28c6e123f0
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+@@ -0,0 +1,65 @@
++/* Enumerate available IFUNC implementations of a function.  RISCV version.
++   Copyright (C) 2013-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <stdbool.h>
++#include <string.h>
++#include <ldsodefs.h>
++#include <sysdep.h>
++#include <ifunc-impl-list.h>
++
++/* Fill ARRAY of MAX elements with IFUNC implementations for function
++   NAME and return the number of valid entries.  */
++
++size_t
++__libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
++			size_t max)
++{
++  size_t i = 0;
++
++  bool use_rvv = (GLRO(dl_hwcap) & HWCAP_ISA_V) != 0;
++
++  IFUNC_IMPL (i, name, memcpy,
++	      IFUNC_IMPL_ADD (array, i, memcpy, use_rvv, __memcpy_vector)
++	      IFUNC_IMPL_ADD (array, i, memcpy, 1, __memcpy_riscv));
++
++  IFUNC_IMPL (i, name, memchr,
++	      IFUNC_IMPL_ADD (array, i, memchr, use_rvv, __memchr_vector)
++	      IFUNC_IMPL_ADD (array, i, memchr, 1, __memchr_riscv));
++
++  IFUNC_IMPL (i, name, memcmp,
++	      IFUNC_IMPL_ADD (array, i, memcmp, use_rvv, __memcmp_vector)
++	      IFUNC_IMPL_ADD (array, i, memcmp, 1, __memcmp_riscv));
++
++  IFUNC_IMPL (i, name, strcmp,
++	      IFUNC_IMPL_ADD (array, i, strcmp, use_rvv, __strcmp_vector)
++	      IFUNC_IMPL_ADD (array, i, strcmp, 1, __strcmp_riscv));
++
++  IFUNC_IMPL (i, name, strlen,
++	      IFUNC_IMPL_ADD (array, i, strlen, use_rvv, __strlen_vector)
++	      IFUNC_IMPL_ADD (array, i, strlen, 1, __strlen_riscv));
++
++  IFUNC_IMPL (i, name, memmove,
++	      IFUNC_IMPL_ADD (array, i, memmove, use_rvv, __memmove_vector)
++	      IFUNC_IMPL_ADD (array, i, memmove, 1, __memmove_riscv));
++
++  IFUNC_IMPL (i, name, memset,
++	      IFUNC_IMPL_ADD (array, i, memset, use_rvv, __memset_vector)
++	      IFUNC_IMPL_ADD (array, i, memset, 1, __memset_riscv));
++
++  return i;
++}
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr.c b/sysdeps/riscv/rv64/multiarch/memchr.c
+new file mode 100644
+index 0000000000..1544bc3d01
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memchr.c
+@@ -0,0 +1,32 @@
++/* Multiple versions of memchr.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define memchr __redirect_memchr
++# include <string.h>
++# undef memchr
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME memchr
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_memchr, memchr, IFUNC_SELECTOR);
++riscv_libc_ifunc_hidden_def (__redirect_memchr, memchr);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+new file mode 100644
+index 0000000000..557098afda
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -0,0 +1,88 @@
++
++/* The assembly function for memchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++ENTRY (memchr)
++   zext.b	a3,a1
++   beqz	a2, .L_not_found
++   andi	a5,a0,7
++.L_not_aligned:      
++   beqz	a5,.L_aligned_8byte
++   lbu	a5,0(a0)
++   addi	a2,a2,-1
++   beq	a5,a3,.L_found
++   addi	a0,a0,1
++   andi	a5,a0,7
++   bnez	a2,.L_not_aligned
++
++.L_not_found:
++   li	a0,0
++.L_found:   
++   ret
++
++.L_aligned_8byte:
++   zext.b	a1,a1
++   slli	a5,a1,0x8
++   or	a1,a1,a5
++   slli	a5,a1,0x10
++   or	a5,a5,a1
++   slli	a1,a5,0x20
++   li	a4,7
++   or	a1,a1,a5
++   bgeu	a4,a2,.L_less_8bytes
++
++   ld    a7, mask1   
++   ld    a6, mask2
++   
++   li	t1,7
++   j	.L_8byte_compare_loop
++.L_8byte_compare:
++   addi	a2,a2,-8
++   addi	a0,a0,8
++   bgeu	t1,a2,.L_8byte_compare_exit
++.L_8byte_compare_loop:   
++   ld	a5,0(a0)
++   xor	a5,a5,a1
++   add	a4,a5,a7
++   not	a5,a5
++   and	a5,a5,a4
++   and	a5,a5,a6
++   beqz	a5,.L_8byte_compare
++
++.L_less_8bytes:
++   add	a2,a2,a0
++   j	.L_less_8bytes_compare
++.L_less_8bytes_loop:   
++   addi	a0,a0,1
++   beq	a2,a0,.L_not_found
++.L_less_8bytes_compare:   
++   lbu	a5,0(a0)
++   bne	a5,a3,.L_less_8bytes_loop
++   ret
++.L_8byte_compare_exit:
++   bnez	a2,.L_less_8bytes
++   j	.L_not_found
++  .align 3
++mask1:
++  .dword 0xfefefefefefefeff
++mask2:
++  .dword 0x8080808080808080
++END (memchr)
++libc_hidden_builtin_def (memchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_riscv.S b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+new file mode 100644
+index 0000000000..ce7b64bbe0
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+@@ -0,0 +1,25 @@
++/* The assembly function for memchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#define memchr __memchr_riscv
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#include "memchr_as.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_vector.S b/sysdeps/riscv/rv64/multiarch/memchr_vector.S
+new file mode 100644
+index 0000000000..77693d716d
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memchr_vector.S
+@@ -0,0 +1,53 @@
++/* The assembly function for memchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memchr.  */
++/* #ifndef __riscv_vector */
++# define memchr __memchr_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (memchr)
++
++   zext.b	a1,a1
++
++.L_memchr_loop:
++   vsetvli	a3,a2,e8,m8,tu,mu
++   vle8ff.v	v0,(a0)
++   vmseq.vx	v8,v0,a1
++   csrr	a3,vl
++   vfirst.m	a4,v8
++   sub	a2,a2,a3
++   bgez	a4,.L_found
++   add	a0,a0,a3
++   bltu	zero,a2,.L_memchr_loop
++
++.L_found:
++   bltz	a4,.L_not_found
++   
++   add	a0,a0,a4
++   ret
++.L_not_found:   
++   add	a0,zero,zero
++   ret
++END (memchr)
++libc_hidden_builtin_def (memchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp.c b/sysdeps/riscv/rv64/multiarch/memcmp.c
+new file mode 100644
+index 0000000000..29730c6ed1
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcmp.c
+@@ -0,0 +1,32 @@
++/* Multiple versions of memcmp.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define memcmp __redirect_memcmp
++# include <string.h>
++# undef memcmp
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME memcmp
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_memcmp, memcmp, IFUNC_SELECTOR);
++riscv_libc_ifunc_hidden_def (__redirect_memcmp, memcmp);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
+new file mode 100644
+index 0000000000..dda15d7d35
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
+@@ -0,0 +1,29 @@
++/* RISCV C version memcmp.
++   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#undef weak_alias
++#  define MEMCMP __memcmp_riscv
++# include <string/memcmp.c>
++#else
++
++# include <string/memcmp.c>
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_vector.S b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+new file mode 100644
+index 0000000000..f6cbc1307b
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+@@ -0,0 +1,56 @@
++/* The assembly function for memcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines strcmp.  */
++/* #ifndef __riscv_vector */
++# define memcmp __memcmp_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (memcmp)
++
++.L_compare_loop:
++   vsetvli	a3,a2,e8,m8,tu,mu
++   vle8.v	v0,(a0)
++   vle8.v	v8,(a1)
++   vmsne.vv	v16,v0,v8
++   sub	a2,a2,a3
++   vfirst.m	a4,v16
++   bgez	a4,.L_compare_not_equal
++   add	a0,a0,a3
++   add	a1,a1,a3
++   bltu	zero,a2,.L_compare_loop
++   bltz	a4,.L_compare_equal
++   
++.L_compare_not_equal:   
++   add	a0,a0,a4
++   add	a1,a1,a4
++   lbu	a5,0(a0)
++   lbu	a6,0(a1)
++   sub	a0,a5,a6
++   ret
++.L_compare_equal:
++   add	a0,zero,zero
++   ret
++END (memcmp)
++libc_hidden_builtin_def (memcmp)
++
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy.c b/sysdeps/riscv/rv64/multiarch/memcpy.c
+new file mode 100644
+index 0000000000..0f20b7fd44
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcpy.c
+@@ -0,0 +1,33 @@
++/* Multiple versions of memcpy.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define memcpy __redirect_memcpy
++# include <string.h>
++# undef memcpy
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME memcpy
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_memcpy, memcpy, IFUNC_SELECTOR);
++
++riscv_libc_ifunc_hidden_def (__redirect_memcpy, memcpy);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_as.S b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+new file mode 100644
+index 0000000000..f0a074df13
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+@@ -0,0 +1,114 @@
++/* The assembly function for memcpy.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++
++#  define LABLE_ALIGN   \
++        .balignl 16, 0x00000013
++
++ENTRY (memcpy)
++
++        /* Test if len less than 8 bytes.  */
++        mv      t6, a0
++        sltiu   a3, a2, 8
++        li     t3, 1
++        bnez    a3, .L_copy_by_byte
++
++        andi    a3, a0, 7
++        li     t5, 8
++	/* Test if dest is not 8 bytes aligned.  */
++        bnez    a3, .L_dest_not_aligned
++.L_dest_aligned:
++        /* If dest is aligned, then copy.  */
++        srli    t4, a2, 6
++        /* Test if len less than 32 bytes.  */
++        beqz     t4, .L_len_less_16bytes
++	andi    a2, a2, 63
++
++.L_len_larger_16bytes:
++        ld      a4, 0(a1)
++        sd      a4, 0(a0)
++        ld      a5, 8(a1)
++        sd      a5, 8(a0)
++        ld      a6, 16(a1)
++        sd      a6, 16(a0)
++        ld      a7, 24(a1)
++        sd      a7, 24(a0)
++        ld      a4, 32(a1)
++        sd      a4, 32(a0)
++        ld      a5, 40(a1)
++        sd      a5, 40(a0)
++        ld      a6, 48(a1)
++        sd      a6, 48(a0)
++        ld      a7, 56(a1)
++        sub     t4, t4, t3
++        addi    a1, a1, 64
++        sd      a7, 56(a0)
++        addi    a0, a0, 64
++	bnez	t4, .L_len_larger_16bytes
++
++.L_len_less_16bytes:
++	srli    t4, a2, 2
++        beqz     t4, .L_copy_by_byte
++        andi    a2, a2, 3
++.L_len_less_16bytes_loop:
++        lw      a4, 0(a1)
++	sub	t4, t4, t3
++        addi    a1, a1, 4
++        sw      a4, 0(a0)
++        addi    a0, a0, 4
++	bnez    t4, .L_len_less_16bytes_loop
++
++        /* Copy tail.  */
++.L_copy_by_byte:
++        andi    t4, a2, 7
++        beqz     t4, .L_return
++.L_copy_by_byte_loop:
++        lb     a4, 0(a1)
++	sub	t4, t4, t3
++        addi    a1, a1, 1
++        sb     a4, 0(a0)
++        addi    a0, a0, 1
++	bnez	t4, .L_copy_by_byte_loop
++
++.L_return:
++        mv      a0, t6
++        ret
++
++        /* If dest is not aligned, just copying some bytes makes the dest
++           align.  */
++.L_dest_not_aligned:
++        sub     a3, t5, a3
++        mv      t5, a3
++.L_dest_not_aligned_loop:
++        /* Makes the dest align.  */
++        lb     a4, 0(a1)
++	sub	a3, a3, t3
++        addi    a1, a1, 1
++        sb     a4, 0(a0)
++        addi    a0, a0, 1
++	bnez	a3, .L_dest_not_aligned_loop
++        sub     a2, a2, t5
++	sltiu	a3, a2, 4
++        bnez    a3, .L_copy_by_byte
++        /* Check whether the src is aligned.  */
++        j		.L_dest_aligned
++END (memcpy)
++
++libc_hidden_builtin_def (memcpy)
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S b/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
+new file mode 100644
+index 0000000000..a0ba2150fc
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
+@@ -0,0 +1,25 @@
++/* The assembly function for memcpy.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++#define memcpy __memcpy_riscv
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#include "memcpy_as.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_vector.S b/sysdeps/riscv/rv64/multiarch/memcpy_vector.S
+new file mode 100644
+index 0000000000..2319647de8
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_vector.S
+@@ -0,0 +1,54 @@
++/* The assembly function for memcpy.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memcpy.  */
++/* #ifndef __riscv_vector */
++# define memcpy __memcpy_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (memcpy)
++	mv	a3, a0
++	sltiu	a4, a2, 16
++	bnez	a4, .loop_cpy
++	andi	a5, a0, 15
++	li	a6, 16
++	beqz	a5, .loop_cpy
++	sub	a5, a6, a5
++	vsetvli	t0, a5, e8, m4
++	vle8.v	v0, (a1)
++	add	a1, a1, t0
++	sub	a2, a2, t0
++	vse8.v	v0, (a3)
++	add	a3, a3, t0
++.loop_cpy:
++	vsetvli	t0, a2, e8, m4
++	vle8.v	v0, (a1)
++	add	a1, a1, t0
++	sub	a2, a2, t0
++	vse8.v	v0, (a3)
++	add	a3, a3, t0
++	bnez	a2, .loop_cpy
++	ret
++END (memcpy)
++
++libc_hidden_builtin_def (memcpy)
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove.c b/sysdeps/riscv/rv64/multiarch/memmove.c
+new file mode 100644
+index 0000000000..8d33da166d
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memmove.c
+@@ -0,0 +1,32 @@
++/* Multiple versions of memmove.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define memmove __redirect_memmove
++# include <string.h>
++# undef memmove
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME memmove
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_memmove, memmove, IFUNC_SELECTOR);
++riscv_libc_ifunc_hidden_def (__redirect_memmove, memmove);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_riscv.c b/sysdeps/riscv/rv64/multiarch/memmove_riscv.c
+new file mode 100644
+index 0000000000..e11a9d1a43
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memmove_riscv.c
+@@ -0,0 +1,29 @@
++/* RISCV C version memmov.
++   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#undef weak_alias
++#  define MEMMOVE __memmove_riscv
++# include <string/memmove.c>
++#else
++
++# include <string/memmove.c>
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_vector.S b/sysdeps/riscv/rv64/multiarch/memmove_vector.S
+new file mode 100644
+index 0000000000..7bf89e6cf6
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memmove_vector.S
+@@ -0,0 +1,56 @@
++/* The assembly function for memmov.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memmov.  */
++/* #ifndef __riscv_vector */
++# define memmove __memmove_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (memmove)
++	add	a4,a0,zero
++	bgeu	a1,a0,.L_forward_copy_loop
++	add	a5,a1,a2
++	add	a6,a0,a2
++	bltu	a0,a5,.L_backward_copy_loop
++
++.L_forward_copy_loop:
++	vsetvli	a3,a2,e8,m8,tu,mu
++	vle8.v	v0,(a1)
++	sub	a2,a2,a3
++	add	a1,a1,a3
++	vse8.v	v0,(a4)
++	add	a4,a4,a3
++	bltu	zero,a2,.L_forward_copy_loop
++	ret
++
++.L_backward_copy_loop:
++	vsetvli	a3,a2,e8,m8,tu,mu
++	sub	a5,a5,a3
++	vle8.v	v0,(a5)
++	sub	a2,a2,a3
++	sub	a6,a6,a3
++	vse8.v	v0,(a6)
++	bltu	zero,a2,.L_backward_copy_loop
++	ret
++END (memmove)
++libc_hidden_builtin_def (memmove)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memset.c b/sysdeps/riscv/rv64/multiarch/memset.c
+new file mode 100644
+index 0000000000..0d3582e49f
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memset.c
+@@ -0,0 +1,33 @@
++/* Multiple versions of memset.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define memset __redirect_memset
++# include <string.h>
++# undef memset
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME memset
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_memset, memset, IFUNC_SELECTOR);
++
++riscv_libc_ifunc_hidden_def (__redirect_memset, memset);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_riscv.c b/sysdeps/riscv/rv64/multiarch/memset_riscv.c
+new file mode 100644
+index 0000000000..1101c10f96
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memset_riscv.c
+@@ -0,0 +1,29 @@
++/* RISCV C version memset.
++   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#undef weak_alias
++#  define MEMSET __memset_riscv
++# include <string/memset.c>
++#else
++
++# include <string/memset.c>
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_vector.S b/sysdeps/riscv/rv64/multiarch/memset_vector.S
+new file mode 100644
+index 0000000000..54d04238d3
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/memset_vector.S
+@@ -0,0 +1,45 @@
++
++/* The assembly function for memset.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memcpy.  */
++/* #ifndef __riscv_vector */
++# define memset __memset_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (memset)
++
++  zext.b	a1,a1
++  add	a5,a0,zero
++  vsetvli	a3,a2,e8,m8,tu,mu
++  vmv.v.x	v0,a1
++.L_memset_loop:
++  vse8.v	v0,(a5)
++  sub	a2,a2,a3
++  add	a5,a5,a3
++  vsetvli	a3,a2,e8,m8,tu,mu
++  bltu	zero,a2,.L_memset_loop
++  ret
++
++END (memset)
++libc_hidden_builtin_def (memset)
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memchr.S b/sysdeps/riscv/rv64/multiarch/rtld-memchr.S
+new file mode 100644
+index 0000000000..0e68548e97
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memchr.S
+@@ -0,0 +1 @@
++#include "memchr_as.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c b/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
+new file mode 100644
+index 0000000000..25faa66478
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
+@@ -0,0 +1 @@
++#include "memcmp_riscv.c"
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memcpy.S b/sysdeps/riscv/rv64/multiarch/rtld-memcpy.S
+new file mode 100644
+index 0000000000..81f48f3aea
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memcpy.S
+@@ -0,0 +1 @@
++#include "memcpy_as.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memmove.c b/sysdeps/riscv/rv64/multiarch/rtld-memmove.c
+new file mode 100644
+index 0000000000..435c059184
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memmove.c
+@@ -0,0 +1,19 @@
++/* RISCV C version memmove.
++   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include "memmove_riscv.c"
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memset.c b/sysdeps/riscv/rv64/multiarch/rtld-memset.c
+new file mode 100644
+index 0000000000..eff6790df5
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memset.c
+@@ -0,0 +1 @@
++#include "memset_riscv.c"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strcmp.S b/sysdeps/riscv/rv64/multiarch/rtld-strcmp.S
+new file mode 100644
+index 0000000000..eb6ff5f8d3
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strcmp.S
+@@ -0,0 +1 @@
++#include "strcmp_.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strlen.c b/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+new file mode 100644
+index 0000000000..73308eb0fa
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+@@ -0,0 +1 @@
++#include "strlen_riscv.c"
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp.c b/sysdeps/riscv/rv64/multiarch/strcmp.c
+new file mode 100644
+index 0000000000..56969c77e8
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strcmp.c
+@@ -0,0 +1,33 @@
++/* Multiple versions of strcmp.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define strcmp __redirect_strcmp
++# include <string.h>
++# undef strcmp
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME strcmp
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_strcmp, strcmp, IFUNC_SELECTOR);
++
++riscv_libc_ifunc_hidden_def (__redirect_strcmp, strcmp);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_.S b/sysdeps/riscv/rv64/multiarch/strcmp_.S
+new file mode 100644
+index 0000000000..db5a6346b8
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_.S
+@@ -0,0 +1,39 @@
++
++
++/* The assembly function for strcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (strcmp)
++.L_strcmp_by_byte:
++   lbu	a5,0(a0)
++   addi	a1,a1,1
++   addi	a0,a0,1
++   lbu	a4,-1(a1)
++   beqz	a5,.L_strcmp_by_byte_exit
++   beq	a5,a4,.L_strcmp_by_byte
++   subw	a0,a5,a4
++   ret
++.L_strcmp_by_byte_exit:
++   negw	a0,a4
++   ret
++
++END (strcmp)
++libc_hidden_builtin_def (strcmp)
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+new file mode 100644
+index 0000000000..93e598f0c5
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+@@ -0,0 +1,9 @@
++
++/* For __riscv_vector this file defines strcmp.  */
++/* #ifndef __riscv_vector */
++# define strcmp __strcmp_riscv
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++#include "strcmp_.S"
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_vector.S b/sysdeps/riscv/rv64/multiarch/strcmp_vector.S
+new file mode 100644
+index 0000000000..41d653748a
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_vector.S
+@@ -0,0 +1,54 @@
++/* The assembly function for strcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines strcmp.  */
++/* #ifndef __riscv_vector */
++# define strcmp __strcmp_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (strcmp)
++
++   vsetvli	a3,zero,e8,m8,tu,mu
++.L_strcmp_loop:
++   vle8ff.v	v0,(a0)
++   vmseq.vx	v16,v0,zero
++   vle8ff.v	v8,(a1)
++   vmsne.vv	v17,v0,v8
++   vmor.mm v16,v16,v17
++   vfirst.m	a4,v16
++   bgez a4, .L_strcmp_loop_exit
++   add a0,a0,a3
++   add a1,a1,a3
++   j .L_strcmp_loop
++
++.L_strcmp_loop_exit:
++   add a0,a0,a4
++   add a1,a1,a4
++   lbu a4,0(a0)
++  	lbu a5,0(a1)
++  	sub a0,a4,a5
++   ret
++
++END (strcmp)
++libc_hidden_builtin_def (strcmp)
++
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen.c b/sysdeps/riscv/rv64/multiarch/strlen.c
+new file mode 100644
+index 0000000000..292c9103fa
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strlen.c
+@@ -0,0 +1,32 @@
++/* Multiple versions of strlen.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++# define strlen __redirect_strlen
++# include <string.h>
++# undef strlen
++
++# include <riscv-ifunc.h>
++
++# define SYMBOL_NAME strlen
++# include "ifunc-common.h"
++
++riscv_libc_ifunc_redirected (__redirect_strlen, strlen, IFUNC_SELECTOR);
++riscv_libc_ifunc_hidden_def (__redirect_strlen, strlen);
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_riscv.c b/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+new file mode 100644
+index 0000000000..e17a5dde31
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+@@ -0,0 +1,29 @@
++/* RISCV C version strlen.
++   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++#undef libc_hidden_builtin_def
++#define libc_hidden_builtin_def(name)
++
++#undef weak_alias
++#  define STRLEN __strlen_riscv
++# include <string/strlen.c>
++#else
++
++# include <string/strlen.c>
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_vector.S b/sysdeps/riscv/rv64/multiarch/strlen_vector.S
+new file mode 100644
+index 0000000000..dd080e3a2f
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strlen_vector.S
+@@ -0,0 +1,46 @@
++/* The assembly function for strlen.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines strlen.  */
++/* #ifndef __riscv_vector */
++# define strlen __strlen_vector
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(a)
++/* #endif */
++
++	.p2align 6
++ENTRY (strlen)
++   mv	a1,a0
++
++.strlen_loop:
++   vsetvli	a2,zero,e8,m8,tu,mu
++   vle8ff.v	v0,(a1)
++   csrr	a2,vl
++   vmseq.vi	v8,v0,0
++   vfirst.m	a3,v8
++   add	a1,a1,a2
++   bltz	a3, .strlen_loop
++   add	a0,a0,a2
++   add	a1,a1,a3
++   sub	a0,a1,a0
++   ret
++
++END (strlen)
++libc_hidden_builtin_def (strlen)
+diff --git a/sysdeps/riscv/sysdep.h b/sysdeps/riscv/sysdep.h
+new file mode 100644
+index 0000000000..5229cfaf02
+--- /dev/null
++++ b/sysdeps/riscv/sysdep.h
+@@ -0,0 +1,24 @@
++/* Copyright (C) 2011-2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#define _SYSDEPS_SYSDEP_H 1
++#include <sysdeps/generic/sysdep.h>
++#include <sys/auxv.h>
++
++#ifdef	__ASSEMBLER__
++
++#endif	/* __ASSEMBLER__ */
+diff --git a/sysdeps/unix/sysv/linux/riscv/sysdep.h b/sysdeps/unix/sysv/linux/riscv/sysdep.h
+index c9f8fd8236..7b75bdfee2 100644
+--- a/sysdeps/unix/sysv/linux/riscv/sysdep.h
++++ b/sysdeps/unix/sysv/linux/riscv/sysdep.h
+@@ -21,6 +21,7 @@
+ 
+ #include <sysdeps/unix/sysv/linux/generic/sysdep.h>
+ #include <tls.h>
++# include <bits/hwcap.h>
+ 
+ #undef SYS_ify
+ #define SYS_ify(syscall_name)	__NR_##syscall_name
+@@ -50,7 +51,6 @@
+ 
+ #ifdef __ASSEMBLER__
+ 
+-# include <bits/hwcap.h>
+ # include <sys/asm.h>
+ 
+ # define ENTRY(name) LEAF(name)
+-- 
+2.33.1
+
