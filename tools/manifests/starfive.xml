@@ -4,7 +4,7 @@
   <remote name="openembedded" fetch="git://github.com/openembedded/" />
   <remote name="riscv" fetch="git://github.com/riscv/" />
   <default remote="openembedded" revision="master" />
-  <remote name="starfive" fetch="ssh://git@192.168.110.45/starfive-tech" />
+  <remote name="starfive" fetch="git://github.com/starfive-tech" />
   <remote name="kraj" fetch="git://github.com/kraj" />
 
   <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="hardknott" />
