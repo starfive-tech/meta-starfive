@@ -1,0 +1,61 @@
+From dccca6f853d2c9ed88bce3f3082dd2b46f179f3d Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 5 Jan 2022 19:27:39 -0800
+Subject: [PATCH 3/6] add multilib v&b support for baremetal toolchain
+
+---
+ clang/lib/Driver/ToolChains/Gnu.cpp | 30 +++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
+index a10edc3db409..045f063b28f2 100644
+--- a/clang/lib/Driver/ToolChains/Gnu.cpp
++++ b/clang/lib/Driver/ToolChains/Gnu.cpp
+@@ -1656,7 +1656,8 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+   constexpr RiscvMultilib RISCVMultilibSet[] = {
+       {"rv32i", "ilp32"},     {"rv32im", "ilp32"},     {"rv32iac", "ilp32"},
+       {"rv32imac", "ilp32"},  {"rv32imafc", "ilp32f"}, {"rv64imac", "lp64"},
+-      {"rv64imafdc", "lp64d"}};
++      {"rv64imafdc", "lp64d"}, {"rv64imafdc_zba_zbb_zbc_zbs", "lp64d"},
++      {"rv64imafdcv_zba_zbb_zbc_zbs", "lp64d"}, {"rv64imafdcv", "lp64d"},};
+ 
+   std::vector<Multilib> Ms;
+   for (auto Element : RISCVMultilibSet) {
+@@ -1682,8 +1683,33 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+   llvm::StringSet<> Added_ABIs;
+   StringRef ABIName = tools::riscv::getRISCVABI(Args, TargetTriple);
+   StringRef MArch = tools::riscv::getRISCVArch(Args, TargetTriple);
++  std::string Ext, Extra;
++  for (auto I = MArch.begin(), E = MArch.end(); I != E; ) {
++    char c = *I;
++    switch (c) {
++      default: 
++      Ext += c;
++      break;
++
++      case 'g':
++      Ext += "imafd";
++      break;
++      
++      case 'b':
++      Extra += "_zba_zbb_zbc_zbs";
++      break;
++
++      case '_':
++      for (;I != E; I++)
++        Ext += *I;
++      continue;    
++    }
++    ++I;
++  }
++  Ext += Extra;  
++  
+   for (auto Element : RISCVMultilibSet) {
+-    addMultilibFlag(MArch == Element.march,
++    addMultilibFlag(Ext == Element.march,
+                     Twine("march=", Element.march).str().c_str(), Flags);
+     if (!Added_ABIs.count(Element.mabi)) {
+       Added_ABIs.insert(Element.mabi);
+-- 
+2.25.1
+

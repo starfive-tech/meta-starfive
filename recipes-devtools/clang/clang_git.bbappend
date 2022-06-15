@@ -1,4 +1,4 @@
-MAJOR_VER = "14"
+MAJOR_VER = "15"
 MINOR_VER = "0"
 PATCH_VER = "0"
 
@@ -7,6 +7,10 @@ LDFLAGS:remove:class-nativesdk = "-fuse-ld=lld"
 FILES:${PN} += "${libdir}/*"
 
 PACKAGECONFIG:append:class-native = " bootstrap"
+
+PASSTHROUGH:append = "LLDB_PYTHON_EXE_RELATIVE_PATH;LLDB_PYTHON_EXT_SUFFIX;\"
+
+LLVM_TARGETS_TO_BUILD = "RISCV;X86"
 
 EXTRA_OECMAKE:append:class-native = " \
 			-DCLANG_VENDOR="StarFive" \
@@ -24,8 +28,10 @@ EXTRA_OECMAKE:append:class-native = " \
 			-DLLVM_ENABLE_WARNINGS=OFF \
 			-DLLVM_ENABLE_ASSERTIONS=TRUE \
 			-DLLVM_INCLUDE_UTILS=ON \
+			-DLLDB_PYTHON_EXE_RELATIVE_PATH="recipe-sysroot-native/usr/bin/python3-native/python3.9" \
 			-DLLDB_PYTHON_RELATIVE_PATH="recipe-sysroot-native/usr/bin/python3-native/" \
-			-DBOOTSTRAP_CMAKE_BUILD_TYPE=Release \
+                        -DLLDB_PYTHON_EXT_SUFFIX=".so" \
+                        -DBOOTSTRAP_CMAKE_BUILD_TYPE=Release \
 			-DBOOTSTRAP_LLVM_APPEND_VC_REV=OFF \
 			-DBOOTSTRAP_LLVM_INSTALL_TOOLCHAIN_ONLY=ON \
 			-DBOOTSTRAP_COMPILER_RT_USE_BUILTINS_LIBRARY=ON \
