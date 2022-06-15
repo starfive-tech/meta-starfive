@@ -20,4 +20,7 @@ SRC_URI += "\
      file://0013-RISC-V-Hypervisor-ext-support-Privileged-Spec-1.12.patch \
      file://0014-fixed-a-compiled-error-when-enable-gdb.patch \
      file://0015-fix-incorrect-pref-address-range.patch \
+     file://0016-Rename-some-assembler-mnemonic-for-rvv1.0.patch \
+     file://0017-add-miss-change-riscv-opc.h-for-rvv1.0.patch \
+     file://0018-ignore-zvl-and-zve-extension-for-now.patch \
 "

@@ -1,0 +1,45 @@
+From 934316687cfbd86ae14e073dbdc9f4c88cf61f22 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Fri, 15 Apr 2022 16:00:53 +0800
+Subject: [PATCH 17/18] add miss change riscv-opc.h for rvv1.0
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ include/opcode/riscv-opc.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 8963216302..bc43e710f6 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2531,21 +2531,21 @@ funct6 VM  VS2  VS1/RS1/IMM funct3 VD   opcode
+ #define MASK_VMANDMM     0xfe00707f
+ #define MATCH_VMNANDMM   0x76002057
+ #define MASK_VMNANDMM    0xfe00707f
+-#define MATCH_VMANDNOTMM 0x62002057
+-#define MASK_VMANDNOTMM  0xfe00707f
++#define MATCH_VMANDNMM   0x62002057
++#define MASK_VMANDNMM    0xfe00707f
+ #define MATCH_VMXORMM    0x6e002057
+ #define MASK_VMXORMM     0xfe00707f
+ #define MATCH_VMORMM     0x6a002057
+ #define MASK_VMORMM      0xfe00707f
+ #define MATCH_VMNORMM    0x7a002057
+ #define MASK_VMNORMM     0xfe00707f
+-#define MATCH_VMORNOTMM  0x72002057
+-#define MASK_VMORNOTMM   0xfe00707f
++#define MATCH_VMORNMM    0x72002057
++#define MASK_VMORNMM     0xfe00707f
+ #define MATCH_VMXNORMM   0x7e002057
+ #define MASK_VMXNORMM    0xfe00707f
+ 
+-#define MATCH_VPOPCM   0x40082057
+-#define MASK_VPOPCM    0xfc0ff07f
++#define MATCH_VCPOPM   0x40082057
++#define MASK_VCPOPM    0xfc0ff07f
+ #define MATCH_VFIRSTM  0x4008a057
+ #define MASK_VFIRSTM   0xfc0ff07f
+ 
+-- 
+2.25.1
+
