@@ -1,22 +1,19 @@
-From e33c9d90d2e9f0abec84fbd009150a4d19cec01c Mon Sep 17 00:00:00 2001
-From: Jun Yuan Tan <junyuan.tan@starfivetech.com>
-Date: Tue, 9 Nov 2021 10:03:40 +0800
-Subject: [PATCH 04/34] llvm: TargetLibraryInfo: Undefine libc functions if
- they are macros
+From 2da0422b45b2b9842a2ceb6840beba05356057d2 Mon Sep 17 00:00:00 2001
+From: Khem Raj <raj.khem@gmail.com>
+Date: Sat, 21 May 2016 00:33:20 +0000
+Subject: [PATCH] llvm: TargetLibraryInfo: Undefine libc functions if they are
+ macros
 
 musl defines some functions as macros and not inline functions
 if this is the case then make sure to undefine them
 
-Rebased to LLVM 14.0.0 by Jun Yuan Tan
-
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
-Signed-off-by: Jun Yuan Tan <junyuan.tan@starfivetech.com>
 ---
  .../llvm/Analysis/TargetLibraryInfo.def       | 21 +++++++++++++++++++
  1 file changed, 21 insertions(+)
 
 diff --git a/llvm/include/llvm/Analysis/TargetLibraryInfo.def b/llvm/include/llvm/Analysis/TargetLibraryInfo.def
-index ded53617b304..da612e9b4352 100644
+index 9c1abef33b28..29d2a79ddecc 100644
 --- a/llvm/include/llvm/Analysis/TargetLibraryInfo.def
 +++ b/llvm/include/llvm/Analysis/TargetLibraryInfo.def
 @@ -815,6 +815,9 @@ TLI_DEFINE_STRING_INTERNAL("fmodl")
@@ -69,7 +66,7 @@ index ded53617b304..da612e9b4352 100644
  TLI_DEFINE_ENUM_INTERNAL(lstat64)
  TLI_DEFINE_STRING_INTERNAL("lstat64")
  /// void *malloc(size_t size);
-@@ -1256,6 +1271,9 @@ TLI_DEFINE_STRING_INTERNAL("sscanf")
+@@ -1262,6 +1277,9 @@ TLI_DEFINE_STRING_INTERNAL("sscanf")
  TLI_DEFINE_ENUM_INTERNAL(stat)
  TLI_DEFINE_STRING_INTERNAL("stat")
  /// int stat64(const char *path, struct stat64 *buf);
@@ -79,7 +76,7 @@ index ded53617b304..da612e9b4352 100644
  TLI_DEFINE_ENUM_INTERNAL(stat64)
  TLI_DEFINE_STRING_INTERNAL("stat64")
  /// int statvfs(const char *path, struct statvfs *buf);
-@@ -1391,6 +1409,9 @@ TLI_DEFINE_STRING_INTERNAL("times")
+@@ -1397,6 +1415,9 @@ TLI_DEFINE_STRING_INTERNAL("times")
  TLI_DEFINE_ENUM_INTERNAL(tmpfile)
  TLI_DEFINE_STRING_INTERNAL("tmpfile")
  /// FILE *tmpfile64(void)
@@ -89,6 +86,3 @@ index ded53617b304..da612e9b4352 100644
  TLI_DEFINE_ENUM_INTERNAL(tmpfile64)
  TLI_DEFINE_STRING_INTERNAL("tmpfile64")
  /// int toascii(int c);
--- 
-2.33.1
-

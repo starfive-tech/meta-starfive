@@ -1,6 +1,6 @@
 FORK = "starfive-tech"
 BRANCH = "starfive-5.15-dubhe"
-SRCREV = "4c4e877d3e5d34af8db62ed4a938e0553554ea53"
+SRCREV = "cbb31a27ff5e0fa07b106691a9ad9851435a5a07"
 
 LINUX_VERSION = "5.15.0"
 LINUX_VERSION_EXTENSION:append = "-starlight"

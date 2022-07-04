@@ -1,0 +1,75 @@
+From 49624b4167173ffbbf3bdf1b9cfa33d5efcd1f0b Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Fri, 15 Apr 2022 02:16:43 -0700
+Subject: [PATCH 5/6] support "b" letter in march string
+
+---
+ llvm/lib/Support/RISCVISAInfo.cpp      |  8 +++++++-
+ llvm/lib/Target/RISCV/RISCV.td         | 11 +++++++++++
+ llvm/lib/Target/RISCV/RISCVSubtarget.h |  2 ++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/Support/RISCVISAInfo.cpp b/llvm/lib/Support/RISCVISAInfo.cpp
+index 20dd08f17311..edeceeaf4e82 100644
+--- a/llvm/lib/Support/RISCVISAInfo.cpp
++++ b/llvm/lib/Support/RISCVISAInfo.cpp
+@@ -600,7 +600,13 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
+       return createStringError(errc::invalid_argument,
+                                "unsupported standard user-level extension '%c'",
+                                C);
+-    ISAInfo->addExtension(std::string(1, C), Major, Minor);
++    if (C == 'b') {
++      ISAInfo->addExtension("zba", Major, Minor);
++      ISAInfo->addExtension("zbb", Major, Minor);
++      ISAInfo->addExtension("zbc", Major, Minor);
++      ISAInfo->addExtension("zbs", Major, Minor);
++    } else 
++      ISAInfo->addExtension(std::string(1, C), Major, Minor);
+ 
+     // Consume full extension name and version, including any optional '_'
+     // between this extension and the next
+diff --git a/llvm/lib/Target/RISCV/RISCV.td b/llvm/lib/Target/RISCV/RISCV.td
+index 2940fdf04192..e9b64bdafab8 100644
+--- a/llvm/lib/Target/RISCV/RISCV.td
++++ b/llvm/lib/Target/RISCV/RISCV.td
+@@ -193,6 +193,17 @@ def HasStdExtZbbOrZbp
+                                    "'Zbb' (Basic Bit-Manipulation) or "
+                                    "'Zbp' (Permutation 'Zb' Instructions)">;
+ 
++def FeatureStdExtB
++    : SubtargetFeature<"b", "HasStdExtB", "true",
++                       "'B' (Bit Manipulation Instructions)",
++                       [FeatureStdExtZba,
++                        FeatureStdExtZbb,
++                        FeatureStdExtZbc,
++                        FeatureStdExtZbs]>;
++def HasStdExtB : Predicate<"Subtarget->hasStdExtB()">,
++                           AssemblerPredicate<(all_of FeatureStdExtB),
++                           "'B' (Bit Manipulation Instructions)">;
++
+ def FeatureStdExtZbkb
+     : SubtargetFeature<"zbkb", "HasStdExtZbkb", "true",
+                        "'Zbkb' (Bitmanip instructions for Cryptography)">;
+diff --git a/llvm/lib/Target/RISCV/RISCVSubtarget.h b/llvm/lib/Target/RISCV/RISCVSubtarget.h
+index a63c07597a2c..75d20193c9a0 100644
+--- a/llvm/lib/Target/RISCV/RISCVSubtarget.h
++++ b/llvm/lib/Target/RISCV/RISCVSubtarget.h
+@@ -65,6 +65,7 @@ private:
+   bool HasStdExtF = false;
+   bool HasStdExtD = false;
+   bool HasStdExtC = false;
++  bool HasStdExtB = false;  
+   bool HasStdExtZihintpause = false;
+   bool HasStdExtZba = false;
+   bool HasStdExtZbb = false;
+@@ -164,6 +165,7 @@ public:
+   bool hasStdExtC() const { return HasStdExtC; }
+   bool hasStdExtV() const { return HasStdExtV; }
+   bool hasStdExtZihintpause() const { return HasStdExtZihintpause; }
++  bool hasStdExtB() const { return HasStdExtB; }
+   bool hasStdExtZba() const { return HasStdExtZba; }
+   bool hasStdExtZbb() const { return HasStdExtZbb; }
+   bool hasStdExtZbc() const { return HasStdExtZbc; }
+-- 
+2.25.1
+

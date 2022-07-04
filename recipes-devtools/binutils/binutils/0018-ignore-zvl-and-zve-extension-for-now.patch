@@ -1,0 +1,31 @@
+From 9851835f05178608811784dec135c598146d9d67 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 18 Apr 2022 09:23:06 -0700
+Subject: [PATCH 18/18] ignore zvl and zve extension for now
+
+---
+ bfd/elfxx-riscv.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/bfd/elfxx-riscv.c b/bfd/elfxx-riscv.c
+index 24c045c46e..aa0a2ee537 100644
+--- a/bfd/elfxx-riscv.c
++++ b/bfd/elfxx-riscv.c
+@@ -1714,6 +1714,14 @@ riscv_parse_prefixed_ext (riscv_parse_subset_t *rps,
+ 	  return NULL;
+ 	}
+ 
++	// we ignore zvl extension now.
++	  if (!strcasecmp ("zvl", subset) || !strcasecmp ("zve", subset))
++	{
++		while (*p != '\0' && *p != '_')
++			p++;
++		continue;
++	}
++
+       riscv_parse_add_subset (rps, subset,
+ 			      major_version,
+ 			      minor_version, false);
+-- 
+2.25.1
+

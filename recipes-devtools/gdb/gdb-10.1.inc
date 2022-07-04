@@ -13,6 +13,8 @@ SRC_URI = "git://github.com/riscv/riscv-binutils-gdb.git;branch=${BRANCH};protoc
            file://0001-add-b-v-extension-support.patch \
            file://0002-RISC-V-Hypervisor-ext-drop-Privileged-Spec-1.9.1-and.patch \
            file://0003-RISC-V-Hypervisor-ext-support-Privileged-Spec-1.12.patch \
+           file://0004-add-pref-instruction.patch \
+           file://0005-Rename-some-assembler-mnemonic-for-rvv1.0.patch \
            file://0001-make-man-install-relative-to-DESTDIR.patch \
            file://0002-mips-linux-nat-Define-_ABIO32-if-not-defined.patch \
            file://0003-ppc-ptrace-Define-pt_regs-uapi_pt_regs-on-GLIBC-syst.patch \
