@@ -1,0 +1,38 @@
+diff --git a/src/flash/nor/fespi.c b/src/flash/nor/fespi.c
+index b2b3f97df..215734bae 100644
+--- a/src/flash/nor/fespi.c
++++ b/src/flash/nor/fespi.c
+@@ -138,6 +138,8 @@ static const struct fespi_target target_devices[] = {
+ 	/* name,   tap_idcode, ctrl_base */
+ 	{ "Freedom E310-G000 SPI Flash", 0x10e31913, 0x10014000 },
+ 	{ "Freedom E310-G002 SPI Flash", 0x20000913, 0x10014000 },
++	{ "Dubhe FPGA SPI Flash",        0x00000913, 0x10010000 },
++	{ "Dubhe FPGA SPI Flash 2",      0x00000cfd, 0x10010000 },
+ 	{ NULL, 0, 0 }
+ };
+ 
+@@ -826,6 +828,11 @@ static int fespi_probe(struct flash_bank *bank)
+ 
+ 	bank->sectors = sectors;
+ 	fespi_info->probed = true;
++
++	/* Set to 4 bytes addressing for XIP */
++	if (fespi_write_reg(bank, FESPI_REG_FFMT, 0x00130009) != ERROR_OK)
++		return ERROR_FAIL;
++
+ 	return ERROR_OK;
+ }
+ 
+diff --git a/src/flash/nor/spi.c b/src/flash/nor/spi.c
+index 627bb416d..34ad5bdcb 100644
+--- a/src/flash/nor/spi.c
++++ b/src/flash/nor/spi.c
+@@ -89,6 +89,7 @@ const struct flash_device flash_devices[] = {
+ 	FLASH_ID("mac 25r3235f",        0x03, 0x00, 0x02, 0xd8, 0xc7, 0x001628c2, 0x100, 0x10000, 0x400000),
+ 	FLASH_ID("mac 25r6435f",        0x03, 0x00, 0x02, 0xd8, 0xc7, 0x001728c2, 0x100, 0x10000, 0x800000),
+ 	FLASH_ID("mac 25u1635e",        0x03, 0xeb, 0x02, 0x20, 0xc7, 0x003525c2, 0x100, 0x1000,  0x100000),
++	FLASH_ID("mac 66u1g45g",        0x13, 0xec, 0x12, 0xdc, 0xc7, 0x003b25c2, 0x100, 0x10000, 0x8000000),
+ 	FLASH_ID("micron n25q032",      0x03, 0xeb, 0x02, 0xd8, 0xc7, 0x0016ba20, 0x100, 0x10000, 0x400000),
+ 	FLASH_ID("micron n25q064",      0x03, 0xeb, 0x02, 0xd8, 0xc7, 0x0017ba20, 0x100, 0x10000, 0x800000),
+ 	FLASH_ID("micron n25q128",      0x03, 0xeb, 0x02, 0xd8, 0xc7, 0x0018ba20, 0x100, 0x10000, 0x1000000),
+
