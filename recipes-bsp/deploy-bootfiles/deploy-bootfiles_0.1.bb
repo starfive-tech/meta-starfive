@@ -5,6 +5,7 @@ LICENSE = "CLOSED"
 LIC_FILES_CHKSUM = ""
 
 SRC_URI = "file://bootcode.bin \
+           file://bootcode_dual.bin \
            file://bootjump.bin \
           "
           
@@ -13,6 +14,7 @@ S = "${WORKDIR}"
 inherit deploy
 do_deploy(){
 	install -m 755 ${WORKDIR}/bootcode.bin ${DEPLOYDIR}/
+	install -m 755 ${WORKDIR}/bootcode_dual.bin ${DEPLOYDIR}/
 	install -m 755 ${WORKDIR}/bootjump.bin ${DEPLOYDIR}/
 }
 
