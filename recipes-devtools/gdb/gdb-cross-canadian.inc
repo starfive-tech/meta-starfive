@@ -18,7 +18,7 @@ PACKAGECONFIG[python] = "--with-python=${WORKDIR}/python,--without-python,native
                          "
 PACKAGECONFIG[readline] = "--with-system-readline,--without-system-readline,nativesdk-readline"
 
-SSTATE_DUPWHITELIST += "${STAGING_DATADIR}/gdb"
+SSTATE_ALLOW_OVERLAP_FILES += "${STAGING_DATADIR}/gdb"
 
 do_configure:prepend() {
 cat > ${WORKDIR}/python << EOF
