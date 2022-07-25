@@ -1,3 +1,7 @@
+require binutils.inc
+require binutils-${PV}.inc
+require binutils-cross.inc
+                                   
 FILESEXTRAPATHS:prepend := "${THISDIR}/binutils:"
 
 SRCREV = "116a737f438d03a1bd6aa706b6ea0b4022f3b7e2"
