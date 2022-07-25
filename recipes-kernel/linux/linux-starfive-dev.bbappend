@@ -17,3 +17,6 @@ INITRAMFS_IMAGE = "dubhe-image-initramfs"
 #KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
 
 COMPATIBLE_MACHINE = "(starfive-dubhe)"
+
+#FILES:${PN} += "${exec_prefix} ${libdir} ${libdir}/debug ${libdir}/debug/boot ${libdir}/debug/boot/*.debug"
+FILES:${KERNEL_PACKAGE_NAME}-base += "/usr/*"
