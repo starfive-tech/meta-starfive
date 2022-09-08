@@ -1,0 +1,62 @@
+From 6df5912f654a6025be5f509d9bcd428830311e9c Mon Sep 17 00:00:00 2001
+From: Ley Foon Tan <leyfoon.tan@starfivetech.com>
+Date: Thu, 26 Aug 2021 15:44:47 +0800
+Subject: [PATCH] riscv: starfive: Enable EXT4 rootfs support
+
+Enable EXT4 rootfs support. Ext4 partition is located at SD card's partition 2.
+
+Signed-off-by: Ley Foon Tan <leyfoon.tan@starfivetech.com>
+---
+ arch/riscv/boot/dts/starfive/dubhe_fpga.dts | 2 +-
+ arch/riscv/configs/starfive_dubhe_defconfig | 7 +++----
+ 2 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
+index 73ac5029e3c8..ed0f1cc1e668 100644
+--- a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
++++ b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
+@@ -11,7 +11,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "console=ttySIF0,115200 earlycon=sbi";
++		bootargs = "console=ttySIF0,115200 earlycon=sbi root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait";
+ 	};
+ 
+ 	cpus {
+diff --git a/arch/riscv/configs/starfive_dubhe_defconfig b/arch/riscv/configs/starfive_dubhe_defconfig
+index 8f16be046a3a..b92979f53f73 100644
+--- a/arch/riscv/configs/starfive_dubhe_defconfig
++++ b/arch/riscv/configs/starfive_dubhe_defconfig
+@@ -14,7 +14,6 @@ CONFIG_NAMESPACES=y
+ CONFIG_USER_NS=y
+ CONFIG_CHECKPOINT_RESTORE=y
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_INITRAMFS_SOURCE="rootfs.cpio"
+ CONFIG_EXPERT=y
+ CONFIG_SOC_STARFIVE_DUBHE=y
+ CONFIG_SMP=y
+@@ -82,6 +81,9 @@ CONFIG_GOLDFISH=y
+ CONFIG_RPMSG_CHAR=y
+ CONFIG_RPMSG_VIRTIO=y
+ CONFIG_RESET_CONTROLLER=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+@@ -108,11 +110,8 @@ CONFIG_NLS_CODEPAGE_1251=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_UTF8=y
+-CONFIG_CRYPTO=y
+-CONFIG_CRYPTO_CRC32C=y
+ CONFIG_CRYPTO_USER_API_HASH=y
+ CONFIG_CRYPTO_DEV_VIRTIO=y
+-CONFIG_CRC16=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_SOFTLOCKUP_DETECTOR=y
+-- 
+GitLab
