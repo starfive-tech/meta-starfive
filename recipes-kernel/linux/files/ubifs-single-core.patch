@@ -1,0 +1,63 @@
+diff --git a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
+index 27de8b56bdfd..6f01d9b1c7ac 100644
+--- a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
++++ b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
+@@ -11,7 +11,7 @@ aliases {
+ 	};
+ 
+ 	chosen {
+-		bootargs = "console=ttySIF0,115200 earlycon=sbi";
++		bootargs = "console=ttySIF0,115200 earlycon=sbi root=ubi0:starfive-dubhe-rootfs ubi.mtd=4 rw rootfstype=ubifs rootwait";
+ 	};
+ 
+ 	cpus {
+@@ -41,6 +41,49 @@ mmc@0 {
+ 
+ &qspi1 {
+ 	status = "okay";
++
++	flash@0 {
++                compatible = "jedec,spi-nor";
++                reg = <0>;
++                spi-max-frequency = <20000000>;
++                m25p,fast-read;
++                spi-tx-bus-width = <1>;
++                spi-rx-bus-width = <1>;
++
++                partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				reg = <0x000000 0x10000>;
++				label = "boot copier";
++				/*read-only;*/
++			};
++
++			partition@10000 {
++				reg = <0x10000 0x10000>;
++				label = "boot jump";
++				/*read-only;*/
++			};
++
++			partition@20000 {
++				reg = <0x20000 0x10000>;
++				label = "DTB";
++			};
++
++			partition@30000 {
++				reg = <0x30000 0x1700000>;
++				label = "FW_payload (OpenSBI and Linux)";
++			};
++
++			partition@1730000 {
++				reg = <0x1730000 0x68D0000>;
++				label = "Rootfs";
++			};
++		};
++        };
++
+ };
+ 
+ &uart0 {
