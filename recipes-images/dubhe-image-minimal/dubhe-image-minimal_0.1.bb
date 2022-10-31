@@ -38,9 +38,9 @@ do_qspi (){
         dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image.bin bs=32 seek=128 count=1
         dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image.bin bs=32 seek=129 count=255
         dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image.bin bs=32 seek=384
-	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min_dual.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=0 count=128
+	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=0 count=128
 	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=128 count=1
-	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga_dual.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=129 count=255
+	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=129 count=255
 	dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-EXT4-Image-Dual.bin bs=32 seek=384
 }
 
