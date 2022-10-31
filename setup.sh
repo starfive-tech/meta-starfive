@@ -145,19 +145,11 @@ echo "   - Initramfs has been bundled into qspi-image.";
 echo "   - The image generated support both single and multicore vector.";
 echo "   - Generated output : "; 
 echo "     QSPI-Image.bin for single core vector."; 
-echo "     QSPI-Image-Dual.bin for multicore vector.";
-echo "";
-echo "2) Dubhe-image-minimal";
-echo "   - Rootfs has been packaged into SD-Image.img."; 
-echo "   - The image generated support both single and multicore vector.";
-echo "   - Generated output : ";
-echo "     QSPI-EXT4-Image.bin for single core vector.";
-echo "     QSPI-EXT4-Image-Dual.bin for multicore vector.";
-echo -e "     SD-Image.img for ext4 rootfs.${NC}";
+echo -e "     QSPI-Image-Dual.bin for multicore vector.${NC}";
 echo "";
 
 PS3="Select your action : "
-options=("Build qspi-image" "Build dubhe-image-minimal" "Show deployed image details" "Quit")
+options=("Build qspi-image" "Quit")
 
 select opt in "${options[@]}" 
 do
@@ -167,6 +159,7 @@ do
             if ! grep -q "ENABLE_EXT4" ./conf/local.conf; then
                 echo 'ENABLE_EXT4="0"' >> ./conf/local.conf;
             else sed -i 's/ENABLE_EXT4="1"/ENABLE_EXT4="0"/g'  ./conf/local.conf;
+		 sed -i 's/ENABLE_UBI="1"/ENABLE_UBI="0"/g'  ./conf/local.conf;
             fi;
             cur_ter=$(tty);
             output=$(MACHINE=starfive-dubhe bitbake qspi-image | tee $cur_ter);
@@ -179,7 +172,8 @@ do
  #           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
             if ! grep -q "ENABLE_EXT4" ./conf/local.conf; then
                 echo 'ENABLE_EXT4="1"' >> ./conf/local.conf;
-            else sed -i 's/ENABLE_EXT4="0"/ENABLE_EXT4="1"/g'  ./conf/local.conf;
+            else sed -i 's/ENABLE_EXT4="0"/ENABLE_EXT4="1"/g'  ./conf/local.conf
+		 sed -i 's/ENABLE_UBI="1"/ENABLE_UBI="0"/g'  ./conf/local.conf;
             fi;
             cur_ter=$(tty);
             output_min=$(MACHINE=starfive-dubhe bitbake dubhe-image-minimal | tee $cur_ter);
@@ -188,8 +182,22 @@ do
                 runprog console-image-minimal;
             else echo -e "\U000274C ${RED}Build Failed${NC}"
             fi;;
-        "Show deployed image details")
-            ls -lh tmp-glibc/deploy/images/starfive-dubhe/;;
+	"Build qspi-ubifs-image")
+#            cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+            if ! grep -q "ENABLE_EXT4" ./conf/local.conf; then
+                echo 'ENABLE_EXT4="1"' >> ./conf/local.conf;
+            else sed -i 's/ENABLE_EXT4="0"/ENABLE_EXT4="1"/g'  ./conf/local.conf;
+            fi;
+	    if ! grep -q "ENABLE_UBI" ./conf/local.conf; then
+                echo 'ENABLE_UBI="1"' >> ./conf/local.conf;
+            else sed -i 's/ENABLE_UBI="0"/ENABLE_UBI="1"/g'  ./conf/local.conf;
+            fi;
+            cur_ter=$(tty);
+            output=$(MACHINE=starfive-dubhe bitbake qspi-ubifs-image | tee $cur_ter);
+            if [[ $output != *"ERROR"* ]]; then
+                echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+            else echo -e "\U000274C ${RED}Build Failed${NC}"
+            fi;;
 	"Quit")
             break;;
         *)
