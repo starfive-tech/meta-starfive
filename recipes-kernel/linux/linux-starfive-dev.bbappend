@@ -1,19 +1,19 @@
 FORK = "starfive-tech"
-BRANCH = "starfive-5.15-dubhe"
-SRCREV = "2450e7aab40813ceb06e1dfa3112cdf73c5aa519"
+BRANCH = "starfive-5.15-dubhe-gmac-dma-v2"
+SRCREV = "1a0171abd28293e21d3b7f2bbbd521b7fff61dbc"
 
 LINUX_VERSION = "5.15.0"
 LINUX_VERSION_EXTENSION:append = "-starlight"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SRC_TMP_B = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
+SRC_TMP_B = "git://git@192.168.110.45/leyfoon.tan/linux.git;protocol=ssh;branch=${BRANCH} \
 	   file://defconfig \
-           file://ext4.patch \
+           file://ext4-nfs.patch \
 	   file://ext4_dual_bootargs.patch \
 	   "
 
-SRC_TMP_A = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
+SRC_TMP_A = "git://git@192.168.110.45/leyfoon.tan/linux.git;protocol=ssh;branch=${BRANCH} \
            file://defconfig \
 	   file://ubifs-single-core.patch \
 	   file://ubifs-dual-core.patch \
