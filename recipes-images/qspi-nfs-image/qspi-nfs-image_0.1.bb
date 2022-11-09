@@ -38,15 +38,6 @@ do_qspi (){
         dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=128 count=1
         dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=129 count=255
         dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=384
-	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image-Dual.bin bs=32 seek=0 count=128
-	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image-Dual.bin bs=32 seek=128 count=1
-	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image-Dual.bin bs=32 seek=129 count=255
-	dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image-Dual.bin bs=32 seek=384
 }
 
-do_sd (){
-	cd ${IMGDEPLOYDIR}
-	bmaptool copy console-image-minimal-starfive-dubhe.wic.gz ${DEPLOY_DIR_IMAGE}/SD-Image.img
-}
-
-IMAGE_POSTPROCESS_COMMAND += "do_qspi;do_sd;"
+IMAGE_POSTPROCESS_COMMAND += "do_qspi;"
