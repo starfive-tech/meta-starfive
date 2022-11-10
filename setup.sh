@@ -171,16 +171,25 @@ do
             fi;;
         "Build qspi-nfs-image")
  #           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
-            if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
-                echo 'ENABLE_NFS="1"' >> ./conf/local.conf;
-            else sed -i 's/ENABLE_NFS="0"/ENABLE_NFS="1"/g'  ./conf/local.conf
-            fi;
-            cur_ter=$(tty);
-            output_min=$(MACHINE=starfive-dubhe bitbake qspi-nfs-image | tee $cur_ter);
-            if [[ $output_min != *"ERROR"* ]]; then
-                echo -e "\U0002705 ${GREEN}Build Complete${NC}"
-            else echo -e "\U000274C ${RED}Build Failed${NC}"
-            fi;;
+	    sed -n 10p ../meta-starfive/recipes-kernel/linux/files/nfs.patch;
+	    read -p "Kindly confirm boot argument such as nfs path and ip address before build (/meta-starfive/recipes-kernel/linux/files/nfs.patch). Proceed to build?[Y/n]:" RES;
+	    case $RES in
+ 		[Yy])
+            		if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
+                		echo 'ENABLE_NFS="1"' >> ./conf/local.conf;
+            		else sed -i 's/ENABLE_NFS="0"/ENABLE_NFS="1"/g'  ./conf/local.conf
+            		fi;
+            		cur_ter=$(tty);
+            		output_min=$(MACHINE=starfive-dubhe bitbake qspi-nfs-image | tee $cur_ter);
+            		if [[ $output_min != *"ERROR"* ]]; then
+                		echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+            		else echo -e "\U000274C ${RED}Build Failed${NC}"
+            		fi;;
+		 [Nn])
+   			return;;
+ 		 *)
+  			echo "Invalid option $RES , [Y/n] only.";
+			esac;;
 	"Quit")
             break;;
         *)
