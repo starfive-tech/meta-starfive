@@ -7,20 +7,14 @@ LINUX_VERSION_EXTENSION:append = "-starlight"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SRC_TMP_B = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
-	   file://defconfig \
-           file://nfs.patch \
-	   "
-
-SRC_TMP_A = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
+SRC_URI = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
            file://defconfig \
-	   file://initramfs.patch \
            "
 
 INITRAMFS_IMAGE_BUNDLE = "${@oe.utils.conditional('ENABLE_NFS','1','','1',d)}"
 INITRAMFS_IMAGE = "${@oe.utils.conditional('ENABLE_NFS','1','','dubhe-image-initramfs',d)}"
 
-SRC_URI = "${@oe.utils.conditional('ENABLE_NFS','1','${SRC_TMP_B}','${SRC_TMP_A}',d)}"
+SRC_URI:append = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','file://initramfs.patch',d)}"
 
 #KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
 
