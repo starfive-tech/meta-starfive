@@ -1,6 +1,6 @@
 FORK = "starfive-tech"
 BRANCH = "starfive-5.15-dubhe"
-SRCREV = "86f3ed476b1034914fe49f2fc83d60ff75003ccc"
+SRCREV = "0f9fd42752277456a1f324b773877ac28aa9290b"
 
 LINUX_VERSION = "5.15.0"
 LINUX_VERSION_EXTENSION:append = "-starlight"
@@ -8,12 +8,18 @@ LINUX_VERSION_EXTENSION:append = "-starlight"
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
-	   file://defconfig \
-	   "
+           file://defconfig \
+           "
 
-INITRAMFS_IMAGE_BUNDLE = "1"
-INITRAMFS_IMAGE = "dubhe-image-initramfs"
+INITRAMFS_IMAGE_BUNDLE = "${@oe.utils.conditional('ENABLE_NFS','1','','1',d)}"
+INITRAMFS_IMAGE = "${@oe.utils.conditional('ENABLE_NFS','1','','dubhe-image-initramfs',d)}"
+
+SRC_URI:append = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','file://initramfs.patch',d)}"
 
 #KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
 
 COMPATIBLE_MACHINE = "(starfive-dubhe)"
+
+FILES:${KERNEL_PACKAGE_NAME}-base += "/usr/*"
+
+do_compile[nostamp] = "1"

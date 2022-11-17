@@ -1,3 +1,7 @@
+require binutils.inc
+require binutils-${PV}.inc
+require binutils-cross.inc
+                                   
 FILESEXTRAPATHS:prepend := "${THISDIR}/binutils:"
 
 SRCREV = "116a737f438d03a1bd6aa706b6ea0b4022f3b7e2"
@@ -20,7 +24,4 @@ SRC_URI += "\
      file://0013-RISC-V-Hypervisor-ext-support-Privileged-Spec-1.12.patch \
      file://0014-fixed-a-compiled-error-when-enable-gdb.patch \
      file://0015-fix-incorrect-pref-address-range.patch \
-     file://0016-Rename-some-assembler-mnemonic-for-rvv1.0.patch \
-     file://0017-add-miss-change-riscv-opc.h-for-rvv1.0.patch \
-     file://0018-ignore-zvl-and-zve-extension-for-now.patch \
 "

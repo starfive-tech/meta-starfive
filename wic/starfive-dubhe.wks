@@ -1,0 +1,10 @@
+#short-description: Create SD card image for Starfive Duhbe
+# long-description: Creates a partitioned SD card image for Starfive Dubhe.
+
+#boot partition (empty)
+part /boot --ondisk mmcblk0 --fstype=vfat --label boot --active --align 1024 --size=17M --use-uuid
+
+#root partition 
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label root --align 1024 --use-uuid
+
+bootloader --append "rootwait console=ttyS0,115200"

@@ -30,10 +30,12 @@ elif [ "${0##*/}" = "dash" ]; then
   return
 fi
 # bootstrap OE
+if [[ ":$PATH:" != *":$PWD/meta-starfive:"* ]]; then
+  export PATH=$PATH:$PWD/meta-starfive
+fi
 echo "Init OE"
 export BASH_SOURCE="openembedded-core/oe-init-build-env"
 . ./openembedded-core/oe-init-build-env $DIR
-
 
 # Symlink the cache
 #echo "Setup symlink for sstate"
@@ -68,7 +70,7 @@ MACHINE ?= "${MACHINE}"
 EXTRA_IMAGE_FEATURES:append = " package-management"
 PACKAGECONFIG:append:pn-qemu-native = " sdl"
 PACKAGECONFIG:append:pn-nativesdk-qemu = " sdl"
-USER_CLASSES ?= "buildstats buildhistory buildstats-summary image-prelink"
+USER_CLASSES ?= "buildstats buildhistory buildstats-summary"
 
 require conf/distro/include/no-static-libs.inc
 require conf/distro/include/yocto-uninative.inc
@@ -77,6 +79,7 @@ require conf/distro/include/security_flags.inc
 INHERIT += "uninative"
 
 DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam  systemd "
+#DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam "
 DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
 VIRTUAL-RUNTIME_init_manager = "systemd"
 ##VIRTUAL-RUNTIME_initscripts = ""
@@ -102,3 +105,95 @@ echo "---------------------------------------------------"
 #echo "Starting build"
 #bitbake $BITBAKEIMAGE
 
+# Launch build script
+# Terminal Style
+PURPLE='\E[1;35m'
+YELLOW='\E[1;33m'
+GREEN='\E[0;32m'
+RED='\E[0;31m'
+NC='\E[0m'
+MARK="\033[0;32m\xE2\x9C\x94\033[0m"
+
+#Function
+runprog(){
+read -p "Do you want to runqemu?[Y/n]:" RES
+
+case $RES in
+ [Yy])
+   MACHINE=starfive-dubhe runqemu nographic $1;;
+ [Nn])
+   return;;
+ *)
+   echo "Invalid option $RES , [Y/n] only.";;
+esac
+}
+
+# Menu script
+echo ""
+echo -e "${PURPLE}*******************************************************************"
+echo "*                                                                 *"
+echo "*                     Welcome to Starfive Yocto                   *"
+echo "*                                                                 *"
+echo -e "*******************************************************************${NC}"
+echo "";
+echo -e "${YELLOW}Description : ";
+echo "";
+echo "This build script consists of two types image.";
+echo "";
+echo "1) QSPI-Image";
+echo "   - Initramfs has been bundled into qspi-image.";
+echo "   - Generated output : "; 
+echo "     QSPI-Image.bin"; 
+echo "2) QSPI-NFS-Image";
+echo "   - NFS config has been enabled.";
+echo "   - Generated output : ";
+echo -e "     QSPI-NFS-Image.bin${NC}";
+echo "";
+
+PS3="Select your action : "
+options=("Build qspi-image" "Build qspi-nfs-image" "Quit")
+
+select opt in "${options[@]}" 
+do
+    case $opt in 
+        "Build qspi-image")
+#            cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+            if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
+                echo 'ENABLE_NFS="0"' >> ./conf/local.conf;
+            else sed -i 's/ENABLE_NFS="1"/ENABLE_NFS="0"/g'  ./conf/local.conf;
+            fi;
+            cur_ter=$(tty);
+            output=$(MACHINE=starfive-dubhe bitbake qspi-image | tee $cur_ter);
+            if [[ $output != *"ERROR"* ]]; then
+                echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+                runprog dubhe-image-initramfs;
+            else echo -e "\U000274C ${RED}Build Failed${NC}"
+            fi;;
+        "Build qspi-nfs-image")
+ #           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+	    sed -n 10p ../meta-starfive/recipes-kernel/linux/files/nfs.patch;
+	    read -p "Kindly confirm boot argument such as nfs path and ip address before build (/meta-starfive/recipes-kernel/linux/files/nfs.patch). Proceed to build?[Y/n]:" RES;
+	    case $RES in
+ 		[Yy])
+            		if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
+                		echo 'ENABLE_NFS="1"' >> ./conf/local.conf;
+            		else sed -i 's/ENABLE_NFS="0"/ENABLE_NFS="1"/g'  ./conf/local.conf
+            		fi;
+            		cur_ter=$(tty);
+            		output_min=$(MACHINE=starfive-dubhe bitbake qspi-nfs-image | tee $cur_ter);
+            		if [[ $output_min != *"ERROR"* ]]; then
+                		echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+            		else echo -e "\U000274C ${RED}Build Failed${NC}"
+            		fi;;
+		 [Nn])
+   			return;;
+ 		 *)
+  			echo "Invalid option $RES , [Y/n] only.";
+			esac;;
+	"Quit")
+            break;;
+        *)
+            echo "Invalid option $REPLY. Kindly select choice between menu range."
+    esac
+    REPLY=
+done

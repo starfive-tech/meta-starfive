@@ -4,7 +4,8 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/meta/files/common-licenses/Apache-2.0;md5
 
 INHIBIT_PACKAGE_STRIP = "1"
 
-SRC_URI = "git://github.com/sifive/benchmark-coremark.git;protocol=https \
+BRANCH = "master"
+SRC_URI = "git://github.com/sifive/benchmark-coremark.git;protocol=ssh;branch=${BRANCH} \
            file://0001-Add-Compiler-Flags-and-remove-exe-from-output.patch \
            "
 SRCREV = "4486de1f0afe9d6c1fa8dd63743e5751286f3d2f"
