@@ -17,6 +17,8 @@ SRC_URI = "\
     file://0004-set-default-march-to-rv64imafcd_zba_zbb_zbc_zbs-and-.patch \
     file://0005-support-b-letter-in-march-string.patch \
     file://0006-set-clang-default-dwarf-version-to-4.patch \
+    file://0007-set-clang-default-march-to-rv64gc.patch \
+    file://0008-change-baremetal-multilib-directory-name-to-align-wi.patch \
     file://0001-libcxxabi-Find-libunwind-headers-when.patch \
     file://0002-compiler-rt-support-a-new-embedded-linux-target.patch \
     file://0004-llvm-TargetLibraryInfo-Undefine-libc-functions-if-th.patch \
