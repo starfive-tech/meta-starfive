@@ -1,0 +1,182 @@
+From 850779729c6da29f45bc10b2fa4f500c9edfd19b Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 6 Sep 2022 02:21:53 -0700
+Subject: [PATCH 07/19] add header files for vector support
+
+cx
+---
+ sysdeps/riscv/rtld-global-offsets.sym         |  7 ++++
+ sysdeps/unix/sysv/linux/riscv/bits/hwcap.h    | 31 +++++++++++++++
+ .../sysv/linux/riscv/bits/pthread_stack_min.h | 21 ++++++++++
+ sysdeps/unix/sysv/linux/riscv/bits/sigstack.h | 32 +++++++++++++++
+ .../linux/riscv/sysconf-pthread_stack_min.h   | 39 +++++++++++++++++++
+ 5 files changed, 130 insertions(+)
+ create mode 100644 sysdeps/riscv/rtld-global-offsets.sym
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/bits/sigstack.h
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+
+diff --git a/sysdeps/riscv/rtld-global-offsets.sym b/sysdeps/riscv/rtld-global-offsets.sym
+new file mode 100644
+index 0000000000..ff4e97f2a6
+--- /dev/null
++++ b/sysdeps/riscv/rtld-global-offsets.sym
+@@ -0,0 +1,7 @@
++#define SHARED 1
++
++#include <ldsodefs.h>
++
++#define rtld_global_ro_offsetof(mem) offsetof (struct rtld_global_ro, mem)
++
++RTLD_GLOBAL_RO_DL_HWCAP_OFFSET	rtld_global_ro_offsetof (_dl_hwcap)
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h b/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+new file mode 100644
+index 0000000000..dbd101fa2e
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/bits/hwcap.h
+@@ -0,0 +1,31 @@
++/* Defines for bits in AT_HWCAP.  RISC-V Linux version.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#if !defined (_SYS_AUXV_H) && !defined (_LINUX_RISCV_SYSDEP_H)
++# error "Never include <bits/hwcap.h> directly; use <sys/auxv.h> instead."
++#endif
++
++/* The following must match the kernel's <asm/hwcap.h>.  */
++#define HWCAP_ISA_I      0x100		//(1 << ('I' - 'A'))
++#define HWCAP_ISA_M      0x1000 	//(1 << ('M' - 'A'))
++#define HWCAP_ISA_A      0x1		//(1 << ('A' - 'A'))
++#define HWCAP_ISA_F      0x20		//(1 << ('F' - 'A'))
++#define HWCAP_ISA_D      0x8		//(1 << ('D' - 'A'))
++#define HWCAP_ISA_C      0x4		//(1 << ('C' - 'A'))
++#define HWCAP_ISA_V      0x200000	//(1 << ('V' - 'A'))
++
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h b/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+new file mode 100644
+index 0000000000..0ab7feb4a7
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/bits/pthread_stack_min.h
+@@ -0,0 +1,21 @@
++/* Definition of PTHREAD_STACK_MIN.  Linux/riscv version.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Minimum size for a thread.  We are free to choose a reasonable value.  */
++#define PTHREAD_STACK_MIN	20480
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/sigstack.h b/sysdeps/unix/sysv/linux/riscv/bits/sigstack.h
+new file mode 100644
+index 0000000000..c75ddc03b0
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/bits/sigstack.h
+@@ -0,0 +1,32 @@
++/* sigstack, sigaltstack definitions.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#ifndef _BITS_SIGSTACK_H
++#define _BITS_SIGSTACK_H 1
++
++#if !defined _SIGNAL_H && !defined _SYS_UCONTEXT_H
++# error "Never include this file directly.  Use <signal.h> instead"
++#endif
++
++/* Minimum stack size (5k+256 bytes) for a signal handler.  */
++#define MINSIGSTKSZ	5376
++
++/* System default stack size.  */
++#define SIGSTKSZ	16384
++
++#endif /* bits/sigstack.h */
+diff --git a/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h b/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+new file mode 100644
+index 0000000000..53ba6a1142
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/sysconf-pthread_stack_min.h
+@@ -0,0 +1,39 @@
++/* __get_pthread_stack_min ().  Linux version.
++   Copyright (C) 2021 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++/* Return sysconf (_SC_THREAD_STACK_MIN).  */
++
++static inline long int
++__get_pthread_stack_min (void)
++{
++  /* sysconf (_SC_THREAD_STACK_MIN) >= sysconf (_SC_MINSIGSTKSZ).  */
++  long int pthread_stack_min = GLRO(dl_minsigstacksize) * 4;
++  assert (pthread_stack_min != 0);
++  _Static_assert (__builtin_constant_p (PTHREAD_STACK_MIN),
++		  "PTHREAD_STACK_MIN is constant");
++  /* Return MAX (PTHREAD_STACK_MIN, pthread_stack_min).  */
++  if (pthread_stack_min < PTHREAD_STACK_MIN)
++    pthread_stack_min = PTHREAD_STACK_MIN;
++  /* We have a private interface, __pthread_get_minstack@GLIBC_PRIVATE
++     which returns a larger size that includes the required TLS variable
++     space which has been determined at startup.  For sysconf here we are
++     conservative and don't include the space required for TLS access.
++     Eventually the TLS variable space will not be part of the stack
++     (Bug 11787).  */
++  return pthread_stack_min;
++}
+-- 
+2.25.1
+

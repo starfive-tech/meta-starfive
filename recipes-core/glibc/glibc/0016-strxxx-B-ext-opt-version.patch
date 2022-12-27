@@ -1,0 +1,675 @@
+From cb7b9da1f6e784440bbebc2377acc0e6d888e1a4 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Wed, 10 Aug 2022 00:16:46 -0700
+Subject: [PATCH 16/19] strxxx B ext opt version
+
+---
+ sysdeps/riscv/rv64/multiarch/Makefile         |  3 +-
+ .../riscv/rv64/multiarch/ifunc-impl-list.c    | 12 +++
+ sysdeps/riscv/rv64/multiarch/rtld-strchr.S    |  1 +
+ sysdeps/riscv/rv64/multiarch/rtld-strchrnul.S |  1 +
+ sysdeps/riscv/rv64/multiarch/rtld-strlen.S    |  1 +
+ sysdeps/riscv/rv64/multiarch/rtld-strlen.c    |  1 -
+ sysdeps/riscv/rv64/multiarch/rtld-strncmp.S   |  1 +
+ sysdeps/riscv/rv64/multiarch/strcmp.c         |  1 -
+ sysdeps/riscv/rv64/multiarch/strcmp_as.S      | 85 ++++++++++++++++---
+ sysdeps/riscv/rv64/multiarch/strcmp_riscv.S   | 17 ++++
+ sysdeps/riscv/rv64/multiarch/strlen_as.S      | 56 ++++++++++++
+ .../{strlen_riscv.c => strlen_riscv.S}        | 23 ++---
+ sysdeps/riscv/rv64/strchr.S                   | 81 ++++++++++++++++++
+ sysdeps/riscv/rv64/strchrnul.S                | 79 +++++++++++++++++
+ sysdeps/riscv/rv64/strncmp.S                  | 73 ++++++++++++++++
+ sysdeps/riscv/rv64/strnlen.S                  | 62 ++++++++++++++
+ 16 files changed, 471 insertions(+), 26 deletions(-)
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strchr.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strchrnul.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strlen.S
+ delete mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+ create mode 100644 sysdeps/riscv/rv64/multiarch/rtld-strncmp.S
+ create mode 100644 sysdeps/riscv/rv64/multiarch/strlen_as.S
+ rename sysdeps/riscv/rv64/multiarch/{strlen_riscv.c => strlen_riscv.S} (60%)
+ create mode 100644 sysdeps/riscv/rv64/strchr.S
+ create mode 100644 sysdeps/riscv/rv64/strchrnul.S
+ create mode 100644 sysdeps/riscv/rv64/strncmp.S
+ create mode 100644 sysdeps/riscv/rv64/strnlen.S
+
+diff --git a/sysdeps/riscv/rv64/multiarch/Makefile b/sysdeps/riscv/rv64/multiarch/Makefile
+index 7e8bfde544..3123ced35d 100644
+--- a/sysdeps/riscv/rv64/multiarch/Makefile
++++ b/sysdeps/riscv/rv64/multiarch/Makefile
+@@ -1,5 +1,6 @@
+ ifeq ($(subdir),string)
+ sysdep_routines += memcpy_vector memcpy_riscv memchr_riscv memchr_vector memcmp_riscv \
+                  memcmp_vector strcmp_riscv strcmp_vector strlen_riscv strlen_vector \
+-                 memmove_vector memmove_riscv memset_vector memset_riscv memrchr
++                 memmove_vector memmove_riscv memset_vector memset_riscv memrchr \
++                  
+ endif
+diff --git a/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+index 1a6611ab88..7bba6fa30c 100644
+--- a/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
++++ b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+@@ -60,6 +60,18 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+   IFUNC_IMPL (i, name, memset,
+ 	      IFUNC_IMPL_ADD (array, i, memset, use_rvv, __memset_vector)
+ 	      IFUNC_IMPL_ADD (array, i, memset, 1, __memset_riscv));
++
++  IFUNC_IMPL (i, name, strchr,
++	      IFUNC_IMPL_ADD (array, i, strchr, use_rvv, __strchr_riscv)
++	      IFUNC_IMPL_ADD (array, i, strchr, 1, __strchr_riscv));
++
++  IFUNC_IMPL (i, name, strchrnul,
++	      IFUNC_IMPL_ADD (array, i, strchrnul, use_rvv, __strchrnul_riscv)
++	      IFUNC_IMPL_ADD (array, i, strchrnul, 1, __strchrnul_riscv));
++
++  IFUNC_IMPL (i, name, strncmp,
++	      IFUNC_IMPL_ADD (array, i, strncmp, use_rvv, __strncmp_riscv)
++	      IFUNC_IMPL_ADD (array, i, strncmp, 1, __strncmp_riscv));
+ #endif
+   return i;
+ }
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strchr.S b/sysdeps/riscv/rv64/multiarch/rtld-strchr.S
+new file mode 100644
+index 0000000000..d969c0ab57
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strchr.S
+@@ -0,0 +1 @@
++#include "../strchr.S"
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strchrnul.S b/sysdeps/riscv/rv64/multiarch/rtld-strchrnul.S
+new file mode 100644
+index 0000000000..5799994393
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strchrnul.S
+@@ -0,0 +1 @@
++#include "../strchrnul.S"
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strlen.S b/sysdeps/riscv/rv64/multiarch/rtld-strlen.S
+new file mode 100644
+index 0000000000..801def494d
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strlen.S
+@@ -0,0 +1 @@
++#include "strlen_as.S"
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strlen.c b/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+deleted file mode 100644
+index d3f1dd4a23..0000000000
+--- a/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
++++ /dev/null
+@@ -1 +0,0 @@
+-# include <string/strlen.c>
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strncmp.S b/sysdeps/riscv/rv64/multiarch/rtld-strncmp.S
+new file mode 100644
+index 0000000000..c5a02a137c
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strncmp.S
+@@ -0,0 +1 @@
++#include "../strncmp.S"
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp.c b/sysdeps/riscv/rv64/multiarch/strcmp.c
+index 3b65aaf55d..d18ae03246 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp.c
++++ b/sysdeps/riscv/rv64/multiarch/strcmp.c
+@@ -28,7 +28,6 @@
+ # include "ifunc-common.h"
+ 
+ riscv_libc_ifunc_redirected (__redirect_strcmp, strcmp, IFUNC_SELECTOR);
+-
+ riscv_libc_ifunc_hidden_def (__redirect_strcmp, strcmp);
+ #else 
+ # include <string.h>
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_as.S b/sysdeps/riscv/rv64/multiarch/strcmp_as.S
+index db5a6346b8..40bdbfef08 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_as.S
+@@ -19,21 +19,82 @@
+    <http://www.gnu.org/licenses/>.  */
+ 
+ #include <sysdep.h>
++#define N 3
+ 
+ 	.p2align 6
+ ENTRY (strcmp)
+-.L_strcmp_by_byte:
+-   lbu	a5,0(a0)
+-   addi	a1,a1,1
+-   addi	a0,a0,1
+-   lbu	a4,-1(a1)
+-   beqz	a5,.L_strcmp_by_byte_exit
+-   beq	a5,a4,.L_strcmp_by_byte
+-   subw	a0,a5,a4
+-   ret
+-.L_strcmp_by_byte_exit:
+-   negw	a0,a4
+-   ret
++  or    a4, a0, a1
++  li    t2, -1
++  and   a4, a4, 7
++  beqz  a4, .Lenter
++  j .Lmisaligned
++
++  .macro check_one_word i n
++    ld a2, \i*8(a0)
++    ld a3, \i*8(a1)
++
++    orc.b t0, a2
++
++    bne   t0, t2, .Lnull\i
++    .if \i+1-\n
++      bne   a2, a3, .Lmismatch
++    .else
++      beq   a2, a3, .Lloop
++      # fall through to .Lmismatch
++    .endif
++  .endm
++
++  .macro foundnull i n
++    .ifne \i
++      .Lnull\i:
++      add   a0, a0, \i*8
++      add   a1, a1, \i*8
++      .ifeq \i-1
++        .Lnull0:
++      .endif
++      bne   a2, a3, .Lmisaligned
++      li    a0, 0
++      ret
++    .endif
++  .endm
++
++.Lloop:
++  add   a0, a0, N*8
++  add   a1, a1, N*8
++
++.Lenter:
++  # examine full words at a time, favoring strings of a couple dozen chars
++  check_one_word 0 N
++  check_one_word 1 N
++  check_one_word 2 N
++  # backwards branch to .Lloop contained above
++
++.Lmismatch:
++  rev8 a4, a2
++  rev8 a5, a3
++  bgeu a4, a5, 1f
++  li a0, -1
++  ret
++1:
++  li a0, 1
++  ret
++
++.Lmisaligned:
++  # misaligned
++  lbu   a2, 0(a0)
++  lbu   a3, 0(a1)
++  add   a0, a0, 1
++  add   a1, a1, 1
++  bne   a2, a3, 1f
++  bnez  a2, .Lmisaligned
++1:
++  sub   a0, a2, a3
++  ret
++
++  # cases in which a null byte was detected
++  foundnull 0 N
++  foundnull 1 N
++  foundnull 2 N
+ 
+ END (strcmp)
+ libc_hidden_builtin_def (strcmp)
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+index abf2984230..8a2bfa9629 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+@@ -1,3 +1,20 @@
++/* The assembly function for strcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
+ 
+ #include <sysdep.h>
+ 
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_as.S b/sysdeps/riscv/rv64/multiarch/strlen_as.S
+new file mode 100644
+index 0000000000..862f5ebb72
+--- /dev/null
++++ b/sysdeps/riscv/rv64/multiarch/strlen_as.S
+@@ -0,0 +1,56 @@
++/* The assembly function for strlen.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (strlen)
++  andi  a3, a0, 7
++  andi  a1, a0, -8
++.Lprologue:
++  li    a4, 8
++  sub   a4, a4, a3
++  slli  a3, a3, 3
++  ld    a2, 0(a1)
++  srl   a2, a2, a3
++  orc.b a2, a2
++  not   a2, a2
++  ctz   a2, a2
++  srli  a0, a2, 3
++  bgtu  a4, a0, .Ldone
++  addi  a3, a1, 8
++  li    a4, -1
++
++  .align 2
++.Lloop:
++  ld    a2, 8(a1)
++  addi  a1, a1, 8
++  orc.b a2, a2
++  beq   a2, a4, .Lloop
++.Lepilogue:
++  not   a2, a2
++  ctz   a2, a2
++  sub   a1, a1, a3
++  add   a0, a0, a1
++  srli  a2, a2, 3
++  add   a0, a0, a2
++.Ldone:
++  ret
++
++END (strlen)
++libc_hidden_builtin_def (strlen)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_riscv.c b/sysdeps/riscv/rv64/multiarch/strlen_riscv.S
+similarity index 60%
+rename from sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+rename to sysdeps/riscv/rv64/multiarch/strlen_riscv.S
+index d3bae0fc43..d6fd969afb 100644
+--- a/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
++++ b/sysdeps/riscv/rv64/multiarch/strlen_riscv.S
+@@ -1,5 +1,5 @@
+-/* RISCV C version strlen.
+-   Copyright (C) 2018-2021 Free Software Foundation, Inc.
++/* The assembly function for strlen.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+    The GNU C Library is free software; you can redistribute it and/or
+@@ -13,20 +13,21 @@
+    Lesser General Public License for more details.
+ 
+    You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library; if not, see
+-   <https://www.gnu.org/licenses/>.  */
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
+ 
++#include <sysdep.h>
+ 
+-#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+-#undef libc_hidden_builtin_def
+-#define libc_hidden_builtin_def(name)
++#if IS_IN (libc)  && defined SHARED && defined __riscv_vector
++# define strlen __strlen_riscv
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(name)
++
++# include "strlen_as.S"
+ 
+-#undef weak_alias
+-#  define STRLEN __strlen_riscv
+-# include <string/strlen.c>
+ #else
++# include "strlen_as.S"
+ 
+-# include <string/strlen.c>
+ #endif
+ 
+ 
+diff --git a/sysdeps/riscv/rv64/strchr.S b/sysdeps/riscv/rv64/strchr.S
+new file mode 100644
+index 0000000000..a9059c19ca
+--- /dev/null
++++ b/sysdeps/riscv/rv64/strchr.S
+@@ -0,0 +1,81 @@
++/* The assembly function for strchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (strchr)
++  andi  a1, a1, 0xff
++
++.Lmisaligned:
++  andi  a5, a0, 7
++  beqz  a5, .Laligned
++  lbu   a5, 0(a0)
++  beq   a5, a1, .Ldone
++  beqz  a5, .Lnofind
++  addi  a0, a0, 1
++  j .Lmisaligned
++
++.Laligned:
++  slli  a5, a1, 0x8
++  or    a5, a5, a1
++  slli  t0, a5, 0x10
++  or    t0, t0, a5
++  slli  a5, t0, 0x20
++  or    t0, t0, a5
++
++  li    a5, -1
++  addi  a0, a0, -8
++.Lloop:
++  addi  a0, a0, 8
++  ld    a2, 0(a0)
++  orc.b t1, a2
++  bne   t1, a5, .Lnull
++  xor   a3, a2, t0
++  orc.b a3, a3
++  bne   a3, a5, .Lfind
++  orc.b a2, a2
++  beq   a2, a5, .Lloop
++
++.Lnofind:
++  li    a0, 0
++.Ldone:
++  ret
++
++.Lfind:
++  not   a3, a3
++  ctz   a3, a3
++  srli  a3, a3, 3
++  add   a0, a0, a3
++  ret
++
++# cases in which a null byte was detected
++.Lnull:
++  bne   a2, t0, .Lend
++  j .Lfind
++
++.Lend:
++  lbu   a5, 0(a0)
++  beq   a5, a1, .Ldone
++  beqz  a5, .Lnofind
++  addi  a0, a0, 1
++  j .Lend
++     
++
++END (strchr)
++libc_hidden_builtin_def (strchr)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/strchrnul.S b/sysdeps/riscv/rv64/strchrnul.S
+new file mode 100644
+index 0000000000..3e48445f11
+--- /dev/null
++++ b/sysdeps/riscv/rv64/strchrnul.S
+@@ -0,0 +1,79 @@
++/* The assembly function for strchrnul.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (__strchrnul)
++  andi  a1, a1, 0xff
++
++.Lmisaligned:
++  andi  a5, a0, 7
++  beqz  a5, .Laligned
++  lbu   a5, 0(a0)
++  beq   a5, a1, .Ldone
++  beqz  a5, .Ldone
++  addi  a0, a0, 1
++  j .Lmisaligned
++
++.Laligned:
++  slli  a5, a1, 0x8
++  or    a5, a5, a1
++  slli  t0, a5, 0x10
++  or    t0, t0, a5
++  slli  a5, t0, 0x20
++  or    t0, t0, a5
++
++  li    a5, -1
++  addi  a0, a0, -8
++.Lloop:
++  addi  a0, a0, 8
++  ld    a2, 0(a0)
++  orc.b t1, a2
++  bne   t1, a5, .Lnull
++  xor   a3, a2, t0
++  orc.b a3, a3
++  bne   a3, a5, .Lfind
++  orc.b a2, a2
++  beq   a2, a5, .Lloop
++
++.Ldone:
++  ret
++
++.Lfind:
++  not   a3, a3
++  ctz   a3, a3
++  srli  a3, a3, 3
++  add   a0, a0, a3
++  ret
++
++# cases in which a null byte was detected
++.Lnull:
++  bne   a2, t0, .Lend
++  j .Lfind
++
++.Lend:
++  lbu   a5, 0(a0)
++  beq   a5, a1, .Ldone
++  beqz  a5, .Ldone
++  addi  a0, a0, 1
++  j .Lend
++
++END (__strchrnul)
++weak_alias (__strchrnul,strchrnul)
++libc_hidden_builtin_def (__strchrnul)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/strncmp.S b/sysdeps/riscv/rv64/strncmp.S
+new file mode 100644
+index 0000000000..85245df98d
+--- /dev/null
++++ b/sysdeps/riscv/rv64/strncmp.S
+@@ -0,0 +1,73 @@
++/* The assembly function for strncmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (strncmp)
++  beqz  a2, .Lequal
++  or    a4, a0, a1
++  li    t2, -1
++  and   a4, a4, 7
++  beqz  a4, .Lenter
++  j     .Lmisaligned
++
++.Lloop:
++  addi  a0, a0, 8
++  addi  a1, a1, 8
++  addi  a2, a2, -8
++
++.Lenter:
++  addi  a5, a2, -8
++  blez  a5, .Lmisaligned
++  ld    a3, 0(a0)
++  ld    a4, 0(a1)
++  orc.b t0, a3
++  bne   t0, t2, .Lnull
++  beq   a3, a4, .Lloop
++  rev8  a6, a3
++  rev8  a7, a4
++  bgeu  a6, a7, 1f
++  li    a0, -1
++  ret
++1:
++  li    a0, 1
++  ret
++
++.Lmisaligned:
++  blez  a2, .Ldone
++  lbu   a3, 0(a0)
++  lbu   a4, 0(a1)
++  addi  a0, a0, 1
++  addi  a1, a1, 1
++  addi  a2, a2, -1
++  bne   a3, a4, .Ldone
++  bnez  a3, .Lmisaligned
++.Ldone:
++  sub   a0, a3, a4
++  ret
++
++# cases in which a null byte was detected
++.Lnull:
++  bne   a3, a4, .Lmisaligned
++.Lequal:
++  li    a0, 0
++  ret
++
++END (strncmp)
++libc_hidden_builtin_def (strncmp)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/strnlen.S b/sysdeps/riscv/rv64/strnlen.S
+new file mode 100644
+index 0000000000..33b140a0ac
+--- /dev/null
++++ b/sysdeps/riscv/rv64/strnlen.S
+@@ -0,0 +1,62 @@
++/* The assembly function for strnlen.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (strnlen)
++  mv    a2, a0
++  mv    a0, a1
++  li    a3, -1
++  beqz  a1, .Ldone
++  add   a0, a2, a1
++  bleu  a2, a0, 1f
++  li    a0, -1
++1:
++  mv    a5, a2
++
++.Lmisaligned:
++  andi  a4, a5, 7
++  beqz  a4, .Lloop
++  lbu   a4, 0(a5)
++  beqz  a4, .Llenth
++  addi  a5, a5, 1
++  j     .Lmisaligned  
++
++.Laligned:
++  addi  a5, a5, 8
++  addi  a1, a1, -8
++.Lloop:
++  bleu  a1, x0, .Llenth
++  ld    a4, 0(a5)
++  orc.b a4, a4
++  beq   a4, a3, .Laligned
++  not   a4, a4
++  ctz   a4, a4
++  srli  a4, a4, 3
++  add   a5, a5, a4
++.Llenth:
++  minu  a5, a5, a0
++  sub   a0, a5, a2
++.Ldone:
++  ret
++
++END (strnlen)
++weak_alias (strnlen, __strnlen)
++libc_hidden_builtin_def (strnlen)
++libc_hidden_builtin_def (__strnlen)
+-- 
+2.25.1
+

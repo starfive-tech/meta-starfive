@@ -1,6 +1,6 @@
 INHIBIT_SYSROOT_STRIP = "1"
 
-PACKAGES = "${PN}-dbg catchsegv sln nscd ldconfig ldd tzcode glibc-thread-db ${PN}-pic libmemusage malloc-debug libnss-db libsegfault ${PN}-pcprofile libsotruss ${PN} ${PN}-utils glibc-extra-nss ${PN}-dev ${PN}-staticdev ${PN}-doc ${PN}-src"
+PACKAGES = "${PN}-dbg sln nscd ldconfig ldd ldso tzcode glibc-thread-db ${PN}-pic libmemusage malloc-debug libnss-db ${PN}-pcprofile libsotruss ${PN} ${PN}-utils glibc-extra-nss ${PN}-dev ${PN}-staticdev ${PN}-doc ${PN}-src"
 
 # The ld.so in this glibc supports the GNU_HASH
 RPROVIDES:${PN} = "eglibc rtld(GNU_HASH)"
@@ -23,21 +23,22 @@ ARCH_DYNAMIC_LOADER:aarch64 = "ld-linux-${TARGET_ARCH}.so.1"
 libc_baselibs:append = " ${@oe.utils.conditional('ARCH_DYNAMIC_LOADER', '', '', '${root_prefix}/lib/${ARCH_DYNAMIC_LOADER}', d)}"
 INSANE_SKIP:${PN}:append:aarch64 = " libdir"
 INSANE_SKIP:${PN}-dev += "staticdev"
+INSANE_SKIP:${MLPREFIX}ldso:append = " dev-so libdir"
 
 FILES:${PN} = "${libc_baselibs} ${libexecdir}/* ${sysconfdir}/ld.so.conf"
 RRECOMMENDS:${PN} = "${@bb.utils.contains('DISTRO_FEATURES', 'ldconfig', '${MLPREFIX}ldconfig', '', d)}"
 FILES:ldconfig = "${base_sbindir}/ldconfig"
 FILES:ldd = "${bindir}/ldd"
-FILES:libsegfault = "${base_libdir}/libSegFault*"
+FILES:ldso = "${bindir}/${MLPREFIX}ld.so"
 FILES:libmemusage = "${base_libdir}/libmemusage.so"
 FILES:malloc-debug = "${base_libdir}/libc_malloc_debug.so.0"
 FILES:libnss-db = "${base_libdir}/libnss_db.so.* ${base_libdir}/libnss_db-*.so ${localstatedir}/db/Makefile ${localstatedir}/db/makedbs.sh"
-RDEPENDS_libnss-db = "${PN}-utils"
+RDEPENDS:libnss-db = "${PN}-utils"
 FILES:glibc-extra-nss = "${base_libdir}/libnss_*-*.so ${base_libdir}/libnss_*.so.*"
 FILES:sln = "${base_sbindir}/sln"
 FILES:${PN}-pic = "${libdir}/*_pic.a ${libdir}/*_pic.map ${libdir}/libc_pic/*.o"
 FILES:libsotruss = "${libdir}/audit/sotruss-lib.so"
-FILES:SOLIBSDEV = "${libdir}/lib*${SOLIBSDEV}"
+FILES_SOLIBSDEV = "${libdir}/lib*${SOLIBSDEV}"
 FILES:${PN}-dev += "${libdir}/libpthread.a ${libdir}/libdl.a ${libdir}/libutil.a ${libdir}/libanl.a ${libdir}/*_nonshared.a ${base_libdir}/*_nonshared.a ${base_libdir}/*.o ${datadir}/aclocal"
 RDEPENDS:${PN}-dev = "linux-libc-headers-dev"
 FILES:${PN}-staticdev += "${libdir}/*.a ${base_libdir}/*.a"
@@ -46,8 +47,6 @@ FILES:nscd = "${sbindir}/nscd* ${sysconfdir}/init.d/nscd ${systemd_system_unitdi
 FILES:${PN}-mtrace = "${bindir}/mtrace"
 FILES:tzcode = "${bindir}/tzselect ${sbindir}/zic ${bindir}/zdump"
 FILES:${PN}-utils = "${bindir}/* ${sbindir}/*"
-FILES:catchsegv = "${bindir}/catchsegv"
-RDEPENDS:catchsegv = "libsegfault"
 FILES:${PN}-pcprofile = "${base_libdir}/libpcprofile.so"
 FILES:glibc-thread-db = "${base_libdir}/libthread_db.so.* ${base_libdir}/libthread_db-*.so"
 RPROVIDES:${PN}-dev += "libc-dev"
@@ -58,7 +57,7 @@ DESCRIPTION:sln = "Similar to the 'ln' utility, but statically linked.  sln is u
 SUMMARY:nscd = "Name service cache daemon"
 DESCRIPTION:nscd = "nscd, name service cache daemon, caches name service lookups for the passwd, group and hosts information.  It can damatically improvide performance with remote, such as NIS or NIS+, name services."
 SUMMARY:glibc-extra-nss = "hesiod, NIS and NIS+ nss libraries"
-DESCRIPTION:glibc-extra-nss = "glibc_ nis, nisplus and hesiod search services."
+DESCRIPTION:glibc-extra-nss = "glibc: nis, nisplus and hesiod search services."
 SUMMARY:ldd = "print shared library dependencies"
 DESCRIPTION:ldd = "${bindir}/ldd prints shared library dependencies for each program or shared library specified on the command line."
 SUMMARY:${PN}-utils = "Miscellaneous utilities provided by glibc"
@@ -121,6 +120,9 @@ do_install() {
 	fi
         ln -rs ${D}${base_libdir}/libpthread.so.0 ${D}${libdir}/libpthread.so
         ln -rs ${D}${base_libdir}/librt.so.1 ${D}${libdir}/librt.so
+        if [ -n "${MLPREFIX}" ]; then
+                mv ${D}${bindir}/ld.so ${D}${bindir}/${MLPREFIX}ld.so
+        fi
 }
 
 def get_libc_fpu_setting(bb, d):
@@ -160,6 +162,7 @@ do_install_armmultilib () {
 	oe_multilib_header bits/shm.h bits/sigstack.h bits/stat.h bits/statfs.h bits/typesizes.h
 	oe_multilib_header bits/procfs-id.h bits/procfs.h bits/shmlba.h
 	oe_multilib_header bits/struct_stat.h bits/pthread_stack_min.h
+	oe_multilib_header bits/dl_find_object.h bits/rseq.h bits/timesize.h
 
 	oe_multilib_header fpu_control.h gnu/lib-names.h gnu/stubs.h ieee754.h
 
@@ -261,17 +264,17 @@ python populate_packages:prepend () {
         bpn = d.getVar('BPN')
         prefix = d.getVar('MLPREFIX') or ""
         # Set the base package...
-        d.setVar('PKG_' + prefix + bpn, prefix + 'libc6')
+        d.setVar('PKG:' + prefix + bpn, prefix + 'libc6')
         libcprefix = prefix + bpn + '-'
         for p in pkgs:
             # And all the subpackages.
             if p.startswith(libcprefix):
                 renamed = p.replace(bpn, 'libc6', 1)
-                d.setVar('PKG_' + p, renamed)
+                d.setVar('PKG:' + p, renamed)
         # For backward compatibility with old -dbg package
-        d.appendVar('RPROVIDES_' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
-        d.appendVar('RCONFLICTS_' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
-        d.appendVar('RREPLACES_' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
+        d.appendVar('RPROVIDES:' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
+        d.appendVar('RCONFLICTS:' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
+        d.appendVar('RREPLACES:' + libcprefix + 'dbg', ' ' + prefix + 'libc-dbg')
 }
 
 pkg_postinst:nscd () {

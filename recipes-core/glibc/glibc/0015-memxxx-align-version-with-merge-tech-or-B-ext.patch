@@ -1,0 +1,980 @@
+From 58e09fded3cf5222461c2a0198b47368bb69d3d6 Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Fri, 2 Dec 2022 15:06:20 +0800
+Subject: [PATCH 15/19] memxxx align version with merge tech or B ext
+
+---
+ sysdeps/riscv/rv64/multiarch/memchr_as.S  | 115 +++++++--------
+ sysdeps/riscv/rv64/multiarch/memcmp_as.S  | 171 ++++++++++------------
+ sysdeps/riscv/rv64/multiarch/memcpy_as.S  | 145 +++++++++---------
+ sysdeps/riscv/rv64/multiarch/memmove_as.S |  62 +++++++-
+ sysdeps/riscv/rv64/multiarch/memrchr.S    | 114 +++++++--------
+ sysdeps/riscv/rv64/multiarch/memset_as.S  | 129 ++++++++--------
+ 6 files changed, 374 insertions(+), 362 deletions(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+index aa6c22a3d0..ad559e6a11 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -21,90 +21,75 @@
+ 
+ .option arch, +zbb
+ 
+-.macro chr_8B
+-    ld      a4, 0(a0)
+-    xor     a4, a4, a1
+-    sub     a3, a4, t1
+-    andn    a3, a3, a4
+-    and     a3, a3, a5
+-    bnez    a3, .L_find
+-.endm
+-.macro gen_pat
+-    slli    a3, a1, 8
+-    or      a1, a1, a3
+-    slli    a3, a1, 16
+-    or      a1, a1, a3
+-    slli    a3, a1, 32
+-    or      a1, a1, a3
+-
+-    li      a5, 0x80
+-    slli    a3, a5, 8
+-    or      a5, a5, a3
+-    slli    a3, a5, 16
+-    or      a5, a5, a3
+-    slli    a3, a5, 32
+-    or      a5, a5, a3  # 0x8080808080808080
+-    srli    t1, a5, 7   # 0x0101010101010101
+-.endm
+-
+ 	.p2align 6
+ ENTRY (memchr)
+-    li      a3, 7
+-    bgtu    a2, a3, .L_8_to_16
+-.L_0_to_7:
+-    beqz    a2, 1f
++    beqz    a2, .L_not_find
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8 
++    
++    neg     a4, a0
++    andi    a4, a4, 0x7
++    beqz    a4, .L_dst_aligned
++
++.L_0_to_8:
++    min     a4, a4, a2
++.L_head:
++    sub     a2, a2, a4
+ 0:
+-    lbu     a4, 0(a0)
+-    beq     a1, a4, 2f
+-    addi    a2, a2, -1
++    lbu     a3, 0(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
+     addi    a0, a0, 1
+-    bnez    a2, 0b
+-1:
+-    li      a0, 0
+-    ret
+-2:
+-    ret
+-.L_8_to_16:
+-    gen_pat
+-    li      a3, 16
+-    bgtu    a2, a3, .L_over_16
+-    addi    a2, a2, -8
+-    chr_8B
+-    add     a0, a0, a2
+-    chr_8B
+-    j       .L_not_find
+-.L_over_16:
+-    neg     t4, a0
+-    andi    t4, t4, 0x7
+-    beqz    t4, .L_dst_aligned
+-    chr_8B
+-    sub     a2, a2, t4
+-    add     a0, a0, t4
++    bnez    a4, 0b
++    beqz    a2, .L_not_find
++
+ .L_dst_aligned:
+-    andi    t0, a2, (16-1)
++    andi    a4, a2, (16-1)
+     srli    a2, a2, 4
+     beqz    a2, .L_tail
++    
++    slli    a3, a1, 8
++    or      a1, a1, a3
++    slli    a3, a1, 16
++    or      a1, a1, a3
++    slli    a3, a1, 32
++    or      a1, a1, a3
++    li      a5, -1
+ .L_loop:
+-    chr_8B
+-    add     a0, a0, 8
+-    chr_8B
++    ld      a3, 0(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find
++    addi    a0, a0, 8
++    
++    ld      a3, 0(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find
++    
+     addi    a2, a2, -1
+     add     a0, a0, 8
+     bnez    a2, .L_loop
+-    beqz    t0, .L_not_find
++    beqz    a4, .L_not_find
++
+ .L_tail:
+-    add     a0, a0, t0
+-    addi    a0, a0, -16
+-    chr_8B
+-    add     a0, a0, 8
+-    chr_8B
++    andi    a1, a1, 0xff
++0:
++    lbu     a3, 0(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
++    addi    a0, a0, 1
++    bnez    a4, 0b
++
+ .L_not_find:
+     li      a0, 0
+     ret
+ .L_find:
++    not     a3, a3
+     ctz     a3, a3
+     srli    a3, a3, 3
+     add     a0, a0, a3
++.L_find_byte:
+     ret
+ END (memchr)
+ libc_hidden_builtin_def (memchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_as.S b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+index 984aeb7645..972f6cb5fd 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+@@ -17,84 +17,46 @@
+    <http://www.gnu.org/licenses/>.  */
+ 
+ #include <sysdep.h>
++.option arch, +zbb
+ 
+ 	.p2align 6
+ ENTRY (memcmp)
+-    li      a3, 32
+     mv      a5, a0
+-    bgtu    a2, a3, .L_over_32
+-    li      a3, 3
+-    bgtu    a2, a3, .L_4_to_8
+-.L_0_to_3:
+-    beqz    a2, 2f
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8
++
++    neg     a4, a5
++    andi    a4, a4, 0x7
++    beqz    a4, .L_8B_aligned
++
++.L_0_to_8:
++    min     a4, a4, a2
++.L_head:
++    beqz    a4, 2f
++    sub     a2, a2, a4
++    add     a4, a4, a5
+ 0:
+     lbu     a3, 0(a1)
+-    lbu     a4, 0(a5)
+-    bne     a3, a4, 1f
+-    addi    a2, a2, -1
++    lbu     a0, 0(a5)
++    bne     a3, a0, 1f
+     addi    a1, a1, 1
+     addi    a5, a5, 1
+-    bnez    a2, 0b
++    bltu    a5, a4, 0b
++    beqz    a2, 2f
++    j       .L_8B_aligned
+ 1:
+-    sub     a0, a4, a3
++    sub     a0, a0, a3
+     ret
+ 2:
+     li      a0, 0
+     ret
+-.L_4_to_8:
+-    li      a3, 8
+-    bgtu    a2, a3, .L_9_to_16
+-    lwu     a3, 0(a1)
+-    lwu     a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    lwu     a3, -4(a1)
+-    lwu     a0, -4(a5)
+-    j       .L_end
+-.L_9_to_16:
+-    li      a3, 16
+-    bgtu    a2, a3, .L_17_to_32
+-    addi    a2, a2, -8
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    j       .L_end
+-.L_17_to_32:
+-    addi    a2, a2, -16
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    ld      a3, 8(a1)
+-    ld      a0, 8(a5)
+-    bne     a3, a0, .L_end
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    ld      a3, 8(a1)
+-    ld      a0, 8(a5)
+-    j       .L_end
+-.L_over_32:
+-    neg     a4, a5
+-    andi    a4, a4, 0x7
+-    beqz    a4, .L_dst_aligned
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    sub     a2, a2, a4
+-    add     a5, a5, a4
+-    add     a1, a1, a4
+-.L_dst_aligned:
+-    andi    a4, a2, -32
+-    andi    a2, a2, (32-1)
+-    beqz    a4, .L_tail
++.L_8B_aligned:
++    andi    a4, a2, -16
++    beqz    a4, .L_byte
+     add     a4, a4, a5
++    andi    t5, a1, 0x7
++    andi    a2, a2, (16-1)
++    bnez    t5, .L_merge
+ .L_loop:
+     ld      a3, 0(a1)
+     ld      a0, 0(a5)
+@@ -102,36 +64,14 @@ ENTRY (memcmp)
+     ld      a3, 8(a1)
+     ld      a0, 8(a5)
+     bne     a3, a0, .L_end
+-    ld      a3, 16(a1)
+-    ld      a0, 16(a5)
+-    bne     a3, a0, .L_end
+-    ld      a3, 24(a1)
+-    ld      a0, 24(a5)
+-    bne     a3, a0, .L_end
+-    addi    a5, a5, 32
+-    addi    a1, a1, 32
++    addi    a5, a5, 16
++    addi    a1, a1, 16
+     bltu    a5, a4, .L_loop
+-    beqz    a2, .L_end
+-.L_tail:
+-    andi    a4, a2, -8
+-    beqz    a4, .L_last
+-    add     a4, a4, a5
+-0:
+-    ld      a3, 0(a1)
+-    ld      a0, 0(a5)
+-    bne     a3, a0, .L_end
+-    add     a5, a5, 8
+-    add     a1, a1, 8
+-    bltu    a5, a4, 0b
++    bnez    a2, .L_byte
+ 
+-.L_last:
+-    andi    a2, a2, (8-1)
+-    beqz    a2, 3f
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, -8(a1)
+-    ld      a0, -8(a5)
+ .L_end:
++    rev8    a0, a0
++    rev8    a3, a3
+     bltu    a0, a3, 2f
+     beq     a0, a3, 3f
+     li      a0, 1
+@@ -142,6 +82,55 @@ ENTRY (memcmp)
+ 3:
+     li      a0, 0
+     ret
++
++.L_byte:
++    add     a2, a2, a5
++0:
++    lbu     a3, 0(a1)
++    lbu     a4, 0(a5)
++    bne     a3, a4, 1f
++    addi    a5, a5, 1
++    addi    a1, a1, 1
++    bltu    a5, a2, 0b
++1:
++    sub     a0, a4, a3
++    ret
++2:
++    li      a0, 0
++    ret
++
++    .balign 4
++    .option push
++    .option norvc
++.L_merge:
++    andi    a1, a1, -8
++    ld      t2, 0(a1)
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    srl     t1, t2, t3
++1:
++    ld      t2, 8(a1)
++    sll     a3, t2, t4
++    or      a3, a3, t1
++    ld      a0, 0(a5)
++    bne     a3, a0, .L_end
++    srl     t1, t2, t3
++
++    ld      t2, 16(a1)
++    sll     a3, t2, t4
++    or      a3, a3, t1
++    ld      a0, 8(a5)
++    bne     a3, a0, .L_end
++    srl     t1, t2, t3
++    .option pop
++
++    addi    a5, a5, 16
++    addi    a1, a1, 16
++    bltu    a5, a4, 1b
++    beqz    a2, .L_end
++    add     a1, a1, t5
++    j       .L_byte
+ END (memcmp)
+ libc_hidden_builtin_def (memcmp)
+ 
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_as.S b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+index 4a97d75545..fae522684c 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcpy_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+@@ -32,73 +32,50 @@
+ 
+     .p2align 6
+ ENTRY (memcpy)
+-    li      a3, 32
+     mv      a5, a0
+-    bgtu    a2, a3, .L_over_32
+-    li      a3, 4
+-    bgtu    a2, a3, .L_5_to_8
+-.L_0_to_4:
+-    beqz    a2, 1f
+-    lb      a4, 0(a1)
+-    sb      a4, 0(a5)
+-    /* process [n-1] */
+-    add     t1, a1, a2
+-    lb      a4, -1(t1)
+-    add     t0, a5, a2
+-    sb      a4, -1(t0)
+-    li      a3, 2
+-    bleu    a2, a3, 1f
+-    lb      a4, 2(a1)
+-    sb      a4, 2(a5)
+-    lb      a4, 1(a1)
+-    sb      a4, 1(a5)
+-1:
+-    ret
+-.L_5_to_8:
+-    li      a3, 8
+-    bgtu    a2, a3, .L_9_to_16
+-    lw      a3, 0(a1)
+-    sw      a3, 0(a5)
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    lw      a3, -4(a1)
+-    sw      a3, -4(a5)
+-    ret
+-.L_9_to_16:
+-    li      a3, 16
+-    bgtu    a2, a3, .L_17_to_32
+-    ld      a3, 0(a1)
+-    sd      a3, 0(a5)
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, -8(a1)
+-    sd      a3, -8(a5)
+-    ret
+-.L_17_to_32:
+-    addi    a2, a2, -16
+-    ld      a3, 0(a1)
+-    sd      a3, 0(a5)
+-    ld      a3, 8(a1)
+-    sd      a3, 8(a5)
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, 0(a1)
+-    sd      a3, 0(a5)
+-    ld      a3, 8(a1)
+-    sd      a3, 8(a5)
+-    ret
+-.L_over_32:
++    li      a4, 9
++    bltu    a2, a4, .L_byte
++
+     neg     a4, a5
+     andi    a4, a4, 0x7
+     beqz    a4, .L_dst_aligned
+-    ld      a3, 0(a1)
+-    sd      a3, 0(a5)
+-    sub     a2, a2, a4
++    j       .L_pc_0
++
++.L_byte:
++    mv      a4, a2
++
++.L_pc_0:
++    auipc   a3, 0
++    slli    t0, a4, 3
++    sub     a3, a3, t0
++    .equ    offset_0, .L_jmp_end_0 - .L_pc_0
++    jalr    x0, a3, %lo(offset_0)
++    lb      a3, 7(a1)
++    sb      a3, 7(a5)
++    lb      a3, 6(a1)
++    sb      a3, 6(a5)
++    lb      a3, 5(a1)
++    sb      a3, 5(a5)
++    lb      a3, 4(a1)
++    sb      a3, 4(a5)
++    lb      a3, 3(a1)
++    sb      a3, 3(a5)
++    lb      a3, 2(a1)
++    sb      a3, 2(a5)
++    lb      a3, 1(a1)
++    sb      a3, 1(a5)
++    lb      a3, 0(a1)
++    sb      a3, 0(a5)
++.L_jmp_end_0:
++    sub     a2, a2, a4          /* update cnt */
++    beqz    a2, .L_ret
+     add     a5, a5, a4
+     add     a1, a1, a4
++
+ .L_dst_aligned:
++    andi    t5, a1, 0x7
++    bnez    t5, .L_merge
+     andi    a4, a2, -32
+-    andi    a2, a2, (32-1)
+     beqz    a4, .L_tail
+     add     a4, a4, a5
+ .L_loop:
+@@ -106,29 +83,57 @@ ENTRY (memcpy)
+     addi    a5, a5, 32
+     addi    a1, a1, 32
+     bltu    a5, a4, .L_loop
++    andi    a2, a2, (32-1)
+     beqz    a2, .L_ret
++
+ .L_tail:
+-    andi    a4, a2, -1
++    andi    a4, a2, -8
+ .L_pc:
+     auipc   a3, 0
+-    andi    a4, a4, -8
+-    srli    a4, a4, 1
+-    sub     a3, a3, a4
++    srli    t0, a4, 1
++    sub     a3, a3, t0
+     .equ    offset, .L_jmp_end - .L_pc
+     jalr    x0, a3, %lo(offset)
+-    ld      a3, 16(a1) # offset-12
++    ld      a3, 16(a1)
+     sd      a3, 16(a5)
+-    ld      a3, 8(a1)  # offset-8
++    ld      a3, 8(a1)
+     sd      a3, 8(a5)
+-    ld      a3, 0(a1)  # offset-4
++    ld      a3, 0(a1)
+     sd      a3, 0(a5)
+ .L_jmp_end:
+-    add     a1, a1, a2
+-    add     a5, a5, a2
+-    ld      a3, -8(a1)
+-    sd      a3, -8(a5)
++    add     a1, a1, a4
++    add     a5, a5, a4
++    andi    a2, a2, (8 - 1)     /* update cnt */
++    j       .L_byte
++
+ .L_ret:
+     ret
++
++    .balign 4
++.L_merge:
++    andi    a4, a2, -8
++    andi    a2, a2, (8 - 1)     /* update cnt */
++    beqz    a4, .L_byte
++    add     a4, a4, a5
++    andi    a1, a1, -8
++    ld      t2, 0(a1)
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    srl     t1, t2, t3
++1:
++    ld      t2, 8(a1)
++    sll     a3, t2, t4
++    or      a3, a3, t1
++    sd      a3, 0(a5)
++    srl     t1, t2, t3
++
++    addi    a5, a5, 8
++    addi    a1, a1, 8
++    bltu    a5, a4, 1b
++    beqz    a2, .L_ret
++    add     a1, a1, t5
++    j       .L_byte
+ END (memcpy)
+ 
+ libc_hidden_builtin_def (memcpy)
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_as.S b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+index 222b87b9c8..b8275b6dd7 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+@@ -35,10 +35,10 @@ ENTRY (memmove)
+     bltu    a3, a2, .L_overlap
+     j       memcpy
+ .L_overlap:
+-    li      a4, 8
+     bltu    a1, a0, .L_backward
+     mv      a5, a0
+-    bltu    a2, a4, .L_byte_fwd
++    li      a3, 8
++    bltu    a2, a3, .L_byte_fwd
+     neg     a4, a0
+     andi    a4, a4, 0x7
+     beqz    a4, .L_32B_fwd
+@@ -52,6 +52,8 @@ ENTRY (memmove)
+     addi    a1, a1, 1
+     bltu    a5, a4, 0b
+ .L_32B_fwd:
++    andi    t5, a1, 0x7
++    bnez    t5, .L_merge_fwd
+     andi    a4, a2, -32
+     andi    a2, a2, (32 - 1)
+     beqz    a4, .L_8B_fwd
+@@ -100,11 +102,36 @@ ENTRY (memmove)
+ .L_ret_fwd:
+     ret
+ 
++    .balign 4
++.L_merge_fwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_fwd
++    add     a4, a4, a5
++    andi    a1, a1, -8
++    ld      t2, 0(a1)
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    srl     t1, t2, t3
++1:
++    ld      t2, 8(a1)
++    sll     a3, t2, t4
++    or      a3, a3, t1
++    sd      a3, 0(a5)
++    srl     t1, t2, t3
++
++    addi    a5, a5, 8
++    addi    a1, a1, 8
++    bltu    a5, a4, 1b
++    add     a1, a1, t5
++    j       .L_byte_tail_fwd
++
+ .L_backward:
+     add     a1, a1, a2
+     add     a5, a0, a2
+-    bltu    a2, a4, .L_byte_bwd
+-    andi    a4, a5, 0x7
++    li      a3, 8
++    bltu    a2, a3, .L_byte_bwd
++    andi    a4, a0, 0x7
+     beqz    a4, .L_32B_bwd
+ .L_byte_head_bwd:
+     sub     a2, a2, a4
+@@ -116,6 +143,8 @@ ENTRY (memmove)
+     sb      a3, 0(a5)
+     bltu    a4, a5, 0b
+ .L_32B_bwd:
++    andi    t5, a1, 0x7
++    bnez    t5, .L_merge_bwd
+     andi    a4, a2, -32
+     andi    a2, a2, (32 - 1)
+     beqz    a4, .L_8B_bwd
+@@ -163,6 +192,31 @@ ENTRY (memmove)
+     bltu    a0, a5, 0b
+ .L_ret_bwd:
+     ret
++
++    .balign 4
++.L_merge_bwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_bwd
++    sub     a4, a5, a4
++    andi    a1, a1, -8
++    ld      t2, 0(a1)   
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    sll     t1, t2, t4
++1:
++    ld      t2, -8(a1)
++    srl     a3, t2, t3
++    or      a3, a3, t1
++    sd      a3, -8(a5)
++    sll     t1, t2, t4
++    
++    addi    a5, a5, -8
++    addi    a1, a1, -8
++    bltu    a4, a5, 1b
++    add     a1, a1, t5 
++    j       .L_byte_tail_bwd
++
+ END (memmove)
+ 
+ libc_hidden_builtin_def (memmove)
+diff --git a/sysdeps/riscv/rv64/multiarch/memrchr.S b/sysdeps/riscv/rv64/multiarch/memrchr.S
+index 01c2d949de..b72a13e62a 100644
+--- a/sysdeps/riscv/rv64/multiarch/memrchr.S
++++ b/sysdeps/riscv/rv64/multiarch/memrchr.S
+@@ -21,96 +21,80 @@
+ 
+ .option arch, +zbb
+ 
+-.macro chr_8B
+-    ld      a4, -8(a0)
+-    xor     a4, a4, a1
+-    sub     a3, a4, t1
+-    andn    a3, a3, a4
+-    and     a3, a3, a5
+-    bnez    a3, .L_find
+-.endm
+-.macro gen_pat
+-    slli    a3, a1, 8
+-    or      a1, a1, a3
+-    slli    a3, a1, 16
+-    or      a1, a1, a3
+-    slli    a3, a1, 32
+-    or      a1, a1, a3
+-
+-    li      a5, 0x80
+-    slli    a3, a5, 8
+-    or      a5, a5, a3
+-    slli    a3, a5, 16
+-    or      a5, a5, a3
+-    slli    a3, a5, 32
+-    or      a5, a5, a3  # 0x8080808080808080
+-    srli    t1, a5, 7   # 0x0101010101010101
+-.endm
+-
+     .p2align 6
+ #ifndef MEMRCHR
+ ENTRY (__memrchr)
+ #else
+ ENTRY (MEMRCHR)
+ #endif
+-    li      a3, 7
++    beqz    a2, .L_not_find
+     add     a0, a0, a2
+-    bgtu    a2, a3, .L_8_to_16
+-.L_0_to_7:
+-    beqz    a2, 1f
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8 
++    
++    andi    a4, a0, 0x7
++    beqz    a4, .L_dst_aligned
++
++.L_0_to_8:
++    min     a4, a4, a2
++.L_head:
++    sub     a2, a2, a4
+ 0:
+-    lbu     a4, -1(a0)
+-    beq     a1, a4, 2f
+-    addi    a2, a2, -1
++    lbu     a3, -1(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
+     addi    a0, a0, -1
+-    bnez    a2, 0b
+-1:
+-    li      a0, 0
+-    ret
+-2:
+-    addi    a0, a0, -1
+-    ret
+-.L_8_to_16:
+-    gen_pat
+-    li      a3, 16
+-    bgtu    a2, a3, .L_over_16
+-    addi    a2, a2, -8
+-    chr_8B
+-    sub     a0, a0, a2
+-    chr_8B
+-    j       .L_not_find
+-.L_over_16:
+-    and     t4, a0, 0x7
+-    beqz    t4, .L_dst_aligned
+-    chr_8B
+-    sub     a2, a2, t4
+-    sub     a0, a0, t4
++    bnez    a4, 0b
++    beqz    a2, .L_not_find
++
+ .L_dst_aligned:
+-    andi    t0, a2, (16-1)
++    andi    a4, a2, (16-1)
+     srli    a2, a2, 4
+     beqz    a2, .L_tail
++    
++    slli    a3, a1, 8
++    or      a1, a1, a3
++    slli    a3, a1, 16
++    or      a1, a1, a3
++    slli    a3, a1, 32
++    or      a1, a1, a3
++    li      a5, -1
+ .L_loop:
+-    chr_8B
++    ld      a3, -8(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find 
+     addi    a0, a0, -8
+-    chr_8B
++
++    ld      a3, -8(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find
++
+     addi    a2, a2, -1
+     addi    a0, a0, -8
+     bnez    a2, .L_loop
+-    beqz    t0, .L_not_find
++    beqz    a4, .L_not_find
++
+ .L_tail:
+-    sub     a0, a0, t0
+-    addi    a0, a0, 16
+-    chr_8B
+-    addi    a0, a0, -8
+-    chr_8B
++    andi    a1, a1, 0xff
++0:
++    lbu     a3, -1(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
++    addi    a0, a0, -1
++    bnez    a4, 0b
++
+ .L_not_find:
+     li      a0, 0
+     ret
+ .L_find:
++    not     a3, a3
+     clz     a3, a3
+-    addi    a0, a0, -1
+     srli    a3, a3, 3
+     sub     a0, a0, a3
++.L_find_byte:
++    addi    a0, a0, -1
+     ret
+ #ifndef MEMRCHR
+ END (__memrchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_as.S b/sysdeps/riscv/rv64/multiarch/memset_as.S
+index 7f67c79215..455033adf0 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memset_as.S
+@@ -21,53 +21,38 @@
+ 
+     .p2align 6
+ ENTRY (memset)
+-    li      a3, 32
+-    andi    a1, a1, 0xff
+     mv      a5, a0
+-    bgtu    a2, a3, .L_over_32
+-    li      a3, 4
+-    bgtu    a2, a3, .L_5_to_8
+-.L_0_to_4:
+-    beqz    a2, 1f
+-    sb      a1, 0(a5)
+-    add     t0, a5, a2
+-    sb      a1, -1(t0)
+-    li      a3, 2
+-    bleu    a2, a3, 1f
+-    sb      a1, 1(a5)
++    andi    a1, a1, 0xff
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8 
++    
++    neg     a4, a5
++    andi    a4, a4, 0x7
++    beqz    a4, .L_dst_aligned
++    j       .L_pc_0
++.L_0_to_8:
++    mv      a4, a2
++
++.L_pc_0:
++    auipc   a3, 0
++    slli    t0, a4, 2
++    sub     a3, a3, t0
++    .equ    offset_0, .L_jmp_end_0 - .L_pc_0
++    jalr    x0, a3, %lo(offset_0)
++    sb      a1, 7(a5)
++    sb      a1, 6(a5)
++    sb      a1, 5(a5)
++    sb      a1, 4(a5)
++    sb      a1, 3(a5)
+     sb      a1, 2(a5)
+-1:
+-    ret
+-.L_5_to_8:
+-    slli    a3, a1, 8
+-    or      a1, a1, a3
+-    slli    a3, a1, 16
+-    or      a1, a1, a3
+-    li      a3, 8
+-    bgtu    a2, a3, .L_9_to_16
+-    sw      a1, 0(a5)
+-    add     a5, a5, a2
+-    sw      a1, -4(a5)
+-    ret
+-.L_9_to_16:
+-    li      a3, 16
+-    bgtu    a2, a3, .L_17_to_32
+-    sw      a1, 0(a5)
+-    sw      a1, 4(a5)
+-    add     a5, a5, a2
+-    sw      a1, -8(a5)
+-    sw      a1, -4(a5)
+-    ret
+-.L_17_to_32:
+-    slli    a3, a1, 32
+-    or      a1, a1, a3
+-    sd      a1, 0(a5)
+-    sd      a1, 8(a5)
+-    add     a5, a5, a2
+-    sd      a1, -16(a5)
+-    sd      a1, -8(a5)
+-    ret
+-.L_over_32:
++    sb      a1, 1(a5)
++    sb      a1, 0(a5)
++.L_jmp_end_0:
++    sub     a2, a2, a4          /* update cnt */
++    beqz    a2, .L_ret
++    add     a5, a5, a4
++
++.L_dst_aligned:
+     slli    a3, a1, 8
+     or      a1, a1, a3
+     slli    a3, a1, 16
+@@ -75,17 +60,10 @@ ENTRY (memset)
+     slli    a3, a1, 32
+     or      a1, a1, a3
+ 
+-    neg     a4, a5
+-    andi    a4, a4, 0x7
+-    beqz    a4, .L_dst_aligned
+-    sd      a1, 0(a5)
+-    sub     a2, a2, a4
+-    add     a5, a5, a4
+-.L_dst_aligned:
+     andi    a4, a2, -64
+-    andi    a2, a2, (64-1)
+     beqz    a4, .L_tail
+     add     a4, a4, a5
++
+ .L_loop:
+     sd      a1, 0(a5)
+     sd      a1, 8(a5)
+@@ -97,27 +75,44 @@ ENTRY (memset)
+     sd      a1, 56(a5)
+     addi    a5, a5, 64
+     bltu    a5, a4, .L_loop
++    andi    a2, a2, (64-1)      /* update cnt */
+     beqz    a2, .L_ret
++
+ .L_tail:
+-    andi    a4, a2, -1
++    andi    a4, a2, -8
+ .L_pc:
+     auipc   a3, 0
+-    andi    a4, a4, -8
+-    srli    a4, a4, 2
+-    sub     a3, a3, a4
++    srli    t0, a4, 2
++    sub     a3, a3, t0
+     .equ    offset, .L_jmp_end - .L_pc
+     jalr    x0, a3, %lo(offset)
+-    sd      a1, 48(a5)
+-    sd      a1, 40(a5)
+-    sd      a1, 32(a5)
+-    sd      a1, 24(a5)
+-    sd      a1, 16(a5)
+-    sd      a1, 8(a5)
+-    sd      a1, 0(a5)
++    sd      a1, 6*8(a5)
++    sd      a1, 5*8(a5)
++    sd      a1, 4*8(a5)
++    sd      a1, 3*8(a5)
++    sd      a1, 2*8(a5)
++    sd      a1, 1*8(a5)
++    sd      a1, 0*8(a5)
+ .L_jmp_end:
+-    add     a5, a5, a2
+-    sd      a1, -8(a5)
+- .L_ret:
++    add     a5, a5, a4
++    andi    a4, a2, (8 - 1)     /* update cnt */
++
++.L_tail_byte:
++.L_pc_2:
++    auipc   a3, 0
++    slli    a4, a4, 2
++    sub     a3, a3, a4
++    .equ    offset_2, .L_jmp_end_2 - .L_pc_2
++    jalr    x0, a3, %lo(offset_2)
++    sb      a1, 6(a5)
++    sb      a1, 5(a5)
++    sb      a1, 4(a5)
++    sb      a1, 3(a5)
++    sb      a1, 2(a5)
++    sb      a1, 1(a5)
++    sb      a1, 0(a5)
++.L_jmp_end_2:
++.L_ret:
+     ret
+ END (memset)
+ libc_hidden_builtin_def (memset)
+-- 
+2.25.1
+

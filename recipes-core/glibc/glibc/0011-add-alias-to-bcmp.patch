@@ -1,0 +1,32 @@
+From c598ae46e8159326563883b6243de8ac8391dc45 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 13 Sep 2022 18:33:27 -0700
+Subject: [PATCH 11/19] add alias to bcmp
+
+---
+ sysdeps/riscv/rv64/multiarch/memcmp_as.S | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_as.S b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+index a737172980..c9c6b3e909 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+@@ -146,5 +146,14 @@ ENTRY (memcmp)
+     li      a0, 0
+     ret
+ END (memcmp)
+-
+ libc_hidden_builtin_def (memcmp)
++
++#ifdef weak_alias
++# undef bcmp
++weak_alias (memcmp, bcmp)
++#endif
++
++#undef __memcmpeq
++strong_alias (memcmp, __memcmpeq)
++libc_hidden_def(__memcmpeq)
++
+-- 
+2.25.1
+

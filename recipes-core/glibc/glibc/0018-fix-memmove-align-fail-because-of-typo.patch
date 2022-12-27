@@ -1,0 +1,25 @@
+From 8461fb86ab5ac8b38bdc3114c09654362d7e9ecf Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Mon, 12 Dec 2022 15:38:27 +0800
+Subject: [PATCH 18/19] fix memmove align fail because of typo
+
+---
+ sysdeps/riscv/rv64/multiarch/memmove_as.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_as.S b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+index b8275b6dd7..35d0905186 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+@@ -131,7 +131,7 @@ ENTRY (memmove)
+     add     a5, a0, a2
+     li      a3, 8
+     bltu    a2, a3, .L_byte_bwd
+-    andi    a4, a0, 0x7
++    andi    a4, a5, 0x7
+     beqz    a4, .L_32B_bwd
+ .L_byte_head_bwd:
+     sub     a2, a2, a4
+-- 
+2.25.1
+

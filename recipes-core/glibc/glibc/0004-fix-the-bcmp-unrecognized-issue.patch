@@ -1,0 +1,33 @@
+From d23b3456285b4276b439f207530208cebcb2ab44 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 16 Jan 2022 16:56:07 -0800
+Subject: [PATCH 04/19] fix the bcmp unrecognized issue
+
+---
+ sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c  | 2 --
+ sysdeps/riscv/rv64/multiarch/memcmp_vector.S | 1 +
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+ delete mode 100644 sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
+
+diff --git a/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c b/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
+deleted file mode 100644
+index 2054d18261..0000000000
+--- a/sysdeps/riscv/rv64/multiarch/aeabi_memcpy.c
++++ /dev/null
+@@ -1,2 +0,0 @@
+-/* Empty file to override sysdeps/riscv version. See memcpy.S for definitions
+-   of these functions.  */
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_vector.S b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+index f6cbc1307b..fe89f92268 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+@@ -52,5 +52,6 @@ ENTRY (memcmp)
+    add	a0,zero,zero
+    ret
+ END (memcmp)
++weak_alias (memcmp, bcmp)
+ libc_hidden_builtin_def (memcmp)
+ 
+-- 
+2.25.1
+

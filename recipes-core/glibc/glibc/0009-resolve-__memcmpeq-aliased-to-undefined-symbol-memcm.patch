@@ -1,0 +1,25 @@
+From 5d6ab9fef7281483da3e9c306b56413c40165ef1 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 6 Sep 2022 20:01:36 -0700
+Subject: [PATCH 09/19] resolve '__memcmpeq' aliased to undefined symbol
+ 'memcmp' issue
+
+cx
+---
+ string/memcmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/string/memcmp.c b/string/memcmp.c
+index 40029474e6..b275e5fbff 100644
+--- a/string/memcmp.c
++++ b/string/memcmp.c
+@@ -361,5 +361,5 @@ weak_alias (memcmp, bcmp)
+ #endif
+ 
+ #undef __memcmpeq
+-strong_alias (memcmp, __memcmpeq)
++strong_alias (MEMCMP, __memcmpeq)
+ libc_hidden_def(__memcmpeq)
+-- 
+2.25.1
+
