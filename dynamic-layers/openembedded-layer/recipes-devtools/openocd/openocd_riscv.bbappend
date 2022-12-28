@@ -12,6 +12,7 @@ SRC_URI = " \
     file://Dubhe_FPGA_openocd.patch \
     file://olimex-openocd_s5.cfg \
     file://olimex_flash_write.cfg \
+    file://0001-autosetup-cc-check-tools-check-only-the-name.patch \
 "
 
 SRCREV_openocd = "a037b20f2e015859327ab37588792386c4fc942f"
