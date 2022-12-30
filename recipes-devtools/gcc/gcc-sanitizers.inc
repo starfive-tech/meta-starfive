@@ -90,7 +90,9 @@ FILES:libasan-dev += "\
     ${libdir}/libhwasan.so \
     ${libdir}/libasan.la \
 "
-FILES:libasan-staticdev += "${libdir}/libasan.a"
+FILES:libasan-staticdev += "${libdir}/libasan.a \
+    ${libdir}/libhwasan.a \
+"
 
 FILES:libubsan += "${libdir}/libubsan.so.*"
 FILES:libubsan-dev += "\

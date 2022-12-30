@@ -51,8 +51,6 @@ do_configure:prepend () {
 
 do_configure:append () {
 	sed -i -e 's#thread_header = .*#thread_header = gthr-single.h#' ${B}/${BPN}/Makefile
-	sed -i -e '/^libgcc_tm_defines = $/a fp128_dec_funcs =' ${B}/${BPN}/Makefile
-	sed -i -e '/^libgcc_tm_defines = $/a fp128_decstr_funcs =' ${B}/${BPN}/Makefile
 }
 
 do_install:append () {

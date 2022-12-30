@@ -1,0 +1,25 @@
+From 7dd16b0fbc894b47e4611a514bc7685bb562e167 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 8 Dec 2021 17:56:57 -0800
+Subject: [PATCH 05/11] enable ifunc for riscv
+
+---
+ gcc/config.gcc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index c5064dd3766..8e1cbb85c2e 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -3622,7 +3622,7 @@ case ${target} in
+         ;;
+ *-*-linux* | *-*-gnu*)
+ 	case ${target} in
+-	aarch64*-* | arm*-* | i[34567]86-* | powerpc*-* | s390*-* | sparc*-* | x86_64-* | loongarch*-*)
++	aarch64*-* | arm*-* | i[34567]86-* | powerpc*-* | s390*-* | sparc*-* | riscv*-*-* | x86_64-*)
+ 		default_gnu_indirect_function=yes
+ 		;;
+ 	esac
+-- 
+2.25.1
+

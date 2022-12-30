@@ -1,0 +1,177 @@
+From 66b69324b10c9aeeab4ed19a4d247bec2f732afb Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 13 Sep 2022 01:22:47 -0700
+Subject: [PATCH 08/11] add dubhe .md file
+
+---
+ gcc/config/riscv/starfive-dubhe.md | 158 +++++++++++++++++++++++++++++
+ 1 file changed, 158 insertions(+)
+ create mode 100644 gcc/config/riscv/starfive-dubhe.md
+
+diff --git a/gcc/config/riscv/starfive-dubhe.md b/gcc/config/riscv/starfive-dubhe.md
+new file mode 100644
+index 00000000000..6cb288d2fd6
+--- /dev/null
++++ b/gcc/config/riscv/starfive-dubhe.md
+@@ -0,0 +1,158 @@
++(define_automaton "starfive_dubhe")
++
++(define_cpu_unit "dubhe_alu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_alu1" "starfive_dubhe")
++
++(define_cpu_unit "dubhe_bru" "starfive_dubhe")
++
++(define_cpu_unit "dubhe_div" "starfive_dubhe")
++
++(define_cpu_unit "dubhe_lsu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_lsu1" "starfive_dubhe")
++
++(define_cpu_unit "dubhe_fpu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_fpu1" "starfive_dubhe")
++(define_cpu_unit "dubhe_fpu0_resource" "starfive_dubhe")
++
++(define_insn_reservation "dubhe_load" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "load"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_fpload" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fpload"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_store"  1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "store"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_fpstore" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fpstore"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_branch" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "branch"))
++  "dubhe_bru")
++
++(define_insn_reservation "dubhe_jump"  4
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "jump,call"))
++  "dubhe_bru")
++
++(define_insn_reservation "dubhe_alu"  1  
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "unknown,arith,shift,slt,multi,logical,move"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_sfb_alu"  4
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "sfb_alu"))
++  "(dubhe_alu0|dubhe_alu1)+dubhe_bru")
++
++(define_insn_reservation "dubhe_mul"    3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "imul"))
++  "dubhe_div")
++
++(define_insn_reservation "dubhe_div" 45
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "idiv"))
++  "dubhe_div,sifive_7_idiv*45")
++
++(define_insn_reservation "dubhe_load_immediate"  1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "nop,const,auipc"))
++  "dubhe_alu0|dubhe_alu1")
++
++(define_insn_reservation "dubhe_sfma"   6
++  (and (eq_attr "tune" "starfive_dubhe")
++       (and (eq_attr "type" "fadd,fmul,fmadd")
++	    (eq_attr "mode" "SF")))
++  "dubhe_fpu0 | dubhe_fpu1")
++
++(define_insn_reservation "dubhe_dfma" 6
++  (and (eq_attr "tune" "starfive_dubhe")
++       (and (eq_attr "type" "fadd,fmul,fmadd")
++	    (eq_attr "mode" "DF")))
++  "dubhe_fpu0 | dubhe_fpu1")
++
++(define_insn_reservation "dubhe_fp_other" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fcvt,fcmp,fmove"))
++  "dubhe_fpu1")
++
++(define_insn_reservation "dubhe_7_fdiv_s" 31
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fdiv,fsqrt")
++       (eq_attr "mode" "SF"))
++  "dubhe_fpu0,dubhe_fpu0_resource*31")
++
++(define_insn_reservation "dubhe_fdiv_d" 60
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fdiv,fsqrt")
++       (eq_attr "mode" "DF"))
++  "dubhe_fpu0,dubhe_fpu0_resource*60")
++
++(define_insn_reservation "dubhe_i2f" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "mtc"))
++  "dubhe_alu0|dubhe_alu1") 
++
++(define_insn_reservation "dubhe_f2i" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "mfc"))
++  "dubhe_alu0|dubhe_alu1")
++
++
++(define_insn_reservation "dubhe_opext" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bopext"))
++  "dubhe_alu0|dubhe_alu1")
++
++(define_insn_reservation "dubhe_shiftadd" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bshiftadd"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_rorate" 2
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "brorate"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_lneg" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "blogic_neg"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_count_bit" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bcount_bit"))
++  "dubhe_div")
++
++(define_insn_reservation "dubhe_minmax" 2
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "blogic_neg"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_cmul" 10
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bclmul"))
++  "dubhe_div")
++
++(define_insn_reservation "dubhe_bitset" 2
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bsbit"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_perm" 4
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bperm"))
++  "dubhe_div")
++
++
++
+-- 
+2.25.1
+

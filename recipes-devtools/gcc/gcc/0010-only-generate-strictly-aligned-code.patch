@@ -1,0 +1,41 @@
+From 6deaf5a014958a132eae634487783c7424ae57c2 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 7 Dec 2022 18:36:45 -0800
+Subject: [PATCH 10/11] only generate strictly aligned code
+
+---
+ gcc/config/riscv/riscv.cc | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 3baa05bd364..981dbf60bd1 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -5046,9 +5046,12 @@ riscv_option_override (void)
+      -m[no-]strict-align is left unspecified, heed -mtune's advice.  */
+   riscv_slow_unaligned_access_p = (cpu->tune_param->slow_unaligned_access
+ 				   || TARGET_STRICT_ALIGN);
+-  if ((target_flags_explicit & MASK_STRICT_ALIGN) == 0
++  /* if ((target_flags_explicit & MASK_STRICT_ALIGN) == 0
+       && cpu->tune_param->slow_unaligned_access)
+     target_flags |= MASK_STRICT_ALIGN;
++  */
++  /* for dubhe, it will not support unaligned mempry access */
++  target_flags |= MASK_STRICT_ALIGN;
+ 
+   /* If the user hasn't specified a branch cost, use the processor's
+      default.  */
+@@ -5827,6 +5830,10 @@ riscv_asan_shadow_offset (void)
+ #define TARGET_DEFAULT_TARGET_FLAGS (MASK_BIG_ENDIAN)
+ #endif
+ 
++/* For dubhe, it will not support unaligned memory access */
++#undef TARGET_DEFAULT_TARGET_FLAGS
++#define TARGET_DEFAULT_TARGET_FLAGS (MASK_STRICT_ALIGN)
++
+ struct gcc_target targetm = TARGET_INITIALIZER;
+ 
+ #include "gt-riscv.h"
+-- 
+2.25.1
+
