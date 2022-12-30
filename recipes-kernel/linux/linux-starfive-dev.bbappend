@@ -1,6 +1,6 @@
 FORK = "starfive-tech"
 BRANCH = "starfive-5.15-dubhe"
-SRCREV = "0f9fd42752277456a1f324b773877ac28aa9290b"
+SRCREV = "a27b2362aa72f92794c0868bff005c136ab3c798"
 
 LINUX_VERSION = "5.15.0"
 LINUX_VERSION_EXTENSION:append = "-starlight"
@@ -14,7 +14,8 @@ SRC_URI = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=
 INITRAMFS_IMAGE_BUNDLE = "${@oe.utils.conditional('ENABLE_NFS','1','','1',d)}"
 INITRAMFS_IMAGE = "${@oe.utils.conditional('ENABLE_NFS','1','','dubhe-image-initramfs',d)}"
 
-SRC_URI:append = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','file://initramfs.patch',d)}"
+# Temporary remove the patch to update the kernel, will create new patches after that
+#SRC_URI:append = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','file://initramfs.patch',d)}"
 
 #KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
 
