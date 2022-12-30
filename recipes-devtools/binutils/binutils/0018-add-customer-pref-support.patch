@@ -1,0 +1,166 @@
+From 3514789d54fb3515547a29405596d4f2cddd4585 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 5 Sep 2022 01:17:31 -0700
+Subject: [PATCH 18/20] add customer pref support
+
+---
+ gas/config/tc-riscv.c      | 44 +++++++++++++++++++++++++++++++++++++-
+ include/opcode/riscv-opc.h |  3 +++
+ include/opcode/riscv.h     |  9 ++++++++
+ opcodes/riscv-dis.c        | 10 +++++++++
+ opcodes/riscv-opc.c        |  1 +
+ 5 files changed, 66 insertions(+), 1 deletion(-)
+
+diff --git a/gas/config/tc-riscv.c b/gas/config/tc-riscv.c
+index a0e8456a0d..934eddc811 100644
+--- a/gas/config/tc-riscv.c
++++ b/gas/config/tc-riscv.c
+@@ -1201,7 +1201,9 @@ validate_riscv_insn (const struct riscv_opcode *opc, int length)
+ 	case ')': break;
+ 	case '<': USE_BITS (OP_MASK_SHAMTW, OP_SH_SHAMTW); break;
+ 	case '>': USE_BITS (OP_MASK_SHAMT, OP_SH_SHAMT); break;
+-	case 'A': break; /* Macro operand, must be symbol.  */
++  case '#': used_bits |= ENCODE_PREF_TIMM (-1U); break;
++  case '+': used_bits |= ENCODE_PREF_SIMM (-1U); break;
++  case 'A': break; /* Macro operand, must be symbol.  */
+ 	case 'B': break; /* Macro operand, must be symbol or constant.  */
+ 	case 'I': break; /* Macro operand, must be constant.  */
+ 	case 'D': /* RD, floating point.  */
+@@ -1600,6 +1602,27 @@ check_absolute_expr (struct riscv_cl_insn *ip, expressionS *ex,
+   normalize_constant_expr (ex);
+ }
+ 
++/* The pref type should be one of the following:
++    0000 - scalar prefetch L1, fetch data as if for a normal scalar load, 
++           and imply load into all lower cache destination levels.
++    0001 - scalar prefetch L2, fetch data and place the cache-line into L2,
++           and imply load into all lower cache destination levels.
++    0010 - scalar prefetch L3, fetch data and place the cache-line into L3,
++           and imply load into all lower cache destination levels.
++    0011 - scalar prefetch L4, fetch data and place the cache-line into L4,
++           and imply load into all lower cache destination levels
++           (if the L5 is in the cache heirarchy).
++    1000 - vector prefetch L1, fetch data as if for a normal scalar load
++           but place the cache-line into vector buffer (vector L1) ,
++           and imply load into all lower cache destination levels.
++*/
++
++static bfd_boolean check_pref_type(unsigned long type)
++{
++  if (type != 0 && type != 1 && type != 2 && type != 3 && type != 8)
++    as_bad (_("Improper pref type (%lu)"), type);
++}
++
+ static symbolS *
+ make_internal_label (void)
+ {
+@@ -2906,6 +2929,25 @@ riscv_ip (char *str, struct riscv_cl_insn *ip, expressionS *imm_expr,
+ 	      asarg = expr_end;
+ 	      continue;
+ 
++      case '#':
++        my_getExpression (imm_expr, asarg);
++        check_pref_type((unsigned long)imm_expr->X_add_number);
++        INSERT_OPERAND (PREF_TYPE, *ip, imm_expr->X_add_number);
++        imm_expr->X_op = O_absent;
++        asarg = expr_end;
++        continue;      
++
++      case '+':
++	      my_getExpression (imm_expr, asarg);
++	      check_absolute_expr (ip, imm_expr, FALSE);
++	      if (imm_expr->X_add_number > 127 || imm_expr->X_add_number < -128)
++		as_bad (_("Improper pref offset value (%d)"),
++			(long) imm_expr->X_add_number);
++	      INSERT_OPERAND (PREF_OFFSET, *ip, imm_expr->X_add_number);
++	      imm_expr->X_op = O_absent;
++	      asarg = expr_end;
++	      continue;
++
+ 	    case 'E': /* Control register.  */
+ 	      insn_with_csr = true;
+ 	      explicit_priv_attr = true;
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 88b8d7ff59..6f08c72c88 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -255,6 +255,7 @@
+ #define MASK_SFENCE_VMA  0xfe007fff
+ #define MATCH_WFI 0x10500073
+ #define MASK_WFI  0xffffffff
++#define MASK_CUSTOMER_PREF 0x7fff
+ #define MATCH_CSRRW 0x1073
+ #define MASK_CSRRW  0x707f
+ #define MATCH_CSRRS 0x2073
+@@ -2852,6 +2853,8 @@ DECLARE_INSN(cbo_clean, MATCH_CBO_CLEAN, MASK_CBO_CLEAN);
+ DECLARE_INSN(cbo_flush, MATCH_CBO_FLUSH, MASK_CBO_FLUSH);
+ DECLARE_INSN(cbo_inval, MATCH_CBO_INVAL, MASK_CBO_INVAL);
+ DECLARE_INSN(cbo_zero, MATCH_CBO_ZERO, MASK_CBO_ZERO);
++DECLARE_INSN(cbo_zero, MATCH_CBO_ZERO, MASK_CBO_ZERO);
++
+ #endif /* DECLARE_INSN */
+ #ifdef DECLARE_CSR
+ /* Unprivileged Counter/Timers CSRs.  */
+diff --git a/include/opcode/riscv.h b/include/opcode/riscv.h
+index b115e338a0..4afb16c092 100644
+--- a/include/opcode/riscv.h
++++ b/include/opcode/riscv.h
+@@ -156,6 +156,10 @@ static const char * const riscv_pred_succ[16] =
+   (RV_X(x, 0, 10) << 20)
+ #define ENCODE_RVV_VC_IMM(x) \
+   (RV_X(x, 0, 11) << 20)
++#define ENCODE_PREF_TIMM(x) \
++  (RV_X(x, 0, 4) << 20)
++#define ENCODE_PREF_SIMM(x) \
++  (RV_X(x, 0, 8) << 24)
+ 
+ #define VALID_ITYPE_IMM(x) (EXTRACT_ITYPE_IMM(ENCODE_ITYPE_IMM(x)) == (x))
+ #define VALID_STYPE_IMM(x) (EXTRACT_STYPE_IMM(ENCODE_STYPE_IMM(x)) == (x))
+@@ -256,6 +260,11 @@ static const char * const riscv_pred_succ[16] =
+ #define OP_MASK_FUNCT2		0x3
+ #define OP_SH_FUNCT2		25
+ 
++#define OP_MASK_PREF_TYPE     0x0f
++#define OP_SH_PREF_TYPE       20
++#define OP_MASK_PREF_OFFSET   0xff
++#define OP_SH_PREF_OFFSET     24
++
+ /* RVC fields.  */
+ 
+ #define OP_MASK_OP2		0x3
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 164fd209db..9a9660cf21 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -490,6 +490,16 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 		 (int)EXTRACT_OPERAND (SHAMTW, l));
+ 	  break;
+ 
++	case '#':
++	  print (info->stream, dis_style_immediate, "0x%x", 
++	     (int)EXTRACT_OPERAND (PREF_TYPE, l));
++	  break;
++
++	case '+':
++	  print (info->stream, dis_style_immediate, "0x%x", 
++	     (int)EXTRACT_OPERAND (PREF_OFFSET, l));
++	  break;
++
+ 	case 'S':
+ 	case 'U':
+ 	  print (info->stream, dis_style_register, "%s", riscv_fpr_names[rs1]);
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 2f9945aa93..5632408ebd 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -401,6 +401,7 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"snez",        0, INSN_CLASS_I, "d,t",       MATCH_SLTU, MASK_SLTU|MASK_RS1, match_opcode, INSN_ALIAS },
+ {"sltz",        0, INSN_CLASS_I, "d,s",       MATCH_SLT, MASK_SLT|MASK_RS2, match_opcode, INSN_ALIAS },
+ {"sgtz",        0, INSN_CLASS_I, "d,t",       MATCH_SLT, MASK_SLT|MASK_RS1, match_opcode, INSN_ALIAS },
++{"pref",        0, INSN_CLASS_I, "#,+(s)",    MATCH_SLTI, MASK_CUSTOMER_PREF, match_opcode, INSN_ALIAS },
+ {"slti",        0, INSN_CLASS_I, "d,s,j",     MATCH_SLTI, MASK_SLTI, match_opcode, 0 },
+ {"slt",         0, INSN_CLASS_I, "d,s,t",     MATCH_SLT, MASK_SLT, match_opcode, 0 },
+ {"slt",         0, INSN_CLASS_I, "d,s,j",     MATCH_SLTI, MASK_SLTI, match_opcode, INSN_ALIAS },
+-- 
+2.25.1
+

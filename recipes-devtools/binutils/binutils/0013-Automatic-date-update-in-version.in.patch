@@ -1,0 +1,25 @@
+From 6995ff43693f4013942223267cfe0609272fc7fd Mon Sep 17 00:00:00 2001
+From: GDB Administrator <gdbadmin@sourceware.org>
+Date: Thu, 1 Sep 2022 00:00:53 +0000
+Subject: [PATCH 13/20] Automatic date update in version.in
+
+---
+ bfd/version.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bfd/version.h b/bfd/version.h
+index 51cec98212..8c973be40f 100644
+--- a/bfd/version.h
++++ b/bfd/version.h
+@@ -16,7 +16,7 @@
+ 
+    In releases, the date is not included in either version strings or
+    sonames.  */
+-#define BFD_VERSION_DATE 20220831
++#define BFD_VERSION_DATE 20220901
+ #define BFD_VERSION @bfd_version@
+ #define BFD_VERSION_STRING  @bfd_version_package@ @bfd_version_string@
+ #define REPORT_BUGS_TO @report_bugs_to@
+-- 
+2.25.1
+
