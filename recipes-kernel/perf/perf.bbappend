@@ -1,0 +1,1 @@
+PACKAGECONFIG[bfd] = ",NO_LIBBFD=1"
