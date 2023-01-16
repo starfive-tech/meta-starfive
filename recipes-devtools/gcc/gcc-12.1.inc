@@ -85,7 +85,7 @@ S = "${TMPDIR}/work-shared/gcc-${PV}-${PR}/${SOURCEDIR}"
 B = "${WORKDIR}/gcc-${PV}/build.${HOST_SYS}.${TARGET_SYS}"
 
 # Language Overrides
-FORTRAN = ""
+FORTRAN = "fortran"
 JAVA = ""
 
 SSP ?= "--disable-libssp"

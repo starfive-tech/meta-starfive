@@ -7,7 +7,7 @@ require gcc-shared-source.inc
 
 # gcc 3.x expects 'f77', 4.0 expects 'f95', 4.1 and 4.2 expect 'fortran'
 FORTRAN ?= ",f77"
-LANGUAGES ?= "c,c++${FORTRAN}"
+LANGUAGES ?= "c,c++,${FORTRAN}"
 
 EXTRA_OECONF_BASE ?= ""
 EXTRA_OECONF_PATHS ?= ""
