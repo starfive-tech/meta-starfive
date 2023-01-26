@@ -48,7 +48,7 @@ EXTRA_OECONF = "\
     --with-mpfr \
     --with-mpc \
     --enable-tls \
-    --without-isl \
+    --with-isl \
 "
 
 # glibc version is a minimum controlling whether features are enabled. 

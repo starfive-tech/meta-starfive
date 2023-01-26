@@ -10,8 +10,8 @@ BINV = "12.1.0"
 
 FILESEXTRAPATHS =. "${FILE_DIRNAME}/gcc:${FILE_DIRNAME}/gcc/backport:"
 
-DEPENDS =+ "mpfr gmp libmpc zlib flex-native"
-NATIVEDEPS = "mpfr-native gmp-native libmpc-native zlib-native flex-native zstd-native"
+DEPENDS =+ "mpfr gmp libmpc isl zlib flex-native "
+NATIVEDEPS = "mpfr-native gmp-native libmpc-native isl-native zlib-native flex-native zstd-native "
 
 LICENSE = "GPL-3.0-with-GCC-exception & GPL-3.0-only"
 
@@ -103,7 +103,7 @@ EXTRA_OECONF_BASE = "\
     --with-cloog=no \
     --enable-checking=release \
     --enable-cheaders=c_global \
-    --without-isl \
+    --with-isl \
 "
 
 EXTRA_OECONF_INITIAL = "\
@@ -115,7 +115,7 @@ EXTRA_OECONF_INITIAL = "\
     --disable-plugin \
     --enable-linker-build-id \
     --enable-decimal-float=no \
-    --without-isl \
+    --with-isl \
     --disable-libssp \
 "
 
