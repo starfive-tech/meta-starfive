@@ -11,6 +11,11 @@ inherit autotools-brokensep deploy
 SRCREV = "bee8253d8f04c56017860386d1b2132cf4f4b7c5"
 SRC_URI = "git://git@192.168.110.45/starfive-tech/opensbi.git;protocol=ssh;branch=starfive-v1.1-dubhe"
 
+SRC_URI:remove:nezha = " \
+    file://0001-lib-utils-fdt-Require-match-data-to-be-const.patch \
+    file://0002-lib-utils-timer-Add-a-separate-compatible-for-the-D1.patch \
+"
+
 S = "${WORKDIR}/git"
 
 EXTRA_OEMAKE += "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= "

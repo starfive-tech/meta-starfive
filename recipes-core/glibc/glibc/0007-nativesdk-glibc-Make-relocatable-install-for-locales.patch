@@ -1,4 +1,4 @@
-From 24bffe9c2645cd6542e29cb57786dc703cced07b Mon Sep 17 00:00:00 2001
+From ce4e796fa8bd2df962cf7a0e4bc69ab6181e4ebf Mon Sep 17 00:00:00 2001
 From: Khem Raj <raj.khem@gmail.com>
 Date: Fri, 3 Aug 2018 09:55:12 -0700
 Subject: [PATCH] nativesdk-glibc: Make relocatable install for locales
@@ -19,10 +19,10 @@ Signed-off-by: Khem Raj <raj.khem@gmail.com>
  4 files changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/locale/findlocale.c b/locale/findlocale.c
-index ab09122b0c..f42cc75780 100644
+index fc433b61d8..d6f030f13c 100644
 --- a/locale/findlocale.c
 +++ b/locale/findlocale.c
-@@ -56,7 +56,7 @@ struct __locale_data *const _nl_C[] attribute_hidden =
+@@ -55,7 +55,7 @@ struct __locale_data *const _nl_C[] attribute_hidden =
     which are somehow addressed.  */
  struct loaded_l10nfile *_nl_locale_file_list[__LC_LAST];
  
@@ -31,7 +31,7 @@ index ab09122b0c..f42cc75780 100644
  
  /* Checks if the name is actually present, that is, not NULL and not
     empty.  */
-@@ -166,7 +166,7 @@ _nl_find_locale (const char *locale_path, size_t locale_path_len,
+@@ -165,7 +165,7 @@ _nl_find_locale (const char *locale_path, size_t locale_path_len,
  
        /* Nothing in the archive.  Set the default path to search below.  */
        locale_path = _nl_default_locale_path;
@@ -41,7 +41,7 @@ index ab09122b0c..f42cc75780 100644
    else
      /* We really have to load some data.  First see whether the name is
 diff --git a/locale/loadarchive.c b/locale/loadarchive.c
-index 512769eaec..436619091b 100644
+index fcc4913319..62cae8c6c0 100644
 --- a/locale/loadarchive.c
 +++ b/locale/loadarchive.c
 @@ -42,7 +42,7 @@
@@ -54,10 +54,10 @@ index 512769eaec..436619091b 100644
  /* Size of initial mapping window, optimal if large enough to
     cover the header plus the initial locale.  */
 diff --git a/locale/localeinfo.h b/locale/localeinfo.h
-index b3d4da0185..22f9dc1140 100644
+index fd43033a19..3dc26272a0 100644
 --- a/locale/localeinfo.h
 +++ b/locale/localeinfo.h
-@@ -331,7 +331,7 @@ _nl_lookup_word (locale_t l, int category, int item)
+@@ -347,7 +347,7 @@ _nl_lookup_word (locale_t l, int category, int item)
  }
  
  /* Default search path if no LOCPATH environment variable.  */
@@ -67,10 +67,10 @@ index b3d4da0185..22f9dc1140 100644
  /* Load the locale data for CATEGORY from the file specified by *NAME.
     If *NAME is "", use environment variables as specified by POSIX, and
 diff --git a/locale/programs/locale.c b/locale/programs/locale.c
-index ca0a95be99..6b98895203 100644
+index 1b51b50d68..87c9049444 100644
 --- a/locale/programs/locale.c
 +++ b/locale/programs/locale.c
-@@ -632,6 +632,7 @@ nameentcmp (const void *a, const void *b)
+@@ -631,6 +631,7 @@ nameentcmp (const void *a, const void *b)
  		  ((const struct nameent *) b)->name);
  }
  
@@ -78,7 +78,7 @@ index ca0a95be99..6b98895203 100644
  
  static int
  write_archive_locales (void **all_datap, char *linebuf)
-@@ -645,7 +646,7 @@ write_archive_locales (void **all_datap, char *linebuf)
+@@ -644,7 +645,7 @@ write_archive_locales (void **all_datap, char *linebuf)
    int fd, ret = 0;
    uint32_t cnt;
  
@@ -87,7 +87,7 @@ index ca0a95be99..6b98895203 100644
    if (fd < 0)
      return 0;
  
-@@ -700,8 +701,8 @@ write_archive_locales (void **all_datap, char *linebuf)
+@@ -699,8 +700,8 @@ write_archive_locales (void **all_datap, char *linebuf)
  	  if (cnt)
  	    putchar_unlocked ('\n');
  

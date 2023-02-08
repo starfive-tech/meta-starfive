@@ -1,0 +1,46 @@
+From 66b5c3e50b1acf0a4cb7cdaf7ddad7c7f8e2c3b8 Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Mon, 31 Oct 2022 11:20:22 +0800
+Subject: [PATCH 13/19] fix compiling error when -march not include b ext
+
+---
+ sysdeps/riscv/rv64/multiarch/memchr_as.S | 4 +++-
+ sysdeps/riscv/rv64/multiarch/memrchr.S   | 2 ++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+index e614630a4d..aa6c22a3d0 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -19,6 +19,8 @@
+ 
+ #include <sysdep.h>
+ 
++.option arch, +zbb
++
+ .macro chr_8B
+     ld      a4, 0(a0)
+     xor     a4, a4, a1
+@@ -105,4 +107,4 @@ ENTRY (memchr)
+     add     a0, a0, a3
+     ret
+ END (memchr)
+-libc_hidden_builtin_def (memchr)
+\ No newline at end of file
++libc_hidden_builtin_def (memchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memrchr.S b/sysdeps/riscv/rv64/multiarch/memrchr.S
+index c6db183163..01c2d949de 100644
+--- a/sysdeps/riscv/rv64/multiarch/memrchr.S
++++ b/sysdeps/riscv/rv64/multiarch/memrchr.S
+@@ -19,6 +19,8 @@
+ 
+ #include <sysdep.h>
+ 
++.option arch, +zbb
++
+ .macro chr_8B
+     ld      a4, -8(a0)
+     xor     a4, a4, a1
+-- 
+2.25.1
+

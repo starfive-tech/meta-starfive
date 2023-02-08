@@ -1,0 +1,53 @@
+From c3dd8b0c45f338b0f5bca70871ea08322fe499d0 Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Fri, 11 Nov 2022 14:29:51 +0800
+Subject: [PATCH 14/19] fix memcmp bug relate to use jmp table
+
+jump table tech is not suitable for memcmp
+memcmp has order requirement, but jmp table has reverse order feature
+---
+ sysdeps/riscv/rv64/multiarch/memcmp_as.S | 25 +++++++++++-------------
+ 1 file changed, 11 insertions(+), 14 deletions(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_as.S b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+index c9c6b3e909..984aeb7645 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+@@ -113,23 +113,20 @@ ENTRY (memcmp)
+     bltu    a5, a4, .L_loop
+     beqz    a2, .L_end
+ .L_tail:
+-    andi    a4, a2, -1
+-.L_pc:
+-    auipc   a3, 0
+-    andi    a4, a4, -8
+-    sub     a3, a3, a4
+-    .equ    offset, .L_jmp_end - .L_pc
+-    jalr    x0, a3, %lo(offset)
+-    ld      a3, 16(a1)
+-    ld      a0, 16(a5)
+-    bne     a3, a0, .L_end
+-    ld      a3, 8(a1)
+-    ld      a0, 8(a5)
+-    bne     a3, a0, .L_end
++    andi    a4, a2, -8
++    beqz    a4, .L_last
++    add     a4, a4, a5
++0:
+     ld      a3, 0(a1)
+     ld      a0, 0(a5)
+     bne     a3, a0, .L_end
+-.L_jmp_end:
++    add     a5, a5, 8
++    add     a1, a1, 8
++    bltu    a5, a4, 0b
++
++.L_last:
++    andi    a2, a2, (8-1)
++    beqz    a2, 3f
+     add     a1, a1, a2
+     add     a5, a5, a2
+     ld      a3, -8(a1)
+-- 
+2.25.1
+

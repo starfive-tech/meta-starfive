@@ -1,0 +1,64 @@
+From 6d8aefd187eceff8c7ed83d1037209061be327b5 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Tue, 6 Dec 2022 19:39:16 -0800
+Subject: [PATCH 6/7] add Custom CSR instructions
+
+---
+ include/opcode/riscv-opc.h | 16 ++++++++++++++++
+ opcodes/riscv-opc.c        |  6 ++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 3eea33a5da..0181fd2b02 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -267,6 +267,16 @@
+ #define MASK_CSRRSI  0x707f
+ #define MATCH_CSRRCI 0x7073
+ #define MASK_CSRRCI  0x707f
++/* Custom CSR instruction */
++#define MATCH_CFLUSH_D_L1    0xfc000073
++#define MASK_CFLUSH_D_L1     0xfff07fff
++#define MATCH_CDISCARD_D_L1  0xfc200073
++#define MASK_CDISCARD_D_L1   0xfff07fff
++#define MATCH_CFLUSH_D_L2    0xfc400073
++#define MASK_CFLUSH_D_L2     0xfff07fff
++#define MATCH_CDISCARD_D_L2  0xfc600073
++#define MASK_CDISCARD_D_L2   0xfff07fff
++/**************************************/
+ #define MATCH_FADD_S 0x53
+ #define MASK_FADD_S  0xfe00007f
+ #define MATCH_FSUB_S 0x8000053
+@@ -2517,6 +2527,12 @@ DECLARE_INSN(csrrc, MATCH_CSRRC, MASK_CSRRC)
+ DECLARE_INSN(csrrwi, MATCH_CSRRWI, MASK_CSRRWI)
+ DECLARE_INSN(csrrsi, MATCH_CSRRSI, MASK_CSRRSI)
+ DECLARE_INSN(csrrci, MATCH_CSRRCI, MASK_CSRRCI)
++/* Custom CSR instruction */
++DECLARE_INSN(cflush_d_l1, MATCH_CFLUSH_D_L1, MASK_CFLUSH_D_L1)
++DECLARE_INSN(cdiscard_d_l1, MATCH_CDISCARD_D_L1, MASK_CDISCARD_D_L1)
++DECLARE_INSN(cflush_d_l2, MATCH_CFLUSH_D_L2, MASK_CFLUSH_D_L2)
++DECLARE_INSN(cdiscard_d_l2, MATCH_CDISCARD_D_L2, MASK_CDISCARD_D_L2)
++/*******************************************************************/
+ DECLARE_INSN(fadd_s, MATCH_FADD_S, MASK_FADD_S)
+ DECLARE_INSN(fsub_s, MATCH_FSUB_S, MASK_FSUB_S)
+ DECLARE_INSN(fmul_s, MATCH_FMUL_S, MASK_FMUL_S)
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index 523d165226..f4e09defe7 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -840,6 +840,12 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"csrrs",      0, INSN_CLASS_ZICSR,"d,E,Z",    MATCH_CSRRSI, MASK_CSRRSI, match_opcode, INSN_ALIAS },
+ {"csrrc",      0, INSN_CLASS_ZICSR,"d,E,s",    MATCH_CSRRC, MASK_CSRRC, match_opcode, 0 },
+ {"csrrc",      0, INSN_CLASS_ZICSR,"d,E,Z",    MATCH_CSRRCI, MASK_CSRRCI, match_opcode, INSN_ALIAS },
++/* Custom CSR instruction */
++{"cflush.d.l1",   0, INSN_CLASS_ZICSR,   "s", 	MATCH_CFLUSH_D_L1, MASK_CFLUSH_D_L1, match_opcode, 0 },
++{"cdiscard.d.l1", 0, INSN_CLASS_ZICSR,   "s",   MATCH_CDISCARD_D_L1, MASK_CDISCARD_D_L1, match_opcode, 0 },
++{"cflush.d.l2",   0, INSN_CLASS_ZICSR,   "s",   MATCH_CFLUSH_D_L2, MASK_CFLUSH_D_L2, match_opcode, 0 },
++{"cdiscard.d.l2", 0, INSN_CLASS_ZICSR,   "s",   MATCH_CDISCARD_D_L2, MASK_CDISCARD_D_L2, match_opcode, 0 },
++/**********************************************************************************************************/
+ {"uret",       0, INSN_CLASS_I,    "",         MATCH_URET, MASK_URET, match_opcode, 0 },
+ {"sret",       0, INSN_CLASS_I,    "",         MATCH_SRET, MASK_SRET, match_opcode, 0 },
+ {"hret",       0, INSN_CLASS_I,    "",         MATCH_HRET, MASK_HRET, match_opcode, 0 },
+-- 
+2.25.1
+

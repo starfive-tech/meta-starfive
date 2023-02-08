@@ -1,0 +1,488 @@
+From bda438df2f20aa476cfdfedca5ce017718a1eefd Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Thu, 1 Sep 2022 01:41:52 -0700
+Subject: [PATCH 07/11] add initial dubhe scheduling model
+
+---
+ gcc/config/riscv/bitmanip.md     | 96 ++++++++++++++++++++++----------
+ gcc/config/riscv/riscv-cores.def |  2 +
+ gcc/config/riscv/riscv-opts.h    |  3 +-
+ gcc/config/riscv/riscv.cc        | 23 +++++++-
+ gcc/config/riscv/riscv.md        | 47 ++--------------
+ 5 files changed, 98 insertions(+), 73 deletions(-)
+
+diff --git a/gcc/config/riscv/bitmanip.md b/gcc/config/riscv/bitmanip.md
+index 0ab9ffe3c0b..86ac00d9a76 100644
+--- a/gcc/config/riscv/bitmanip.md
++++ b/gcc/config/riscv/bitmanip.md
+@@ -62,7 +62,7 @@
+   "TARGET_ZBA
+    && (INTVAL (operands[2]) >= 1) && (INTVAL (operands[2]) <= 3)"
+   "sh%2add\t%0,%1,%3"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bshiftadd")
+    (set_attr "mode" "<X:MODE>")])
+ 
+ (define_insn "*shNadduw"
+@@ -76,7 +76,7 @@
+    && (INTVAL (operands[2]) >= 1) && (INTVAL (operands[2]) <= 3)
+    && (INTVAL (operands[3]) >> INTVAL (operands[2])) == 0xffffffff"
+   "sh%2add.uw\t%0,%1,%4"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bshiftadd")
+    (set_attr "mode" "DI")])
+ 
+ (define_insn "*add.uw"
+@@ -86,7 +86,7 @@
+ 		 (match_operand:DI 2 "register_operand" "r")))]
+   "TARGET_64BIT && TARGET_ZBA"
+   "add.uw\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bopext")
+    (set_attr "mode" "DI")])
+ 
+ (define_insn "*slliuw"
+@@ -97,7 +97,7 @@
+   "TARGET_64BIT && TARGET_ZBA
+    && (INTVAL (operands[3]) >> INTVAL (operands[2])) == 0xffffffff"
+   "slli.uw\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bopext")
+    (set_attr "mode" "DI")])
+ 
+ ;; ZBB extension.
+@@ -108,7 +108,7 @@
+                             (match_operand:X 2 "register_operand" "r")))]
+   "TARGET_ZBB"
+   "<insn>n\t%0,%2,%1"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "blogic_neg")
+    (set_attr "mode" "<X:MODE>")])
+ 
+ (define_insn "*xor_not<mode>"
+@@ -117,7 +117,7 @@
+                       (match_operand:X 2 "register_operand" "r"))))]
+   "TARGET_ZBB"
+   "xnor\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "blogic_neg")
+    (set_attr "mode" "<X:MODE>")])
+ 
+ (define_insn "<bitmanip_optab>si2"
+@@ -125,16 +125,17 @@
+         (clz_ctz_pcnt:SI (match_operand:SI 1 "register_operand" "r")))]
+   "TARGET_ZBB"
+   { return TARGET_64BIT ? "<bitmanip_insn>w\t%0,%1" : "<bitmanip_insn>\t%0,%1"; }
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bcount_bit")
+    (set_attr "mode" "SI")])
+ 
++
+ (define_insn "*<bitmanip_optab>disi2"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+         (sign_extend:DI
+           (clz_ctz_pcnt:SI (match_operand:SI 1 "register_operand" "r"))))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "<bitmanip_insn>w\t%0,%1"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bcount_bit")
+    (set_attr "mode" "SI")])
+ 
+ (define_insn "<bitmanip_optab>di2"
+@@ -142,7 +143,7 @@
+         (clz_ctz_pcnt:DI (match_operand:DI 1 "register_operand" "r")))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "<bitmanip_insn>\t%0,%1"
+-  [(set_attr "type" "bitmanip")
++  [(set_attr "type" "bcount_bit")
+    (set_attr "mode" "DI")])
+ 
+ (define_insn "*zero_extendhi<GPR:mode>2_bitmanip"
+@@ -155,6 +156,7 @@
+   [(set_attr "type" "bitmanip,load")
+    (set_attr "mode" "<GPR:MODE>")])
+ 
++
+ (define_insn "*extend<SHORT:mode><SUPERQI:mode>2_zbb"
+   [(set (match_operand:SUPERQI   0 "register_operand"     "=r,r")
+ 	(sign_extend:SUPERQI
+@@ -183,7 +185,7 @@
+ 		     (match_operand:QI 2 "arith_operand" "rI")))]
+   "TARGET_ZBB"
+   { return TARGET_64BIT ? "ror%i2w\t%0,%1,%2" : "ror%i2\t%0,%1,%2"; }
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "rotrdi3"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+@@ -191,7 +193,7 @@
+ 		     (match_operand:QI 2 "arith_operand" "rI")))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "ror%i2\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "rotrsi3_sext"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+@@ -199,7 +201,7 @@
+ 				     (match_operand:QI 2 "register_operand" "r"))))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "rorw\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "rotlsi3"
+   [(set (match_operand:SI 0 "register_operand" "=r")
+@@ -207,7 +209,7 @@
+ 		   (match_operand:QI 2 "register_operand" "r")))]
+   "TARGET_ZBB"
+   { return TARGET_64BIT ? "rolw\t%0,%1,%2" : "rol\t%0,%1,%2"; }
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "rotldi3"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+@@ -215,7 +217,7 @@
+ 		   (match_operand:QI 2 "register_operand" "r")))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "rol\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "rotlsi3_sext"
+   [(set (match_operand:DI 0 "register_operand" "=r")
+@@ -223,14 +225,14 @@
+ 				   (match_operand:QI 2 "register_operand" "r"))))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "rolw\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "brorate")])
+ 
+ (define_insn "bswap<mode>2"
+   [(set (match_operand:X 0 "register_operand" "=r")
+         (bswap:X (match_operand:X 1 "register_operand" "r")))]
+   "TARGET_64BIT && TARGET_ZBB"
+   "rev8\t%0,%1"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bperm")])
+ 
+ (define_insn "<bitmanip_optab><mode>3"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -238,7 +240,7 @@
+ 			   (match_operand:X 2 "register_operand" "r")))]
+   "TARGET_ZBB"
+   "<bitmanip_insn>\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bcount_bit")])
+ 
+ ;; ZBS extension.
+ 
+@@ -249,7 +251,7 @@
+ 	       (match_operand:X 1 "register_operand" "r")))]
+   "TARGET_ZBS"
+   "bset\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bset<mode>_mask"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -260,7 +262,7 @@
+ 	       (match_operand:X 1 "register_operand" "r")))]
+   "TARGET_ZBS"
+   "bset\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bset<mode>_1"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -268,7 +270,7 @@
+ 		  (match_operand:QI 1 "register_operand" "r")))]
+   "TARGET_ZBS"
+   "bset\t%0,x0,%1"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bset<mode>_1_mask"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -278,7 +280,7 @@
+ 			  (match_operand 2 "<X:shiftm1>" "i")) 0)))]
+   "TARGET_ZBS"
+   "bset\t%0,x0,%1"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bseti<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -286,7 +288,7 @@
+ 	       (match_operand 2 "single_bit_mask_operand" "i")))]
+   "TARGET_ZBS"
+   "bseti\t%0,%1,%S2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bclr<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -295,7 +297,7 @@
+ 	       (match_operand:X 1 "register_operand" "r")))]
+   "TARGET_ZBS"
+   "bclr\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bclri<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -303,7 +305,7 @@
+ 	       (match_operand 2 "not_single_bit_mask_operand" "i")))]
+   "TARGET_ZBS"
+   "bclri\t%0,%1,%T2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*binv<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -312,7 +314,7 @@
+ 	       (match_operand:X 1 "register_operand" "r")))]
+   "TARGET_ZBS"
+   "binv\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*binvi<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -320,7 +322,7 @@
+ 	       (match_operand 2 "single_bit_mask_operand" "i")))]
+   "TARGET_ZBS"
+   "binvi\t%0,%1,%S2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bext<mode>"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -330,7 +332,7 @@
+ 			 (match_operand:QI 2 "register_operand" "r"))))]
+   "TARGET_ZBS"
+   "bext\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bsbit")])
+ 
+ (define_insn "*bexti"
+   [(set (match_operand:X 0 "register_operand" "=r")
+@@ -339,4 +341,42 @@
+ 			(match_operand 2 "immediate_operand" "i")))]
+   "TARGET_ZBS"
+   "bexti\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
++  [(set_attr "type" "bopext")])
++
++(define_insn "riscv_orc_b"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_ZBB"
++  "orc.b\t%0,%1,%2"
++  [(set_attr "type" "bperm")])
++
++(define_insn "riscv_rev8"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_ZBB"
++  "rev8\t%0,%1,%2"
++  [(set_attr "type" "bperm")])
++
++(define_insn "riscv_clmul"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmul\t%0,%1,%2"
++  [(set_attr "type" "bclmul")])
++
++(define_insn "riscv_clmulh"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmulh\t%0,%1,%2"
++  [(set_attr "type" "bclmul")])
++
++(define_insn "riscv_clmulr"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmulr\t%0,%1,%2"
++  [(set_attr "type" "bclmul")])
+\ No newline at end of file
+diff --git a/gcc/config/riscv/riscv-cores.def b/gcc/config/riscv/riscv-cores.def
+index ecb5e213d98..051c9c5d05f 100644
+--- a/gcc/config/riscv/riscv-cores.def
++++ b/gcc/config/riscv/riscv-cores.def
+@@ -45,5 +45,7 @@ RISCV_CORE("sifive-s76",      "rv64imafdc", "sifive-7-series")
+ 
+ RISCV_CORE("sifive-u54",      "rv64imafdc", "sifive-5-series")
+ RISCV_CORE("sifive-u74",      "rv64imafdc", "sifive-7-series")
++RISCV_CORE("starfive-dubhe",      "rv64imafdc", "starfive-dubhe-series")
++
+ 
+ #undef RISCV_CORE
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index 15bb5e76854..fcb1aaa4ba1 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -52,7 +52,8 @@ extern enum riscv_isa_spec_class riscv_isa_spec;
+ /* Keep this list in sync with define_attr "tune" in riscv.md.  */
+ enum riscv_microarchitecture_type {
+   generic,
+-  sifive_7
++  sifive_7,
++  starfive_dubhe
+ };
+ extern enum riscv_microarchitecture_type riscv_microarchitecture;
+ 
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index ec7030f6c2e..3baa05bd364 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -301,6 +301,19 @@ static const struct riscv_tune_param sifive_7_tune_info = {
+   true,						/* slow_unaligned_access */
+ };
+ 
++/* Costs to use when optimizing for dubhe.  */
++static const struct riscv_tune_param starfive_dubhe_tune_info = {
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* fp_add */
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* fp_mul */
++  {COSTS_N_INSNS (20), COSTS_N_INSNS (20)},	/* fp_div */
++  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* int_mul */
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* int_div */
++  8,						/* issue_rate */
++  1,						/* branch_cost */
++  3,						/* memory_cost */
++  true,						/* slow_unaligned_access */
++};
++
+ /* Costs to use when optimizing for T-HEAD c906.  */
+ static const struct riscv_tune_param thead_c906_tune_info = {
+   {COSTS_N_INSNS (4), COSTS_N_INSNS (5)}, /* fp_add */
+@@ -327,6 +340,7 @@ static const struct riscv_tune_param optimize_size_tune_info = {
+   false,					/* slow_unaligned_access */
+ };
+ 
++
+ static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
+ static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
+ 
+@@ -361,7 +375,7 @@ static const struct riscv_tune_info riscv_tune_info_table[] = {
+   { "rocket", generic, &rocket_tune_info },
+   { "sifive-3-series", generic, &rocket_tune_info },
+   { "sifive-5-series", generic, &rocket_tune_info },
+-  { "sifive-7-series", sifive_7, &sifive_7_tune_info },
++  { "starfive-dubhe-series", starfive_dubhe, &starfive_dubhe_tune_info },  
+   { "thead-c906", generic, &thead_c906_tune_info },
+   { "size", generic, &optimize_size_tune_info },
+ };
+@@ -4763,12 +4777,15 @@ riscv_secondary_memory_needed (machine_mode mode, reg_class_t class1,
+ 	  && (class1 == FP_REGS) != (class2 == FP_REGS));
+ }
+ 
+-/* Implement TARGET_REGISTER_MOVE_COST.  */
+-
+ static int
+ riscv_register_move_cost (machine_mode mode,
+ 			  reg_class_t from, reg_class_t to)
+ {
++  /* do not move between fp and int registers.  */
++  if (from == FP_REGS && to == GR_REGS || from == GR_REGS && to == FP_REGS)
++    return 20;
++    
++
+   return riscv_secondary_memory_needed (mode, from, to) ? 8 : 2;
+ }
+ 
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index e56979ca800..1bcc6d49391 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -169,10 +169,12 @@
+ ;; nop		no operation
+ ;; ghost	an instruction that produces no real code
+ ;; bitmanip	bit manipulation instructions
++;; 
+ (define_attr "type"
+   "unknown,branch,jump,call,load,fpload,store,fpstore,
+    mtc,mfc,const,arith,logical,shift,slt,imul,idiv,move,fmove,fadd,fmul,
+-   fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,rotate"
++   fmadd,fdiv,fcmp,fcvt,fsqrt,multi,auipc,sfb_alu,nop,ghost,bitmanip,
++   bopext,bshiftadd,brorate,blogic_neg,bminmax,bcount_bit,bclmul,bsbit,bperm"
+   (cond [(eq_attr "got" "load") (const_string "load")
+ 
+ 	 ;; If a doubleword move uses these expensive instructions,
+@@ -254,7 +256,7 @@
+ ;; Microarchitectures we know how to tune for.
+ ;; Keep this in sync with enum riscv_microarchitecture.
+ (define_attr "tune"
+-  "generic,sifive_7"
++  "generic,sifive_7, starfive_dubhe"
+   (const (symbol_ref "((enum attr_tune) riscv_microarchitecture)")))
+ 
+ ;; Describe a user's asm statement.
+@@ -308,7 +310,7 @@
+ ;; instruction.
+ (define_mode_attr size [(QI "b") (HI "h")])
+ 
+-;; Mode attributes for loads.
++;; Mode attriutes for loads.
+ (define_mode_attr load [(QI "lb") (HI "lh") (SI "lw") (DI "ld") (SF "flw") (DF "fld")])
+ 
+ ;; Instruction names for integer loads that aren't explicitly sign or zero
+@@ -2767,44 +2769,6 @@
+   [(set_attr "length" "0")]
+ )
+ 
+-(define_insn "riscv_orc_b"
+-  [(set (match_operand:SI 0 "register_operand" "=r")
+-	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
+-  "TARGET_ZBB"
+-  "orc.b\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
+-
+-(define_insn "riscv_rev8"
+-  [(set (match_operand:SI 0 "register_operand" "=r")
+-	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
+-  "TARGET_ZBB"
+-  "rev8\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
+-
+-(define_insn "riscv_clmul"
+-  [(set (match_operand:SI 0 "register_operand" "=r")
+-	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
+-				   (match_operand:SI 2 "register_operand" "r"))))]
+-  "TARGET_ZBC"
+-  "clmul\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
+-
+-(define_insn "riscv_clmulh"
+-  [(set (match_operand:SI 0 "register_operand" "=r")
+-	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
+-				   (match_operand:SI 2 "register_operand" "r"))))]
+-  "TARGET_ZBC"
+-  "clmulh\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
+-
+-(define_insn "riscv_clmulr"
+-  [(set (match_operand:SI 0 "register_operand" "=r")
+-	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
+-				   (match_operand:SI 2 "register_operand" "r"))))]
+-  "TARGET_ZBC"
+-  "clmulr\t%0,%1,%2"
+-  [(set_attr "type" "bitmanip")])
+-
+ ;; This fixes a failure with gcc.c-torture/execute/pr64242.c at -O2 for a
+ ;; 32-bit target when using -mtune=sifive-7-series.  The first sched pass
+ ;; runs before register elimination, and we have a non-obvious dependency
+@@ -2907,3 +2871,4 @@
+ (include "pic.md")
+ (include "generic.md")
+ (include "sifive-7.md")
++(include "starfive-dubhe.md")
+-- 
+2.25.1
+

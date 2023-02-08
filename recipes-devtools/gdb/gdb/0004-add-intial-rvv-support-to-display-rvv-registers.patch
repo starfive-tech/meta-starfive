@@ -1,0 +1,628 @@
+From 6793d19defcc4baba2879006e5e2ce89396e3afc Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 1 Nov 2022 19:50:38 -0700
+Subject: [PATCH 4/7] add intial rvv support to display rvv registers
+
+---
+ gdb/arch/riscv.c             |  12 ++-
+ gdb/features/riscv/vpu.c     |  66 +++++++++++++++++
+ gdb/nat/riscv-linux-tdesc.c  |  46 +++++++++++-
+ gdb/nat/riscv-linux-tdesc.h  |  18 +++++
+ gdb/riscv-linux-nat.c        | 139 +++++++++++++++++++++++++++++++++++
+ gdb/riscv-tdep.c             |  45 +++++++++++-
+ gdb/riscv-tdep.h             |   5 ++
+ gdbserver/linux-riscv-low.cc |  58 +++++++++++++++
+ include/elf/common.h         |   4 +
+ 9 files changed, 388 insertions(+), 5 deletions(-)
+ create mode 100644 gdb/features/riscv/vpu.c
+
+diff --git a/gdb/arch/riscv.c b/gdb/arch/riscv.c
+index 030c2cfdd9..03fcf7360f 100644
+--- a/gdb/arch/riscv.c
++++ b/gdb/arch/riscv.c
+@@ -25,6 +25,8 @@
+ #include "../features/riscv/32bit-fpu.c"
+ #include "../features/riscv/64bit-fpu.c"
+ #include "../features/riscv/rv32e-xregs.c"
++#include "../features/riscv/vpu.c"
++
+ 
+ #ifndef GDBSERVER
+ #define STATIC_IN_GDB static
+@@ -61,6 +63,9 @@ riscv_create_target_description (const struct riscv_gdbarch_features features)
+     arch_name.append ("d");
+   else if (features.flen == 16)
+     arch_name.append ("q");
++  
++  if (features.vlen > 0)
++    arch_name.append ("v");
+ 
+   set_tdesc_architecture (tdesc.get (), arch_name.c_str ());
+ #endif
+@@ -88,7 +93,12 @@ riscv_create_target_description (const struct riscv_gdbarch_features features)
+      targets.  We don't support creating vector features on native targets
+      (yet).  */
+   if (features.vlen != 0)
+-    error (_("unable to create vector feature"));
++  {
++    if (features.xlen == 4)
++      create_feature_riscv_vpu (tdesc.get (), 32, features.vlen);
++    else if (features.xlen == 8)
++      create_feature_riscv_vpu (tdesc.get (), 64, features.vlen);
++  }
+ 
+   return tdesc;
+ }
+diff --git a/gdb/features/riscv/vpu.c b/gdb/features/riscv/vpu.c
+new file mode 100644
+index 0000000000..fe45f37b4c
+--- /dev/null
++++ b/gdb/features/riscv/vpu.c
+@@ -0,0 +1,66 @@
++#include "gdbsupport/tdesc.h"
++
++static int
++create_feature_riscv_vpu (struct target_desc *result, int arch, int vlen)
++{
++  struct tdesc_feature *feature;
++  tdesc_type *element_type, *field_type;
++  tdesc_type_with_fields *type_with_fields;
++  int i, regnum;
++  char regname[10]; 
++  printf("create_feature_riscv_vpu\n ");
++
++  feature = tdesc_create_feature (result, "org.gnu.gdb.riscv.vector");
++
++  if (vlen >= 16)
++  {
++    element_type = tdesc_named_type (feature, "uint128");
++    tdesc_create_vector (feature, "v_quads", element_type, (vlen * 8)/128);
++  }
++  if (vlen >= 8)
++  {
++    element_type = tdesc_named_type (feature, "uint64");
++    tdesc_create_vector (feature, "v_longs", element_type, (vlen * 8)/64);
++  }
++  element_type = tdesc_named_type (feature, "uint32");
++  tdesc_create_vector (feature, "v_words", element_type, (vlen * 8)/32);
++  element_type = tdesc_named_type (feature, "uint16");
++  tdesc_create_vector (feature, "v_shorts", element_type, (vlen * 8)/32);
++  element_type = tdesc_named_type (feature, "uint8");
++  tdesc_create_vector (feature, "v_bytes", element_type, vlen);
++
++  type_with_fields = tdesc_create_union (feature, "riscv_vector");
++  if (vlen >= 16)
++  {
++    field_type = tdesc_named_type (feature, "v_quads");
++    tdesc_add_field (type_with_fields, "q", field_type);
++  }
++  if (vlen >= 8)
++  {
++    field_type = tdesc_named_type (feature, "v_longs");
++    tdesc_add_field (type_with_fields, "l", field_type);
++  }
++  field_type = tdesc_named_type (feature, "v_words");
++  tdesc_add_field (type_with_fields, "w", field_type);
++  field_type = tdesc_named_type (feature, "v_shorts");
++  tdesc_add_field (type_with_fields, "s", field_type);
++  field_type = tdesc_named_type (feature, "v_bytes");
++  tdesc_add_field (type_with_fields, "b", field_type);
++
++  tdesc_create_reg (feature, "vstart", 73, 1, NULL, arch, "int");
++  tdesc_create_reg (feature, "vcsr", 80, 1, NULL, arch, "int");
++  tdesc_create_reg (feature, "vl", 3169, 1, NULL, arch, "int");
++  tdesc_create_reg (feature, "vtype", 3170, 1, NULL, arch, "int");
++
++  regnum = 4162;
++  
++  for (i = 0; i < 32; i++)
++  {
++    memset(regname, 0, sizeof(regname));
++    sprintf(regname, "v%d", i);
++    tdesc_create_reg (feature, regname, regnum++, 1, 
++                      NULL, vlen * 8, "riscv_vector");
++  }
++
++  return regnum;
++}
+diff --git a/gdb/nat/riscv-linux-tdesc.c b/gdb/nat/riscv-linux-tdesc.c
+index 07b49c0f16..b349035d9a 100644
+--- a/gdb/nat/riscv-linux-tdesc.c
++++ b/gdb/nat/riscv-linux-tdesc.c
+@@ -23,7 +23,7 @@
+ #include "elf/common.h"
+ #include "nat/gdb_ptrace.h"
+ #include "nat/riscv-linux-tdesc.h"
+-
++#include "nat/linux-ptrace.h"
+ #include <sys/uio.h>
+ 
+ /* Work around glibc header breakage causing ELF_NFPREG not to be usable.  */
+@@ -31,6 +31,26 @@
+ # define NFPREG 33
+ #endif
+ 
++#ifndef CSR_VLENB
++#define CSR_VLENB 0xC22
++#endif
++
++#ifdef __ASSEMBLY__
++#define __ASM_STR(x)	x
++#else
++#define __ASM_STR(x)	#x
++#endif
++
++
++#define csr_read(csr)						\
++({								\
++	register unsigned long __v;				\
++	__asm__ __volatile__ ("csrr %0, " __ASM_STR(csr)	\
++			      : "=r" (__v) :			\
++			      : "memory");			\
++	__v;							\
++})
++
+ /* See nat/riscv-linux-tdesc.h.  */
+ 
+ struct riscv_gdbarch_features
+@@ -78,6 +98,30 @@ riscv_linux_read_features (int tid)
+ 	features.flen = flen;
+       break;
+     }
++  
++  struct __riscv_v_state rv_state;
++  struct iovec iov;
++  iov.iov_base = &rv_state;
++  iov.iov_len = sizeof(rv_state);
++
++  if (ptrace (PTRACE_GETREGSET, tid, NT_RISCV_VECTOR,
++      (PTRACE_TYPE_ARG3) &iov) == -1)
++  {
++	  switch (errno)
++	    {
++	    case EINVAL:
++	      break;
++	    case EIO:
++	      break;
++	    default:
++	      perror_with_name (_("Couldn't get registers"));
++	      break;
++      }
++  }
++  else 
++  {
++    features.vlen = csr_read(CSR_VLENB);
++  }
+ 
+   return features;
+ }
+diff --git a/gdb/nat/riscv-linux-tdesc.h b/gdb/nat/riscv-linux-tdesc.h
+index 4f476aed5c..092ee7d29b 100644
+--- a/gdb/nat/riscv-linux-tdesc.h
++++ b/gdb/nat/riscv-linux-tdesc.h
+@@ -21,6 +21,24 @@
+ 
+ #include "arch/riscv.h"
+ 
++/* Work around glibc header breakage causing ELF_NFPREG not to be usable.  */
++#ifndef NFPREG
++# define NFPREG 33
++#endif
++
++#ifndef NVREG
++#define NVREG 32
++#endif
++
++#define csr_read(csr)						\
++({								\
++	register unsigned long __v;				\
++	__asm__ __volatile__ ("csrr %0, " csr	\
++			      : "=r" (__v) :			\
++			      : "memory");			\
++	__v;							\
++})
++
+ /* Determine XLEN and FLEN for the LWP identified by TID, and return a
+    corresponding features object.  */
+ struct riscv_gdbarch_features riscv_linux_read_features (int tid);
+diff --git a/gdb/riscv-linux-nat.c b/gdb/riscv-linux-nat.c
+index 7063494148..0e24cbcb86 100644
+--- a/gdb/riscv-linux-nat.c
++++ b/gdb/riscv-linux-nat.c
+@@ -34,6 +34,10 @@
+ # define NFPREG 33
+ #endif
+ 
++#ifndef ELF_NVREG 
++#define ELF_NVREG 32
++#endif
++
+ /* RISC-V Linux native additions to the default linux support.  */
+ 
+ class riscv_linux_nat_target final : public linux_nat_target
+@@ -196,6 +200,90 @@ fill_fpregset (const struct regcache *regcache, prfpregset_t *fpregs,
+     }
+ }
+ 
++/* Copy vector register REGNUM (or all vector regs if REGNUM == -1)
++   from regset vregs into REGCACHE.  */
++
++static void
++supply_vregset_regnum (struct regcache *regcache, char *vregs,
++			int regnum)
++{
++  int i;
++  int vlen = riscv_isa_vlen(regcache->arch());
++  __riscv_v_state *vstate = (__riscv_v_state*)vregs;
++  vregs += sizeof(__riscv_v_state); 
++
++  if (regnum == -1)
++    {
++      regcache->raw_supply (RISCV_CSR_VSTART_REGNUM, &vstate->vstart);
++      regcache->raw_supply (RISCV_CSR_VCSR_REGNUM, &vstate->vcsr); 
++      regcache->raw_supply (RISCV_CSR_VL_REGNUM, &vstate->vl); 
++      regcache->raw_supply (RISCV_CSR_VTYPE_REGNUM, &vstate->vtype); 
++
++      for (i = RISCV_V0_REGNUM;
++	   i <= RISCV_V31_REGNUM;
++	   i++, vregs += vlen)
++	regcache->raw_supply (i, vregs);
++    }
++  else if (regnum >= RISCV_V0_REGNUM && regnum <= RISCV_V31_REGNUM)
++    {
++      vregs += (regnum - RISCV_V0_REGNUM) * vlen;
++      regcache->raw_supply (regnum, vregs);
++    }
++  else if (regnum == RISCV_CSR_VSTART_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vstart);
++  else if (regnum == RISCV_CSR_VCSR_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vcsr);
++  else if (regnum == RISCV_CSR_VL_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vl);
++  else if (regnum == RISCV_CSR_VTYPE_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vtype);
++}
++
++
++/* Copy all vector registers from regset vregs into REGCACHE.  */
++
++void
++supply_vregset (struct regcache *regcache, const void *vregs)
++{
++  supply_vregset_regnum (regcache, (char *)vregs, -1);
++}
++
++/* Copy vector register REGNUM (or all fp regs if REGNUM == -1)
++   from REGCACHE into regset FPREGS.  */
++void
++fill_vregset (struct regcache *regcache, char *vregs,
++	       int regnum)
++{
++  int i;
++  int vlen = riscv_isa_vlen(regcache->arch());
++  __riscv_v_state *vstate = (__riscv_v_state*)vregs;
++  if (regnum == -1)   
++    {
++      regcache->raw_collect (RISCV_CSR_VSTART_REGNUM, &vstate->vstart);
++      regcache->raw_collect (RISCV_CSR_VCSR_REGNUM, &vstate->vcsr); 
++      regcache->raw_collect (RISCV_CSR_VL_REGNUM, &vstate->vl); 
++      regcache->raw_collect (RISCV_CSR_VTYPE_REGNUM, &vstate->vtype); 
++
++      for (i = RISCV_V0_REGNUM;
++	   i <= RISCV_V31_REGNUM;
++	   i++, vregs += vlen)
++	regcache->raw_collect (i, vregs); 
++    }    
++  else if (regnum >= RISCV_V0_REGNUM && regnum <= RISCV_V31_REGNUM)
++    {
++      vregs += (regnum - RISCV_V0_REGNUM) * vlen;
++      regcache->raw_collect (regnum, vregs);
++    }
++    else if (regnum == RISCV_CSR_VSTART_REGNUM)
++      regcache->raw_collect (regnum, &vstate->vstart);
++    else if (regnum == RISCV_CSR_VCSR_REGNUM)
++      regcache->raw_collect (regnum, &vstate->vcsr);
++    else if (regnum == RISCV_CSR_VL_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vl);
++    else if (regnum == RISCV_CSR_VTYPE_REGNUM)
++      regcache->raw_supply (regnum, &vstate->vl);
++}
++
+ /* Return a target description for the current target.  */
+ 
+ const struct target_desc *
+@@ -252,6 +340,31 @@ riscv_linux_nat_target::fetch_registers (struct regcache *regcache, int regnum)
+ 	supply_fpregset_regnum (regcache, &regs, regnum);
+     }
+ 
++  if ((regnum >= RISCV_V0_REGNUM
++       && regnum <= RISCV_V31_REGNUM)
++      || (regnum == RISCV_CSR_VSTART_REGNUM)
++      || (regnum == RISCV_CSR_VCSR_REGNUM)
++      || (regnum == RISCV_CSR_VL_REGNUM)
++      || (regnum == RISCV_CSR_VTYPE_REGNUM)
++      || (regnum == -1))
++    {
++      struct iovec iov;
++      iov.iov_len = sizeof(__riscv_v_state) + 
++          ELF_NVREG * riscv_isa_vlen(regcache->arch());
++      
++      iov.iov_base = malloc(iov.iov_len);
++      char * buf = (char *)iov.iov_base + sizeof(__riscv_v_state);
++      gdb_assert (iov.iov_base != NULL);
++
++      if (ptrace (PTRACE_GETREGSET, tid, NT_RISCV_VECTOR,
++		  (PTRACE_TYPE_ARG3) &iov) == -1)
++	perror_with_name (_("Couldn't get vector registers"));
++      else      
++	supply_vregset_regnum (regcache, (char *)(iov.iov_base), regnum);
++
++      free(iov.iov_base);
++    }
++
+   if ((regnum == RISCV_CSR_MISA_REGNUM)
+       || (regnum == -1))
+     {
+@@ -321,6 +434,32 @@ riscv_linux_nat_target::store_registers (struct regcache *regcache, int regnum)
+ 	}
+     }
+ 
++  if ((regnum >= RISCV_V0_REGNUM
++       && regnum <= RISCV_V31_REGNUM)
++      || (regnum == RISCV_CSR_VSTART_REGNUM)
++      || (regnum == RISCV_CSR_VCSR_REGNUM)
++      || (regnum == RISCV_CSR_VL_REGNUM)
++      || (regnum == RISCV_CSR_VTYPE_REGNUM)
++      || (regnum == -1))
++    {
++      struct iovec iov;
++      iov.iov_len = sizeof(__riscv_v_state) + 
++          ELF_NVREG * riscv_isa_vlen(regcache->arch ());
++      iov.iov_base = malloc(iov.iov_len);
++      gdb_assert (iov.iov_base != NULL);
++
++      if (ptrace (PTRACE_GETREGSET, tid, NT_RISCV_VECTOR,
++		  (PTRACE_TYPE_ARG3) &iov) == -1)
++	perror_with_name (_("Couldn't get vector registers"));
++      else
++  { 
++    fill_vregset (regcache, (char *)(iov.iov_base), regnum);
++	  if (ptrace (PTRACE_SETREGSET, tid, NT_FPREGSET,
++		      (PTRACE_TYPE_ARG3) &iov) == -1)
++	    perror_with_name (_("Couldn't set vector registers"));
++  }
++      free(iov.iov_base);
++    }
+   /* Access to CSRs has potential security issues, don't support them for
+      now.  */
+ }
+diff --git a/gdb/riscv-tdep.c b/gdb/riscv-tdep.c
+index 886996ce5b..44ce340f39 100644
+--- a/gdb/riscv-tdep.c
++++ b/gdb/riscv-tdep.c
+@@ -619,16 +619,21 @@ struct riscv_vector_feature : public riscv_register_feature
+       { RISCV_V0_REGNUM + 29, { "v29" } },
+       { RISCV_V0_REGNUM + 30, { "v30" } },
+       { RISCV_V0_REGNUM + 31, { "v31" } },
++       
++      { RISCV_CSR_VSTART_REGNUM, { "vstart" } },
++      { RISCV_CSR_VCSR_REGNUM, { "vcsr" } },
++      { RISCV_CSR_VL_REGNUM, { "vl" } },
++      { RISCV_CSR_VTYPE_REGNUM, { "vtype" } },      
+     };
+   }
+ 
+   /* Return the preferred name for the register with gdb register number
+      REGNUM, which must be in the inclusive range RISCV_V0_REGNUM to
+-     RISCV_V0_REGNUM + 31.  */
++     RISCV_V31_REGNUM.  */
+   const char *register_name (int regnum) const
+   {
+     gdb_assert (regnum >= RISCV_V0_REGNUM
+-		&& regnum <= RISCV_V0_REGNUM + 31);
++		&& regnum <= RISCV_V31_REGNUM);
+     regnum -= RISCV_V0_REGNUM;
+     return m_registers[regnum].names[0];
+   }
+@@ -663,6 +668,12 @@ struct riscv_vector_feature : public riscv_register_feature
+     int vector_bitsize = -1;
+     for (const auto &reg : m_registers)
+       {
++        if (reg.regnum == RISCV_CSR_VSTART_REGNUM ||
++          reg.regnum == RISCV_CSR_VCSR_REGNUM || 
++          reg.regnum == RISCV_CSR_VL_REGNUM || 
++          reg.regnum == RISCV_CSR_VTYPE_REGNUM
++        )
++    continue;
+ 	int reg_bitsize = -1;
+ 	for (const char *name : reg.names)
+ 	  {
+@@ -737,6 +748,16 @@ riscv_isa_xlen (struct gdbarch *gdbarch)
+   return tdep->isa_features.xlen;
+ }
+ 
++/* See riscv-tdep.h.  */
++
++int
++riscv_isa_vlen (struct gdbarch *gdbarch)
++{
++  riscv_gdbarch_tdep *tdep = (riscv_gdbarch_tdep *) gdbarch_tdep (gdbarch);
++  return tdep->isa_features.vlen;
++}
++
++
+ /* See riscv-tdep.h.  */
+ 
+ int
+@@ -781,6 +802,13 @@ riscv_has_fp_regs (struct gdbarch *gdbarch)
+   return (riscv_isa_flen (gdbarch) > 0);
+ }
+ 
++/* Return true if the target for GDBARCH has vector hardware.  */
++static bool
++riscv_has_v_regs (struct gdbarch *gdbarch)
++{
++  return (riscv_isa_vlen (gdbarch) > 0);
++}
++
+ /* Return true if GDBARCH is using any of the floating point hardware ABIs.  */
+ 
+ static bool
+@@ -873,7 +901,7 @@ riscv_sw_breakpoint_from_kind (struct gdbarch *gdbarch, int kind, int *size)
+ 
+ /* Implement the register_name gdbarch method.  This is used instead of
+    the function supplied by calling TDESC_USE_REGISTERS so that we can
+-   ensure the preferred names are offered for x-regs and f-regs.  */
++   ensure the preferred names are offered for x-regs,f-regs and v-regs.  */
+ 
+ static const char *
+ riscv_register_name (struct gdbarch *gdbarch, int regnum)
+@@ -902,6 +930,14 @@ riscv_register_name (struct gdbarch *gdbarch, int regnum)
+ 	return NULL;
+     }
+ 
++  if (regnum >= RISCV_V0_REGNUM && regnum <= RISCV_LAST_REGNUM)
++    {
++      if (riscv_has_v_regs (gdbarch))
++	return riscv_vector_feature.register_name (regnum);
++      else
++	return NULL;
++    }
++
+   /* Some targets (QEMU) are reporting these three registers twice, once
+      in the FPU feature, and once in the CSR feature.  Both of these read
+      the same underlying state inside the target, but naming the register
+@@ -3545,6 +3581,7 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
+ {
+   int isa_xlen = riscv_isa_xlen (gdbarch);
+   int isa_flen = riscv_isa_flen (gdbarch);
++  int isa_vlen = riscv_isa_vlen (gdbarch);
+   int abi_xlen = riscv_abi_xlen (gdbarch);
+   int abi_flen = riscv_abi_flen (gdbarch);
+   std::string target_options;
+@@ -3560,6 +3597,8 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
+     target_options += "imafc";
+   else
+     target_options += "imac";
++  if (isa_vlen)
++    target_options += "v"; /* change to zvl zve later */
+ 
+   target_options += " -mabi=";
+   if (abi_xlen == 8)
+diff --git a/gdb/riscv-tdep.h b/gdb/riscv-tdep.h
+index ac4b4b7144..913c5f1724 100644
+--- a/gdb/riscv-tdep.h
++++ b/gdb/riscv-tdep.h
+@@ -139,6 +139,11 @@ extern int riscv_abi_xlen (struct gdbarch *gdbarch);
+    with RISCV_ISA_FLEN.  */
+ extern int riscv_abi_flen (struct gdbarch *gdbarch);
+ 
++/* Return the width in bytes of the hardware vector registers for
++   GDBARCH.  If this architecture has no vector registers, then
++   return 0.  Possible values are 32, 64, 128, ...2pow(16)  */
++extern int riscv_isa_vlen(struct gdbarch *gdbarch);
++
+ /* Return true if GDBARCH is using the embedded x-regs abi, that is the
+    target only has 16 x-registers, which includes a reduced number of
+    argument registers.  */
+diff --git a/gdbserver/linux-riscv-low.cc b/gdbserver/linux-riscv-low.cc
+index 6b2902e422..54444f9883 100644
+--- a/gdbserver/linux-riscv-low.cc
++++ b/gdbserver/linux-riscv-low.cc
+@@ -30,6 +30,17 @@
+ # define NFPREG 33
+ #endif
+ 
++#ifndef NVREG 
++#define NVREG 32
++#endif
++
++/* In RVV spec, the register width must be no greater than 2exp(16). 
++   We set the max width to 1024 for now.
++*/
++#ifndef VREG_MAX_LEN
++#define VREG_MAX_LEN 1024
++#endif
++
+ /* Linux target op definitions for the RISC-V architecture.  */
+ 
+ class riscv_target : public linux_process_target
+@@ -158,6 +169,50 @@ riscv_store_fpregset (struct regcache *regcache, const void *buf)
+   supply_register_by_name (regcache, "fcsr", regbuf);
+ }
+ 
++
++/* Collect VRs from REGCACHE into BUF.  */
++
++static void
++riscv_fill_vregset (struct regcache *regcache, void *buf)
++{
++  int i;
++  const struct target_desc *tdesc = regcache->tdesc;
++  int regno = find_regno (tdesc, "v0");
++  int vlen = register_size (regcache->tdesc, regno);
++  __riscv_v_state *vstate = (__riscv_v_state *)buf;
++  buf += sizeof(__riscv_v_state);
++
++  for (i = 0; i < NVREG; i++, buf += vlen)
++  	collect_register (regcache, regno + i, buf);
++
++  collect_register_by_name (regcache, "vstart", &vstate->vstart); 
++  collect_register_by_name (regcache, "vl", &vstate->vl);     
++  collect_register_by_name (regcache, "vtype", &vstate->vtype);  
++  collect_register_by_name (regcache, "vcsr", &vstate->vcsr);   
++}
++
++/* Supply VECRs from BUF into REGCACHE.  */
++
++static void
++riscv_store_vregset (struct regcache *regcache, const void *buf)
++{
++  const struct target_desc *tdesc = regcache->tdesc;
++  struct __riscv_v_state *vstate = (__riscv_v_state *)buf;
++  buf += sizeof(__riscv_v_state);
++  int regno = find_regno (tdesc, "v0");
++  int vlen = register_size (regcache->tdesc, regno);
++  int i;
++
++  for (i = 0; i < NVREG; i++, buf += vlen)
++    supply_register (regcache, regno + i, buf);
++
++  supply_register_by_name (regcache, "vstart", &vstate->vstart); 
++  supply_register_by_name (regcache, "vl", &vstate->vl);     
++  supply_register_by_name (regcache, "vtype", &vstate->vtype);  
++  supply_register_by_name (regcache, "vcsr", &vstate->vcsr);   ;
++}
++
++
+ /* RISC-V/Linux regsets.  FPRs are optional and come in different sizes,
+    so define multiple regsets for them marking them all as OPTIONAL_REGS
+    rather than FP_REGS, so that "regsets_fetch_inferior_registers" picks
+@@ -175,6 +230,9 @@ static struct regset_info riscv_regsets[] = {
+   { PTRACE_GETREGSET, PTRACE_SETREGSET, NT_FPREGSET,
+     sizeof (struct __riscv_mc_f_ext_state), OPTIONAL_REGS,
+     riscv_fill_fpregset, riscv_store_fpregset },
++  { PTRACE_GETREGSET, PTRACE_SETREGSET, NT_RISCV_VECTOR,
++    sizeof (struct __riscv_v_state) + NVREG * VREG_MAX_LEN, EXTENDED_REGS,
++    riscv_fill_vregset, riscv_store_vregset},    
+   NULL_REGSET
+ };
+ 
+diff --git a/include/elf/common.h b/include/elf/common.h
+index 70d63e3299..2662e767ba 100644
+--- a/include/elf/common.h
++++ b/include/elf/common.h
+@@ -690,6 +690,10 @@
+ 					/*   note name must be "LINUX".  */
+ #define NT_ARM_PAC_ENABLED_KEYS	0x40a	/* AArch64 pointer authentication
+ 					   enabled keys (prctl()) */
++
++					/*   note name must be "LINUX".  */
++#define NT_RISCV_VECTOR	0x900		/* RISC-V vector registers */                 
++
+ 					/*   note name must be "LINUX".  */
+ #define NT_ARC_V2	0x600		/* ARC HS accumulator/extra registers.  */
+ 					/*   note name must be "LINUX".  */
+-- 
+2.25.1
+

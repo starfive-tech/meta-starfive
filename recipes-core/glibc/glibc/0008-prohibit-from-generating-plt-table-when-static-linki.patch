@@ -1,0 +1,598 @@
+From 3549fcbe22dab50b01361db0d8e5542879ccdfc2 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 15 Jun 2022 00:10:33 -0700
+Subject: [PATCH 08/19] prohibit from generating plt table when static linking
+
+---
+ sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c |  4 ++--
+ sysdeps/riscv/rv64/multiarch/memchr.c          |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/memchr_as.S       |  2 ++
+ sysdeps/riscv/rv64/multiarch/memchr_riscv.S    | 10 +++++++++-
+ sysdeps/riscv/rv64/multiarch/memchr_vector.S   |  6 ++++--
+ sysdeps/riscv/rv64/multiarch/memcmp.c          |  6 +++++-
+ sysdeps/riscv/rv64/multiarch/memcmp_riscv.c    |  9 +++++++--
+ sysdeps/riscv/rv64/multiarch/memcmp_vector.S   |  7 +++++--
+ sysdeps/riscv/rv64/multiarch/memcpy.c          |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/memcpy_riscv.S    | 11 ++++++++++-
+ sysdeps/riscv/rv64/multiarch/memcpy_vector.S   |  6 ++++--
+ sysdeps/riscv/rv64/multiarch/memmove.c         |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/memmove_riscv.c   |  6 ++++--
+ sysdeps/riscv/rv64/multiarch/memmove_vector.S  |  8 +++++---
+ sysdeps/riscv/rv64/multiarch/memset.c          |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/memset_riscv.c    |  6 ++++--
+ sysdeps/riscv/rv64/multiarch/memset_vector.S   |  7 ++++---
+ sysdeps/riscv/rv64/multiarch/rtld-memcmp.c     |  2 +-
+ sysdeps/riscv/rv64/multiarch/rtld-memmove.c    |  2 +-
+ sysdeps/riscv/rv64/multiarch/rtld-memset.c     |  2 +-
+ sysdeps/riscv/rv64/multiarch/rtld-strlen.c     |  2 +-
+ sysdeps/riscv/rv64/multiarch/strcmp.c          |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/strcmp_riscv.S    | 12 ++++++++----
+ sysdeps/riscv/rv64/multiarch/strcmp_vector.S   |  7 ++++---
+ sysdeps/riscv/rv64/multiarch/strlen.c          |  5 ++++-
+ sysdeps/riscv/rv64/multiarch/strlen_riscv.c    |  7 +++++--
+ sysdeps/riscv/rv64/multiarch/strlen_vector.S   |  6 ++++--
+ 27 files changed, 114 insertions(+), 44 deletions(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+index 28c6e123f0..1a6611ab88 100644
+--- a/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
++++ b/sysdeps/riscv/rv64/multiarch/ifunc-impl-list.c
+@@ -30,7 +30,7 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+ 			size_t max)
+ {
+   size_t i = 0;
+-
++#if defined SHARED && defined __riscv_vector
+   bool use_rvv = (GLRO(dl_hwcap) & HWCAP_ISA_V) != 0;
+ 
+   IFUNC_IMPL (i, name, memcpy,
+@@ -60,6 +60,6 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+   IFUNC_IMPL (i, name, memset,
+ 	      IFUNC_IMPL_ADD (array, i, memset, use_rvv, __memset_vector)
+ 	      IFUNC_IMPL_ADD (array, i, memset, 1, __memset_riscv));
+-
++#endif
+   return i;
+ }
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr.c b/sysdeps/riscv/rv64/multiarch/memchr.c
+index 1544bc3d01..0a059b2977 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr.c
++++ b/sysdeps/riscv/rv64/multiarch/memchr.c
+@@ -17,7 +17,8 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector  
++
+ # define memchr __redirect_memchr
+ # include <string.h>
+ # undef memchr
+@@ -29,4 +30,6 @@
+ 
+ riscv_libc_ifunc_redirected (__redirect_memchr, memchr, IFUNC_SELECTOR);
+ riscv_libc_ifunc_hidden_def (__redirect_memchr, memchr);
++#else 
++# include <string.h>
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+index 557098afda..b8691744f3 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -19,6 +19,8 @@
+ 
+ #include <sysdep.h>
+ 
++	.p2align 6
++
+ ENTRY (memchr)
+    zext.b	a3,a1
+    beqz	a2, .L_not_found
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_riscv.S b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+index ce7b64bbe0..ee4394fef9 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+@@ -18,8 +18,16 @@
+ 
+ #include <sysdep.h>
+ 
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
++
+ #define memchr __memchr_riscv
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
++#include "memchr_as.S"
++
++
++#elif !defined __riscv_vector
++
++#include "memchr_as.S"
+ 
+-#include "memchr_as.S"
+\ No newline at end of file
++#endif
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_vector.S b/sysdeps/riscv/rv64/multiarch/memchr_vector.S
+index 77693d716d..9441ddb489 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_vector.S
+@@ -19,11 +19,12 @@
+ #include <sysdep.h>
+ 
+ /* For __riscv_vector this file defines memchr.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define memchr __memchr_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif
+ 
+ 	.p2align 6
+ ENTRY (memchr)
+@@ -51,3 +52,4 @@ ENTRY (memchr)
+    ret
+ END (memchr)
+ libc_hidden_builtin_def (memchr)
++#endif
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp.c b/sysdeps/riscv/rv64/multiarch/memcmp.c
+index 29730c6ed1..3dab42ea74 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp.c
++++ b/sysdeps/riscv/rv64/multiarch/memcmp.c
+@@ -17,7 +17,8 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
++
+ # define memcmp __redirect_memcmp
+ # include <string.h>
+ # undef memcmp
+@@ -29,4 +30,7 @@
+ 
+ riscv_libc_ifunc_redirected (__redirect_memcmp, memcmp, IFUNC_SELECTOR);
+ riscv_libc_ifunc_hidden_def (__redirect_memcmp, memcmp);
++
++#else 
++# include <string.h>
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
+index dda15d7d35..076431132b 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.c
+@@ -16,14 +16,19 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
++
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+ #undef weak_alias
+ #  define MEMCMP __memcmp_riscv
+ # include <string/memcmp.c>
+-#else
+ 
++#elif !defined __riscv_vector
+ # include <string/memcmp.c>
++
+ #endif
++
++
++
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_vector.S b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+index fe89f92268..4810af026a 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_vector.S
+@@ -20,10 +20,13 @@
+ 
+ /* For __riscv_vector this file defines strcmp.  */
+ /* #ifndef __riscv_vector */
++
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define memcmp __memcmp_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif 
+ 
+ 	.p2align 6
+ ENTRY (memcmp)
+@@ -54,4 +57,4 @@ ENTRY (memcmp)
+ END (memcmp)
+ weak_alias (memcmp, bcmp)
+ libc_hidden_builtin_def (memcmp)
+-
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy.c b/sysdeps/riscv/rv64/multiarch/memcpy.c
+index 0f20b7fd44..45cf14f52a 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcpy.c
++++ b/sysdeps/riscv/rv64/multiarch/memcpy.c
+@@ -17,7 +17,8 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
++
+ # define memcpy __redirect_memcpy
+ # include <string.h>
+ # undef memcpy
+@@ -30,4 +31,6 @@
+ riscv_libc_ifunc_redirected (__redirect_memcpy, memcpy, IFUNC_SELECTOR);
+ 
+ riscv_libc_ifunc_hidden_def (__redirect_memcpy, memcpy);
++#else 
++# include <string.h>
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S b/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
+index a0ba2150fc..249d4f6067 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_riscv.S
+@@ -18,8 +18,17 @@
+ 
+ #include <sysdep.h>
+ 
++#if IS_IN (libc)  && defined SHARED && defined __riscv_vector
++
+ #define memcpy __memcpy_riscv
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+-#include "memcpy_as.S"
+\ No newline at end of file
++#include "memcpy_as.S"
++
++#elif !defined __riscv_vector
++#include "memcpy_as.S"
++
++#endif
++
++
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_vector.S b/sysdeps/riscv/rv64/multiarch/memcpy_vector.S
+index bae330f6e0..d15f4c3954 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcpy_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_vector.S
+@@ -19,11 +19,12 @@
+ #include <sysdep.h>
+ 
+ /* For __riscv_vector this file defines memcpy.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define memcpy __memcpy_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif
+ 
+ 	.p2align 6
+ ENTRY (memcpy)
+@@ -52,3 +53,4 @@ ENTRY (memcpy)
+ END (memcpy)
+ 
+ libc_hidden_builtin_def (memcpy)
++#endif
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove.c b/sysdeps/riscv/rv64/multiarch/memmove.c
+index 8d33da166d..3fc276e943 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove.c
++++ b/sysdeps/riscv/rv64/multiarch/memmove.c
+@@ -17,7 +17,7 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ # define memmove __redirect_memmove
+ # include <string.h>
+ # undef memmove
+@@ -29,4 +29,7 @@
+ 
+ riscv_libc_ifunc_redirected (__redirect_memmove, memmove, IFUNC_SELECTOR);
+ riscv_libc_ifunc_hidden_def (__redirect_memmove, memmove);
++
++#else 
++# include <string.h>
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_riscv.c b/sysdeps/riscv/rv64/multiarch/memmove_riscv.c
+index e11a9d1a43..03708e0deb 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_riscv.c
++++ b/sysdeps/riscv/rv64/multiarch/memmove_riscv.c
+@@ -16,14 +16,16 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
++
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+ #undef weak_alias
+ #  define MEMMOVE __memmove_riscv
+ # include <string/memmove.c>
+-#else
++#elif !defined __riscv_vector
+ 
+ # include <string/memmove.c>
+ #endif
++
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_vector.S b/sysdeps/riscv/rv64/multiarch/memmove_vector.S
+index 7bf89e6cf6..af748be5b2 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memmove_vector.S
+@@ -19,11 +19,12 @@
+ #include <sysdep.h>
+ 
+ /* For __riscv_vector this file defines memmov.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define memmove __memmove_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif
+ 
+ 	.p2align 6
+ ENTRY (memmove)
+@@ -53,4 +54,5 @@ ENTRY (memmove)
+ 	bltu	zero,a2,.L_backward_copy_loop
+ 	ret
+ END (memmove)
+-libc_hidden_builtin_def (memmove)
+\ No newline at end of file
++libc_hidden_builtin_def (memmove)
++#endif
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/memset.c b/sysdeps/riscv/rv64/multiarch/memset.c
+index 0d3582e49f..56d7169ad1 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset.c
++++ b/sysdeps/riscv/rv64/multiarch/memset.c
+@@ -17,7 +17,7 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ # define memset __redirect_memset
+ # include <string.h>
+ # undef memset
+@@ -30,4 +30,7 @@
+ riscv_libc_ifunc_redirected (__redirect_memset, memset, IFUNC_SELECTOR);
+ 
+ riscv_libc_ifunc_hidden_def (__redirect_memset, memset);
++#else 
++# include <string.h>
++
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_riscv.c b/sysdeps/riscv/rv64/multiarch/memset_riscv.c
+index 1101c10f96..de631eb187 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset_riscv.c
++++ b/sysdeps/riscv/rv64/multiarch/memset_riscv.c
+@@ -16,14 +16,16 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+ #undef weak_alias
+ #  define MEMSET __memset_riscv
+ # include <string/memset.c>
+-#else
++#elif !defined __riscv_vector
+ 
+ # include <string/memset.c>
+ #endif
++
++
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_vector.S b/sysdeps/riscv/rv64/multiarch/memset_vector.S
+index 54d04238d3..dc407630a6 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/memset_vector.S
+@@ -19,12 +19,12 @@
+ 
+ #include <sysdep.h>
+ 
+-/* For __riscv_vector this file defines memcpy.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define memset __memset_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif
+ 
+ 	.p2align 6
+ ENTRY (memset)
+@@ -43,3 +43,4 @@ ENTRY (memset)
+ 
+ END (memset)
+ libc_hidden_builtin_def (memset)
++#endif
+\ No newline at end of file
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c b/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
+index 25faa66478..36a22eee60 100644
+--- a/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memcmp.c
+@@ -1 +1 @@
+-#include "memcmp_riscv.c"
++# include <string/memcmp.c>
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memmove.c b/sysdeps/riscv/rv64/multiarch/rtld-memmove.c
+index 435c059184..90e37dbd8b 100644
+--- a/sysdeps/riscv/rv64/multiarch/rtld-memmove.c
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memmove.c
+@@ -16,4 +16,4 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#include "memmove_riscv.c"
++# include <string/memmove.c>
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-memset.c b/sysdeps/riscv/rv64/multiarch/rtld-memset.c
+index eff6790df5..fa3c6f4104 100644
+--- a/sysdeps/riscv/rv64/multiarch/rtld-memset.c
++++ b/sysdeps/riscv/rv64/multiarch/rtld-memset.c
+@@ -1 +1 @@
+-#include "memset_riscv.c"
+\ No newline at end of file
++# include <string/memset.c>
+diff --git a/sysdeps/riscv/rv64/multiarch/rtld-strlen.c b/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+index 73308eb0fa..d3f1dd4a23 100644
+--- a/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
++++ b/sysdeps/riscv/rv64/multiarch/rtld-strlen.c
+@@ -1 +1 @@
+-#include "strlen_riscv.c"
++# include <string/strlen.c>
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp.c b/sysdeps/riscv/rv64/multiarch/strcmp.c
+index 56969c77e8..3b65aaf55d 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp.c
++++ b/sysdeps/riscv/rv64/multiarch/strcmp.c
+@@ -17,7 +17,7 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ # define strcmp __redirect_strcmp
+ # include <string.h>
+ # undef strcmp
+@@ -30,4 +30,7 @@
+ riscv_libc_ifunc_redirected (__redirect_strcmp, strcmp, IFUNC_SELECTOR);
+ 
+ riscv_libc_ifunc_hidden_def (__redirect_strcmp, strcmp);
++#else 
++# include <string.h>
++
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+index 93e598f0c5..f5be83d5b7 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_riscv.S
+@@ -1,9 +1,13 @@
+ 
+-/* For __riscv_vector this file defines strcmp.  */
+-/* #ifndef __riscv_vector */
++#include <sysdep.h>
++
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ # define strcmp __strcmp_riscv
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
+ 
+-#include "strcmp_.S"
+\ No newline at end of file
++#include "strcmp_.S"
++#elif !defined __riscv_vector
++
++#include "strcmp_.S"
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_vector.S b/sysdeps/riscv/rv64/multiarch/strcmp_vector.S
+index 41d653748a..d0b8e316f9 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_vector.S
+@@ -19,11 +19,12 @@
+ #include <sysdep.h>
+ 
+ /* For __riscv_vector this file defines strcmp.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define strcmp __strcmp_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif 
+ 
+ 	.p2align 6
+ ENTRY (strcmp)
+@@ -51,4 +52,4 @@ ENTRY (strcmp)
+ 
+ END (strcmp)
+ libc_hidden_builtin_def (strcmp)
+-
++#endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen.c b/sysdeps/riscv/rv64/multiarch/strlen.c
+index 292c9103fa..8fab570609 100644
+--- a/sysdeps/riscv/rv64/multiarch/strlen.c
++++ b/sysdeps/riscv/rv64/multiarch/strlen.c
+@@ -17,7 +17,7 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ # define strlen __redirect_strlen
+ # include <string.h>
+ # undef strlen
+@@ -29,4 +29,7 @@
+ 
+ riscv_libc_ifunc_redirected (__redirect_strlen, strlen, IFUNC_SELECTOR);
+ riscv_libc_ifunc_hidden_def (__redirect_strlen, strlen);
++#else 
++# include <string.h>
++
+ #endif
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_riscv.c b/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+index e17a5dde31..d605941766 100644
+--- a/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
++++ b/sysdeps/riscv/rv64/multiarch/strlen_riscv.c
+@@ -16,14 +16,17 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#if IS_IN (libc)
++
++#if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+ #undef weak_alias
+ #  define STRLEN __strlen_riscv
+ # include <string/strlen.c>
+-#else
++#elif !defined __riscv_vector
+ 
+ # include <string/strlen.c>
+ #endif
++
++
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_vector.S b/sysdeps/riscv/rv64/multiarch/strlen_vector.S
+index dd080e3a2f..f674de3a26 100644
+--- a/sysdeps/riscv/rv64/multiarch/strlen_vector.S
++++ b/sysdeps/riscv/rv64/multiarch/strlen_vector.S
+@@ -19,11 +19,12 @@
+ #include <sysdep.h>
+ 
+ /* For __riscv_vector this file defines strlen.  */
+-/* #ifndef __riscv_vector */
++#ifdef __riscv_vector 
++#ifdef SHARED
+ # define strlen __strlen_vector
+ # undef libc_hidden_builtin_def
+ # define libc_hidden_builtin_def(a)
+-/* #endif */
++#endif
+ 
+ 	.p2align 6
+ ENTRY (strlen)
+@@ -44,3 +45,4 @@ ENTRY (strlen)
+ 
+ END (strlen)
+ libc_hidden_builtin_def (strlen)
++#endif
+\ No newline at end of file
+-- 
+2.25.1
+

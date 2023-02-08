@@ -1,0 +1,123 @@
+From 6de07625ef56d37f9804ef4ffc7fe568954cb689 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 14 Dec 2022 16:55:05 -0800
+Subject: [PATCH 19/19] fix missing alias functions
+
+---
+ sysdeps/riscv/rv64/multiarch/memchr_as.S     |  8 ++++++--
+ sysdeps/riscv/rv64/multiarch/memchr_riscv.S  |  3 +--
+ sysdeps/riscv/rv64/multiarch/memcmp_riscv.S  |  1 -
+ sysdeps/riscv/rv64/multiarch/memmove_riscv.S |  1 -
+ sysdeps/riscv/rv64/multiarch/memset_riscv.S  |  1 -
+ sysdeps/riscv/rv64/strnlen.S                 | 13 ++++++++-----
+ 6 files changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+index ad559e6a11..4d3221c60e 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -22,7 +22,7 @@
+ .option arch, +zbb
+ 
+ 	.p2align 6
+-ENTRY (memchr)
++ENTRY (__memchr)
+     beqz    a2, .L_not_find
+     li      a4, 9
+     bltu    a2, a4, .L_0_to_8 
+@@ -91,5 +91,9 @@ ENTRY (memchr)
+     add     a0, a0, a3
+ .L_find_byte:
+     ret
+-END (memchr)
++END (__memchr)
++#ifdef weak_alias
++weak_alias (__memchr, memchr)
++#endif
++
+ libc_hidden_builtin_def (memchr)
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_riscv.S b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+index 84b3375f31..829f57e7e5 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_riscv.S
+@@ -20,12 +20,11 @@
+ 
+ #if IS_IN (libc) && defined SHARED && defined __riscv_vector
+ 
+-#define memchr __memchr_riscv
++#define __memchr __memchr_riscv
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ #include "memchr_as.S"
+ 
+-
+ #else
+ 
+ #include "memchr_as.S"
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_riscv.S b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.S
+index 32df79f769..f9ba9da081 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_riscv.S
+@@ -21,7 +21,6 @@
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+-#undef weak_alias
+ #  define memcmp __memcmp_riscv
+ # include "memcmp_as.S"
+ 
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_riscv.S b/sysdeps/riscv/rv64/multiarch/memmove_riscv.S
+index 14f154e226..f829e0d5c3 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memmove_riscv.S
+@@ -21,7 +21,6 @@
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+-#undef weak_alias
+ #  define memmove __memmove_riscv
+ # include "memmove_as.S"
+ 
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_riscv.S b/sysdeps/riscv/rv64/multiarch/memset_riscv.S
+index 8585db0228..6540639296 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset_riscv.S
++++ b/sysdeps/riscv/rv64/multiarch/memset_riscv.S
+@@ -20,7 +20,6 @@
+ #undef libc_hidden_builtin_def
+ #define libc_hidden_builtin_def(name)
+ 
+-#undef weak_alias
+ #  define memset __memset_riscv
+ # include "memset_as.S"
+ #else
+diff --git a/sysdeps/riscv/rv64/strnlen.S b/sysdeps/riscv/rv64/strnlen.S
+index 33b140a0ac..73757b69f2 100644
+--- a/sysdeps/riscv/rv64/strnlen.S
++++ b/sysdeps/riscv/rv64/strnlen.S
+@@ -19,7 +19,7 @@
+ #include <sysdep.h>
+ 
+ 	.p2align 6
+-ENTRY (strnlen)
++ENTRY (__strnlen)
+   mv    a2, a0
+   mv    a0, a1
+   li    a3, -1
+@@ -56,7 +56,10 @@ ENTRY (strnlen)
+ .Ldone:
+   ret
+ 
+-END (strnlen)
+-weak_alias (strnlen, __strnlen)
+-libc_hidden_builtin_def (strnlen)
+-libc_hidden_builtin_def (__strnlen)
++END (__strnlen)
++
++#ifndef STRNLEN
++libc_hidden_def (__strnlen)
++weak_alias (__strnlen, strnlen)
++#endif
++libc_hidden_def (strnlen)
+-- 
+2.25.1
+

@@ -53,6 +53,9 @@ export WINDRES_FOR_TARGET = "${TARGET_PREFIX}windres"
 export ARCH_FLAGS_FOR_TARGET = "--sysroot=${STAGING_DIR_TARGET}"
 
 do_configure () {
+        if [ ! -d ${RECIPE_SYSROOT}/${target_includedir} ]; then
+            mkdir -p ${RECIPE_SYSROOT}/${target_includedir}
+        fi
 	export CC_FOR_BUILD="${BUILD_CC}"
 	export CXX_FOR_BUILD="${BUILD_CXX}"
 	export CFLAGS_FOR_BUILD="${BUILD_CFLAGS}"
@@ -132,7 +135,7 @@ do_install () {
 	dest=${D}${libexecdir}/gcc/${TARGET_SYS}/${BINV}/
 	install -d $dest
 	suffix=${EXEEXT}
-	for t in ar as ld nm objcopy objdump ranlib strip g77 gcc cpp gfortran; do
+	for t in ar as ld ld.bfd ld.gold nm objcopy objdump ranlib strip g77 gcc cpp gfortran; do
 		if [ "$t" = "g77" -o "$t" = "gfortran" ] && [ ! -e ${D}${bindir}/${TARGET_PREFIX}$t$suffix ]; then
 			continue
 		fi
@@ -180,17 +183,16 @@ do_install () {
 }
 
 ELFUTILS = "nativesdk-elfutils"
-DEPENDS += "nativesdk-gmp nativesdk-mpfr nativesdk-libmpc ${ELFUTILS} nativesdk-zlib"
-RDEPENDS:${PN} += "nativesdk-mpfr nativesdk-libmpc ${ELFUTILS}"
+DEPENDS += "nativesdk-gmp nativesdk-mpfr nativesdk-libmpc nativesdk-isl ${ELFUTILS} nativesdk-zlib nativesdk-zstd"
+RDEPENDS:${PN} += "nativesdk-mpfr nativesdk-libmpc nativesdk-isl ${ELFUTILS}"
 
 SYSTEMHEADERS = "${target_includedir}/"
 SYSTEMLIBS = "${target_base_libdir}/"
 SYSTEMLIBS1 = "${target_libdir}/"
 
-EXTRA_OECONF += "--enable-poison-system-directories"
-EXTRA_OECONF:remove:elf = "--with-sysroot=/not/exist"
-EXTRA_OECONF:remove:eabi = "--with-sysroot=/not/exist"
-EXTRA_OECONF:append:elf = " --without-headers --with-newlib"
-EXTRA_OECONF:append:eabi = " --without-headers --with-newlib"
+EXTRA_OECONF += "--enable-poison-system-directories \
+                 --with-isl=${STAGING_DIR_HOST}${SDKPATHNATIVE}${prefix_nativesdk} \
+                 "
+
 # gcc 4.7 needs -isystem
 export ARCH_FLAGS_FOR_TARGET = "--sysroot=${STAGING_DIR_TARGET} -isystem=${target_includedir}"

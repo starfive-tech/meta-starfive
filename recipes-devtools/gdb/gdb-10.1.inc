@@ -25,5 +25,12 @@ SRC_URI = "git://github.com/riscv/riscv-binutils-gdb.git;branch=${BRANCH};protoc
            file://0009-resolve-restrict-keyword-conflict.patch \
            file://0010-Fix-invalid-sigprocmask-call.patch \
            file://0011-gdbserver-ctrl-c-handling.patch \
+	   file://0001-Automatic-date-update-in-version.in.patch \
+	   file://0002-Automatic-date-update-in-version.in.patch \
+	   file://0003-Automatic-date-update-in-version.in.patch \
+	   file://0004-add-intial-rvv-support-to-display-rvv-registers.patch \
+	   file://0005-fix-incorrect-short-size.patch \
+	   file://0006-add-Custom-CSR-instructions.patch \
+	   file://0007-add-customer-pref-insn-support.patch \
            "
 SRC_URI[sha256sum] = "f82f1eceeec14a3afa2de8d9b0d3c91d5a3820e23e0a01bbb70ef9f0276b62c0"

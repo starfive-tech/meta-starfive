@@ -1,0 +1,273 @@
+From d8b1bc0917a815fdb55457ad8e1eb14d0042f469 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 5 Sep 2022 22:03:01 -0700
+Subject: [PATCH 01/19] modify &and merge sifive patches to support V
+
+---
+ sysdeps/riscv/Makefile                        |  5 +++
+ .../unix/sysv/linux/riscv/bits/sigcontext.h   | 31 --------------
+ sysdeps/unix/sysv/linux/riscv/getcontext.S    | 24 ++++++++++-
+ sysdeps/unix/sysv/linux/riscv/setcontext.S    | 22 ++++++++++
+ sysdeps/unix/sysv/linux/riscv/swapcontext.S   | 41 +++++++++++++++++++
+ sysdeps/unix/sysv/linux/riscv/sys/ucontext.h  |  2 +
+ sysdeps/unix/sysv/linux/riscv/sysdep.h        |  1 +
+ sysdeps/unix/sysv/linux/riscv/ucontext_i.sym  |  5 +++
+ 8 files changed, 98 insertions(+), 33 deletions(-)
+ delete mode 100644 sysdeps/unix/sysv/linux/riscv/bits/sigcontext.h
+
+diff --git a/sysdeps/riscv/Makefile b/sysdeps/riscv/Makefile
+index 8fb10b164f..e2d84640d4 100644
+--- a/sysdeps/riscv/Makefile
++++ b/sysdeps/riscv/Makefile
+@@ -2,6 +2,11 @@ ifeq ($(subdir),misc)
+ sysdep_headers += sys/asm.h
+ endif
+ 
++ifeq ($(subdir),csu)
++# get offset to rtld_global._dl_hwcap and rtld_global._dl_hwcap2.
++gen-as-const-headers += rtld-global-offsets.sym
++endif
++
+ # RISC-V's assembler also needs to know about PIC as it changes the definition
+ # of some assembler macros.
+ ASFLAGS-.os += $(pic-ccflag)
+diff --git a/sysdeps/unix/sysv/linux/riscv/bits/sigcontext.h b/sysdeps/unix/sysv/linux/riscv/bits/sigcontext.h
+deleted file mode 100644
+index b6e15b5f62..0000000000
+--- a/sysdeps/unix/sysv/linux/riscv/bits/sigcontext.h
++++ /dev/null
+@@ -1,31 +0,0 @@
+-/* Machine-dependent signal context structure for Linux.  RISC-V version.
+-   Copyright (C) 1996-2022 Free Software Foundation, Inc.  This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <https://www.gnu.org/licenses/>.  */
+-
+-#ifndef _BITS_SIGCONTEXT_H
+-#define _BITS_SIGCONTEXT_H 1
+-
+-#if !defined _SIGNAL_H && !defined _SYS_UCONTEXT_H
+-# error "Never use <bits/sigcontext.h> directly; include <signal.h> instead."
+-#endif
+-
+-struct sigcontext {
+-  /* gregs[0] holds the program counter.  */
+-  unsigned long int gregs[32];
+-  unsigned long long int fpregs[66] __attribute__ ((__aligned__ (16)));
+-};
+-
+-#endif
+diff --git a/sysdeps/unix/sysv/linux/riscv/getcontext.S b/sysdeps/unix/sysv/linux/riscv/getcontext.S
+index 499f70b65d..371ebd52a7 100644
+--- a/sysdeps/unix/sysv/linux/riscv/getcontext.S
++++ b/sysdeps/unix/sysv/linux/riscv/getcontext.S
+@@ -16,6 +16,8 @@
+    License along with the GNU C Library.  If not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
++#include <sysdep.h>
++#include <rtld-global-offsets.h>
+ #include "ucontext-macros.h"
+ 
+ /* int getcontext (ucontext_t *ucp) */
+@@ -39,6 +41,25 @@ LEAF (__getcontext)
+ 	SAVE_INT_REG (s10, 26, a0)
+ 	SAVE_INT_REG (s11, 27, a0)
+ 
++#ifdef __riscv_vector
++# ifdef SHARED
++	la	t1, _rtld_global_ro
++	REG_L   t1, RTLD_GLOBAL_RO_DL_HWCAP_OFFSET(t1)
++# else
++	la	t1, _dl_hwcap
++	REG_L	t1, (t1)
++# endif
++	li	t2, HWCAP_ISA_V
++	and	t2, t1, t2
++	beqz	t2, 1f
++	addi	t2, a0,	MCONTEXT_EXTENSION
++	li	t1, RVV_MAGIC
++	sw	t1, (t2)
++	csrr	t1, vcsr
++	REG_S	t1, VCSR_OFFSET(t2)
++1:
++#endif
++
+ #ifndef __riscv_float_abi_soft
+ 	frsr	a1
+ 
+@@ -73,5 +94,4 @@ LEAF (__getcontext)
+ 99:	j	__syscall_error
+ 
+ PSEUDO_END (__getcontext)
+-
+-weak_alias (__getcontext, getcontext)
++weak_alias (__getcontext, getcontext)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/setcontext.S b/sysdeps/unix/sysv/linux/riscv/setcontext.S
+index e3bc84a2e6..423d94df27 100644
+--- a/sysdeps/unix/sysv/linux/riscv/setcontext.S
++++ b/sysdeps/unix/sysv/linux/riscv/setcontext.S
+@@ -16,6 +16,8 @@
+    License along with the GNU C Library.  If not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
++#include <sysdep.h>
++#include <rtld-global-offsets.h>
+ #include "ucontext-macros.h"
+ 
+ /*  int __setcontext (const ucontext_t *ucp)
+@@ -64,6 +66,26 @@ LEAF (__setcontext)
+ 	fssr	t1
+ #endif /* __riscv_float_abi_soft */
+ 
++#ifdef __riscv_vector
++#ifdef SHARED
++	la	t1, _rtld_global_ro
++	REG_L   t1, RTLD_GLOBAL_RO_DL_HWCAP_OFFSET(t1)
++#else
++	la	t1, _dl_hwcap
++	REG_L	t1, (t1)
++#endif
++	li	t2, HWCAP_ISA_V
++	and	t2, t1, t2
++	beqz	t2, 1f
++	li      t1, RVV_MAGIC
++	addi	t2, t0,	MCONTEXT_EXTENSION
++	lw	a1, (t2)
++	bne	a1, t1, 1f
++	REG_L   t1, VCSR_OFFSET(t2)
++	csrw	vcsr, t1
++1:
++#endif
++
+ 	/* Note the contents of argument registers will be random
+ 	   unless makecontext() has been called.  */
+ 	RESTORE_INT_REG     (t1,   0, t0)
+diff --git a/sysdeps/unix/sysv/linux/riscv/swapcontext.S b/sysdeps/unix/sysv/linux/riscv/swapcontext.S
+index 4da615f6d4..16600f78df 100644
+--- a/sysdeps/unix/sysv/linux/riscv/swapcontext.S
++++ b/sysdeps/unix/sysv/linux/riscv/swapcontext.S
+@@ -16,6 +16,8 @@
+    License along with the GNU C Library.  If not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
++#include <sysdep.h>
++#include <rtld-global-offsets.h>
+ #include "ucontext-macros.h"
+ 
+ /* int swapcontext (ucontext_t *oucp, const ucontext_t *ucp) */
+@@ -40,6 +42,25 @@ LEAF (__swapcontext)
+ 	SAVE_INT_REG (s10, 26, a0)
+ 	SAVE_INT_REG (s11, 27, a0)
+ 
++#ifdef __riscv_vector
++#ifdef SHARED
++	la      t1, _rtld_global_ro
++	REG_L   t1, RTLD_GLOBAL_RO_DL_HWCAP_OFFSET(t1)
++#else
++	la	t1, _dl_hwcap
++	REG_L   t1, (t1)
++#endif
++	li	t2, HWCAP_ISA_V
++	and	t2, t1, t2
++	beqz	t2, 1f
++	addi	t2, a0,	MCONTEXT_EXTENSION
++	li	t1, RVV_MAGIC
++	sw	t1, (t2)
++	csrr	t1, vcsr
++	REG_S	t1, VCSR_OFFSET(t2)
++1:
++#endif
++
+ #ifndef __riscv_float_abi_soft
+ 	frsr a1
+ 
+@@ -89,6 +110,26 @@ LEAF (__swapcontext)
+ 	fssr	t1
+ #endif /* __riscv_float_abi_soft */
+ 
++#ifdef __riscv_vector
++#ifdef SHARED
++	la      t1, _rtld_global_ro
++	REG_L   t1, RTLD_GLOBAL_RO_DL_HWCAP_OFFSET(t1)
++#else
++	la	t1, _dl_hwcap
++	REG_L   t1, (t1)
++#endif
++	li	t2, HWCAP_ISA_V
++	and	t2, t1, t2
++	beqz	t2, 1f
++	li      t1, RVV_MAGIC
++	addi	t2, t0,	MCONTEXT_EXTENSION
++	lw	a1, (t2)
++	bne	a1, t1, 1f
++	REG_L   t1, VCSR_OFFSET(t2)
++	csrw	vcsr, t1
++1:
++#endif
++
+ 	/* Note the contents of argument registers will be random
+ 	   unless makecontext() has been called.  */
+ 	RESTORE_INT_REG (t1,   0, t0)
+diff --git a/sysdeps/unix/sysv/linux/riscv/sys/ucontext.h b/sysdeps/unix/sysv/linux/riscv/sys/ucontext.h
+index e226ee85ee..1b370f0f45 100644
+--- a/sysdeps/unix/sysv/linux/riscv/sys/ucontext.h
++++ b/sysdeps/unix/sysv/linux/riscv/sys/ucontext.h
+@@ -82,6 +82,8 @@ typedef struct mcontext_t
+   {
+     __riscv_mc_gp_state __gregs;
+     union  __riscv_mc_fp_state __fpregs;
++    /* 5K + 256 reserved for vector state and future expansion.  */
++    unsigned char __reserved[5376] __attribute__ ((__aligned__ (16)));
+   } mcontext_t;
+ 
+ /* Userlevel context.  */
+diff --git a/sysdeps/unix/sysv/linux/riscv/sysdep.h b/sysdeps/unix/sysv/linux/riscv/sysdep.h
+index 37ff07a0d7..c9f8fd8236 100644
+--- a/sysdeps/unix/sysv/linux/riscv/sysdep.h
++++ b/sysdeps/unix/sysv/linux/riscv/sysdep.h
+@@ -50,6 +50,7 @@
+ 
+ #ifdef __ASSEMBLER__
+ 
++# include <bits/hwcap.h>
+ # include <sys/asm.h>
+ 
+ # define ENTRY(name) LEAF(name)
+diff --git a/sysdeps/unix/sysv/linux/riscv/ucontext_i.sym b/sysdeps/unix/sysv/linux/riscv/ucontext_i.sym
+index be55b26310..b91945a080 100644
+--- a/sysdeps/unix/sysv/linux/riscv/ucontext_i.sym
++++ b/sysdeps/unix/sysv/linux/riscv/ucontext_i.sym
+@@ -2,6 +2,7 @@
+ #include <signal.h>
+ #include <stddef.h>
+ #include <sys/ucontext.h>
++#include <asm/sigcontext.h>
+ 
+ -- Constants used by the rt_sigprocmask call.
+ 
+@@ -27,5 +28,9 @@ STACK_FLAGS			stack (ss_flags)
+ 
+ MCONTEXT_GREGS			mcontext (__gregs)
+ MCONTEXT_FPREGS			mcontext (__fpregs)
++MCONTEXT_EXTENSION 		mcontext (__reserved)
+ 
+ UCONTEXT_SIZE			sizeof (ucontext_t)
++VCSR_OFFSET			offsetof (struct __riscv_v_state, vcsr)
++
++RVV_MAGIC
+-- 
+2.25.1
+

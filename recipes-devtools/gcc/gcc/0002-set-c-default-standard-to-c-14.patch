@@ -1,0 +1,60 @@
+From 5fb88421181bac4a3cf160f9b52258f23c06dd05 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 6 Jul 2022 19:26:53 -0700
+Subject: [PATCH 02/11] set c++ default standard to c++14
+
+---
+ gcc/doc/invoke.texi                   | 2 +-
+ gcc/doc/standards.texi                | 2 +-
+ gcc/testsuite/lib/target-supports.exp | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 07b440190c3..490287b85d1 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -2446,6 +2446,7 @@ The name @samp{c++1y} is deprecated.
+ @item gnu++14
+ @itemx gnu++1y
+ GNU dialect of @option{-std=c++14}.
++This is the default for C++ code.
+ The name @samp{gnu++1y} is deprecated.
+ 
+ @item c++17
+@@ -2456,7 +2457,6 @@ The name @samp{c++1z} is deprecated.
+ @item gnu++17
+ @itemx gnu++1z
+ GNU dialect of @option{-std=c++17}.
+-This is the default for C++ code.
+ The name @samp{gnu++1z} is deprecated.
+ 
+ @item c++20
+diff --git a/gcc/doc/standards.texi b/gcc/doc/standards.texi
+index f878615ca30..fd6d270a567 100644
+--- a/gcc/doc/standards.texi
++++ b/gcc/doc/standards.texi
+@@ -254,7 +254,7 @@ select an extended version of the C++ language explicitly with
+ @option{-std=gnu++20} (for C++20 with GNU extensions).
+ 
+ The default, if
+-no C++ language dialect options are given, is @option{-std=gnu++17}.
++no C++ language dialect options are given, is @option{-std=gnu++14}.
+ 
+ @section Objective-C and Objective-C++ Languages
+ @cindex Objective-C
+diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
+index 2d5d0539bb4..f59ef570aa5 100644
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -10153,7 +10153,7 @@ proc check_effective_target_c++ { } {
+  return 0
+ }
+ 
+-set cxx_default "c++17"
++set cxx_default "c++14"
+ # Check whether the current active language standard supports the features
+ # of C++11/C++14 by checking for the presence of one of the -std flags.
+ # This assumes that the default for the compiler is $cxx_default, and that
+-- 
+2.25.1
+

@@ -1,0 +1,33 @@
+From bf362d8a818dee92a93c7062e9bfb0399746ef59 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 9 Oct 2022 00:12:28 -0700
+Subject: [PATCH 7/8] set clang default march to rv64gc
+
+---
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index 21a7cdf02291..9fe13fe2aec3 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -290,11 +290,10 @@ StringRef riscv::getRISCVArch(const llvm::opt::ArgList &Args,
+     else
+       return "rv32imafdc";
+   } else {
+-    //if (Triple.getOS() == llvm::Triple::UnknownOS)
+-    //  return "rv64imac";
+-    //else
+-    //  return "rv64imafdc";
+-    // align the default march with gcc toolchain of dubhe
+-    return "rv64imafdc_zba_zbb_zbc_zbs";  
++    if (Triple.getOS() == llvm::Triple::UnknownOS)
++      return "rv64imafdc";
++    else
++      //for dubhe linux toolchain, default is rv64gcb 
++      return "rv64imafdc_zba_zbb_zbc_zbs";
+   }
+ }
+-- 
+2.25.1
+

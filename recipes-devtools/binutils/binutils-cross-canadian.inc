@@ -13,8 +13,6 @@ EXTRA_OECONF += "--with-sysroot=${SDKPATH}/sysroots/${TUNE_PKGARCH}${TARGET_VEND
 # e.g. we switch between different machines with different tunes.
 EXTRA_OECONF[vardepsexclude] = "TUNE_PKGARCH"
 
-LDGOLD:sdkmingw32 = ""
-
 do_install () {
 	autotools_do_install
 
@@ -25,7 +23,9 @@ do_install () {
 	rm -f ${D}${libdir}/libiberty*
 	rm -f ${D}${libdir}/libopcodes*
 	rm -f ${D}${includedir}/*.h
-	
+	rm -f ${D}${sysconfdir}/gprofng.rc
+	rmdir ${D}${sysconfdir} || :
+
 	cross_canadian_bindirlinks
 }
 

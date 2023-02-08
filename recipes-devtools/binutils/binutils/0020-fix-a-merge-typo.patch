@@ -1,0 +1,24 @@
+From 3378dfe00fa17aece8de221f2f3b51d06e576752 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 6 Dec 2022 19:34:57 -0800
+Subject: [PATCH 20/20] fix a merge typo
+
+---
+ include/opcode/riscv-opc.h | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index b130357392..20a541e503 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -2869,7 +2869,6 @@ DECLARE_INSN(cbo_clean, MATCH_CBO_CLEAN, MASK_CBO_CLEAN);
+ DECLARE_INSN(cbo_flush, MATCH_CBO_FLUSH, MASK_CBO_FLUSH);
+ DECLARE_INSN(cbo_inval, MATCH_CBO_INVAL, MASK_CBO_INVAL);
+ DECLARE_INSN(cbo_zero, MATCH_CBO_ZERO, MASK_CBO_ZERO);
+-DECLARE_INSN(cbo_zero, MATCH_CBO_ZERO, MASK_CBO_ZERO);
+ 
+ #endif /* DECLARE_INSN */
+ #ifdef DECLARE_CSR
+-- 
+2.25.1
+

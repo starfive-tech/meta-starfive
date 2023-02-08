@@ -1,0 +1,25 @@
+From f8e87829b8008dbaed49d7e33821086a10054b41 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 2 Nov 2022 19:17:52 -0700
+Subject: [PATCH 5/7] fix incorrect short size
+
+---
+ gdb/features/riscv/vpu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gdb/features/riscv/vpu.c b/gdb/features/riscv/vpu.c
+index fe45f37b4c..2da8d20663 100644
+--- a/gdb/features/riscv/vpu.c
++++ b/gdb/features/riscv/vpu.c
+@@ -25,7 +25,7 @@ create_feature_riscv_vpu (struct target_desc *result, int arch, int vlen)
+   element_type = tdesc_named_type (feature, "uint32");
+   tdesc_create_vector (feature, "v_words", element_type, (vlen * 8)/32);
+   element_type = tdesc_named_type (feature, "uint16");
+-  tdesc_create_vector (feature, "v_shorts", element_type, (vlen * 8)/32);
++  tdesc_create_vector (feature, "v_shorts", element_type, (vlen * 8)/16);
+   element_type = tdesc_named_type (feature, "uint8");
+   tdesc_create_vector (feature, "v_bytes", element_type, vlen);
+ 
+-- 
+2.25.1
+
