@@ -4,7 +4,7 @@
   <remote name="openembedded" fetch="https://github.com/openembedded/" />
   <remote name="riscv" fetch="https://github.com/riscv/" />
   <default remote="openembedded" revision="master" />
-  <remote name="starfive" fetch="http://192.168.110.45/starfive-tech" />
+  <remote name="starfive" fetch="https://github.com/starfive-tech" />
   <remote name="kraj" fetch="https://github.com/kraj" />
 
   <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="kirkstone" />
