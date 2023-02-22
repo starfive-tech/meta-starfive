@@ -7,7 +7,7 @@ LINUX_VERSION_EXTENSION:append = "-starlight"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SRC_URI = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
+SRC_URI = "git://github.com/starfive-tech/linux.git;protocol=https;branch=${BRANCH} \
            file://defconfig \
            "
 
