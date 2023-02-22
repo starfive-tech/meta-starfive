@@ -9,7 +9,7 @@ require opensbi-payloads.inc
 inherit autotools-brokensep deploy
 
 SRCREV = "bee8253d8f04c56017860386d1b2132cf4f4b7c5"
-SRC_URI = "git://git@192.168.110.45/starfive-tech/opensbi.git;protocol=ssh;branch=starfive-v1.1-dubhe"
+SRC_URI = "git://git@github.com/starfive-tech/opensbi.git;protocol=https;branch=starfive-v1.1-dubhe"
 
 SRC_URI:remove:nezha = " \
     file://0001-lib-utils-fdt-Require-match-data-to-be-const.patch \
