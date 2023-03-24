@@ -1,0 +1,47 @@
+From 7d7146102365f708a37401c902fce2f4024b546a Mon Sep 17 00:00:00 2001
+From: Florian Weimer <fweimer@redhat.com>
+Date: Wed, 4 Jan 2023 11:13:17 +0100
+Subject: [PATCH 327/547] libsanitizer: Avoid implicit function declaration in
+ configure test
+
+libsanitizer/
+
+	* configure.ac (sanitizer_supported): Include <unistd.h> for
+	syscall prototype.
+	* configure: Regenerate.
+
+(cherry picked from commit 6be2672e4ee41c566a9e072088cccca263bab5f7)
+---
+ libsanitizer/configure    | 1 +
+ libsanitizer/configure.ac | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/libsanitizer/configure b/libsanitizer/configure
+index 771b135573a..ae8c1bd7e83 100755
+--- a/libsanitizer/configure
++++ b/libsanitizer/configure
+@@ -16028,6 +16028,7 @@ case "$target" in
+     cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ #include <sys/syscall.h>
++#include <unistd.h>
+ int
+ main ()
+ {
+diff --git a/libsanitizer/configure.ac b/libsanitizer/configure.ac
+index 7f1ef3979c4..ad49f29db7e 100644
+--- a/libsanitizer/configure.ac
++++ b/libsanitizer/configure.ac
+@@ -161,7 +161,8 @@ case "$target" in
+   *-*-linux*)
+     # Some old Linux distributions miss required syscalls.
+     sanitizer_supported=no
+-    AC_TRY_COMPILE([#include <sys/syscall.h>],[
++    AC_TRY_COMPILE([#include <sys/syscall.h>
++#include <unistd.h>],[
+       syscall (__NR_gettid);
+       syscall (__NR_futex);
+       syscall (__NR_exit_group);
+-- 
+2.25.1
+

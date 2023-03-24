@@ -1,0 +1,63 @@
+From a5453c659bce698d80f5aebdab5ab0eba39b1ed6 Mon Sep 17 00:00:00 2001
+From: Andrew Pinski <apinski@marvell.com>
+Date: Thu, 9 Feb 2023 16:03:54 +0100
+Subject: [PATCH 455/547] match.pd: When simplifying BFR of an insert, require
+ a mode precision integral type [PR108688]
+
+The same problem as PR 88739 has crept in but
+this time in match.pd when simplifying bit_field_ref of
+an bit_insert. That is we are generating a BIT_FIELD_REF
+of a non-mode-precision integral type.
+
+	PR tree-optimization/108688
+	* match.pd (bit_field_ref [bit_insert]): Avoid generating
+	BIT_FIELD_REFs of non-mode-precision integral operands.
+
+	* gcc.c-torture/compile/pr108688-1.c: New test.
+
+(cherry picked from commit 44f308e59bfa0f93ae05b17e257d8563c12399fd)
+---
+ gcc/match.pd                                     |  4 +++-
+ gcc/testsuite/gcc.c-torture/compile/pr108688-1.c | 15 +++++++++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr108688-1.c
+
+diff --git a/gcc/match.pd b/gcc/match.pd
+index e3bb7c9ae4c..ef352af1572 100644
+--- a/gcc/match.pd
++++ b/gcc/match.pd
+@@ -6993,7 +6993,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
+       isize = tree_to_uhwi (TYPE_SIZE (TREE_TYPE (@1)));
+   }
+   (switch
+-   (if (wi::leu_p (wi::to_wide (@ipos), wi::to_wide (@rpos))
++   (if ((!INTEGRAL_TYPE_P (TREE_TYPE (@1))
++         || type_has_mode_precision_p (TREE_TYPE (@1)))
++        && wi::leu_p (wi::to_wide (@ipos), wi::to_wide (@rpos))
+ 	&& wi::leu_p (wi::to_wide (@rpos) + wi::to_wide (@rsize),
+ 		      wi::to_wide (@ipos) + isize))
+     (BIT_FIELD_REF @1 @rsize { wide_int_to_tree (bitsizetype,
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr108688-1.c b/gcc/testsuite/gcc.c-torture/compile/pr108688-1.c
+new file mode 100644
+index 00000000000..43d782d62bd
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr108688-1.c
+@@ -0,0 +1,15 @@
++
++
++union U { signed int d : 7; signed int e : 2; } u;
++int a, b;
++
++void
++foo (void)
++{
++  for (int i = 0; i < 64; i++)
++    {
++      u.d = a;
++      u.e ^= b;
++    }
++}
++
+-- 
+2.25.1
+

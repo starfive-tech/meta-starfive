@@ -1,0 +1,119 @@
+From 09c5937d8295fbc96f6d05cc12ec3709740a277d Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 23 Dec 2022 11:17:45 -0500
+Subject: [PATCH 532/547] c++: get_nsdmi in template context [PR108116]
+
+Here during ahead of time checking of C{}, we indirectly call get_nsdmi
+for C::m from finish_compound_literal, which in turn calls
+break_out_target_exprs for C::m's (non-templated) initializer, during
+which we build a call to A::~A and check expr_noexcept_p for it (from
+build_vec_delete_1).  But this is all done with processing_template_decl
+set, so the built A::~A call is templated (whose form was recently
+changed by r12-6897-gdec8d0e5fa00ceb2) which expr_noexcept_p doesn't
+expect, and we crash.
+
+This patch fixes this by clearing processing_template_decl before
+the call to break_out_target_exprs from get_nsdmi.  And since it more
+generally seems we shouldn't be seeing (or producing) non-templated
+trees in break_out_target_exprs, this patch also adds an assert to
+that effect.
+
+	PR c++/108116
+
+gcc/cp/ChangeLog:
+
+	* constexpr.cc (maybe_constant_value): Clear
+	processing_template_decl before calling break_out_target_exprs.
+	* init.cc (get_nsdmi): Likewise.
+	* tree.cc (break_out_target_exprs): Assert processing_template_decl
+	is cleared.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/nsdmi-template24.C: New test.
+
+(cherry picked from commit cf59c8983ef6590f0d69014f8dc8778b5b7691c6)
+---
+ gcc/cp/constexpr.cc                           |  4 ++++
+ gcc/cp/init.cc                                |  4 ++++
+ gcc/cp/tree.cc                                |  4 ++++
+ gcc/testsuite/g++.dg/cpp0x/nsdmi-template24.C | 22 +++++++++++++++++++
+ 4 files changed, 34 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/nsdmi-template24.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 468a58f95cc..79acec6e713 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -8170,6 +8170,10 @@ maybe_constant_value (tree t, tree decl, bool manifestly_const_eval)
+       r = *cached;
+       if (r != t)
+ 	{
++	  /* Clear processing_template_decl for sake of break_out_target_exprs;
++	     entries in the cv_cache are non-templated.  */
++	  processing_template_decl_sentinel ptds;
++
+ 	  r = break_out_target_exprs (r, /*clear_loc*/true);
+ 	  protected_set_expr_location (r, EXPR_LOCATION (t));
+ 	}
+diff --git a/gcc/cp/init.cc b/gcc/cp/init.cc
+index 773d26a4b54..fdfaaf9b983 100644
+--- a/gcc/cp/init.cc
++++ b/gcc/cp/init.cc
+@@ -672,6 +672,10 @@ get_nsdmi (tree member, bool in_ctor, tsubst_flags_t complain)
+       current_class_ptr = build_address (current_class_ref);
+     }
+ 
++  /* Clear processing_template_decl for sake of break_out_target_exprs;
++     INIT is always non-templated.  */
++  processing_template_decl_sentinel ptds;
++
+   /* Strip redundant TARGET_EXPR so we don't need to remap it, and
+      so the aggregate init code below will see a CONSTRUCTOR.  */
+   bool simple_target = (init && SIMPLE_TARGET_EXPR_P (init));
+diff --git a/gcc/cp/tree.cc b/gcc/cp/tree.cc
+index e8a9c473ef6..add33cd9af6 100644
+--- a/gcc/cp/tree.cc
++++ b/gcc/cp/tree.cc
+@@ -3342,6 +3342,10 @@ break_out_target_exprs (tree t, bool clear_location /* = false */)
+   static int target_remap_count;
+   static splay_tree target_remap;
+ 
++  /* We shouldn't be called on templated trees, nor do we want to
++     produce them.  */
++  gcc_checking_assert (!processing_template_decl);
++
+   if (!target_remap_count++)
+     target_remap = splay_tree_new (splay_tree_compare_pointers,
+ 				   /*splay_tree_delete_key_fn=*/NULL,
+diff --git a/gcc/testsuite/g++.dg/cpp0x/nsdmi-template24.C b/gcc/testsuite/g++.dg/cpp0x/nsdmi-template24.C
+new file mode 100644
+index 00000000000..202c67d7321
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/nsdmi-template24.C
+@@ -0,0 +1,22 @@
++// PR c++/108116
++// { dg-do compile { target c++11 } }
++
++#include <initializer_list>
++
++struct A {
++  A(int);
++  ~A();
++};
++
++struct B {
++  B(std::initializer_list<A>);
++};
++
++struct C {
++  B m{0};
++};
++
++template<class>
++void f() {
++  C c = C{};
++};
+-- 
+2.25.1
+

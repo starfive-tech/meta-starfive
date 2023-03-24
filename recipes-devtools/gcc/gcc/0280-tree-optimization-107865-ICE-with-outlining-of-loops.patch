@@ -1,0 +1,63 @@
+From 09469705318de7a0fe5f10f5d5b92870d3fada6e Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 25 Nov 2022 08:27:42 +0100
+Subject: [PATCH 280/547] tree-optimization/107865 - ICE with outlining of
+ loops
+
+The following makes sure to clear loops number of iterations when
+outlining them as part of a SESE region as can happen with
+auto-parallelization.  The referenced SSA names become stale otherwise.
+
+	PR tree-optimization/107865
+	* tree-cfg.cc (move_sese_region_to_fn): Free the number of
+	iterations of moved loops.
+
+	* gfortran.dg/graphite/pr107865.f90: New testcase.
+
+(cherry picked from commit bcc2449384f2092cbdf5d6ac2357aeabe3212b2e)
+---
+ .../gfortran.dg/graphite/pr107865.f90          | 18 ++++++++++++++++++
+ gcc/tree-cfg.cc                                |  2 ++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/graphite/pr107865.f90
+
+diff --git a/gcc/testsuite/gfortran.dg/graphite/pr107865.f90 b/gcc/testsuite/gfortran.dg/graphite/pr107865.f90
+new file mode 100644
+index 00000000000..6bddb17a1be
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/graphite/pr107865.f90
+@@ -0,0 +1,18 @@
++! { dg-do compile }
++! { dg-options "-O1 -floop-parallelize-all -ftree-parallelize-loops=2" }
++
++      SUBROUTINE FNC (F)
++
++      IMPLICIT REAL (A-H)
++      DIMENSION F(N)
++
++      DO I = 1, 6
++         DO J = 1, 6
++            IF (J .NE. I) THEN
++               F(I) = F(I) + 1
++            END IF
++         END DO
++      END DO
++
++      RETURN
++      END
+diff --git a/gcc/tree-cfg.cc b/gcc/tree-cfg.cc
+index c0824e34802..05fc4514714 100644
+--- a/gcc/tree-cfg.cc
++++ b/gcc/tree-cfg.cc
+@@ -7737,6 +7737,8 @@ move_sese_region_to_fn (struct function *dest_cfun, basic_block entry_bb,
+       if (bb->loop_father->header == bb)
+ 	{
+ 	  class loop *this_loop = bb->loop_father;
++	  /* Avoid the need to remap SSA names used in nb_iterations.  */
++	  free_numbers_of_iterations_estimates (this_loop);
+ 	  class loop *outer = loop_outer (this_loop);
+ 	  if (outer == loop
+ 	      /* If the SESE region contains some bbs ending with
+-- 
+2.25.1
+

@@ -1,0 +1,141 @@
+From 0172c0685e94e884d4da35a37b92bbbee6bc1ee9 Mon Sep 17 00:00:00 2001
+From: Mikael Morin <mikael@gcc.gnu.org>
+Date: Wed, 31 Aug 2022 11:00:45 +0200
+Subject: [PATCH 126/547] fortran: Move the clobber generation code
+
+This change inlines the clobber generation code from
+gfc_conv_expr_reference to the single caller from where the add_clobber
+flag can be true, and removes the add_clobber argument.
+
+What motivates this is the standard making the procedure call a cause
+for a variable to become undefined, which translates to a clobber
+generation, so clobber generation should be closely related to procedure
+call generation, whereas it is rather orthogonal to variable reference
+generation.  Thus the generation of the clobber feels more appropriate
+in gfc_conv_procedure_call than in gfc_conv_expr_reference.
+
+Behaviour remains unchanged.
+
+gcc/fortran/ChangeLog:
+
+	* trans.h (gfc_conv_expr_reference): Remove add_clobber
+	argument.
+	* trans-expr.cc (gfc_conv_expr_reference): Ditto. Inline code
+	depending on add_clobber and conditions controlling it ...
+	(gfc_conv_procedure_call): ... to here.
+
+(cherry picked from commit 2b393f6f83903cb836676bbd042c1b99a6e7e6f7)
+---
+ gcc/fortran/trans-expr.cc | 60 +++++++++++++++++++++------------------
+ gcc/fortran/trans.h       |  3 +-
+ 2 files changed, 33 insertions(+), 30 deletions(-)
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index 16e232da537..3cfde439cc0 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -6401,7 +6401,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 				&& e->symtree->n.sym->attr.pointer))
+ 			&& fsym && fsym->attr.target)
+ 		/* Make sure the function only gets called once.  */
+-		gfc_conv_expr_reference (&parmse, e, false);
++		gfc_conv_expr_reference (&parmse, e);
+ 	      else if (e->expr_type == EXPR_FUNCTION
+ 		       && e->symtree->n.sym->result
+ 		       && e->symtree->n.sym->result != e->symtree->n.sym
+@@ -6508,22 +6508,36 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 		    }
+ 		  else
+ 		    {
+-		      bool add_clobber;
+-		      add_clobber = fsym && fsym->attr.intent == INTENT_OUT
+-			&& !fsym->attr.allocatable && !fsym->attr.pointer
+-			&& e->symtree && e->symtree->n.sym
+-			&& !e->symtree->n.sym->attr.dimension
+-			&& !e->symtree->n.sym->attr.pointer
+-			&& !e->symtree->n.sym->attr.allocatable
+-			/* See PR 41453.  */
+-			&& !e->symtree->n.sym->attr.dummy
+-			/* FIXME - PR 87395 and PR 41453  */
+-			&& e->symtree->n.sym->attr.save == SAVE_NONE
+-			&& !e->symtree->n.sym->attr.associate_var
+-			&& e->ts.type != BT_CHARACTER && e->ts.type != BT_DERIVED
+-			&& e->ts.type != BT_CLASS && !sym->attr.elemental;
+-
+-		      gfc_conv_expr_reference (&parmse, e, add_clobber);
++		      gfc_conv_expr_reference (&parmse, e);
++
++		      if (fsym
++			  && fsym->attr.intent == INTENT_OUT
++			  && !fsym->attr.allocatable
++			  && !fsym->attr.pointer
++			  && e->expr_type == EXPR_VARIABLE
++			  && e->ref == NULL
++			  && e->symtree
++			  && e->symtree->n.sym
++			  && !e->symtree->n.sym->attr.dimension
++			  && !e->symtree->n.sym->attr.pointer
++			  && !e->symtree->n.sym->attr.allocatable
++			  /* See PR 41453.  */
++			  && !e->symtree->n.sym->attr.dummy
++			  /* FIXME - PR 87395 and PR 41453  */
++			  && e->symtree->n.sym->attr.save == SAVE_NONE
++			  && !e->symtree->n.sym->attr.associate_var
++			  && e->ts.type != BT_CHARACTER
++			  && e->ts.type != BT_DERIVED
++			  && e->ts.type != BT_CLASS
++			  && !sym->attr.elemental)
++			{
++			  tree var;
++			  /* FIXME: This fails if var is passed by reference, see PR
++			     41453.  */
++			  var = e->symtree->n.sym->backend_decl;
++			  tree clobber = build_clobber (TREE_TYPE (var));
++			  gfc_add_modify (&se->pre, var, clobber);
++			}
+ 		    }
+ 		  /* Catch base objects that are not variables.  */
+ 		  if (e->ts.type == BT_CLASS
+@@ -9490,7 +9504,7 @@ gfc_conv_expr_type (gfc_se * se, gfc_expr * expr, tree type)
+    values only.  */
+ 
+ void
+-gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr, bool add_clobber)
++gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr)
+ {
+   gfc_ss *ss;
+   tree var;
+@@ -9530,16 +9544,6 @@ gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr, bool add_clobber)
+ 	  gfc_add_block_to_block (&se->pre, &se->post);
+ 	  se->expr = var;
+ 	}
+-      else if (add_clobber && expr->ref == NULL)
+-	{
+-	  tree clobber;
+-	  tree var;
+-	  /* FIXME: This fails if var is passed by reference, see PR
+-	     41453.  */
+-	  var = expr->symtree->n.sym->backend_decl;
+-	  clobber = build_clobber (TREE_TYPE (var));
+-	  gfc_add_modify (&se->pre, var, clobber);
+-	}
+       return;
+     }
+ 
+diff --git a/gcc/fortran/trans.h b/gcc/fortran/trans.h
+index 623aceed520..6451a633e60 100644
+--- a/gcc/fortran/trans.h
++++ b/gcc/fortran/trans.h
+@@ -499,8 +499,7 @@ tree gfc_build_compare_string (tree, tree, tree, tree, int, enum tree_code);
+ void gfc_conv_expr (gfc_se * se, gfc_expr * expr);
+ void gfc_conv_expr_val (gfc_se * se, gfc_expr * expr);
+ void gfc_conv_expr_lhs (gfc_se * se, gfc_expr * expr);
+-void gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr,
+-			      bool add_clobber = false);
++void gfc_conv_expr_reference (gfc_se * se, gfc_expr * expr);
+ void gfc_conv_expr_type (gfc_se * se, gfc_expr *, tree);
+ 
+ 
+-- 
+2.25.1
+

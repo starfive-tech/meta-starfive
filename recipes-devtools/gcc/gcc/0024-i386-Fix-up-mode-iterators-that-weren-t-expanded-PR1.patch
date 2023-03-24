@@ -1,0 +1,49 @@
+From 0784ef5e2a7ea72614aa600dccb29e926e46bab6 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 24 Aug 2022 09:57:09 +0200
+Subject: [PATCH 024/547] i386: Fix up mode iterators that weren't expanded
+ [PR106721]
+
+Currently, when md file reader sees <something> and something is valid mode
+(or code) attribute but which doesn't include case for the current mode
+(or code), it just keeps the <something> untouched.
+I went through all cases matching <[a-zA-Z] in tmp-mddump.md after make mddump.
+One of the cases was related to the V*HF mode additions and there was one typo.
+
+2022-08-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/106721
+	* config/i386/sse.md (i128vldq): Add V16HF entry.
+	(avx512er_vmrcp28<mode><mask_name><round_saeonly_name>): Fix typo,
+	mask_opernad3 -> mask_operand3.
+
+(cherry picked from commit 846e5c009e360f0c4fe58ff0d3aee03ebe3ca1a9)
+---
+ gcc/config/i386/sse.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index 2ce1aed4ad9..407bcd8f837 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -1215,7 +1215,7 @@
+ ;; For 256-bit modes for TARGET_AVX512VL && TARGET_AVX512DQ
+ ;; i32x4, f32x4, i64x2 or f64x2 suffixes.
+ (define_mode_attr i128vldq
+-  [(V8SF "f32x4") (V4DF "f64x2")
++  [(V16HF "i32x4") (V8SF "f32x4") (V4DF "f64x2")
+    (V32QI "i32x4") (V16HI "i32x4") (V8SI "i32x4") (V4DI "i64x2")])
+ 
+ ;; Mix-n-match
+@@ -23424,7 +23424,7 @@
+ 	  (match_operand:VF_128 2 "register_operand" "v")
+ 	  (const_int 1)))]
+   "TARGET_AVX512ER"
+-  "vrcp28<ssescalarmodesuffix>\t{<round_saeonly_mask_op3>%1, %2, %0<mask_operand3>|<mask_opernad3>%0, %2, %<iptr>1<round_saeonly_mask_op3>}"
++  "vrcp28<ssescalarmodesuffix>\t{<round_saeonly_mask_op3>%1, %2, %0<mask_operand3>|<mask_operand3>%0, %2, %<iptr>1<round_saeonly_mask_op3>}"
+   [(set_attr "length_immediate" "1")
+    (set_attr "prefix" "evex")
+    (set_attr "type" "sse")
+-- 
+2.25.1
+

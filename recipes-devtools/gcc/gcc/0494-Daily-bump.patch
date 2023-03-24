@@ -1,0 +1,84 @@
+From d642468d9cc562197572347a3f85caa208307b4a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 21 Feb 2023 00:22:04 +0000
+Subject: [PATCH 494/547] Daily bump.
+
+---
+ gcc/ChangeLog           |  9 +++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 10 ++++++++++
+ gcc/testsuite/ChangeLog | 19 +++++++++++++++++++
+ 4 files changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 569b0a7406b..b108d4a1789 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-20  Alex Coplan  <alex.coplan@arm.com>
++
++	Backported from master:
++	2023-02-06  Alex Coplan  <alex.coplan@arm.com>
++
++	PR target/104921
++	* config/aarch64/aarch64-simd.md (aarch64_bfmlal<bt>_lane<q>v4sf):
++	Use correct constraint for operand 3.
++
+ 2023-02-18  Xi Ruoyao  <xry111@xry111.site>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 09ddb49ab8a..6d7db2787db 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230220
++20230221
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index c31bb9f5caa..f80334802d5 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,13 @@
++2023-02-20  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-20  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/108829
++	* pt.cc (prepend_one_capture): Set LAMBDA_CAPTURE_EXPLICIT_P.
++	(tsubst_lambda_expr): Pass LAMBDA_CAPTURE_EXPLICIT_P to
++	prepend_one_capture.
++
+ 2023-02-15  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index a96c697c100..bca8ea9139c 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,22 @@
++2023-02-20  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-20  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/108829
++	* g++.dg/cpp0x/lambda/lambda-108829-2.C: New test.
++	* g++.dg/cpp0x/lambda/lambda-108829.C: New test.
++
++2023-02-20  Alex Coplan  <alex.coplan@arm.com>
++
++	Backported from master:
++	2023-02-06  Alex Coplan  <alex.coplan@arm.com>
++
++	PR target/104921
++	* gcc.target/aarch64/pr104921-1.c: New test.
++	* gcc.target/aarch64/pr104921-2.c: New test.
++	* gcc.target/aarch64/pr104921.x: Include file for new tests.
++
+ 2023-02-16  Steve Kargl  <kargl@gcc.gnu.org>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

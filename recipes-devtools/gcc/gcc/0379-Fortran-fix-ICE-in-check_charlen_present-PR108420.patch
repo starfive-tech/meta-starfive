@@ -1,0 +1,62 @@
+From 523ee9f5994961b27c61d46b27dbe064f68d0d76 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Mon, 16 Jan 2023 21:41:09 +0100
+Subject: [PATCH 379/547] Fortran: fix ICE in check_charlen_present [PR108420]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108420
+	* iresolve.cc (check_charlen_present): Preserve character length if
+	there is no array constructor.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108420
+	* gfortran.dg/pr108420.f90: New test.
+
+(cherry picked from commit e6669c0a50ed8aee9e5997d61e6271668d149218)
+---
+ gcc/fortran/iresolve.cc                |  9 ++++++---
+ gcc/testsuite/gfortran.dg/pr108420.f90 | 10 ++++++++++
+ 2 files changed, 16 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108420.f90
+
+diff --git a/gcc/fortran/iresolve.cc b/gcc/fortran/iresolve.cc
+index dea19358b17..a21ebb14c76 100644
+--- a/gcc/fortran/iresolve.cc
++++ b/gcc/fortran/iresolve.cc
+@@ -94,9 +94,12 @@ check_charlen_present (gfc_expr *source)
+   else if (source->expr_type == EXPR_ARRAY)
+     {
+       gfc_constructor *c = gfc_constructor_first (source->value.constructor);
+-      source->ts.u.cl->length
+-		= gfc_get_int_expr (gfc_charlen_int_kind, NULL,
+-				    c->expr->value.character.length);
++      if (c)
++	source->ts.u.cl->length
++	  = gfc_get_int_expr (gfc_charlen_int_kind, NULL,
++			      c->expr->value.character.length);
++      if (source->ts.u.cl->length == NULL)
++	gfc_internal_error ("check_charlen_present(): length not set");
+     }
+ }
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr108420.f90 b/gcc/testsuite/gfortran.dg/pr108420.f90
+new file mode 100644
+index 00000000000..985c0b3bf53
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108420.f90
+@@ -0,0 +1,10 @@
++! { dg-do compile }
++! PR fortran/108420
++! Contributed by G.Steinmetz
++
++program p
++  character :: c = 'c'
++  logical   :: m = .true.
++  print *, merge(transfer('a', 'b', 0), c, .true.)
++  print *, merge(transfer('a', 'b', 0), c, m)
++end
+-- 
+2.25.1
+

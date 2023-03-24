@@ -1,0 +1,54 @@
+From aa66bc253a71deefe0d01e29a1f62ae3365dda6e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 18 Nov 2022 18:13:03 +0000
+Subject: [PATCH 219/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/cp/ChangeLog        | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 3204c3c9c61..578404781e6 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221117
++20221118
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 4b4e6d5ea1a..74a47baf510 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-18  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-11-18  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/104066
++	* decl.cc (grokdeclarator): Check funcdecl_p before complaining
++	about constinit.
++
+ 2022-11-03  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 6d01b9964f3..7c14e60eba2 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-11-18  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-11-18  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/104066
++	* g++.dg/cpp2a/constinit18.C: New test.
++
+ 2022-11-16  Martin Jambor  <mjambor@suse.cz>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

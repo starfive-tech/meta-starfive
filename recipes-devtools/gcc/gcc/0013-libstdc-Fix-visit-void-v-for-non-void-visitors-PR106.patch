@@ -1,0 +1,67 @@
+From 219d9f61a241d370b7933aecae56ce0905465830 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 23 Aug 2022 15:46:16 +0100
+Subject: [PATCH 013/547] libstdc++: Fix visit<void>(v) for non-void visitors
+ [PR106589]
+
+The optimization for the common case of std::visit forgot to handle the
+edge case of passing zero variants to a non-void visitor and converting
+the result to void.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/106589
+	* include/std/variant (__do_visit): Handle is_void<R> for zero
+	argument case.
+	* testsuite/20_util/variant/visit_r.cc: Check std::visit<void>(v).
+
+(cherry picked from commit e85bb1881e57e53306ede2a15f30d06480d69886)
+---
+ libstdc++-v3/include/std/variant                  | 7 ++++++-
+ libstdc++-v3/testsuite/20_util/variant/visit_r.cc | 8 ++++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/variant b/libstdc++-v3/include/std/variant
+index beed396fccb..df0dd08d90a 100644
+--- a/libstdc++-v3/include/std/variant
++++ b/libstdc++-v3/include/std/variant
+@@ -1730,7 +1730,12 @@ namespace __variant
+     {
+       // Get the silly case of visiting no variants out of the way first.
+       if constexpr (sizeof...(_Variants) == 0)
+-	return std::forward<_Visitor>(__visitor)();
++	{
++	  if constexpr (is_void_v<_Result_type>)
++	    return (void) std::forward<_Visitor>(__visitor)();
++	  else
++	    return std::forward<_Visitor>(__visitor)();
++	}
+       else
+ 	{
+ 	  constexpr size_t __max = 11; // "These go to eleven."
+diff --git a/libstdc++-v3/testsuite/20_util/variant/visit_r.cc b/libstdc++-v3/testsuite/20_util/variant/visit_r.cc
+index 712459f25e3..c77b259c386 100644
+--- a/libstdc++-v3/testsuite/20_util/variant/visit_r.cc
++++ b/libstdc++-v3/testsuite/20_util/variant/visit_r.cc
+@@ -54,10 +54,18 @@ void test02()
+   std::visit<const void>(Visitor(), v);
+ }
+ 
++void test03()
++{
++  // PR libstdc++/106589 - visit<void> rejects lambdas that do not return void
++  auto visitor = []{ return 0; };
++  std::visit<void>(visitor);
++  std::visit<void>(static_cast<int(*)()>(visitor));
++}
+ 
+ int
+ main()
+ {
+   test01();
+   test02();
++  test03();
+ }
+-- 
+2.25.1
+

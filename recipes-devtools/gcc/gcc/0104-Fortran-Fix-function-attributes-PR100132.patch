@@ -1,0 +1,138 @@
+From 9de83c0939dabdbefcb88dfef3ad7caf932951ec Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Rui=20Faustino=20de=20Sousa?=
+ <jrfsousa@gmail.com>
+Date: Mon, 19 Sep 2022 22:00:45 +0200
+Subject: [PATCH 104/547] Fortran: Fix function attributes [PR100132]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/100132
+	* trans-types.cc (create_fn_spec): Fix function attributes when
+	passing polymorphic pointers.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/100132
+	* gfortran.dg/PR100132.f90: New test.
+
+(cherry picked from commit be60aa5b608b5f09fadfeff852a46589ac311a42)
+---
+ gcc/fortran/trans-types.cc             | 15 +++++-
+ gcc/testsuite/gfortran.dg/PR100132.f90 | 75 ++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/PR100132.f90
+
+diff --git a/gcc/fortran/trans-types.cc b/gcc/fortran/trans-types.cc
+index 3cdc529eb28..a01e218b30f 100644
+--- a/gcc/fortran/trans-types.cc
++++ b/gcc/fortran/trans-types.cc
+@@ -3042,12 +3042,23 @@ create_fn_spec (gfc_symbol *sym, tree fntype)
+   for (f = gfc_sym_get_dummy_args (sym); f; f = f->next)
+     if (spec_len < sizeof (spec))
+       {
+-	if (!f->sym || f->sym->attr.pointer || f->sym->attr.target
++	bool is_class = false;
++	bool is_pointer = false;
++
++	if (f->sym)
++	  {
++	    is_class = f->sym->ts.type == BT_CLASS && CLASS_DATA (f->sym)
++	      && f->sym->attr.class_ok;
++	    is_pointer = is_class ? CLASS_DATA (f->sym)->attr.class_pointer
++				  : f->sym->attr.pointer;
++	  }
++
++	if (f->sym == NULL || is_pointer || f->sym->attr.target
+ 	    || f->sym->attr.external || f->sym->attr.cray_pointer
+ 	    || (f->sym->ts.type == BT_DERIVED
+ 		&& (f->sym->ts.u.derived->attr.proc_pointer_comp
+ 		    || f->sym->ts.u.derived->attr.pointer_comp))
+-	    || (f->sym->ts.type == BT_CLASS
++	    || (is_class
+ 		&& (CLASS_DATA (f->sym)->ts.u.derived->attr.proc_pointer_comp
+ 		    || CLASS_DATA (f->sym)->ts.u.derived->attr.pointer_comp))
+ 	    || (f->sym->ts.type == BT_INTEGER && f->sym->ts.is_c_interop))
+diff --git a/gcc/testsuite/gfortran.dg/PR100132.f90 b/gcc/testsuite/gfortran.dg/PR100132.f90
+new file mode 100644
+index 00000000000..78ae6702810
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/PR100132.f90
+@@ -0,0 +1,75 @@
++! { dg-do run }
++!
++! Test the fix for PR100132
++!
++
++module main_m
++  implicit none
++
++  private
++
++  public :: &
++    foo_t
++
++  public :: &
++    set,    &
++    get
++
++  type :: foo_t
++    integer :: i
++  end type foo_t
++
++  type(foo_t), save, pointer :: data => null()
++
++contains
++
++  subroutine set(this)
++    class(foo_t), pointer, intent(in) :: this
++
++    if(associated(data)) stop 1
++    data => this
++  end subroutine set
++
++  subroutine get(this)
++    type(foo_t), pointer, intent(out) :: this
++
++    if(.not.associated(data)) stop 4
++    this => data
++    nullify(data)
++  end subroutine get
++
++end module main_m
++
++program main_p
++
++  use :: main_m, only: &
++    foo_t, set, get
++
++  implicit none
++
++  integer, parameter :: n = 1000
++
++  type(foo_t), pointer :: ps
++  type(foo_t),  target :: s
++  integer              :: i, j, yay, nay
++
++  yay = 0
++  nay = 0
++  do i = 1, n
++    s%i = i
++    call set(s)
++    call get(ps)
++    if(.not.associated(ps)) stop 13
++    j = ps%i
++    if(i/=j) stop 14
++    if(i/=s%i) stop 15
++    if(ps%i/=s%i) stop 16
++    if(associated(ps, s))then
++      yay = yay + 1
++    else
++      nay = nay + 1
++    end if
++  end do
++  if((yay/=n).or.(nay/=0)) stop 17
++
++end program main_p
+-- 
+2.25.1
+

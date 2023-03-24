@@ -1,0 +1,110 @@
+From b9f58edfc2ccb0fb3840751a2fb4268ce5dd9b3d Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 23 Sep 2022 14:28:52 +0200
+Subject: [PATCH 139/547] tree-optimization/106922 - extend same-val clobber
+ FRE
+
+The following extends the skipping of same valued stores to
+handle an arbitrary number of them as long as they are from the
+same value (which we now record).  That's an obvious extension
+which allows to optimize the m_engaged member of std::optional
+more reliably.
+
+	PR tree-optimization/106922
+	* tree-ssa-sccvn.cc (vn_reference_lookup_3): Allow
+	an arbitrary number of same valued skipped stores.
+
+	* g++.dg/torture/pr106922.C: New testcase.
+
+(cherry picked from commit af611afe5fcc908a6678b5b205fb5af7d64fbcb2)
+---
+ gcc/testsuite/g++.dg/torture/pr106922.C | 48 +++++++++++++++++++++++++
+ gcc/tree-ssa-sccvn.cc                   | 10 ++++--
+ 2 files changed, 55 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/torture/pr106922.C
+
+diff --git a/gcc/testsuite/g++.dg/torture/pr106922.C b/gcc/testsuite/g++.dg/torture/pr106922.C
+new file mode 100644
+index 00000000000..046fc6cce76
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/torture/pr106922.C
+@@ -0,0 +1,48 @@
++// { dg-do compile }
++// { dg-require-effective-target c++17 }
++// { dg-additional-options "-Wall" }
++// -O1 doesn't iterate VN and thus has bogus uninit diagnostics
++// { dg-skip-if "" { *-*-* } { "-O1" } { "" } }
++
++#include <vector>
++
++#include <optional>
++template <class T>
++using Optional = std::optional<T>;
++
++#include <sstream>
++
++struct MyOptionalStructWithInt {
++    int myint; /* works without this */
++    Optional<std::vector<std::string>> myoptional;
++};
++
++struct MyOptionalsStruct {
++    MyOptionalStructWithInt external1;
++    MyOptionalStructWithInt external2;
++};
++
++struct MyStruct { };
++std::ostream &operator << (std::ostream &os, const MyStruct &myStruct);
++
++std::vector<MyStruct> getMyStructs();
++
++void test()
++{
++    MyOptionalsStruct externals;
++    MyOptionalStructWithInt internal1;
++    MyOptionalStructWithInt internal2;
++
++    std::vector<MyStruct> myStructs;
++    myStructs = getMyStructs();
++
++    for (const auto& myStruct : myStructs)
++    {
++        std::stringstream address_stream;
++        address_stream << myStruct;
++        internal1.myint = internal2.myint = 0;
++        externals.external1 = internal1;
++        externals.external2 = internal2;
++        externals.external2 = internal2;
++    }
++}
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index cfacf609f43..854c0c25bc7 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -2671,7 +2671,6 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
+       if (is_gimple_reg_type (TREE_TYPE (lhs))
+ 	  && types_compatible_p (TREE_TYPE (lhs), vr->type)
+ 	  && (ref->ref || data->orig_ref.ref)
+-	  && !data->same_val
+ 	  && !data->mask
+ 	  && data->partial_defs.is_empty ()
+ 	  && multiple_p (get_object_alignment
+@@ -2684,8 +2683,13 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
+ 	     a different loop iteration but only to loop invariants.  Use
+ 	     CONSTANT_CLASS_P (unvalueized!) as conservative approximation.
+ 	     The one-hop lookup below doesn't have this issue since there's
+-	     a virtual PHI before we ever reach a backedge to cross.  */
+-	  if (CONSTANT_CLASS_P (rhs))
++	     a virtual PHI before we ever reach a backedge to cross.
++	     We can skip multiple defs as long as they are from the same
++	     value though.  */
++	  if (data->same_val
++	      && !operand_equal_p (data->same_val, rhs))
++	    ;
++	  else if (CONSTANT_CLASS_P (rhs))
+ 	    {
+ 	      if (dump_file && (dump_flags & TDF_DETAILS))
+ 		{
+-- 
+2.25.1
+

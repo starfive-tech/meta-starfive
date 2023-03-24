@@ -1,0 +1,92 @@
+From 690512f25c8f0434ec3193bbf79160d2a2bda98f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 15 Feb 2023 00:21:42 +0000
+Subject: [PATCH 477/547] Daily bump.
+
+---
+ gcc/ChangeLog           |  4 ++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        |  8 ++++++++
+ gcc/testsuite/ChangeLog | 12 ++++++++++++
+ libstdc++-v3/ChangeLog  | 13 +++++++++++++
+ 5 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index c3bccd0dcfe..35b116f569a 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,7 @@
++2023-02-14  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gimplify.cc (gimplify_save_expr): Add missing guard.
++
+ 2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index fe9ab157aec..79267617449 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230214
++20230215
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 77b64d7f032..c31bb9f5caa 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-15  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-15  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/106675
++	* call.cc (joust_maybe_elide_copy): Return false for ck_ambig.
++
+ 2023-02-10  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index a6032971c95..b2ea440de92 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,15 @@
++2023-02-15  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-15  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/106675
++	* g++.dg/cpp0x/overload-conv-5.C: New test.
++
++2023-02-14  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/shift2.adb: New test.
++
+ 2023-02-13  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index d1af612ff7e..70477201021 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,16 @@
++2023-02-14  Thomas W Rodgers  <rodgert@twrodgers.com>
++
++	Backported from master:
++	2023-02-14  Thomas W Rodgers  <rodgert@twrodgers.com>
++
++	PR libstdc++/103934
++	* include/std/atomic (atomic_flag_test): Add.
++	(atomic_flag_test_explicit): Add.
++	* testsuite/29_atomics/atomic_flag/test/explicit.cc: Add
++	test case to cover missing atomic_flag free functions.
++	* testsuite/29_atomics/atomic_flag/test/implicit.cc:
++	Likewise.
++
+ 2023-02-10  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

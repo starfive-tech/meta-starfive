@@ -1,0 +1,311 @@
+From 35ad6ec3bb6ea6ef369c2d851b52e156420046a4 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 16 Dec 2022 16:07:29 +0000
+Subject: [PATCH 306/547] libstdc++: Fixes for std::expected
+
+This fixes some bugs in the swap functions for std::expected.
+
+It also disables the noexcept-specifiers for equality operators, because
+those are problematic when querying whether a std::expected is equality
+comparable. The operator==(const expected<T,E>&, const U&) function is
+not constrained, so is viable for comparing expected<T,E> with
+expected<void,G>, but then we get an error from the noexcept-specifier.
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/expected (expected::_M_swap_val_unex): Guard the
+	correct object.
+	(expected::swap): Move is_swappable
+	requirement from static_assert to constraint.
+	(swap): Likewise.
+	(operator==): Remove noexcept-specifier.
+	* testsuite/20_util/expected/swap.cc: Check swapping of
+	types without non-throwing move constructor. Check constraints
+	on swap.
+	* testsuite/20_util/expected/unexpected.cc: Check constraints on
+	swap.
+	* testsuite/20_util/expected/equality.cc: New test.
+
+(cherry picked from commit 59822c39207c9e8be576e9d6c3370bd85ddaf886)
+---
+ libstdc++-v3/include/std/expected             | 21 ++---
+ .../testsuite/20_util/expected/equality.cc    | 49 ++++++++++
+ .../testsuite/20_util/expected/swap.cc        | 92 ++++++++++++++++++-
+ .../testsuite/20_util/expected/unexpected.cc  |  4 +
+ 4 files changed, 152 insertions(+), 14 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/20_util/expected/equality.cc
+
+diff --git a/libstdc++-v3/include/std/expected b/libstdc++-v3/include/std/expected
+index e491ce41591..2fe25a90d2d 100644
+--- a/libstdc++-v3/include/std/expected
++++ b/libstdc++-v3/include/std/expected
+@@ -217,8 +217,8 @@ namespace __expected
+ 
+       constexpr void
+       swap(unexpected& __other) noexcept(is_nothrow_swappable_v<_Er>)
++      requires is_swappable_v<_Er>
+       {
+-	static_assert( is_swappable_v<_Er> );
+ 	using std::swap;
+ 	swap(_M_unex, __other._M_unex);
+       }
+@@ -230,9 +230,8 @@ namespace __expected
+ 	{ return __x._M_unex == __y.error(); }
+ 
+       friend constexpr void
+-      swap(unexpected& __x, unexpected& __y)
+-      noexcept(noexcept(__x.swap(__y)))
+-      requires requires {__x.swap(__y);}
++      swap(unexpected& __x, unexpected& __y) noexcept(noexcept(__x.swap(__y)))
++      requires is_swappable_v<_Er>
+       { __x.swap(__y); }
+ 
+     private:
+@@ -798,8 +797,8 @@ namespace __expected
+ 	requires (!is_void_v<_Up>)
+ 	friend constexpr bool
+ 	operator==(const expected& __x, const expected<_Up, _Er2>& __y)
+-	noexcept(noexcept(bool(*__x == *__y))
+-		  && noexcept(bool(__x.error() == __y.error())))
++	// FIXME: noexcept(noexcept(bool(*__x == *__y))
++		  // && noexcept(bool(__x.error() == __y.error())))
+ 	{
+ 	  if (__x.has_value())
+ 	    return __y.has_value() && bool(*__x == *__y);
+@@ -810,13 +809,13 @@ namespace __expected
+       template<typename _Up>
+ 	friend constexpr bool
+ 	operator==(const expected& __x, const _Up& __v)
+-	noexcept(noexcept(bool(*__x == __v)))
++	// FIXME: noexcept(noexcept(bool(*__x == __v)))
+ 	{ return __x.has_value() && bool(*__x == __v); }
+ 
+       template<typename _Er2>
+ 	friend constexpr bool
+ 	operator==(const expected& __x, const unexpected<_Er2>& __e)
+-	noexcept(noexcept(bool(__x.error() == __e.error())))
++	// FIXME: noexcept(noexcept(bool(__x.error() == __e.error())))
+ 	{ return !__x.has_value() && bool(__x.error() == __e.error()); }
+ 
+       friend constexpr void
+@@ -878,7 +877,7 @@ namespace __expected
+ 	  }
+ 	else
+ 	  {
+-	    __expected::_Guard<_Tp> __guard(__rhs._M_val);
++	    __expected::_Guard<_Tp> __guard(_M_val);
+ 	    std::construct_at(__builtin_addressof(_M_unex),
+ 			      std::move(__rhs._M_unex)); // might throw
+ 	    _M_has_value = false;
+@@ -1187,7 +1186,7 @@ namespace __expected
+ 	requires is_void_v<_Up>
+ 	friend constexpr bool
+ 	operator==(const expected& __x, const expected<_Up, _Er2>& __y)
+-	noexcept(noexcept(bool(__x.error() == __y.error())))
++	// FIXME: noexcept(noexcept(bool(__x.error() == __y.error())))
+ 	{
+ 	  if (__x.has_value())
+ 	    return __y.has_value();
+@@ -1198,7 +1197,7 @@ namespace __expected
+       template<typename _Er2>
+ 	friend constexpr bool
+ 	operator==(const expected& __x, const unexpected<_Er2>& __e)
+-	noexcept(noexcept(bool(__x.error() == __e.error())))
++	// FIXME: noexcept(noexcept(bool(__x.error() == __e.error())))
+ 	{ return !__x.has_value() && bool(__x.error() == __e.error()); }
+ 
+       friend constexpr void
+diff --git a/libstdc++-v3/testsuite/20_util/expected/equality.cc b/libstdc++-v3/testsuite/20_util/expected/equality.cc
+new file mode 100644
+index 00000000000..1862719e73d
+--- /dev/null
++++ b/libstdc++-v3/testsuite/20_util/expected/equality.cc
+@@ -0,0 +1,49 @@
++// { dg-options "-std=gnu++23" }
++// { dg-do compile { target c++23 } }
++
++#include <expected>
++#include <testsuite_hooks.h>
++
++template<typename T, typename U>
++concept Eq = requires(T t, U u) { t == u; };
++
++static_assert(Eq<std::expected<int, long>, std::expected<short, unsigned>>);
++static_assert(Eq<std::expected<void, long>, std::expected<void, unsigned>>);
++// static_assert(!Eq<std::expected<void, long>, std::expected<short, unsigned>>);
++static_assert(Eq<std::expected<int, long>, short>);
++static_assert(!Eq<std::expected<void, long>, short>);
++static_assert(Eq<std::expected<int, long>, std::unexpected<short>>);
++static_assert(Eq<std::expected<void, long>, std::unexpected<short>>);
++
++struct NotEqCmp
++{
++  constexpr bool operator==(int) const { return true; }
++  bool operator==(NotEqCmp) const = delete;
++};
++
++constexpr bool
++test_eq()
++{
++  std::expected<NotEqCmp, int> e1;
++  VERIFY(e1 == 1);
++  std::expected<int, int> e2;
++  VERIFY(e2 == e2);
++  VERIFY(e1 == e2);
++  VERIFY(e1 != std::unexpected<int>(1));
++  e1 = std::unexpected<int>(1);
++  VERIFY(e1 == std::unexpected<int>(1));
++  VERIFY(e1 != std::unexpected<int>(2));
++  VERIFY(e1 != e2);
++
++  std::expected<void, int> e3;
++  VERIFY(e3 == e3);
++  VERIFY(e3 != std::unexpected<int>(1));
++  e3 = std::unexpected<int>(1);
++  VERIFY(e3 == e3);
++  VERIFY(e3 == std::unexpected<int>(1));
++  VERIFY(e3 != std::unexpected<int>(2));
++
++  return true;
++}
++
++static_assert( test_eq() );
+diff --git a/libstdc++-v3/testsuite/20_util/expected/swap.cc b/libstdc++-v3/testsuite/20_util/expected/swap.cc
+index 745db65fc6c..08a110da47c 100644
+--- a/libstdc++-v3/testsuite/20_util/expected/swap.cc
++++ b/libstdc++-v3/testsuite/20_util/expected/swap.cc
+@@ -4,8 +4,18 @@
+ #include <expected>
+ #include <testsuite_hooks.h>
+ 
++struct NonTrivial
++{
++  constexpr NonTrivial(int i) : i(i) { }
++  constexpr NonTrivial(const NonTrivial& x) noexcept(false): i(x.i) { }
++  constexpr ~NonTrivial() { }
++  int i;
++
++  constexpr bool operator==(const NonTrivial&) const = default;
++};
++
+ constexpr bool
+-test_swap()
++test_swap_obj()
+ {
+   std::expected<int, int> e1(1), e2(2);
+   std::expected<int, int> e3(std::unexpect, 3), e4(std::unexpect, 4);
+@@ -27,6 +37,52 @@ test_swap()
+   VERIFY( e3.error() == 4 );
+   VERIFY( e4.error() == 3 );
+ 
++  std::expected<int, NonTrivial> e5(1), e6(2);
++  std::expected<int, NonTrivial> e7(std::unexpect, 3), e8(std::unexpect, 4);
++
++  swap(e5, e6);
++  VERIFY( e5.value() == 2 );
++  VERIFY( e6.value() == 1 );
++  swap(e5, e7);
++  VERIFY( ! e5.has_value() );
++  VERIFY( e5.error() == 3 );
++  VERIFY( e7.value() == 2 );
++  swap(e5, e7);
++  VERIFY( ! e7.has_value() );
++  VERIFY( e5.value() == 2 );
++  VERIFY( e7.error() == 3 );
++  swap(e7, e8);
++  VERIFY( ! e7.has_value() );
++  VERIFY( ! e8.has_value() );
++  VERIFY( e7.error() == 4 );
++  VERIFY( e8.error() == 3 );
++
++  std::expected<NonTrivial, int> e9(1), e10(2);
++  std::expected<NonTrivial, int> e11(std::unexpect, 3), e12(std::unexpect, 4);
++
++  swap(e9, e10);
++  VERIFY( e9.value() == 2 );
++  VERIFY( e10.value() == 1 );
++  swap(e9, e11);
++  VERIFY( ! e9.has_value() );
++  VERIFY( e9.error() == 3 );
++  VERIFY( e11.value() == 2 );
++  swap(e9, e11);
++  VERIFY( ! e11.has_value() );
++  VERIFY( e9.value() == 2 );
++  VERIFY( e11.error() == 3 );
++  swap(e11, e12);
++  VERIFY( ! e11.has_value() );
++  VERIFY( ! e12.has_value() );
++  VERIFY( e11.error() == 4 );
++  VERIFY( e12.error() == 3 );
++
++  return true;
++}
++
++constexpr bool
++test_swap_void()
++{
+   std::expected<void, int> v1, v2;
+   std::expected<void, int> v3(std::unexpect, 3), v4(std::unexpect, 4);
+ 
+@@ -47,11 +103,41 @@ test_swap()
+   VERIFY( v3.error() == 4 );
+   VERIFY( v4.error() == 3 );
+ 
++  std::expected<void, NonTrivial> v5, v6;
++  std::expected<void, NonTrivial> v7(std::unexpect, 3), v8(std::unexpect, 4);
++
++  swap(v5, v6);
++  VERIFY( v5.has_value() );
++  VERIFY( v6.has_value() );
++  swap(v5, v7);
++  VERIFY( ! v5.has_value() );
++  VERIFY( v5.error() == 3 );
++  VERIFY( v7.has_value() );
++  swap(v5, v7);
++  VERIFY( ! v7.has_value() );
++  VERIFY( v5.has_value() );
++  VERIFY( v7.error() == 3 );
++  swap(v7, v8);
++  VERIFY( ! v7.has_value() );
++  VERIFY( ! v8.has_value() );
++  VERIFY( v7.error() == 4 );
++  VERIFY( v8.error() == 3 );
++
+   return true;
+ }
+ 
++static_assert( std::is_swappable_v<std::expected<int, int>> );
++static_assert( std::is_swappable_v<std::expected<void, int>> );
++
++struct A { A& operator=(A&&) = delete; };
++static_assert( ! std::is_swappable_v<std::expected<A, int>> );
++static_assert( ! std::is_swappable_v<std::expected<int, A>> );
++static_assert( ! std::is_swappable_v<std::expected<void, A>> );
++
+ int main()
+ {
+-  static_assert( test_swap() );
+-  test_swap();
++  static_assert( test_swap_obj() );
++  test_swap_obj();
++  static_assert( test_swap_void() );
++  test_swap_void();
+ }
+diff --git a/libstdc++-v3/testsuite/20_util/expected/unexpected.cc b/libstdc++-v3/testsuite/20_util/expected/unexpected.cc
+index d4cbeadf674..050f8e3e81f 100644
+--- a/libstdc++-v3/testsuite/20_util/expected/unexpected.cc
++++ b/libstdc++-v3/testsuite/20_util/expected/unexpected.cc
+@@ -73,6 +73,10 @@ test()
+   return true;
+ }
+ 
++static_assert( std::is_swappable_v<std::unexpected<int>> );
++struct A { A& operator=(A&&) = delete; };
++static_assert( ! std::is_swappable_v<std::unexpected<A>> );
++
+ int main()
+ {
+   static_assert( test() );
+-- 
+2.25.1
+

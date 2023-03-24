@@ -1,0 +1,76 @@
+From 792ce47e3600d56d5c83c516372a7ee08d1d2d60 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 15 Nov 2022 08:17:11 +0100
+Subject: [PATCH 223/547] c++: Fix a typo in function name
+
+I've noticed I've made a typo in the name of the function.
+Fixed thusly.
+
+2022-11-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* cp-tree.h (next_common_initial_seqence): Rename to ...
+	(next_common_initial_sequence): ... this.
+	* typeck.cc (next_common_initial_seqence): Rename to ...
+	(next_common_initial_sequence): ... this.
+	(layout_compatible_type_p): Call next_common_initial_sequence
+	rather than next_common_initial_seqence.
+	* semantics.cc (is_corresponding_member_aggr): Likewise.
+
+(cherry picked from commit 87c4057b3fc7fe2c2f8914d2755024ca890a3bc1)
+---
+ gcc/cp/cp-tree.h    | 2 +-
+ gcc/cp/semantics.cc | 2 +-
+ gcc/cp/typeck.cc    | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index 72f4398a8f9..cb434af789d 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -7957,7 +7957,7 @@ extern bool comp_except_specs			(const_tree, const_tree, int);
+ extern bool comptypes				(tree, tree, int);
+ extern bool same_type_ignoring_top_level_qualifiers_p (tree, tree);
+ extern bool similar_type_p			(tree, tree);
+-extern bool next_common_initial_seqence		(tree &, tree &);
++extern bool next_common_initial_sequence	(tree &, tree &);
+ extern bool layout_compatible_type_p		(tree, tree);
+ extern bool compparms				(const_tree, const_tree);
+ extern int comp_cv_qualification		(const_tree, const_tree);
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index a158d626ac1..de755904d50 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -11600,7 +11600,7 @@ is_corresponding_member_aggr (location_t loc, tree basetype1, tree membertype1,
+   tree ret = boolean_false_node;
+   while (1)
+     {
+-      bool r = next_common_initial_seqence (field1, field2);
++      bool r = next_common_initial_sequence (field1, field2);
+       if (field1 == NULL_TREE || field2 == NULL_TREE)
+ 	break;
+       if (r
+diff --git a/gcc/cp/typeck.cc b/gcc/cp/typeck.cc
+index 341869fc550..b2ffde34dde 100644
+--- a/gcc/cp/typeck.cc
++++ b/gcc/cp/typeck.cc
+@@ -1627,7 +1627,7 @@ similar_type_p (tree type1, tree type2)
+    the common initial sequence.  */
+ 
+ bool
+-next_common_initial_seqence (tree &memb1, tree &memb2)
++next_common_initial_sequence (tree &memb1, tree &memb2)
+ {
+   while (memb1)
+     {
+@@ -1719,7 +1719,7 @@ layout_compatible_type_p (tree type1, tree type2)
+ 	{
+ 	  while (1)
+ 	    {
+-	      if (!next_common_initial_seqence (field1, field2))
++	      if (!next_common_initial_sequence (field1, field2))
+ 		return false;
+ 	      if (field1 == NULL_TREE)
+ 		return true;
+-- 
+2.25.1
+

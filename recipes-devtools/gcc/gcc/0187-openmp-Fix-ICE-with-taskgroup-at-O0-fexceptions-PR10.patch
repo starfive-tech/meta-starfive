@@ -1,0 +1,125 @@
+From c8dc6b06daf910b758bb964116ada2c5070de764 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 24 Sep 2022 09:24:26 +0200
+Subject: [PATCH 187/547] openmp: Fix ICE with taskgroup at -O0 -fexceptions
+ [PR107001]
+
+The following testcase ICEs because with -O0 -fexceptions GOMP_taskgroup_end
+call isn't directly followed by GOMP_RETURN statement, but there are some
+conditionals to handle exceptions and we fail to find the correct GOMP_RETURN.
+
+The fix is to treat taskgroup similarly to target data, both of these constructs
+emit a try { body } finally { end_call } around the construct's body during
+gimplification and we need to see proper construct nesting during gimplification
+and omp lowering (including nesting of regions checks), but during omp expansion
+we don't really need their nesting anymore, all we need is emit something at
+the start of the region and the end of the region is the end API call we've
+already emitted during gimplification.  For target data, we weren't adding
+GOMP_RETURN statement during omp lowering, so after that pass it is treated
+merely like stand-alone omp directives.  This patch does the same for
+taskgroup too.
+
+2022-09-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107001
+	* omp-low.cc (lower_omp_taskgroup): Don't add GOMP_RETURN statement
+	at the end.
+	* omp-expand.cc (build_omp_regions_1): Clarify GF_OMP_TARGET_KIND_DATA
+	is not stand-alone directive.  For GIMPLE_OMP_TASKGROUP, also don't
+	update parent.
+	(omp_make_gimple_edges) <case GIMPLE_OMP_TASKGROUP>: Reset
+	cur_region back after new_omp_region.
+
+	* c-c++-common/gomp/pr107001.c: New test.
+
+(cherry picked from commit ad2aab5c816a6fd56b46210c0a4a4c6243da1de9)
+---
+ gcc/omp-expand.cc                          | 17 +++++++++++++++--
+ gcc/omp-low.cc                             |  1 -
+ gcc/testsuite/c-c++-common/gomp/pr107001.c | 14 ++++++++++++++
+ 3 files changed, 29 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/gomp/pr107001.c
+
+diff --git a/gcc/omp-expand.cc b/gcc/omp-expand.cc
+index 19d04a0d959..bb019ea3a18 100644
+--- a/gcc/omp-expand.cc
++++ b/gcc/omp-expand.cc
+@@ -10465,7 +10465,10 @@ build_omp_regions_1 (basic_block bb, struct omp_region *parent,
+ 		case GF_OMP_TARGET_KIND_OACC_ENTER_DATA:
+ 		case GF_OMP_TARGET_KIND_OACC_EXIT_DATA:
+ 		case GF_OMP_TARGET_KIND_OACC_DECLARE:
+-		  /* ..., other than for those stand-alone directives...  */
++		  /* ..., other than for those stand-alone directives...
++		     To be precise, target data isn't stand-alone, but
++		     gimplifier put the end API call into try finally block
++		     for it, so omp expansion can treat it as such.  */
+ 		  region = NULL;
+ 		  break;
+ 		default:
+@@ -10483,6 +10486,11 @@ build_omp_regions_1 (basic_block bb, struct omp_region *parent,
+ 		   && gimple_omp_task_taskwait_p (stmt))
+ 	    /* #pragma omp taskwait depend(...) is a stand-alone directive.  */
+ 	    region = NULL;
++	  else if (code == GIMPLE_OMP_TASKGROUP)
++	    /* #pragma omp taskgroup isn't a stand-alone directive, but
++	       gimplifier put the end API call into try finall block
++	       for it, so omp expansion can treat it as such.  */
++	    region = NULL;
+ 	  /* ..., this directive becomes the parent for a new region.  */
+ 	  if (region)
+ 	    parent = region;
+@@ -10679,13 +10687,18 @@ omp_make_gimple_edges (basic_block bb, struct omp_region **region,
+     case GIMPLE_OMP_MASTER:
+     case GIMPLE_OMP_MASKED:
+     case GIMPLE_OMP_SCOPE:
+-    case GIMPLE_OMP_TASKGROUP:
+     case GIMPLE_OMP_CRITICAL:
+     case GIMPLE_OMP_SECTION:
+       cur_region = new_omp_region (bb, code, cur_region);
+       fallthru = true;
+       break;
+ 
++    case GIMPLE_OMP_TASKGROUP:
++      cur_region = new_omp_region (bb, code, cur_region);
++      fallthru = true;
++      cur_region = cur_region->outer;
++      break;
++
+     case GIMPLE_OMP_TASK:
+       cur_region = new_omp_region (bb, code, cur_region);
+       fallthru = true;
+diff --git a/gcc/omp-low.cc b/gcc/omp-low.cc
+index a59996e2f13..06d13a2a7c2 100644
+--- a/gcc/omp-low.cc
++++ b/gcc/omp-low.cc
+@@ -9677,7 +9677,6 @@ lower_omp_taskgroup (gimple_stmt_iterator *gsi_p, omp_context *ctx)
+   gimple_bind_add_seq (bind, gimple_omp_body (stmt));
+   gimple_omp_set_body (stmt, NULL);
+ 
+-  gimple_bind_add_stmt (bind, gimple_build_omp_return (true));
+   gimple_bind_add_seq (bind, dseq);
+ 
+   pop_gimplify_context (bind);
+diff --git a/gcc/testsuite/c-c++-common/gomp/pr107001.c b/gcc/testsuite/c-c++-common/gomp/pr107001.c
+new file mode 100644
+index 00000000000..9c19d9b8745
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/gomp/pr107001.c
+@@ -0,0 +1,14 @@
++/* PR c/107001 */
++/* { dg-do compile } */
++/* { dg-options "-O0 -fopenmp -fexceptions" } */
++/* { dg-require-effective-target exceptions } */
++
++void bar (void);
++void foo (void)
++{
++  #pragma omp taskgroup
++  {
++    #pragma omp taskgroup
++    bar ();
++  }
++}
+-- 
+2.25.1
+

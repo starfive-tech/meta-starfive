@@ -1,0 +1,176 @@
+From d6419c18056ae27741e961cd2dab9d120bfe746a Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Sat, 4 Mar 2023 13:14:01 -0500
+Subject: [PATCH 521/547] c++: variable template and targ deduction [PR108550]
+
+In this test, we get a bogus error because we failed to deduce the auto in
+constexpr auto is_pointer_v = is_pointer<Tp>::value;
+to bool.  Then ensure_literal_type_for_constexpr_object thinks the object
+isn't literal and an error is reported.
+
+This is another case of the interaction between tf_partial and 'auto',
+where the auto was not reduced so the deduction failed.  In more detail:
+we have
+
+  Wrap1<int>()
+
+in the code and we need to perform OR -> fn_type_unification.  The targ
+list is incomplete, so we do
+      tsubst_flags_t ecomplain = complain | tf_partial | tf_fndecl_type;
+      fntype = tsubst (TREE_TYPE (fn), explicit_targs, ecomplain, NULL_TREE);
+where TREE_TYPE (fn) is struct integral_constant <T402> (void).  Then
+we substitute the return type, which results in tsubsting is_pointer_v<int>.
+is_pointer_v is a variable template with a placeholder type:
+
+  template <class Tp>
+  constexpr auto is_pointer_v = is_pointer<Tp>::value;
+
+so we find ourselves in lookup_and_finish_template_variable.  tf_partial is
+still set, so finish_template_variable -> instantiate_template -> tsubst
+won't reduce the level of auto.  But then we do mark_used which eventually
+calls do_auto_deduction which clears tf_partial, because we want to replace
+the auto now.  But we hadn't reduced auto's level so this fails.  And
+since we're not in an immediate context, we emit a hard error.
+
+I suppose that when we reach lookup_and_finish_template_variable it's
+probably time to clear tf_partial.  (I added an assert and our testsuite
+doesn't have a test whereby we get to lookup_and_finish_template_variable
+while tf_partial is still active.)
+
+	PR c++/108550
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (lookup_and_finish_template_variable): Clear tf_partial.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1y/var-templ70.C: New test.
+	* g++.dg/cpp1y/var-templ71.C: New test.
+	* g++.dg/cpp1y/var-templ72.C: New test.
+---
+ gcc/cp/pt.cc                             |  6 ++++++
+ gcc/testsuite/g++.dg/cpp1y/var-templ70.C | 25 ++++++++++++++++++++++
+ gcc/testsuite/g++.dg/cpp1y/var-templ71.C | 26 +++++++++++++++++++++++
+ gcc/testsuite/g++.dg/cpp1y/var-templ72.C | 27 ++++++++++++++++++++++++
+ 4 files changed, 84 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ70.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ71.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ72.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 10aa88f5518..19dd181c62a 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -10420,6 +10420,12 @@ lookup_and_finish_template_variable (tree templ, tree targs,
+   templ = lookup_template_variable (templ, targs);
+   if (!any_dependent_template_arguments_p (targs))
+     {
++      /* We may be called while doing a partial substitution, but the
++	 type of the variable template may be auto, in which case we
++	 will call do_auto_deduction in mark_used (which clears tf_partial)
++	 and the auto must be properly reduced at that time for the
++	 deduction to work.  */
++      complain &= ~tf_partial;
+       templ = finish_template_variable (templ, complain);
+       mark_used (templ);
+     }
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ70.C b/gcc/testsuite/g++.dg/cpp1y/var-templ70.C
+new file mode 100644
+index 00000000000..1d35c38c7cc
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ70.C
+@@ -0,0 +1,25 @@
++// PR c++/108550
++// { dg-do compile { target c++14 } }
++
++template<class T>
++struct is_pointer
++{
++  static constexpr bool value = false;
++};
++
++template<class T, T T1>
++struct integral_constant
++{
++  static constexpr T value = T1;
++};
++
++
++template <class Tp>
++constexpr auto is_pointer_v = is_pointer<Tp>::value;
++
++template <class Tp, int = 0>
++integral_constant<bool, is_pointer_v<int>> Wrap1();
++
++int main() {
++  static_assert(!decltype(Wrap1<int>())::value, "");
++}
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ71.C b/gcc/testsuite/g++.dg/cpp1y/var-templ71.C
+new file mode 100644
+index 00000000000..e0cf55230d9
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ71.C
+@@ -0,0 +1,26 @@
++// PR c++/108550
++// { dg-do compile { target c++14 } }
++
++template<class T, T T1>
++struct integral_constant
++{
++  static constexpr T value = T1;
++};
++
++template <typename T>
++struct S {
++  template <typename U, typename V>
++  static constexpr void foo(V) { }
++
++  constexpr bool bar () const { foo<int>(10); return false; }
++};
++
++template <class Tp>
++constexpr auto is_pointer_v = S<Tp>{}.bar();
++
++template <class Tp, int = 0>
++integral_constant<bool, is_pointer_v<int>> Wrap1();
++
++int main() {
++  static_assert(!decltype(Wrap1<int>())::value, "");
++}
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ72.C b/gcc/testsuite/g++.dg/cpp1y/var-templ72.C
+new file mode 100644
+index 00000000000..7426bad4a6c
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ72.C
+@@ -0,0 +1,27 @@
++// PR c++/108550
++// { dg-do compile { target c++14 } }
++
++template<class T>
++struct is_pointer
++{
++  static constexpr bool value = false;
++};
++
++template<class T, T T1>
++struct integral_constant
++{
++  static constexpr T value = T1;
++};
++
++template<typename T>
++using PTR_P = is_pointer<T>;
++
++template <class Tp>
++constexpr auto is_pointer_v = PTR_P<Tp>::value;
++
++template <class Tp, int = 0>
++integral_constant<bool, is_pointer_v<Tp>> Wrap1();
++
++int main() {
++  static_assert(!decltype(Wrap1<int>())::value, "");
++}
+-- 
+2.25.1
+

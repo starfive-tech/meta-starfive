@@ -1,0 +1,157 @@
+From 33561e870dc48966e8c7ede46e95032279a15423 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Fri, 4 Nov 2022 11:23:12 +0100
+Subject: [PATCH 194/547] Fix recent thinko in operand_equal_p
+
+There is a thinko in a recent improvement made to operand_equal_p where
+the code just looks at operand 2 of COMPONENT_REF, if it is present, to
+compare addresses.  That's wrong because operand 2 contains the number of
+DECL_OFFSET_ALIGN-bit-sized words so, when DECL_OFFSET_ALIGN > 8, not all
+the  bytes are included and some of them are in DECL_FIELD_BIT_OFFSET, see
+get_inner_reference for the model computation.
+
+In other words, you would need to compare operand 2 and DECL_OFFSET_ALIGN
+and DECL_FIELD_BIT_OFFSET in this situation, but I'm not sure this is worth
+the hassle in practice so the fix just removes this alternate handling.
+
+gcc/
+	* fold-const.cc (operand_compare::operand_equal_p) <COMPONENT_REF>:
+	Do not take into account operand 2.
+	(operand_compare::hash_operand) <COMPONENT_REF>: Likewise.
+
+gcc/testsuite/
+	* gnat.dg/opt99.adb: New test.
+	* gnat.dg/opt99_pkg1.ads, gnat.dg/opt99_pkg1.adb: New helper.
+	* gnat.dg/opt99_pkg2.ads: Likewise.
+---
+ gcc/fold-const.cc                    | 18 ++++--------------
+ gcc/testsuite/gnat.dg/opt99.adb      | 15 +++++++++++++++
+ gcc/testsuite/gnat.dg/opt99_pkg1.adb | 10 ++++++++++
+ gcc/testsuite/gnat.dg/opt99_pkg1.ads | 19 +++++++++++++++++++
+ gcc/testsuite/gnat.dg/opt99_pkg2.ads | 13 +++++++++++++
+ 5 files changed, 61 insertions(+), 14 deletions(-)
+ create mode 100644 gcc/testsuite/gnat.dg/opt99.adb
+ create mode 100644 gcc/testsuite/gnat.dg/opt99_pkg1.adb
+ create mode 100644 gcc/testsuite/gnat.dg/opt99_pkg1.ads
+ create mode 100644 gcc/testsuite/gnat.dg/opt99_pkg2.ads
+
+diff --git a/gcc/fold-const.cc b/gcc/fold-const.cc
+index 948e13a22d8..eec4c1820ed 100644
+--- a/gcc/fold-const.cc
++++ b/gcc/fold-const.cc
+@@ -3351,9 +3351,6 @@ operand_compare::operand_equal_p (const_tree arg0, const_tree arg1,
+ 		if (compare_address
+ 		    && (flags & OEP_ADDRESS_OF_SAME_FIELD) == 0)
+ 		  {
+-		    if (TREE_OPERAND (arg0, 2)
+-			|| TREE_OPERAND (arg1, 2))
+-		      return OP_SAME_WITH_NULL (2);
+ 		    tree field0 = TREE_OPERAND (arg0, 1);
+ 		    tree field1 = TREE_OPERAND (arg1, 1);
+ 
+@@ -3864,17 +3861,10 @@ operand_compare::hash_operand (const_tree t, inchash::hash &hstate,
+ 	      if (sflags & OEP_ADDRESS_OF)
+ 		{
+ 		  hash_operand (TREE_OPERAND (t, 0), hstate, flags);
+-		  if (TREE_OPERAND (t, 2))
+-		    hash_operand (TREE_OPERAND (t, 2), hstate,
+-				  flags & ~OEP_ADDRESS_OF);
+-		  else
+-		    {
+-		      tree field = TREE_OPERAND (t, 1);
+-		      hash_operand (DECL_FIELD_OFFSET (field),
+-				    hstate, flags & ~OEP_ADDRESS_OF);
+-		      hash_operand (DECL_FIELD_BIT_OFFSET (field),
+-				    hstate, flags & ~OEP_ADDRESS_OF);
+-		    }
++		  hash_operand (DECL_FIELD_OFFSET (TREE_OPERAND (t, 1)),
++				hstate, flags & ~OEP_ADDRESS_OF);
++		  hash_operand (DECL_FIELD_BIT_OFFSET (TREE_OPERAND (t, 1)),
++				hstate, flags & ~OEP_ADDRESS_OF);
+ 		  return;
+ 		}
+ 	      break;
+diff --git a/gcc/testsuite/gnat.dg/opt99.adb b/gcc/testsuite/gnat.dg/opt99.adb
+new file mode 100644
+index 00000000000..8805d47c122
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt99.adb
+@@ -0,0 +1,15 @@
++-- { dg-do run }
++-- { dg-options "-O" }
++
++with Opt99_Pkg1; use Opt99_Pkg1;
++
++procedure Opt99 is
++  C : constant My_Character := (D => True, C => ' ');
++  D : Derived;
++
++begin
++  Set (D, C, C);
++  if not D.C2.D then
++    raise Program_Error;
++  end if;
++end;
+diff --git a/gcc/testsuite/gnat.dg/opt99_pkg1.adb b/gcc/testsuite/gnat.dg/opt99_pkg1.adb
+new file mode 100644
+index 00000000000..476b09c9524
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt99_pkg1.adb
+@@ -0,0 +1,10 @@
++package body Opt99_Pkg1 is
++
++  procedure Set (D: in out Derived; C1, C2 : My_Character) is
++  begin
++    D.I  := 0;
++    D.C1 := C1;
++    D.C2 := C2;
++  end;
++
++end Opt99_Pkg1;
+diff --git a/gcc/testsuite/gnat.dg/opt99_pkg1.ads b/gcc/testsuite/gnat.dg/opt99_pkg1.ads
+new file mode 100644
+index 00000000000..3e265616d14
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt99_pkg1.ads
+@@ -0,0 +1,19 @@
++with Opt99_Pkg2;
++
++package Opt99_Pkg1 is
++
++  type My_Character (D : Boolean := False) is record
++    case D is
++      when False => null;
++      when True  => C : Character;
++    end case;
++  end record;
++
++  type Derived is new Opt99_Pkg2.Root with record
++    I : Integer;
++    C1, C2 : My_Character;
++  end record;
++
++  procedure Set (D: in out Derived; C1, C2 : My_Character);
++
++end Opt99_Pkg1;
+diff --git a/gcc/testsuite/gnat.dg/opt99_pkg2.ads b/gcc/testsuite/gnat.dg/opt99_pkg2.ads
+new file mode 100644
+index 00000000000..09aaff14e01
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt99_pkg2.ads
+@@ -0,0 +1,13 @@
++package Opt99_Pkg2 is
++
++  function Get_Max return Positive is (4);
++
++  C : constant Positive := Get_Max;
++
++  type Arr is array (1 .. C) of Integer;
++
++  type Root is tagged record
++    Data : Arr;
++  end record;
++
++end Opt99_Pkg2;
+-- 
+2.25.1
+

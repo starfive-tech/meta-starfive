@@ -1,0 +1,111 @@
+From 463bf7cfb0b03d9e75754ea8ba89c61186d0982f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 11 Jan 2023 10:40:54 +0100
+Subject: [PATCH 441/547] fortran: Fix up function types for realloc and
+ sincos{,f,l} builtins [PR108349]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+As reported in the PR, the FUNCTION_TYPE for __builtin_realloc in the
+Fortran FE is wrong since r0-100026-gb64fca63690ad which changed
+-  tmp = tree_cons (NULL_TREE, pvoid_type_node, void_list_node);
+-  tmp = tree_cons (NULL_TREE, size_type_node, tmp);
+-  ftype = build_function_type (pvoid_type_node, tmp);
++  ftype = build_function_type_list (pvoid_type_node,
++                                    size_type_node, pvoid_type_node,
++                                    NULL_TREE);
+   gfc_define_builtin ("__builtin_realloc", ftype, BUILT_IN_REALLOC,
+                      "realloc", false);
+The return type is correct, void *, but the first argument should be
+void * too and only second one size_t, while the above change changed
+realloc to be void *__builtin_realloc (size_t, void *);
+I went through all other changes from that commit and found that
+__builtin_sincos{,f,l} got broken as well, instead of the former
+void __builtin_sincos{,f,l} (ftype, ftype *, ftype *);
+where ftype is {double,float,long double} it is now incorrectly
+void __builtin_sincos{,f,l} (ftype *, ftype *);
+
+The following patch fixes that, plus some formatting issues around
+the spots I've changed.
+
+2023-01-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/108349
+	* f95-lang.cc (gfc_init_builtin_function): Fix up function types
+	for BUILT_IN_REALLOC and BUILT_IN_SINCOS{F,,L}.  Formatting fixes.
+
+(cherry picked from commit 0986c351aa8a9f08b3cb614baec13564dd62c114)
+---
+ gcc/fortran/f95-lang.cc | 38 ++++++++++++++++++++------------------
+ 1 file changed, 20 insertions(+), 18 deletions(-)
+
+diff --git a/gcc/fortran/f95-lang.cc b/gcc/fortran/f95-lang.cc
+index 20c4a87c90b..468a0b7e310 100644
+--- a/gcc/fortran/f95-lang.cc
++++ b/gcc/fortran/f95-lang.cc
+@@ -703,31 +703,34 @@ gfc_init_builtin_functions (void)
+                                                 float_type_node, NULL_TREE);
+ 
+   func_cdouble_double = build_function_type_list (double_type_node,
+-                                                  complex_double_type_node,
+-                                                  NULL_TREE);
++						  complex_double_type_node,
++						  NULL_TREE);
+ 
+   func_double_cdouble = build_function_type_list (complex_double_type_node,
+-                                                  double_type_node, NULL_TREE);
++						  double_type_node, NULL_TREE);
+ 
+-  func_clongdouble_longdouble =
+-    build_function_type_list (long_double_type_node,
+-                              complex_long_double_type_node, NULL_TREE);
++  func_clongdouble_longdouble
++    = build_function_type_list (long_double_type_node,
++				complex_long_double_type_node, NULL_TREE);
+ 
+-  func_longdouble_clongdouble =
+-    build_function_type_list (complex_long_double_type_node,
+-                              long_double_type_node, NULL_TREE);
++  func_longdouble_clongdouble
++    = build_function_type_list (complex_long_double_type_node,
++				long_double_type_node, NULL_TREE);
+ 
+   ptype = build_pointer_type (float_type_node);
+-  func_float_floatp_floatp =
+-    build_function_type_list (void_type_node, ptype, ptype, NULL_TREE);
++  func_float_floatp_floatp
++    = build_function_type_list (void_type_node, float_type_node, ptype, ptype,
++				NULL_TREE);
+ 
+   ptype = build_pointer_type (double_type_node);
+-  func_double_doublep_doublep =
+-    build_function_type_list (void_type_node, ptype, ptype, NULL_TREE);
++  func_double_doublep_doublep
++    = build_function_type_list (void_type_node, double_type_node, ptype,
++				ptype, NULL_TREE);
+ 
+   ptype = build_pointer_type (long_double_type_node);
+-  func_longdouble_longdoublep_longdoublep =
+-    build_function_type_list (void_type_node, ptype, ptype, NULL_TREE);
++  func_longdouble_longdoublep_longdoublep
++    = build_function_type_list (void_type_node, long_double_type_node, ptype,
++				ptype, NULL_TREE);
+ 
+ /* Non-math builtins are defined manually, so they're not included here.  */
+ #define OTHER_BUILTIN(ID,NAME,TYPE,CONST)
+@@ -981,9 +984,8 @@ gfc_init_builtin_functions (void)
+ 		      "calloc", ATTR_NOTHROW_LEAF_MALLOC_LIST);
+   DECL_IS_MALLOC (builtin_decl_explicit (BUILT_IN_CALLOC)) = 1;
+ 
+-  ftype = build_function_type_list (pvoid_type_node,
+-                                    size_type_node, pvoid_type_node,
+-                                    NULL_TREE);
++  ftype = build_function_type_list (pvoid_type_node, pvoid_type_node,
++				    size_type_node, NULL_TREE);
+   gfc_define_builtin ("__builtin_realloc", ftype, BUILT_IN_REALLOC,
+ 		      "realloc", ATTR_NOTHROW_LEAF_LIST);
+ 
+-- 
+2.25.1
+

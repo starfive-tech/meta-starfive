@@ -1,0 +1,78 @@
+From 50ef4fc8c848929ee79af97ac445a45baab7d575 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Mon, 19 Dec 2022 14:55:45 +0100
+Subject: [PATCH 367/547] tree-optimization/108164 - undefined overflow with IV
+ vectorization
+
+vect_update_ivs_after_vectorizer can end up emitting a signed
+IV update when the loop body performed an unsigned computation.
+The following makes sure to perform that update in the type
+of the loop update type to avoid undefined behavior on overflow.
+
+	PR tree-optimization/108164
+	* tree-vect-loop-manip.cc (vect_update_ivs_after_vectorizer):
+	Perform vect_step_op_add update in the appropriate type.
+
+	* gcc.dg/pr108164.c: New testcase.
+
+(cherry picked from commit ec459469f8a75d96a9b26694554efcc900d411de)
+---
+ gcc/testsuite/gcc.dg/pr108164.c | 19 +++++++++++++++++++
+ gcc/tree-vect-loop-manip.cc     | 12 +++++++-----
+ 2 files changed, 26 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108164.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr108164.c b/gcc/testsuite/gcc.dg/pr108164.c
+new file mode 100644
+index 00000000000..d76d557876e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108164.c
+@@ -0,0 +1,19 @@
++/* { dg-do run } */
++/* { dg-options "-O3 -fno-tree-dce" } */
++
++int a, b, c;
++int main()
++{
++  int e = -1;
++  short f = -1;
++  for (; c < 1; c++)
++    while (f >= e)
++      f++;
++  for (; a < 2; a++) {
++    short g = ~(~b | ~f);
++    int h = -g;
++    int i = (3 / ~h) / ~b;
++    b = i;
++  }
++  return 0;
++}
+diff --git a/gcc/tree-vect-loop-manip.cc b/gcc/tree-vect-loop-manip.cc
+index e4381eb7079..cb5bb87ae33 100644
+--- a/gcc/tree-vect-loop-manip.cc
++++ b/gcc/tree-vect-loop-manip.cc
+@@ -1596,14 +1596,16 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
+ 
+       init_expr = PHI_ARG_DEF_FROM_EDGE (phi, loop_preheader_edge (loop));
+ 
+-      off = fold_build2 (MULT_EXPR, TREE_TYPE (step_expr),
+-			 fold_convert (TREE_TYPE (step_expr), niters),
+-			 step_expr);
++      tree stype = TREE_TYPE (step_expr);
++      off = fold_build2 (MULT_EXPR, stype,
++			 fold_convert (stype, niters), step_expr);
+       if (POINTER_TYPE_P (type))
+ 	ni = fold_build_pointer_plus (init_expr, off);
+       else
+-	ni = fold_build2 (PLUS_EXPR, type,
+-			  init_expr, fold_convert (type, off));
++	ni = fold_convert (type,
++			   fold_build2 (PLUS_EXPR, stype,
++					fold_convert (stype, init_expr),
++					off));
+ 
+       var = create_tmp_var (type, "tmp");
+ 
+-- 
+2.25.1
+

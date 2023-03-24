@@ -1,0 +1,75 @@
+From e1a1e1f79dffe1afda122dd63a4fe1b1cd09db30 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 26 Jan 2023 00:21:48 +0000
+Subject: [PATCH 370/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 15 +++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 23 +++++++++++++++++++++++
+ 3 files changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index f1e43fd803c..948824b5012 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,18 @@
++2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
++
++	Backported from master:
++	2023-01-12  Christophe Lyon  <christophe.lyon@arm.com>
++		    Richard Sandiford  <richard.sandiford@arm.com>
++
++	* config/aarch64/aarch64.cc (aarch64_function_arg_alignment): Fix
++	comment.
++	(aarch64_layout_arg): Factorize warning conditions.
++	(aarch64_function_arg_boundary): Fix typo.
++	* function.cc (currently_expanding_function_start): New variable.
++	(expand_function_start): Handle
++	currently_expanding_function_start.
++	* function.h (currently_expanding_function_start): Declare.
++
+ 2023-01-24  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e26ffa6a16c..b0742d6879d 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230125
++20230126
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 64dd4d95fcf..bf0369980d9 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,26 @@
++2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
++
++	Backported from master:
++	2023-01-12  Christophe Lyon  <christophe.lyon@arm.com>
++		    Richard Sandiford  <richard.sandiford@arm.com>
++
++	* gcc.target/aarch64/bitfield-abi-warning-align16-O2.c: New test.
++	* gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c: New
++	test.
++	* gcc.target/aarch64/bitfield-abi-warning-align32-O2.c: New test.
++	* gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c: New
++	test.
++	* gcc.target/aarch64/bitfield-abi-warning-align8-O2.c: New test.
++	* gcc.target/aarch64/bitfield-abi-warning.h: New test.
++	* g++.target/aarch64/bitfield-abi-warning-align16-O2.C: New test.
++	* g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C: New
++	test.
++	* g++.target/aarch64/bitfield-abi-warning-align32-O2.C: New test.
++	* g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C: New
++	test.
++	* g++.target/aarch64/bitfield-abi-warning-align8-O2.C: New test.
++	* g++.target/aarch64/bitfield-abi-warning.h: New test.
++
+ 2023-01-24  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

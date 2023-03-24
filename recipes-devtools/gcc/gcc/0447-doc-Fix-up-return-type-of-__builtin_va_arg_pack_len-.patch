@@ -1,0 +1,47 @@
+From ca1e81324ab9915b745e724945db4a108777f46d Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 27 Jan 2023 11:17:35 +0100
+Subject: [PATCH 447/547] doc: Fix up return type of __builtin_va_arg_pack_len
+ [PR108560]
+
+__builtin_va_arg_pack_len as implemented returned int since its introduction
+in 2007.  The initial documentation didn't mention any return type,
+which changed in 2010 in r0-103077-gab940b73bfabe2cec4 during some
+documentation formatting cleanups
+https://gcc.gnu.org/legacy-ml/gcc-patches/2010-09/msg01632.html
+I can understand that for formatting some type was needed there
+but what exactly hasn't been really discussed.
+
+So, I think we should change documentation to match the implementation,
+rather than change implementation to match the documentation.
+Most people don't use more than 2147483647 arguments to inline functions,
+and on poor targets with 16-bit ints I bet even having more than 65535
+arguments to inline functions would be highly unexpected.
+
+2023-01-27  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/108560
+	* doc/extend.texi: Fix up return type of __builtin_va_arg_pack_len
+	from size_t to int.
+
+(cherry picked from commit 16f30680f403891556da2ad6329fcef9dc9b47db)
+---
+ gcc/doc/extend.texi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/doc/extend.texi b/gcc/doc/extend.texi
+index 192df1b9d00..33a776a7978 100644
+--- a/gcc/doc/extend.texi
++++ b/gcc/doc/extend.texi
+@@ -688,7 +688,7 @@ myprintf (FILE *f, const char *format, ...)
+ @end smallexample
+ @end deftypefn
+ 
+-@deftypefn {Built-in Function} {size_t} __builtin_va_arg_pack_len ()
++@deftypefn {Built-in Function} {int} __builtin_va_arg_pack_len ()
+ This built-in function returns the number of anonymous arguments of
+ an inline function.  It can be used only in inline functions that
+ are always inlined, never compiled as a separate function, such
+-- 
+2.25.1
+

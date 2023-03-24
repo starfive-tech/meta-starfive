@@ -1,0 +1,64 @@
+From 23605c6a4eef5ca8ecb64d7006b60aeed241c29c Mon Sep 17 00:00:00 2001
+From: Ian Lance Taylor <iant@golang.org>
+Date: Tue, 13 Sep 2022 13:11:17 -0700
+Subject: [PATCH 065/547] libgo: make runtime.Version return a meaningful
+ string
+
+For golang/go#51850
+Fixes PR go/106747
+
+Reviewed-on: https://go-review.googlesource.com/c/gofrontend/+/414734
+---
+ libgo/Makefile.am          |  1 +
+ libgo/Makefile.in          |  1 +
+ libgo/go/runtime/extern.go | 10 ----------
+ 3 files changed, 2 insertions(+), 10 deletions(-)
+
+diff --git a/libgo/Makefile.am b/libgo/Makefile.am
+index a5d4b6a3525..b03e6553e90 100644
+--- a/libgo/Makefile.am
++++ b/libgo/Makefile.am
+@@ -568,6 +568,7 @@ s-goroot: Makefile
+ 	rm -f goroot.go.tmp
+ 	echo "package runtime" > goroot.go.tmp
+ 	echo 'var defaultGOROOT = `$(prefix)`' >> goroot.go.tmp
++	echo 'var buildVersion = `'`cat $(srcdir)/VERSION | sed 1q`' '`$(GOC) --version | sed 1q`'`' >> goroot.go.tmp
+ 	$(SHELL) $(srcdir)/mvifdiff.sh goroot.go.tmp goroot.go
+ 	$(STAMP) $@
+ 
+diff --git a/libgo/Makefile.in b/libgo/Makefile.in
+index 22f48a52938..16ed62a82ed 100644
+--- a/libgo/Makefile.in
++++ b/libgo/Makefile.in
+@@ -2780,6 +2780,7 @@ s-goroot: Makefile
+ 	rm -f goroot.go.tmp
+ 	echo "package runtime" > goroot.go.tmp
+ 	echo 'var defaultGOROOT = `$(prefix)`' >> goroot.go.tmp
++	echo 'var buildVersion = `'`cat $(srcdir)/VERSION | sed 1q`' '`$(GOC) --version | sed 1q`'`' >> goroot.go.tmp
+ 	$(SHELL) $(srcdir)/mvifdiff.sh goroot.go.tmp goroot.go
+ 	$(STAMP) $@
+ 
+diff --git a/libgo/go/runtime/extern.go b/libgo/go/runtime/extern.go
+index a371d9c0ee0..8e226147965 100644
+--- a/libgo/go/runtime/extern.go
++++ b/libgo/go/runtime/extern.go
+@@ -231,16 +231,6 @@ func GOROOT() string {
+ 	return defaultGOROOT
+ }
+ 
+-// buildVersion is the Go tree's version string at build time.
+-//
+-// If any GOEXPERIMENTs are set to non-default values, it will include
+-// "X:<GOEXPERIMENT>".
+-//
+-// This is set by the linker.
+-//
+-// This is accessed by "go version <binary>".
+-var buildVersion string
+-
+ // Version returns the Go tree's version string.
+ // It is either the commit hash and date at the time of the build or,
+ // when possible, a release tag like "go1.3".
+-- 
+2.25.1
+

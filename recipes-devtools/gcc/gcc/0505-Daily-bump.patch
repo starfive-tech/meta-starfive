@@ -1,0 +1,36 @@
+From 801964ca1191d02c4c00550306b7f2b6a0d3e624 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 25 Feb 2023 00:21:46 +0000
+Subject: [PATCH 505/547] Daily bump.
+
+---
+ gcc/ChangeLog | 8 ++++++++
+ gcc/DATESTAMP | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index b108d4a1789..d85b224948f 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-24  Sebastian Huber  <sebastian.huber@embedded-brains.de>
++
++	Backported from master:
++	2023-02-24  Sebastian Huber  <sebastian.huber@embedded-brains.de>
++
++	* config/riscv/t-rtems: Keep only -mcmodel=medany 64-bit multilibs.
++	Add non-compact 32-bit multilibs.
++
+ 2023-02-20  Alex Coplan  <alex.coplan@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index fb96f27d182..cd4bc360c21 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230224
++20230225
+-- 
+2.25.1
+

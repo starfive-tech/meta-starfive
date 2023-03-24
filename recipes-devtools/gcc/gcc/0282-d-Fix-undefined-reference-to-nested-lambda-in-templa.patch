@@ -1,0 +1,187 @@
+From 3b8b42f32627ca5ad029fe418a5839b9fc4512e9 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Sat, 10 Dec 2022 22:11:41 +0100
+Subject: [PATCH 282/547] d: Fix undefined reference to nested lambda in
+ template (PR108055)
+
+Sometimes, nested lambdas of templated functions get no code generation
+due to them being marked as instantianted outside of all modules being
+compiled in the current compilation unit.  This despite enclosing
+template instances being marked as instantiated inside the current
+compilation unit.  To fix, all enclosing templates are now checked in
+`function_defined_in_root_p'.
+
+Because of this change, `function_needs_inline_definition_p' has also
+been fixed up to only check whether the regular function definition
+itself is to be emitted in the current compilation unit.
+
+	PR d/108055
+
+gcc/d/ChangeLog:
+
+	* decl.cc (function_defined_in_root_p): Check all enclosing template
+	instances for definition in a root module.
+	(function_needs_inline_definition_p): Replace call to
+	function_defined_in_root_p with test for outer module `isRoot'.
+
+gcc/testsuite/ChangeLog:
+
+	* gdc.dg/torture/imports/pr108055conv.d: New.
+	* gdc.dg/torture/imports/pr108055spec.d: New.
+	* gdc.dg/torture/imports/pr108055write.d: New.
+	* gdc.dg/torture/pr108055.d: New test.
+
+(cherry picked from commit 9fe7d3debbf60ed9fef8053123ad542a99d62100)
+---
+ gcc/d/decl.cc                                 | 14 ++++++----
+ .../gdc.dg/torture/imports/pr108055conv.d     | 26 +++++++++++++++++++
+ .../gdc.dg/torture/imports/pr108055spec.d     | 18 +++++++++++++
+ .../gdc.dg/torture/imports/pr108055write.d    | 19 ++++++++++++++
+ gcc/testsuite/gdc.dg/torture/pr108055.d       | 12 +++++++++
+ 5 files changed, 84 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gdc.dg/torture/imports/pr108055conv.d
+ create mode 100644 gcc/testsuite/gdc.dg/torture/imports/pr108055spec.d
+ create mode 100644 gcc/testsuite/gdc.dg/torture/imports/pr108055write.d
+ create mode 100644 gcc/testsuite/gdc.dg/torture/pr108055.d
+
+diff --git a/gcc/d/decl.cc b/gcc/d/decl.cc
+index e62be0c580a..11fd7f6c81f 100644
+--- a/gcc/d/decl.cc
++++ b/gcc/d/decl.cc
+@@ -1023,7 +1023,8 @@ build_decl_tree (Dsymbol *d)
+   input_location = saved_location;
+ }
+ 
+-/* Returns true if function FD is defined or instantiated in a root module.  */
++/* Returns true if function FD, or any lexically enclosing scope function of FD
++   is defined or instantiated in a root module.  */
+ 
+ static bool
+ function_defined_in_root_p (FuncDeclaration *fd)
+@@ -1032,9 +1033,11 @@ function_defined_in_root_p (FuncDeclaration *fd)
+   if (md && md->isRoot ())
+     return true;
+ 
+-  TemplateInstance *ti = fd->isInstantiated ();
+-  if (ti && ti->minst && ti->minst->isRoot ())
+-    return true;
++  for (TemplateInstance *ti = fd->isInstantiated (); ti != NULL; ti = ti->tinst)
++    {
++      if (ti->minst && ti->minst->isRoot ())
++	return true;
++    }
+ 
+   return false;
+ }
+@@ -1062,7 +1065,8 @@ function_needs_inline_definition_p (FuncDeclaration *fd)
+ 
+   /* Check whether function will be regularly defined later in the current
+      translation unit.  */
+-  if (function_defined_in_root_p (fd))
++  Module *md = fd->getModule ();
++  if (md && md->isRoot ())
+     return false;
+ 
+   /* Non-inlineable functions are always external.  */
+diff --git a/gcc/testsuite/gdc.dg/torture/imports/pr108055conv.d b/gcc/testsuite/gdc.dg/torture/imports/pr108055conv.d
+new file mode 100644
+index 00000000000..93ebba747b1
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/torture/imports/pr108055conv.d
+@@ -0,0 +1,26 @@
++module imports.pr108055conv;
++
++T toStr(T, S)(S src)
++{
++    static if (is(typeof(T.init[0]) E))
++    {
++        struct Appender
++        {
++            inout(E)[] data;
++        }
++
++        import imports.pr108055spec;
++        import imports.pr108055write;
++
++        auto w = Appender();
++        FormatSpec!E f;
++        formatValue(w, src, f);
++        return w.data;
++    }
++}
++
++T to(T, A)(A args)
++{
++    return toStr!T(args);
++}
++
+diff --git a/gcc/testsuite/gdc.dg/torture/imports/pr108055spec.d b/gcc/testsuite/gdc.dg/torture/imports/pr108055spec.d
+new file mode 100644
+index 00000000000..801c5810516
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/torture/imports/pr108055spec.d
+@@ -0,0 +1,18 @@
++module imports.pr108055spec;
++
++template Unqual(T : const U, U)
++{
++    alias Unqual = U;
++}
++
++template FormatSpec(Char)
++if (!is(Unqual!Char == Char))
++{
++    alias FormatSpec = FormatSpec!(Unqual!Char);
++}
++
++struct FormatSpec(Char)
++if (is(Unqual!Char == Char))
++{
++    const(Char)[] nested;
++}
+diff --git a/gcc/testsuite/gdc.dg/torture/imports/pr108055write.d b/gcc/testsuite/gdc.dg/torture/imports/pr108055write.d
+new file mode 100644
+index 00000000000..fe41d7baa7c
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/torture/imports/pr108055write.d
+@@ -0,0 +1,19 @@
++module imports.pr108055write;
++import imports.pr108055spec;
++
++void formatValueImpl(Writer, T, Char)(ref Writer , const(T) ,
++                                      scope const ref FormatSpec!Char )
++{
++    T val;
++    char spec;
++
++    (ref val) @trusted {
++        return (cast(const char*) &val)[0 .. val.sizeof];
++    }(val);
++
++}
++
++void formatValue(Writer, T, Char)(Writer w, T val, Char f)
++{
++    formatValueImpl(w, val, f);
++}
+diff --git a/gcc/testsuite/gdc.dg/torture/pr108055.d b/gcc/testsuite/gdc.dg/torture/pr108055.d
+new file mode 100644
+index 00000000000..c4ffad26d1e
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/torture/pr108055.d
+@@ -0,0 +1,12 @@
++// { dg-do link }
++// { dg-additional-files "imports/pr108055conv.d imports/pr108055spec.d imports/pr108055write.d" }
++// { dg-additional-options "-I[srcdir] -fno-druntime" }
++import imports.pr108055conv;
++
++extern(C) int main()
++{
++    float zis;
++    static if (is(typeof(to!string(&zis))))
++        to!string(&zis);
++    return 0;
++}
+-- 
+2.25.1
+

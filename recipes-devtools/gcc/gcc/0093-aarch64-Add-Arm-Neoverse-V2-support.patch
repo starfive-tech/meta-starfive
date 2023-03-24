@@ -1,0 +1,202 @@
+From 6a59baca1f2a6b42021d194006f09edd6ba26ce8 Mon Sep 17 00:00:00 2001
+From: Kyrylo Tkachov <kyrylo.tkachov@arm.com>
+Date: Fri, 23 Sep 2022 12:12:29 +0100
+Subject: [PATCH 093/547] aarch64: Add Arm Neoverse V2 support
+
+This patch adds -mcpu/-mtune support for the Arm Neoverse V2 core.
+This updates the internal references to "demeter", but leaves "demeter" as an
+accepted value to -mcpu/-mtune as it appears in the released GCC 12 series.
+
+Bootstrapped and tested on aarch64-none-linux-gnu.
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64-cores.def (neoverse-v2): New entry.
+	(demeter): Update tunings to neoversev2.
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* config/aarch64/aarch64.cc (demeter_addrcost_table): Rename to
+	neoversev2_addrcost_table.
+	(demeter_regmove_cost): Rename to neoversev2_addrcost_table.
+	(demeter_advsimd_vector_cost): Rename to neoversev2_advsimd_vector_cost.
+	(demeter_sve_vector_cost): Rename to neoversev2_sve_vector_cost.
+	(demeter_scalar_issue_info): Rename to neoversev2_scalar_issue_info.
+	(demeter_advsimd_issue_info): Rename to neoversev2_advsimd_issue_info.
+	(demeter_sve_issue_info): Rename to neoversev2_sve_issue_info.
+	(demeter_vec_issue_info): Rename to neoversev2_vec_issue_info.
+	Update references to above.
+	(demeter_vector_cost): Rename to neoversev2_vector_cost.
+	(demeter_tunings): Rename to neoversev2_tunings.
+	(aarch64_vec_op_count::rename_cycles_per_iter): Use
+	neoversev2_sve_issue_info instead of demeter_sve_issue_info.
+	* doc/invoke.texi (AArch64 Options): Document neoverse-v2.
+
+(cherry picked from commit 14d4b4fb12041dde1511262b926662929196c3fe)
+---
+ gcc/config/aarch64/aarch64-cores.def |  3 ++-
+ gcc/config/aarch64/aarch64-tune.md   |  2 +-
+ gcc/config/aarch64/aarch64.cc        | 40 ++++++++++++++--------------
+ gcc/doc/invoke.texi                  |  2 +-
+ 4 files changed, 24 insertions(+), 23 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64-cores.def b/gcc/config/aarch64/aarch64-cores.def
+index 41d95354b6a..0402bfb748f 100644
+--- a/gcc/config/aarch64/aarch64-cores.def
++++ b/gcc/config/aarch64/aarch64-cores.def
+@@ -171,6 +171,7 @@ AARCH64_CORE("cortex-x2",  cortexx2, cortexa57, 9A,  AARCH64_FL_FOR_ARCH9 | AARC
+ 
+ AARCH64_CORE("neoverse-n2", neoversen2, cortexa57, 9A, AARCH64_FL_FOR_ARCH9 | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_RNG | AARCH64_FL_MEMTAG | AARCH64_FL_PROFILE, neoversen2, 0x41, 0xd49, -1)
+ 
+-AARCH64_CORE("demeter", demeter, cortexa57, 9A, AARCH64_FL_FOR_ARCH9 | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_RNG | AARCH64_FL_MEMTAG | AARCH64_FL_PROFILE, demeter, 0x41, 0xd4f, -1)
++AARCH64_CORE("demeter", demeter, cortexa57, 9A, AARCH64_FL_FOR_ARCH9 | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_RNG | AARCH64_FL_MEMTAG | AARCH64_FL_PROFILE, neoversev2, 0x41, 0xd4f, -1)
++AARCH64_CORE("neoverse-v2", neoversev2, cortexa57, 9A, AARCH64_FL_FOR_ARCH9 | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_RNG | AARCH64_FL_MEMTAG | AARCH64_FL_PROFILE, neoversev2, 0x41, 0xd4f, -1)
+ 
+ #undef AARCH64_CORE
+diff --git a/gcc/config/aarch64/aarch64-tune.md b/gcc/config/aarch64/aarch64-tune.md
+index 27da961475a..84e9bbf44f6 100644
+--- a/gcc/config/aarch64/aarch64-tune.md
++++ b/gcc/config/aarch64/aarch64-tune.md
+@@ -1,5 +1,5 @@
+ ;; -*- buffer-read-only: t -*-
+ ;; Generated automatically by gentune.sh from aarch64-cores.def
+ (define_attr "tune"
+-	"cortexa34,cortexa35,cortexa53,cortexa57,cortexa72,cortexa73,thunderx,thunderxt88p1,thunderxt88,octeontx,octeontxt81,octeontxt83,thunderxt81,thunderxt83,ampere1,emag,xgene1,falkor,qdf24xx,exynosm1,phecda,thunderx2t99p1,vulcan,thunderx2t99,cortexa55,cortexa75,cortexa76,cortexa76ae,cortexa77,cortexa78,cortexa78ae,cortexa78c,cortexa65,cortexa65ae,cortexx1,ares,neoversen1,neoversee1,octeontx2,octeontx2t98,octeontx2t96,octeontx2t93,octeontx2f95,octeontx2f95n,octeontx2f95mm,a64fx,tsv110,thunderx3t110,zeus,neoversev1,neoverse512tvb,saphira,cortexa57cortexa53,cortexa72cortexa53,cortexa73cortexa35,cortexa73cortexa53,cortexa75cortexa55,cortexa76cortexa55,cortexr82,cortexa510,cortexa710,cortexx2,neoversen2,demeter"
++	"cortexa34,cortexa35,cortexa53,cortexa57,cortexa72,cortexa73,thunderx,thunderxt88p1,thunderxt88,octeontx,octeontxt81,octeontxt83,thunderxt81,thunderxt83,ampere1,emag,xgene1,falkor,qdf24xx,exynosm1,phecda,thunderx2t99p1,vulcan,thunderx2t99,cortexa55,cortexa75,cortexa76,cortexa76ae,cortexa77,cortexa78,cortexa78ae,cortexa78c,cortexa65,cortexa65ae,cortexx1,ares,neoversen1,neoversee1,octeontx2,octeontx2t98,octeontx2t96,octeontx2t93,octeontx2f95,octeontx2f95n,octeontx2f95mm,a64fx,tsv110,thunderx3t110,zeus,neoversev1,neoverse512tvb,saphira,cortexa57cortexa53,cortexa72cortexa53,cortexa73cortexa35,cortexa73cortexa53,cortexa75cortexa55,cortexa76cortexa55,cortexr82,cortexa510,cortexa710,cortexx2,neoversen2,demeter,neoversev2"
+ 	(const (symbol_ref "((enum attr_tune) aarch64_tune)")))
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index ac1153e31af..058fe9a4ec4 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -537,7 +537,7 @@ static const struct cpu_addrcost_table neoversen2_addrcost_table =
+   0 /* imm_offset  */
+ };
+ 
+-static const struct cpu_addrcost_table demeter_addrcost_table =
++static const struct cpu_addrcost_table neoversev2_addrcost_table =
+ {
+     {
+       1, /* hi  */
+@@ -680,7 +680,7 @@ static const struct cpu_regmove_cost neoversev1_regmove_cost =
+   2 /* FP2FP  */
+ };
+ 
+-static const struct cpu_regmove_cost demeter_regmove_cost =
++static const struct cpu_regmove_cost neoversev2_regmove_cost =
+ {
+   1, /* GP2GP  */
+   /* Spilling to int<->fp instead of memory is recommended so set
+@@ -2429,7 +2429,7 @@ static const struct tune_params neoversen2_tunings =
+   &generic_prefetch_tune
+ };
+ 
+-static const advsimd_vec_cost demeter_advsimd_vector_cost =
++static const advsimd_vec_cost neoversev2_advsimd_vector_cost =
+ {
+   2, /* int_stmt_cost  */
+   2, /* fp_stmt_cost  */
+@@ -2460,7 +2460,7 @@ static const advsimd_vec_cost demeter_advsimd_vector_cost =
+   1  /* store_cost  */
+ };
+ 
+-static const sve_vec_cost demeter_sve_vector_cost =
++static const sve_vec_cost neoversev2_sve_vector_cost =
+ {
+   {
+     2, /* int_stmt_cost  */
+@@ -2517,7 +2517,7 @@ static const sve_vec_cost demeter_sve_vector_cost =
+   3 /* scatter_store_elt_cost  */
+ };
+ 
+-static const aarch64_scalar_vec_issue_info demeter_scalar_issue_info =
++static const aarch64_scalar_vec_issue_info neoversev2_scalar_issue_info =
+ {
+   3, /* loads_stores_per_cycle  */
+   2, /* stores_per_cycle  */
+@@ -2526,7 +2526,7 @@ static const aarch64_scalar_vec_issue_info demeter_scalar_issue_info =
+   1 /* fp_simd_store_general_ops  */
+ };
+ 
+-static const aarch64_advsimd_vec_issue_info demeter_advsimd_issue_info =
++static const aarch64_advsimd_vec_issue_info neoversev2_advsimd_issue_info =
+ {
+   {
+     3, /* loads_stores_per_cycle  */
+@@ -2540,7 +2540,7 @@ static const aarch64_advsimd_vec_issue_info demeter_advsimd_issue_info =
+   3 /* ld4_st4_general_ops  */
+ };
+ 
+-static const aarch64_sve_vec_issue_info demeter_sve_issue_info =
++static const aarch64_sve_vec_issue_info neoversev2_sve_issue_info =
+ {
+   {
+     {
+@@ -2562,15 +2562,15 @@ static const aarch64_sve_vec_issue_info demeter_sve_issue_info =
+   1 /* gather_scatter_pair_pred_ops  */
+ };
+ 
+-static const aarch64_vec_issue_info demeter_vec_issue_info =
++static const aarch64_vec_issue_info neoversev2_vec_issue_info =
+ {
+-  &demeter_scalar_issue_info,
+-  &demeter_advsimd_issue_info,
+-  &demeter_sve_issue_info
++  &neoversev2_scalar_issue_info,
++  &neoversev2_advsimd_issue_info,
++  &neoversev2_sve_issue_info
+ };
+ 
+ /* Demeter costs for vector insn classes.  */
+-static const struct cpu_vector_cost demeter_vector_cost =
++static const struct cpu_vector_cost neoversev2_vector_cost =
+ {
+   1, /* scalar_int_stmt_cost  */
+   2, /* scalar_fp_stmt_cost  */
+@@ -2578,17 +2578,17 @@ static const struct cpu_vector_cost demeter_vector_cost =
+   1, /* scalar_store_cost  */
+   1, /* cond_taken_branch_cost  */
+   1, /* cond_not_taken_branch_cost  */
+-  &demeter_advsimd_vector_cost, /* advsimd  */
+-  &demeter_sve_vector_cost, /* sve  */
+-  &demeter_vec_issue_info /* issue_info  */
++  &neoversev2_advsimd_vector_cost, /* advsimd  */
++  &neoversev2_sve_vector_cost, /* sve  */
++  &neoversev2_vec_issue_info /* issue_info  */
+ };
+ 
+-static const struct tune_params demeter_tunings =
++static const struct tune_params neoversev2_tunings =
+ {
+   &cortexa76_extra_costs,
+-  &demeter_addrcost_table,
+-  &demeter_regmove_cost,
+-  &demeter_vector_cost,
++  &neoversev2_addrcost_table,
++  &neoversev2_regmove_cost,
++  &neoversev2_vector_cost,
+   &generic_branch_cost,
+   &generic_approx_modes,
+   SVE_128, /* sve_width  */
+@@ -15532,7 +15532,7 @@ aarch64_vec_op_count::rename_cycles_per_iter () const
+ {
+   if (sve_issue_info () == &neoverse512tvb_sve_issue_info
+       || sve_issue_info () == &neoversen2_sve_issue_info
+-      || sve_issue_info () == &demeter_sve_issue_info)
++      || sve_issue_info () == &neoversev2_sve_issue_info)
+     /* + 1 for an addition.  We've already counted a general op for each
+        store, so we don't need to account for stores separately.  The branch
+        reads no registers and so does not need to be counted either.
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index ff6c338bedb..3749e06f13e 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -19194,7 +19194,7 @@ performance of the code.  Permissible values for this option are:
+ @samp{cortex-a78}, @samp{cortex-a78ae}, @samp{cortex-a78c},
+ @samp{ares}, @samp{exynos-m1}, @samp{emag}, @samp{falkor},
+ @samp{neoverse-512tvb}, @samp{neoverse-e1}, @samp{neoverse-n1},
+-@samp{neoverse-n2}, @samp{neoverse-v1}, @samp{qdf24xx},
++@samp{neoverse-n2}, @samp{neoverse-v1}, @samp{neoverse-v2}, @samp{qdf24xx},
+ @samp{saphira}, @samp{phecda}, @samp{xgene1}, @samp{vulcan},
+ @samp{octeontx}, @samp{octeontx81},  @samp{octeontx83},
+ @samp{octeontx2}, @samp{octeontx2t98}, @samp{octeontx2t96}
+-- 
+2.25.1
+

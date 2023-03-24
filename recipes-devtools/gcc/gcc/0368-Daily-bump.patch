@@ -1,0 +1,109 @@
+From 3026c532acd9ac7111739ae2873117ade2e06595 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 25 Jan 2023 00:22:00 +0000
+Subject: [PATCH 368/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 47 +++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 25 ++++++++++++++++++++++
+ 3 files changed, 73 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 147ee79ec63..f1e43fd803c 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,50 @@
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-19  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/108164
++	* tree-vect-loop-manip.cc (vect_update_ivs_after_vectorizer):
++	Perform vect_step_op_add update in the appropriate type.
++
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/108076
++	* tree-if-conv.cc (if_convertible_loop_p_1): Reject blocks
++	with non-local or forced labels that we later remove
++	labels from.
++
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-21  Richard Biener  <rguenther@suse.de>
++
++	PR middle-end/107994
++	* gimplify.cc (gimplify_expr): Catch errorneous comparison
++	operand.
++
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-11-11  Richard Biener  <rguenther@suse.de>
++		    Nikita Voronov  <nik_1357@mail.ru>
++
++	PR tree-optimization/107554
++	* tree-ssa-strlen.cc (strlen_pass::count_nonzero_bytes):
++	Use unsigned HOST_WIDE_INT type for the strlen.
++
++2023-01-24  Sergei Trofimovich  <siarheit@google.com>
++
++	Backported from master:
++	2022-08-16  Sergei Trofimovich  <siarheit@google.com>
++
++	PR driver/106624
++	* gcc.cc (driver::detect_jobserver): Allocate storage xputenv()
++	argument using xstrdup().
++
+ 2023-01-23  Andreas Krebbel  <krebbel@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 9ed1bcf7f8f..e26ffa6a16c 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230124
++20230125
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 7c7297608d3..64dd4d95fcf 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,28 @@
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-19  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/108164
++	* gcc.dg/pr108164.c: New testcase.
++
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/108076
++	* gcc.dg/torture/pr108076.c: New testcase.
++
++2023-01-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-11-11  Richard Biener  <rguenther@suse.de>
++		    Nikita Voronov  <nik_1357@mail.ru>
++
++	PR tree-optimization/107554
++	* gcc.dg/pr107554.c: New testcase.
++
+ 2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

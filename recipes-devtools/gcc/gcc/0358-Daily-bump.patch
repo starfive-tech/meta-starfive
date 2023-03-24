@@ -1,0 +1,47 @@
+From 6cc80436a9359e08401930086f309702184779a0 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 22 Jan 2023 00:21:24 +0000
+Subject: [PATCH 358/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 5 +++++
+ gcc/testsuite/ChangeLog | 5 +++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 583ce61ca83..39523e2052c 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230121
++20230122
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 2f89c6d8c25..0a4565123b4 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,8 @@
++2023-01-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/106731
++	* trans-array.cc (gfc_trans_auto_array_allocation): Remove gcc_assert (!TREE_STATIC()).
++
+ 2022-12-28  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 1395871f38a..6b3a9f3b121 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,8 @@
++2023-01-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/106731
++	* gfortran.dg/pr106731.f90: New test.
++
+ 2023-01-11  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* gcc.dg/sso-17.c: New test.
+-- 
+2.25.1
+

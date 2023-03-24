@@ -1,0 +1,70 @@
+From e3c997824f17dd6a4f7eb8d668b9ed2ef84408fc Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Wed, 19 Oct 2022 22:37:56 +0200
+Subject: [PATCH 162/547] Fortran: error recovery with references of bad array
+ constructors [PR105633]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/105633
+	* expr.cc (find_array_section): Move check for NULL pointers so
+	that both subscript triplets and vector subscripts are covered.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/105633
+	* gfortran.dg/pr105633.f90: New test.
+
+Co-authored-by: Steven G. Kargl <kargl@gcc.gnu.org>
+(cherry picked from commit ecb20df4fa6d99daa635c7fb662dc0554610777e)
+---
+ gcc/fortran/expr.cc                    | 10 +++++++---
+ gcc/testsuite/gfortran.dg/pr105633.f90 |  8 ++++++++
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr105633.f90
+
+diff --git a/gcc/fortran/expr.cc b/gcc/fortran/expr.cc
+index 290ddf360c8..69d0b57c688 100644
+--- a/gcc/fortran/expr.cc
++++ b/gcc/fortran/expr.cc
+@@ -1552,6 +1552,12 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
+       lower = ref->u.ar.as->lower[d];
+       upper = ref->u.ar.as->upper[d];
+ 
++      if (!lower || !upper)
++	{
++	  t = false;
++	  goto cleanup;
++	}
++
+       if (ref->u.ar.dimen_type[d] == DIMEN_VECTOR)  /* Vector subscript.  */
+ 	{
+ 	  gfc_constructor *ci;
+@@ -1594,9 +1600,7 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
+ 	{
+ 	  if ((begin && begin->expr_type != EXPR_CONSTANT)
+ 	      || (finish && finish->expr_type != EXPR_CONSTANT)
+-	      || (step && step->expr_type != EXPR_CONSTANT)
+-	      || !lower
+-	      || !upper)
++	      || (step && step->expr_type != EXPR_CONSTANT))
+ 	    {
+ 	      t = false;
+ 	      goto cleanup;
+diff --git a/gcc/testsuite/gfortran.dg/pr105633.f90 b/gcc/testsuite/gfortran.dg/pr105633.f90
+new file mode 100644
+index 00000000000..f2dbc5e742a
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr105633.f90
+@@ -0,0 +1,8 @@
++! { dg-do compile }
++! PR fortran/105633 - ICE in find_array_section
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a(:) = [1,2] ! { dg-error "deferred shape" }
++  print *, [a([1,2])]
++end
+-- 
+2.25.1
+

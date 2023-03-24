@@ -1,0 +1,71 @@
+From dd2fdf114b59db1b0bfb0de497fc3ab11f034d89 Mon Sep 17 00:00:00 2001
+From: Julian Brown <julian@codesourcery.com>
+Date: Fri, 14 Oct 2022 11:06:07 +0000
+Subject: [PATCH 158/547] amdgcn: Use FLAT addressing for all functions with
+ pointer arguments [PR105421]
+
+The GCN backend uses a heuristic to determine whether to use FLAT or
+GLOBAL addressing in a particular (offload) function: namely, if a
+function takes a pointer-to-scalar parameter, it is assumed that the
+pointer may refer to "flat scratch" space, and thus FLAT addressing must
+be used instead of GLOBAL.
+
+I came up with this heuristic initially whilst working on support for
+moving OpenACC gang-private variables into local-data share (scratch)
+memory. The assumption that only scalar variables would be transformed in
+that way turned out to be wrong.  For example, prior to the next patch in
+the series, Fortran compiler-generated temporary structures were treated
+as gang private and moved to LDS space, typically overflowing the region
+allocated for such variables.  That will no longer happen after that
+patch is applied, but there may be other cases of structs moving to LDS
+space now or in the future that this patch may be needed for.
+
+2022-10-14  Julian Brown  <julian@codesourcery.com>
+
+	PR target/105421
+gcc/
+	* config/gcn/gcn.cc (gcn_detect_incoming_pointer_arg): Any pointer
+	argument forces FLAT addressing mode, not just
+	pointer-to-non-aggregate.
+
+(cherry picked from commit 7c55755d4c760de326809636531478fd7419e1e5)
+---
+ gcc/config/gcn/gcn.cc | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/gcc/config/gcn/gcn.cc b/gcc/config/gcn/gcn.cc
+index e2e9335ad75..e2cbdd1ac39 100644
+--- a/gcc/config/gcn/gcn.cc
++++ b/gcc/config/gcn/gcn.cc
+@@ -2458,10 +2458,14 @@ gcn_arg_partial_bytes (cumulative_args_t cum_v, const function_arg_info &arg)
+   return (NUM_PARM_REGS - cum->num) * UNITS_PER_WORD;
+ }
+ 
+-/* A normal function which takes a pointer argument (to a scalar) may be
+-   passed a pointer to LDS space (via a high-bits-set aperture), and that only
+-   works with FLAT addressing, not GLOBAL.  Force FLAT addressing if the
+-   function has an incoming pointer-to-scalar parameter.  */
++/* A normal function which takes a pointer argument may be passed a pointer to
++   LDS space (via a high-bits-set aperture), and that only works with FLAT
++   addressing, not GLOBAL.  Force FLAT addressing if the function has an
++   incoming pointer parameter.  NOTE: This is a heuristic that works in the
++   offloading case, but in general, a function might read global pointer
++   variables, etc. that may refer to LDS space or other special memory areas
++   not supported by GLOBAL instructions, and then this argument check would not
++   suffice.  */
+ 
+ static void
+ gcn_detect_incoming_pointer_arg (tree fndecl)
+@@ -2471,8 +2475,7 @@ gcn_detect_incoming_pointer_arg (tree fndecl)
+   for (tree arg = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
+        arg;
+        arg = TREE_CHAIN (arg))
+-    if (POINTER_TYPE_P (TREE_VALUE (arg))
+-	&& !AGGREGATE_TYPE_P (TREE_TYPE (TREE_VALUE (arg))))
++    if (POINTER_TYPE_P (TREE_VALUE (arg)))
+       cfun->machine->use_flat_addressing = true;
+ }
+ 
+-- 
+2.25.1
+

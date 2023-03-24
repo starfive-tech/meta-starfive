@@ -1,0 +1,35 @@
+From 1a8af012222a8386fcda16a61dc17f11ba9cfbfd Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 29 Nov 2022 09:03:46 +0100
+Subject: [PATCH 281/547] tree-optimization/107898 - ICE with
+ -Walloca-larger-than
+
+The following avoids ICEing with a mismatched prototype for alloca
+and -Walloca-larger-than using irange for checks which doesn't
+like mismatched types.
+
+	PR tree-optimization/107898
+	* gimple-ssa-warn-alloca.cc (alloca_call_type): Check
+	the type of the alloca argument is compatible with size_t
+	before querying ranges.
+
+(cherry picked from commit 9948daa4fd0f0ea0a9d56c2fefe1bca478554d27)
+---
+ gcc/gimple-ssa-warn-alloca.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/gimple-ssa-warn-alloca.cc b/gcc/gimple-ssa-warn-alloca.cc
+index 273b88ec141..23f63f066f5 100644
+--- a/gcc/gimple-ssa-warn-alloca.cc
++++ b/gcc/gimple-ssa-warn-alloca.cc
+@@ -217,6 +217,7 @@ alloca_call_type (gimple *stmt, bool is_vla)
+   int_range_max r;
+   if (warn_limit_specified_p (is_vla)
+       && TREE_CODE (len) == SSA_NAME
++      && types_compatible_p (TREE_TYPE (len), size_type_node)
+       && get_range_query (cfun)->range_of_expr (r, len, stmt)
+       && !r.varying_p ())
+     {
+-- 
+2.25.1
+

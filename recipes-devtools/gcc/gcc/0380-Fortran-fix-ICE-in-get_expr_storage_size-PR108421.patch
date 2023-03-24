@@ -1,0 +1,57 @@
+From 0e4c239ebde0a926832e3bcaae707eabf81927ff Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Mon, 16 Jan 2023 21:30:56 +0100
+Subject: [PATCH 380/547] Fortran: fix ICE in get_expr_storage_size [PR108421]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108421
+	* interface.cc (get_expr_storage_size): Check that we actually have
+	an integer value before trying to extract it with mpz_get_si.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108421
+	* gfortran.dg/pr108421.f90: New test.
+
+(cherry picked from commit a75760374ee54768e5fd6a27080698bfbbd041ab)
+---
+ gcc/fortran/interface.cc               |  3 ++-
+ gcc/testsuite/gfortran.dg/pr108421.f90 | 11 +++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108421.f90
+
+diff --git a/gcc/fortran/interface.cc b/gcc/fortran/interface.cc
+index 54847301aaa..fc23bb70193 100644
+--- a/gcc/fortran/interface.cc
++++ b/gcc/fortran/interface.cc
+@@ -2843,7 +2843,8 @@ get_expr_storage_size (gfc_expr *e)
+   if (e->ts.type == BT_CHARACTER)
+     {
+       if (e->ts.u.cl && e->ts.u.cl->length
+-          && e->ts.u.cl->length->expr_type == EXPR_CONSTANT)
++	  && e->ts.u.cl->length->expr_type == EXPR_CONSTANT
++	  && e->ts.u.cl->length->ts.type == BT_INTEGER)
+ 	strlen = mpz_get_si (e->ts.u.cl->length->value.integer);
+       else if (e->expr_type == EXPR_CONSTANT
+ 	       && (e->ts.u.cl == NULL || e->ts.u.cl->length == NULL))
+diff --git a/gcc/testsuite/gfortran.dg/pr108421.f90 b/gcc/testsuite/gfortran.dg/pr108421.f90
+new file mode 100644
+index 00000000000..89439bc7eec
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108421.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/108421
++! Contributed by G.Steinmetz
++
++program p
++  character(real(3)) :: c ! { dg-error "must be of INTEGER type" }
++  call s(c)
++end
++subroutine s(x)
++  character(*) :: x
++end
+-- 
+2.25.1
+

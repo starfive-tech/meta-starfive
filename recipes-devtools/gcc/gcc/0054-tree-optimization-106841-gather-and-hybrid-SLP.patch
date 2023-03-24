@@ -1,0 +1,103 @@
+From 41b4faa130a32b37debb1f92e3fa93b2fe8571fc Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 6 Sep 2022 10:08:44 +0200
+Subject: [PATCH 054/547] tree-optimization/106841 - gather and hybrid SLP
+
+Hybrid SLP detection currently fails to consider a not direct
+offset operand of a scatter/gather operation.  The following fixes
+this.
+
+	PR tree-optimization/106841
+	* tree-vect-slp.cc (vect_detect_hybrid_slp): Also process
+	scatter/gather offset.
+
+	* g++.dg/vect/pr106841.cc: New testcase.
+
+(cherry picked from commit e33e61d417eb5e981bb7d709f8681a2f55ed518a)
+---
+ gcc/testsuite/g++.dg/vect/pr106841.cc | 52 +++++++++++++++++++++++++++
+ gcc/tree-vect-slp.cc                  |  9 +++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/vect/pr106841.cc
+
+diff --git a/gcc/testsuite/g++.dg/vect/pr106841.cc b/gcc/testsuite/g++.dg/vect/pr106841.cc
+new file mode 100644
+index 00000000000..7458bc15a25
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/vect/pr106841.cc
+@@ -0,0 +1,52 @@
++// { dg-do compile }
++// { dg-additional-options "-O3 -ffast-math" }
++// { dg-additional-options "-march=bdver2" { target x86_64-*-* } }
++
++struct R3 {
++  double z;
++  R3(R3 A, R3 B) : z(B.z - A.z) {}
++  double norme() { return z; }
++};
++struct TBoundaryEdge {
++  int *vertices[2];
++  int &operator[](int i) { return *vertices[i]; }
++};
++struct Mesh {
++  int vertices;
++  TBoundaryEdge *bedges;
++  int operator()(int &vv) { return &vv - &vertices; }
++  TBoundaryEdge be(int i) { return bedges[i]; }
++};
++template <typename Data> struct GenericElement {
++  typedef typename Data::V Vertex;
++  static const int nv = Data::NbOfVertices;
++  Vertex *vertices[nv];
++  double mes;
++  void set(int *iv, Vertex *v0) {
++    for (int i = 0; i < nv; ++i)
++      vertices[i] = v0 + iv[i];
++    mes = Data::mesure(vertices);
++  }
++};
++struct DataSeg3 {
++  static const int NbOfVertices = 2;
++  typedef R3 V;
++  static double mesure(V *pv[]) { return R3(*pv[0], *pv[1]).norme(); }
++};
++struct MeshS {
++  MeshS();
++};
++template <class> struct Movemesh_Op { void foo(Mesh, DataSeg3::V *) const; };
++template <> void Movemesh_Op<int>::foo(Mesh pTh, DataSeg3::V *v0) const {
++  GenericElement<DataSeg3> *bS = new GenericElement<DataSeg3>[8];
++  for (int ibe = 0; ibe < 8; ibe++) {
++    TBoundaryEdge K(pTh.be(ibe));
++    int iv[2];
++    for (int i = 0; i < 2; i++) {
++      int &__trans_tmp_2 = K[i];
++      iv[i] = pTh(__trans_tmp_2);
++    }
++    bS[ibe].set(iv, v0);
++  }
++  MeshS T_Th;
++}
+diff --git a/gcc/tree-vect-slp.cc b/gcc/tree-vect-slp.cc
+index b89a417711b..0223056a186 100644
+--- a/gcc/tree-vect-slp.cc
++++ b/gcc/tree-vect-slp.cc
+@@ -4387,6 +4387,15 @@ vect_detect_hybrid_slp (loop_vec_info loop_vinfo)
+ 	 to use walk_gimple_op.  */
+       wi.is_lhs = 0;
+       walk_gimple_op (stmt_info->stmt, vect_detect_hybrid_slp, &wi);
++      /* For gather/scatter make sure to walk the offset operand, that
++	 can be a scaling and conversion away.  */
++      gather_scatter_info gs_info;
++      if (STMT_VINFO_GATHER_SCATTER_P (stmt_info)
++	  && vect_check_gather_scatter (stmt_info, loop_vinfo, &gs_info))
++	{
++	  int dummy;
++	  vect_detect_hybrid_slp (&gs_info.offset, &dummy, &wi);
++	}
+     }
+ }
+ 
+-- 
+2.25.1
+

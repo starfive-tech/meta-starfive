@@ -1,0 +1,235 @@
+From ed3e8a988e0ec5b926093e26dfeef1d8b7504d1f Mon Sep 17 00:00:00 2001
+From: Tobias Burnus <tobias@codesourcery.com>
+Date: Wed, 21 Dec 2022 07:55:22 +0100
+Subject: [PATCH 305/547] libgfortran's ISO_Fortran_binding.c: Use GCC11
+ version for backward-only code [PR108056]
+
+Since GCC 12, the conversion between the array descriptors formats - the
+internal (GFC) and the C binding one (CFI) - moved to the compiler itself
+such that the cfi_desc_to_gfc_desc/gfc_desc_to_cfi_desc functions are only
+used with older code (GCC 9 to 11).  The newly added checks caused asserts
+as older code did not pass the proper values (e.g. real(4) as effective
+argument arrived as BT_ASSUME type as the effective type got lost inbetween).
+
+As proposed in the PR, revert to the GCC 11 version - known bugs is better
+than some fixes and new issues. Still, GCC 12 is much better in terms of
+TS29113 support and should really be used.
+
+This patch uses the current libgomp version of the GCC 11 branch, except
+it fixes the GFC version number (which is 0), uses calloc instead of malloc,
+and sets the lower bound to 1 instead of keeping it as is for
+CFI_attribute_other.
+
+(cherry picked from commit e205ec03f0794aeac3e8a89e947c12624d5a274e)
+
+(This cherry pick excludes an accidentally committed file, which was
+removed in follow-up commit 18af26fc375398f0a7cd7bae5aabebd447f8c899.)
+
+libgfortran/ChangeLog:
+
+	PR libfortran/108056
+	* runtime/ISO_Fortran_binding.c (cfi_desc_to_gfc_desc,
+	gfc_desc_to_cfi_desc): Mostly revert to GCC 11 version for
+	those backward-compatiblity-only functions.
+---
+ libgfortran/runtime/ISO_Fortran_binding.c | 151 ++++------------------
+ 1 file changed, 22 insertions(+), 129 deletions(-)
+
+diff --git a/libgfortran/runtime/ISO_Fortran_binding.c b/libgfortran/runtime/ISO_Fortran_binding.c
+index 342df4275b9..e63a717a69b 100644
+--- a/libgfortran/runtime/ISO_Fortran_binding.c
++++ b/libgfortran/runtime/ISO_Fortran_binding.c
+@@ -39,60 +39,31 @@ export_proto(cfi_desc_to_gfc_desc);
+ void
+ cfi_desc_to_gfc_desc (gfc_array_void *d, CFI_cdesc_t **s_ptr)
+ {
+-  signed char type;
+-  size_t size;
+   int n;
++  index_type kind;
+   CFI_cdesc_t *s = *s_ptr;
+ 
+   if (!s)
+     return;
+ 
+-  /* Verify descriptor.  */
+-  switch (s->attribute)
+-    {
+-    case CFI_attribute_pointer:
+-    case CFI_attribute_allocatable:
+-      break;
+-    case CFI_attribute_other:
+-      if (s->base_addr)
+-	break;
+-      runtime_error ("Nonallocatable, nonpointer actual argument to BIND(C) "
+-		     "dummy argument where the effective argument is either "
+-		     "not allocated or not associated");
+-      break;
+-    default:
+-      runtime_error ("Invalid attribute type %d in CFI_cdesc_t descriptor",
+-		     (int) s->attribute);
+-      break;
+-    }
+   GFC_DESCRIPTOR_DATA (d) = s->base_addr;
++  GFC_DESCRIPTOR_TYPE (d) = (signed char)(s->type & CFI_type_mask);
++  kind = (index_type)((s->type - (s->type & CFI_type_mask)) >> CFI_type_kind_shift);
+ 
+   /* Correct the unfortunate difference in order with types.  */
+-  type = (signed char)(s->type & CFI_type_mask);
+-  switch (type)
+-    {
+-    case CFI_type_Character:
+-      type = BT_CHARACTER;
+-      break;
+-    case CFI_type_struct:
+-      type = BT_DERIVED;
+-      break;
+-    case CFI_type_cptr:
+-      /* FIXME: PR 100915.  GFC descriptors do not distinguish between
+-	 CFI_type_cptr and CFI_type_cfunptr.  */
+-      type = BT_VOID;
+-      break;
+-    default:
+-      break;
+-    }
+-
+-  GFC_DESCRIPTOR_TYPE (d) = type;
+-  GFC_DESCRIPTOR_SIZE (d) = s->elem_len;
++  if (GFC_DESCRIPTOR_TYPE (d) == BT_CHARACTER)
++    GFC_DESCRIPTOR_TYPE (d) = BT_DERIVED;
++  else if (GFC_DESCRIPTOR_TYPE (d) == BT_DERIVED)
++    GFC_DESCRIPTOR_TYPE (d) = BT_CHARACTER;
++
++  if (!s->rank || s->dim[0].sm == (CFI_index_t)s->elem_len)
++    GFC_DESCRIPTOR_SIZE (d) = s->elem_len;
++  else if (GFC_DESCRIPTOR_TYPE (d) != BT_DERIVED)
++    GFC_DESCRIPTOR_SIZE (d) = kind;
++  else
++    GFC_DESCRIPTOR_SIZE (d) = s->elem_len;
+ 
+   d->dtype.version = 0;
+-
+-  if (s->rank < 0 || s->rank > CFI_MAX_RANK)
+-    internal_error (NULL, "Invalid rank in descriptor");
+   GFC_DESCRIPTOR_RANK (d) = (signed char)s->rank;
+ 
+   d->dtype.attribute = (signed short)s->attribute;
+@@ -131,7 +102,6 @@ gfc_desc_to_cfi_desc (CFI_cdesc_t **d_ptr, const gfc_array_void *s)
+ {
+   int n;
+   CFI_cdesc_t *d;
+-  signed char type, kind;
+ 
+   /* Play it safe with allocation of the flexible array member 'dim'
+      by setting the length to CFI_MAX_RANK. This should not be necessary
+@@ -142,99 +112,22 @@ gfc_desc_to_cfi_desc (CFI_cdesc_t **d_ptr, const gfc_array_void *s)
+   else
+     d = *d_ptr;
+ 
+-  /* Verify descriptor.  */
+-  switch (s->dtype.attribute)
+-    {
+-    case CFI_attribute_pointer:
+-    case CFI_attribute_allocatable:
+-      break;
+-    case CFI_attribute_other:
+-      if (s->base_addr)
+-	break;
+-      runtime_error ("Nonallocatable, nonpointer actual argument to BIND(C) "
+-		     "dummy argument where the effective argument is either "
+-		     "not allocated or not associated");
+-      break;
+-    default:
+-      internal_error (NULL, "Invalid attribute in gfc_array descriptor");
+-      break;
+-    }
+   d->base_addr = GFC_DESCRIPTOR_DATA (s);
+   d->elem_len = GFC_DESCRIPTOR_SIZE (s);
+-  if (d->elem_len <= 0)
+-    internal_error (NULL, "Invalid size in descriptor");
+-
+   d->version = CFI_VERSION;
+-
+   d->rank = (CFI_rank_t)GFC_DESCRIPTOR_RANK (s);
+-  if (d->rank < 0 || d->rank > CFI_MAX_RANK)
+-    internal_error (NULL, "Invalid rank in descriptor");
+-
+   d->attribute = (CFI_attribute_t)s->dtype.attribute;
+ 
+-  type = GFC_DESCRIPTOR_TYPE (s);
+-  switch (type)
+-    {
+-    case BT_CHARACTER:
+-      d->type = CFI_type_Character;
+-      break;
+-    case BT_DERIVED:
+-      d->type = CFI_type_struct;
+-      break;
+-    case BT_VOID:
+-      /* FIXME: PR 100915.  GFC descriptors do not distinguish between
+-	 CFI_type_cptr and CFI_type_cfunptr.  */
+-      d->type = CFI_type_cptr;
+-      break;
+-    default:
+-      d->type = (CFI_type_t)type;
+-      break;
+-    }
+-
+-  switch (d->type)
+-    {
+-    case CFI_type_Integer:
+-    case CFI_type_Logical:
+-    case CFI_type_Real:
+-      kind = (signed char)d->elem_len;
+-      break;
+-    case CFI_type_Complex:
+-      kind = (signed char)(d->elem_len >> 1);
+-      break;
+-    case CFI_type_Character:
+-      /* FIXME: we can't distinguish between kind/len because
+-	 the GFC descriptor only encodes the elem_len..
+-	 Until PR92482 is fixed, assume elem_len refers to the
+-	 character size and not the string length.  */
+-      kind = (signed char)d->elem_len;
+-      break;
+-    case CFI_type_struct:
+-    case CFI_type_cptr:
+-    case CFI_type_other:
+-      /* FIXME: PR 100915.  GFC descriptors do not distinguish between
+-	 CFI_type_cptr and CFI_type_cfunptr.  */
+-      kind = 0;
+-      break;
+-    default:
+-      internal_error (NULL, "Invalid type in descriptor");
+-    }
+-
+-  if (kind < 0)
+-    internal_error (NULL, "Invalid kind in descriptor");
+-
+-  /* FIXME: This is PR100917.  Because the GFC descriptor encodes only the
+-     elem_len and not the kind, we get into trouble with long double kinds
+-     that do not correspond directly to the elem_len, specifically the
+-     kind 10 80-bit long double on x86 targets.  On x86_64, this has size
+-     16 and cannot be differentiated from true _Float128.  Prefer the
+-     standard long double type over the GNU extension in that case.  */
+-  if (d->type == CFI_type_Real && kind == sizeof (long double))
+-    d->type = CFI_type_long_double;
+-  else if (d->type == CFI_type_Complex && kind == sizeof (long double))
+-    d->type = CFI_type_long_double_Complex;
++  if (GFC_DESCRIPTOR_TYPE (s) == BT_CHARACTER)
++    d->type = CFI_type_Character;
++  else if (GFC_DESCRIPTOR_TYPE (s) == BT_DERIVED)
++    d->type = CFI_type_struct;
+   else
++    d->type = (CFI_type_t)GFC_DESCRIPTOR_TYPE (s);
++
++  if (GFC_DESCRIPTOR_TYPE (s) != BT_DERIVED)
+     d->type = (CFI_type_t)(d->type
+-			   + ((CFI_type_t)kind << CFI_type_kind_shift));
++		+ ((CFI_type_t)d->elem_len << CFI_type_kind_shift));
+ 
+   if (d->base_addr)
+     /* Full pointer or allocatable arrays retain their lower_bounds.  */
+-- 
+2.25.1
+

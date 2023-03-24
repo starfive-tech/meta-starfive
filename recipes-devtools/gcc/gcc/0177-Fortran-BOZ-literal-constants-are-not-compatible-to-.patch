@@ -1,0 +1,61 @@
+From 9831a5f4843b573bbdb2688bbf2de864b4e8be8b Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Wed, 26 Oct 2022 21:00:44 +0200
+Subject: [PATCH 177/547] Fortran: BOZ literal constants are not compatible to
+ any type [PR103413]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/103413
+	* symbol.cc (gfc_type_compatible): A boz-literal-constant has no type
+	and thus is not considered compatible to any type.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/103413
+	* gfortran.dg/illegal_boz_arg_4.f90: New test.
+
+(cherry picked from commit f7d28818179247685f3c101f9f2f16366f56309b)
+---
+ gcc/fortran/symbol.cc                           |  4 ++++
+ gcc/testsuite/gfortran.dg/illegal_boz_arg_4.f90 | 13 +++++++++++++
+ 2 files changed, 17 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/illegal_boz_arg_4.f90
+
+diff --git a/gcc/fortran/symbol.cc b/gcc/fortran/symbol.cc
+index 7a80dfd063b..b092813a5c0 100644
+--- a/gcc/fortran/symbol.cc
++++ b/gcc/fortran/symbol.cc
+@@ -5133,6 +5133,10 @@ gfc_type_compatible (gfc_typespec *ts1, gfc_typespec *ts2)
+   bool is_union1 = (ts1->type == BT_UNION);
+   bool is_union2 = (ts2->type == BT_UNION);
+ 
++  /* A boz-literal-constant has no type.  */
++  if (ts1->type == BT_BOZ || ts2->type == BT_BOZ)
++    return false;
++
+   if (is_class1
+       && ts1->u.derived->components
+       && ((ts1->u.derived->attr.is_class
+diff --git a/gcc/testsuite/gfortran.dg/illegal_boz_arg_4.f90 b/gcc/testsuite/gfortran.dg/illegal_boz_arg_4.f90
+new file mode 100644
+index 00000000000..856cfa9211f
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/illegal_boz_arg_4.f90
+@@ -0,0 +1,13 @@
++! { dg-do compile }
++! { dg-options "-std=f2018" }
++! PR fortran/103413
++! Contributed by G.Steinmetz
++
++program p
++  type t
++     class(*), allocatable :: a
++  end type
++  type(t) :: x
++  allocate (x%a, source=z'1') ! { dg-error "type incompatible" }
++  allocate (x%a, mold=z'1')   ! { dg-error "type incompatible" }
++end
+-- 
+2.25.1
+

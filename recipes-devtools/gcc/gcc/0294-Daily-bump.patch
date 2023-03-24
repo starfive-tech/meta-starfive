@@ -1,0 +1,54 @@
+From 8e08394fdf9e06ca8ae0022d55bd777672f7a8f4 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 19 Dec 2022 00:21:58 +0000
+Subject: [PATCH 294/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8b45390a1dd..11fabd49cf9 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221218
++20221219
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 90cde4f78d8..c20b7345e55 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2022-12-09  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/107872
++	* resolve.cc (derived_inaccessible): Skip over allocatable components
++	to prevent an infinite loop.
++
+ 2022-11-25  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 724d45ebe29..c63dd2bbb6f 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2022-12-09  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/107872
++	* gfortran.dg/pr107872.f90: New test.
++
+ 2022-12-15  Sebastian Pop  <spop@amazon.com>
+ 
+ 	PR target/98776
+-- 
+2.25.1
+

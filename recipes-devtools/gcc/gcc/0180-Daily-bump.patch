@@ -1,0 +1,60 @@
+From 67a7e47119b4a26d5c59ead630cc3b76ed9d6bcf Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 30 Oct 2022 00:19:54 +0000
+Subject: [PATCH 180/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 13 +++++++++++++
+ gcc/testsuite/ChangeLog | 10 ++++++++++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 06511cc68c5..1440bc55c69 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221029
++20221030
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index beccae107fc..fd118323103 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,16 @@
++2022-10-29  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-10-21  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100097
++	PR fortran/100098
++	* trans-array.cc (gfc_trans_class_array): New function to
++	initialize class descriptor's TKR information.
++	* trans-array.h (gfc_trans_class_array): Add function prototype.
++	* trans-decl.cc (gfc_trans_deferred_vars): Add calls to the new
++	function for both pointers and allocatables.
++
+ 2022-10-28  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 7b6bf8bf81c..600ec620dcb 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,13 @@
++2022-10-29  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-10-21  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100097
++	PR fortran/100098
++	* gfortran.dg/PR100097.f90: New test.
++	* gfortran.dg/PR100098.f90: New test.
++
+ 2022-10-28  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

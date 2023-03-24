@@ -1,0 +1,121 @@
+From e365bfacf2617403f6bc6aa79a45a27bdba8da36 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 31 Jan 2023 09:46:35 +0100
+Subject: [PATCH 448/547] bbpart: Fix up ICE on asm goto [PR108596]
+
+On the following testcase we have asm goto in hot block with 2 successors,
+one cold to which it both falls through and has one of the label
+pointing to it and another hot successor with another label.
+
+Now, during bbpart we want to ensure that no blocks from one partition fall
+through into a block in a different partition.  fix_up_fall_thru_edges
+does that by temporarily clearing the EDGE_CROSSING on the fallthrough edge,
+calling force_nonfallthru and then depending on whether it created a new
+bb either set EDGE_CROSSING on the single successor edge from the new bb
+(the new bb is kept in the same partition as the predecessor block), or
+if no new bb has been created setting EDGE_CROSSING back on the fallthru
+edge which has been forced non-EDGE_FALLTHRU.
+For asm goto this doesn't always work, force_nonfallthru can create a new bb
+and change the fallthrough edge to point to that, but if the original
+fallthru destination block has its label referenced among the asm goto
+labels, it will create a new non-fallthru edge for the label(s).
+But because we've temporarily cheated and cleared EDGE_CROSSING on the edge,
+it is cleared on the new edge as well, then the caller sees we've created
+a new bb and just sets EDGE_CROSSING on the single fallthru edge from the
+new bb.  But the direct edge from cur_bb to fallthru edge's destination
+isn't handled and fails afterwards consistency checks, because it crosses
+partitions.
+
+The following patch notes the case and sets EDGE_CROSSING on that edge too.
+
+2023-01-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/108596
+	* bb-reorder.cc (fix_up_fall_thru_edges): Handle the case where cur_bb
+	ends with asm goto and has a crossing fallthrough edge to the same bb
+	that contains at least one of its labels by restoring EDGE_CROSSING
+	flag even on possible edge from cur_bb to new_bb successor.
+
+	* gcc.c-torture/compile/pr108596.c: New test.
+
+(cherry picked from commit 603a6fbcaac1e80aa90d1d26318c881a53473066)
+---
+ gcc/bb-reorder.cc                             | 21 ++++++++++++++-
+ .../gcc.c-torture/compile/pr108596.c          | 26 +++++++++++++++++++
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr108596.c
+
+diff --git a/gcc/bb-reorder.cc b/gcc/bb-reorder.cc
+index d20ccb83aa6..2c194aa9055 100644
+--- a/gcc/bb-reorder.cc
++++ b/gcc/bb-reorder.cc
+@@ -1998,6 +1998,7 @@ fix_up_fall_thru_edges (void)
+ 		     becomes EDGE_CROSSING.  */
+ 
+ 		  fall_thru->flags &= ~EDGE_CROSSING;
++		  unsigned old_count = EDGE_COUNT (cur_bb->succs);
+ 		  basic_block new_bb = force_nonfallthru (fall_thru);
+ 
+ 		  if (new_bb)
+@@ -2009,7 +2010,25 @@ fix_up_fall_thru_edges (void)
+ 		      gcc_assert (BB_PARTITION (new_bb)
+                                   == BB_PARTITION (cur_bb));
+ 
+-		      single_succ_edge (new_bb)->flags |= EDGE_CROSSING;
++		      edge e = single_succ_edge (new_bb);
++		      e->flags |= EDGE_CROSSING;
++		      if (EDGE_COUNT (cur_bb->succs) > old_count)
++			{
++			  /* If asm goto has a crossing fallthrough edge
++			     and at least one of the labels to the same bb,
++			     force_nonfallthru can result in the fallthrough
++			     edge being redirected and a new edge added for the
++			     label or more labels to e->dest.  As we've
++			     temporarily cleared EDGE_CROSSING flag on the
++			     fallthrough edge, we need to restore it again.
++			     See PR108596.  */
++			  rtx_insn *j = BB_END (cur_bb);
++			  gcc_checking_assert (JUMP_P (j)
++					       && asm_noperands (PATTERN (j)));
++			  edge e2 = find_edge (cur_bb, e->dest);
++			  if (e2)
++			    e2->flags |= EDGE_CROSSING;
++			}
+ 		    }
+ 		  else
+ 		    {
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr108596.c b/gcc/testsuite/gcc.c-torture/compile/pr108596.c
+new file mode 100644
+index 00000000000..4de6c49d7ce
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr108596.c
+@@ -0,0 +1,26 @@
++/* PR rtl-optimization/108596 */
++
++__attribute__((__cold__)) void foo (void);
++void bar (void);
++
++void
++baz (void)
++{
++  asm goto ("" : : : : l1, l0);
++  goto l0;
++l1:
++  bar ();
++l0:
++  foo ();
++}
++
++void
++qux (void)
++{
++  asm goto ("" : : : : l1, l0);
++  __builtin_unreachable ();
++l1:
++  bar ();
++l0:
++  foo ();
++}
+-- 
+2.25.1
+

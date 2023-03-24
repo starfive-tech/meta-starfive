@@ -1,0 +1,86 @@
+From 104864f99c07f87b53c7f45c50a1991b21249489 Mon Sep 17 00:00:00 2001
+From: "Kewen.Lin" <linkw@gcc.gnu.org>
+Date: Tue, 13 Sep 2022 04:13:59 -0500
+Subject: [PATCH 079/547] rs6000: Handle unresolved overloaded builtin
+ [PR105485]
+
+PR105485 exposes that new builtin function framework doesn't handle
+unresolved overloaded builtin function well.  With new builtin
+function support, we don't have builtin info for any overloaded
+rs6000_gen_builtins enum, since they are expected to be resolved to
+one specific instance.  So when function rs6000_gimple_fold_builtin
+faces one unresolved overloaded builtin, the access for builtin info
+becomes out of bound and gets ICE then.
+
+We should not try to fold one unresolved overloaded builtin there
+and as the previous support we should emit one error message during
+expansion phase like "unresolved overload for builtin ...".
+
+	PR target/105485
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
+	the handling for unresolved overloaded builtin function.
+	(rs6000_expand_builtin): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.target/powerpc/pr105485.C: New test.
+
+(cherry picked from commit 94504c9ae157db937a2e62d533a36d56598f3c09)
+---
+ gcc/config/rs6000/rs6000-builtin.cc         | 13 +++++++++++++
+ gcc/testsuite/g++.target/powerpc/pr105485.C |  9 +++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 gcc/testsuite/g++.target/powerpc/pr105485.C
+
+diff --git a/gcc/config/rs6000/rs6000-builtin.cc b/gcc/config/rs6000/rs6000-builtin.cc
+index 15370e45e65..26b486a9e5d 100644
+--- a/gcc/config/rs6000/rs6000-builtin.cc
++++ b/gcc/config/rs6000/rs6000-builtin.cc
+@@ -1299,6 +1299,11 @@ rs6000_gimple_fold_builtin (gimple_stmt_iterator *gsi)
+   enum tree_code bcode;
+   gimple *g;
+ 
++  /* For an unresolved overloaded builtin, return early here since there
++     is no builtin info for it and we are unable to fold it.  */
++  if (fn_code > RS6000_OVLD_NONE)
++    return false;
++
+   size_t uns_fncode = (size_t) fn_code;
+   enum insn_code icode = rs6000_builtin_info[uns_fncode].icode;
+   const char *fn_name1 = rs6000_builtin_info[uns_fncode].bifname;
+@@ -3300,6 +3305,14 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
+   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+   enum rs6000_gen_builtins fcode
+     = (enum rs6000_gen_builtins) DECL_MD_FUNCTION_CODE (fndecl);
++
++  /* Emit error message if it's an unresolved overloaded builtin.  */
++  if (fcode > RS6000_OVLD_NONE)
++    {
++      error ("unresolved overload for builtin %qF", fndecl);
++      return const0_rtx;
++    }
++
+   size_t uns_fcode = (size_t)fcode;
+   enum insn_code icode = rs6000_builtin_info[uns_fcode].icode;
+ 
+diff --git a/gcc/testsuite/g++.target/powerpc/pr105485.C b/gcc/testsuite/g++.target/powerpc/pr105485.C
+new file mode 100644
+index 00000000000..db1bd944aae
+--- /dev/null
++++ b/gcc/testsuite/g++.target/powerpc/pr105485.C
+@@ -0,0 +1,9 @@
++/* It's to verify no ICE here, ignore error/warning messages
++   since they are not test points here.  */
++/* { dg-excess-errors "pr105485" } */
++
++template <class> void __builtin_vec_vslv();
++typedef  __attribute__((altivec(vector__))) char T;
++T b (T c, T d) {
++    return __builtin_vec_vslv(c, d);
++}
+-- 
+2.25.1
+

@@ -1,0 +1,114 @@
+From 511928102dc9fa3f9c377e01f9bfb605b4995a61 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 24 Jan 2023 22:36:25 +0100
+Subject: [PATCH 408/547] Fortran: fix ICE in compare_bound_int [PR108527]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108527
+	* resolve.cc (compare_bound_int): Expression to compare must be of
+	type INTEGER.
+	(compare_bound_mpz_t): Likewise.
+	(check_dimension): Fix comment on checks applied to array section
+	and clean up associated logic.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108527
+	* gfortran.dg/pr108527.f90: New test.
+
+Co-authored-by: Steven G. Kargl <kargl@gcc.gnu.org>
+(cherry picked from commit 22afa4947584c701633a79fd8750c9ceeaa96711)
+---
+ gcc/fortran/resolve.cc                 | 29 +++++++++++++-------------
+ gcc/testsuite/gfortran.dg/pr108527.f90 | 10 +++++++++
+ 2 files changed, 24 insertions(+), 15 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108527.f90
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index f4b5441622e..a1a91dc425f 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -4575,12 +4575,11 @@ compare_bound_int (gfc_expr *a, int b)
+ {
+   int i;
+ 
+-  if (a == NULL || a->expr_type != EXPR_CONSTANT)
++  if (a == NULL
++      || a->expr_type != EXPR_CONSTANT
++      || a->ts.type != BT_INTEGER)
+     return CMP_UNKNOWN;
+ 
+-  if (a->ts.type != BT_INTEGER)
+-    gfc_internal_error ("compare_bound_int(): Bad expression");
+-
+   i = mpz_cmp_si (a->value.integer, b);
+ 
+   if (i < 0)
+@@ -4598,12 +4597,11 @@ compare_bound_mpz_t (gfc_expr *a, mpz_t b)
+ {
+   int i;
+ 
+-  if (a == NULL || a->expr_type != EXPR_CONSTANT)
++  if (a == NULL
++      || a->expr_type != EXPR_CONSTANT
++      || a->ts.type != BT_INTEGER)
+     return CMP_UNKNOWN;
+ 
+-  if (a->ts.type != BT_INTEGER)
+-    gfc_internal_error ("compare_bound_int(): Bad expression");
+-
+   i = mpz_cmp (a->value.integer, b);
+ 
+   if (i < 0)
+@@ -4733,23 +4731,24 @@ check_dimension (int i, gfc_array_ref *ar, gfc_array_spec *as)
+ #define AR_END (ar->end[i] ? ar->end[i] : as->upper[i])
+ 
+ 	compare_result comp_start_end = compare_bound (AR_START, AR_END);
++	compare_result comp_stride_zero = compare_bound_int (ar->stride[i], 0);
+ 
+ 	/* Check for zero stride, which is not allowed.  */
+-	if (compare_bound_int (ar->stride[i], 0) == CMP_EQ)
++	if (comp_stride_zero == CMP_EQ)
+ 	  {
+ 	    gfc_error ("Illegal stride of zero at %L", &ar->c_where[i]);
+ 	    return false;
+ 	  }
+ 
+-	/* if start == len || (stride > 0 && start < len)
+-			   || (stride < 0 && start > len),
++	/* if start == end || (stride > 0 && start < end)
++			   || (stride < 0 && start > end),
+ 	   then the array section contains at least one element.  In this
+ 	   case, there is an out-of-bounds access if
+ 	   (start < lower || start > upper).  */
+-	if (compare_bound (AR_START, AR_END) == CMP_EQ
+-	    || ((compare_bound_int (ar->stride[i], 0) == CMP_GT
+-		 || ar->stride[i] == NULL) && comp_start_end == CMP_LT)
+-	    || (compare_bound_int (ar->stride[i], 0) == CMP_LT
++	if (comp_start_end == CMP_EQ
++	    || ((comp_stride_zero == CMP_GT || ar->stride[i] == NULL)
++		&& comp_start_end == CMP_LT)
++	    || (comp_stride_zero == CMP_LT
+ 	        && comp_start_end == CMP_GT))
+ 	  {
+ 	    if (compare_bound (AR_START, as->lower[i]) == CMP_LT)
+diff --git a/gcc/testsuite/gfortran.dg/pr108527.f90 b/gcc/testsuite/gfortran.dg/pr108527.f90
+new file mode 100644
+index 00000000000..c97ba3111cb
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108527.f90
+@@ -0,0 +1,10 @@
++! { dg-do compile }
++! PR fortran/108527 - ICE in compare_bound_int
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a((2.)) = [4,8] ! { dg-error "must be of INTEGER type" }
++  integer(a(1:1)) :: b                  ! { dg-error "out of bounds" }
++end
++
++! { dg-prune-output "Parameter array" }
+-- 
+2.25.1
+

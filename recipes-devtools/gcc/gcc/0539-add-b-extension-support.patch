@@ -1,0 +1,82 @@
+From 2b9e86889e52cbe8ae224420f4094d1b52a03139 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 14 Mar 2023 19:11:32 -0700
+Subject: [PATCH 539/547] add "b" extension support
+
+---
+ gcc/common/config/riscv/riscv-common.cc | 19 ++++++++++++++++---
+ gcc/config/riscv/riscv.opt              |  2 ++
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index 1501242e296..f26874c57ab 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -47,6 +47,10 @@ struct riscv_implied_info_t
+ /* Implied ISA info, must end with NULL sentinel.  */
+ static const riscv_implied_info_t riscv_implied_info[] =
+ {
++  {"b", "zbb"},
++  {"b", "zbs"},
++  {"b", "zba"},
++  {"b", "zbc"},
+   {"d", "f"},
+   {"f", "zicsr"},
+   {"d", "zicsr"},
+@@ -149,6 +153,7 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
+   {"zifencei", ISA_SPEC_CLASS_20191213, 2, 0},
+   {"zifencei", ISA_SPEC_CLASS_20190608, 2, 0},
+ 
++  {"b", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbb", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbc", ISA_SPEC_CLASS_NONE, 1, 0},
+@@ -787,8 +792,15 @@ riscv_subset_list::parse_std_ext (const char *p)
+ 
+       p = parsing_subset_version (subset, p, &major_version, &minor_version,
+ 				  /* std_ext_p= */ true, &explicit_version_p);
+-
+-      add (subset, major_version, minor_version, explicit_version_p, false);
++      if (std_ext == 'b')
++        { 
++          add ("zba", major_version, minor_version, explicit_version_p, false);
++          add ("zbb", major_version, minor_version, explicit_version_p, false);
++          add ("zbc", major_version, minor_version, explicit_version_p, false);
++          add ("zbs", major_version, minor_version, explicit_version_p, false);
++        }
++      else 
++        add (subset, major_version, minor_version, explicit_version_p, false);
+     }
+   return p;
+ }
+@@ -1094,6 +1106,7 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"zicsr",    &gcc_options::x_riscv_zi_subext, MASK_ZICSR},
+   {"zifencei", &gcc_options::x_riscv_zi_subext, MASK_ZIFENCEI},
+ 
++  {"b",      &gcc_options::x_target_flags, MASK_BITMANIP},
+   {"zba",    &gcc_options::x_riscv_zb_subext, MASK_ZBA},
+   {"zbb",    &gcc_options::x_riscv_zb_subext, MASK_ZBB},
+   {"zbc",    &gcc_options::x_riscv_zb_subext, MASK_ZBC},
+@@ -1304,4 +1317,4 @@ static const struct default_options riscv_option_optimization_table[] =
+ #undef TARGET_HANDLE_OPTION
+ #define TARGET_HANDLE_OPTION riscv_handle_option
+ 
+-struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
++struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
+\ No newline at end of file
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index 492aad12324..164b6762fd1 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -148,6 +148,8 @@ Mask(RVE)
+ 
+ Mask(VECTOR)
+ 
++Mask(BITMANIP)
++
+ mriscv-attribute
+ Target Var(riscv_emit_attribute_p) Init(-1)
+ Emit RISC-V ELF attribute.
+-- 
+2.25.1
+

@@ -1,0 +1,134 @@
+From 445082ff3cb7f9d30021adf338e9ab6038c3e412 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 23 Feb 2023 17:54:47 -0500
+Subject: [PATCH 517/547] c++: ICE with constexpr variable template [PR107938]
+
+Since r11-557, cp_finish_decl can call check_initializer even in
+a template for a constexpr initializer.  That ultimately leads to
+convert_for_assignment and check_address_or_pointer_of_packed_member,
+where we crash, because it doesn't expect that the CALL_EXPR is
+a function object.  Q has a constexpr operator(), but since we're
+in a template, q(0) is a CALL_EXPR whose CALL_EXPR_FN is just
+a VAR_DECL; it hasn't been converted to Q::operator<int>(&q, 0) yet.
+I propose to robustify check_address_or_pointer_of_packed_member.
+
+var-templ74.C has an XFAIL, subject to 107939.
+
+I noticed that our -Waddress-of-packed-member tests weren't testing
+member functions, added thus.  (I was tempted to check
+FUNCTION_POINTER_TYPE_P but that doesn't include METHOD_TYPE.)
+
+	PR c++/107938
+
+gcc/c-family/ChangeLog:
+
+	* c-warn.cc (check_address_or_pointer_of_packed_member): Check
+	POINTER_TYPE_P.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1y/var-templ73.C: New test.
+	* g++.dg/cpp1y/var-templ74.C: New test.
+	* g++.dg/warn/Waddress-of-packed-member3.C: New test.
+
+(cherry picked from commit ea718febab2a1f6e58806738abf70f1c73c6a308)
+---
+ gcc/c-family/c-warn.cc                        |  4 ++++
+ gcc/testsuite/g++.dg/cpp1y/var-templ73.C      | 12 ++++++++++
+ gcc/testsuite/g++.dg/cpp1y/var-templ74.C      | 19 +++++++++++++++
+ .../g++.dg/warn/Waddress-of-packed-member3.C  | 23 +++++++++++++++++++
+ 4 files changed, 58 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ73.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ74.C
+ create mode 100644 gcc/testsuite/g++.dg/warn/Waddress-of-packed-member3.C
+
+diff --git a/gcc/c-family/c-warn.cc b/gcc/c-family/c-warn.cc
+index 0ad0034180b..0791ba1647a 100644
+--- a/gcc/c-family/c-warn.cc
++++ b/gcc/c-family/c-warn.cc
+@@ -2986,6 +2986,10 @@ check_address_or_pointer_of_packed_member (tree type, tree rhs)
+ 	  if (rhs == NULL_TREE)
+ 	    return NULL_TREE;
+ 	  rhs = TREE_TYPE (rhs);	/* Pointer type.  */
++	  /* We could be called while processing a template and RHS could be
++	     a functor.  In that case it's a class, not a pointer.  */
++	  if (!POINTER_TYPE_P (rhs))
++	    return NULL_TREE;
+ 	  rhs = TREE_TYPE (rhs);	/* Function type.  */
+ 	  rhstype = TREE_TYPE (rhs);
+ 	  if (!rhstype || !POINTER_TYPE_P (rhstype))
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ73.C b/gcc/testsuite/g++.dg/cpp1y/var-templ73.C
+new file mode 100644
+index 00000000000..b76babcfa81
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ73.C
+@@ -0,0 +1,12 @@
++// PR c++/107938
++// { dg-do compile { target c++14 } }
++
++struct Q {
++  int n;
++  constexpr const Q* operator()(int) const { return this; }
++};
++
++constexpr Q q{};
++
++template<int>
++constexpr const Q* p = q(0);
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ74.C b/gcc/testsuite/g++.dg/cpp1y/var-templ74.C
+new file mode 100644
+index 00000000000..4e2e800a6eb
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ74.C
+@@ -0,0 +1,19 @@
++// PR c++/107938
++// { dg-do compile { target c++14 } }
++
++struct Q {
++  int n;
++  constexpr const Q* operator()(int) const { return this; }
++};
++
++extern const Q q;
++
++template<int>
++constexpr const Q* p = q(0); // { dg-bogus "not usable" "PR107939" { xfail *-*-* } }
++
++void
++g ()
++{
++  constexpr const Q* p2 = q(0);
++  constexpr auto x = p<0>;
++}
+diff --git a/gcc/testsuite/g++.dg/warn/Waddress-of-packed-member3.C b/gcc/testsuite/g++.dg/warn/Waddress-of-packed-member3.C
+new file mode 100644
+index 00000000000..aeffb969c01
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Waddress-of-packed-member3.C
+@@ -0,0 +1,23 @@
++// { dg-do compile { target { ! default_packed } } }
++// Test that -Waddress-of-packed-member works with member functions.
++
++struct S {
++  char c;
++} __attribute__((packed));
++
++struct X {
++  S* memfn ();
++  static S* smemfn ();
++} x;
++
++S *foo ();
++
++S**
++f ()
++{
++  S **s;
++  s = reinterpret_cast<S**>(foo ()); // { dg-warning "converting a packed" }
++  s = reinterpret_cast<S**>(x.memfn ()); // { dg-warning "converting a packed" }
++  s = reinterpret_cast<S**>(X::smemfn ()); // { dg-warning "converting a packed" }
++  return s;
++}
+-- 
+2.25.1
+

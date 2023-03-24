@@ -1,0 +1,110 @@
+From 4c8e17a6a578b9eb15cd210651b6ea273022db39 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 4 Jan 2023 10:54:38 +0100
+Subject: [PATCH 438/547] generic-match-head: Don't assume GENERIC folding is
+ done only early [PR108237]
+
+We ICE on the following testcase, because a valid V2DImode
+!= comparison is folded into an unsupported V2DImode > comparison.
+The match.pd pattern which does this looks like:
+/* Transform comparisons of the form (X & Y) CMP 0 to X CMP2 Z
+   where ~Y + 1 == pow2 and Z = ~Y.  */
+(for cst (VECTOR_CST INTEGER_CST)
+ (for cmp (eq ne)
+      icmp (le gt)
+  (simplify
+   (cmp (bit_and:c@2 @0 cst@1) integer_zerop)
+    (with { tree csts = bitmask_inv_cst_vector_p (@1); }
+     (if (csts && (VECTOR_TYPE_P (TREE_TYPE (@1)) || single_use (@2)))
+      (with { auto optab = VECTOR_TYPE_P (TREE_TYPE (@1))
+                         ? optab_vector : optab_default;
+              tree utype = unsigned_type_for (TREE_TYPE (@1)); }
+       (if (target_supports_op_p (utype, icmp, optab)
+            || (optimize_vectors_before_lowering_p ()
+                && (!target_supports_op_p (type, cmp, optab)
+                    || !target_supports_op_p (type, BIT_AND_EXPR, optab))))
+        (if (TYPE_UNSIGNED (TREE_TYPE (@1)))
+         (icmp @0 { csts; })
+         (icmp (view_convert:utype @0) { csts; })))))))))
+and that optimize_vectors_before_lowering_p () guarded stuff there
+already deals with this problem, not trying to fold a supported comparison
+into a non-supported one.  The reason it doesn't work in this case is that
+it isn't GIMPLE folding which does this, but GENERIC folding done during
+forwprop4 - forward_propagate_into_comparison -> forward_propagate_into_comparison_1
+-> combine_cond_expr_cond -> fold_binary_loc -> generic_simplify
+and we simply assumed that GENERIC folding happens only before
+gimplification.
+
+The following patch fixes that by checking cfun properties instead of
+always returning true in those cases.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108237
+	* generic-match-head.cc: Include tree-pass.h.
+	(canonicalize_math_p, optimize_vectors_before_lowering_p): Define
+	to false if cfun and cfun->curr_properties has PROP_gimple_opt_math
+	resp. PROP_gimple_lvec property set.
+
+	* gcc.c-torture/compile/pr108237.c: New test.
+
+(cherry picked from commit 345dffd0d4ebff7e705dfff1a8a72017a167120a)
+---
+ gcc/generic-match-head.cc                      |  5 +++--
+ gcc/testsuite/gcc.c-torture/compile/pr108237.c | 14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr108237.c
+
+diff --git a/gcc/generic-match-head.cc b/gcc/generic-match-head.cc
+index e11a736b343..749587eae5e 100644
+--- a/gcc/generic-match-head.cc
++++ b/gcc/generic-match-head.cc
+@@ -38,6 +38,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "optabs-tree.h"
+ #include "dbgcnt.h"
+ #include "tm.h"
++#include "tree-pass.h"
+ 
+ /* Routine to determine if the types T1 and T2 are effectively
+    the same for GENERIC.  If T1 or T2 is not a type, the test
+@@ -69,7 +70,7 @@ single_use (tree t ATTRIBUTE_UNUSED)
+ static inline bool
+ canonicalize_math_p ()
+ {
+-  return true;
++  return !cfun || (cfun->curr_properties & PROP_gimple_opt_math) == 0;
+ }
+ 
+ /* Return true if math operations that are beneficial only after
+@@ -88,7 +89,7 @@ canonicalize_math_after_vectorization_p ()
+ static inline bool
+ optimize_vectors_before_lowering_p ()
+ {
+-  return true;
++  return !cfun || (cfun->curr_properties & PROP_gimple_lvec) == 0;
+ }
+ 
+ /* Return true if successive divisions can be optimized.
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr108237.c b/gcc/testsuite/gcc.c-torture/compile/pr108237.c
+new file mode 100644
+index 00000000000..52b7f9d177f
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr108237.c
+@@ -0,0 +1,14 @@
++/* PR middle-end/108237 */
++
++typedef unsigned char __attribute__((__vector_size__ (1))) U;
++typedef unsigned long long __attribute__((__vector_size__ (16))) V;
++
++U u;
++V v;
++
++V
++foo (void)
++{
++  V w = v != ((unsigned char) ((unsigned char) u == u) & v);
++  return w;
++}
+-- 
+2.25.1
+

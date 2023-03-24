@@ -1,0 +1,28 @@
+From 6484fc2bf682ccf50c11675773cf72d32a079426 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Mon, 14 Nov 2022 08:08:26 +0100
+Subject: [PATCH 371/547] restrict gcc.dg/pr107554.c to 64bit platforms
+
+The following avoids exceeding the maximum object size on 32bit
+platforms.
+
+	* gcc.dg/pr107554.c: Restrict to lp64.
+
+(cherry picked from commit e7ebdf51ea514ad0b2272ecfa97d6ec72a527e40)
+---
+ gcc/testsuite/gcc.dg/pr107554.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.dg/pr107554.c b/gcc/testsuite/gcc.dg/pr107554.c
+index 8bbe6b07ae9..61ef2bcd90a 100644
+--- a/gcc/testsuite/gcc.dg/pr107554.c
++++ b/gcc/testsuite/gcc.dg/pr107554.c
+@@ -1,4 +1,4 @@
+-/* { dg-do compile } */
++/* { dg-do compile { target lp64 } } */
+ /* { dg-options "-O -foptimize-strlen" } */
+ 
+ #define ELEMS 0x40000000
+-- 
+2.25.1
+

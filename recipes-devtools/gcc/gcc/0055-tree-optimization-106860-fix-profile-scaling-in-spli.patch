@@ -1,0 +1,99 @@
+From 4ce316ca54c863cf0fd4257ba0ab768ab83c62e5 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 7 Sep 2022 10:44:33 +0200
+Subject: [PATCH 055/547] tree-optimization/106860 - fix profile scaling in
+ split_loop
+
+The following fixes a mistake in loop splitting which assumes loop
+latches have a single predecessor and that edge is from the exit
+test.  Instead work from the single exit edge we have to find the
+edge towards the latch.
+
+	PR tree-optimization/106860
+	* tree-ssa-loop-split.cc (split_loop): Find the exit to
+	latch edge from the loop exit edge instead of from the
+	latch.  Verify we're going to find it.
+
+	* g++.dg/opt/pr106860.C: New testcase.
+
+(cherry picked from commit 0386609923577e07354ee63754795b2f729e7e00)
+---
+ gcc/testsuite/g++.dg/opt/pr106860.C | 23 +++++++++++++++++++++++
+ gcc/tree-ssa-loop-split.cc          | 16 ++++++++++------
+ 2 files changed, 33 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/opt/pr106860.C
+
+diff --git a/gcc/testsuite/g++.dg/opt/pr106860.C b/gcc/testsuite/g++.dg/opt/pr106860.C
+new file mode 100644
+index 00000000000..a0209dcf9da
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/pr106860.C
+@@ -0,0 +1,23 @@
++// { dg-do compile }
++// { dg-options "-Ofast -ftrapv -fnon-call-exceptions -fno-tree-fre" }
++
++static const int N = 12;
++int nSlip;
++
++int main ()
++{
++  int i, j, k, fdot = 0;
++  int a[N][N];
++
++  for ( i = 1; i < nSlip; i++)
++    {
++      for ( j = i+1; j < nSlip; j++)
++        {
++          for ( k = 0; k < i; k++)
++            fdot += a[i][k] * a[k][j];
++          a[i][j] = a[i][j] - fdot;
++        }
++   }
++
++  return 0;
++}
+diff --git a/gcc/tree-ssa-loop-split.cc b/gcc/tree-ssa-loop-split.cc
+index b93ee4c8769..b819c0676c9 100644
+--- a/gcc/tree-ssa-loop-split.cc
++++ b/gcc/tree-ssa-loop-split.cc
+@@ -533,16 +533,17 @@ split_loop (class loop *loop1)
+   tree guard_iv;
+   tree border = NULL_TREE;
+   affine_iv iv;
++  edge exit1;
+ 
+-  if (!single_exit (loop1)
++  if (!(exit1 = single_exit (loop1))
++      || EDGE_COUNT (exit1->src->succs) != 2
+       /* ??? We could handle non-empty latches when we split the latch edge
+ 	 (not the exit edge), and put the new exit condition in the new block.
+ 	 OTOH this executes some code unconditionally that might have been
+ 	 skipped by the original exit before.  */
+       || !empty_block_p (loop1->latch)
+       || !easy_exit_values (loop1)
+-      || !number_of_iterations_exit (loop1, single_exit (loop1), &niter,
+-				     false, true)
++      || !number_of_iterations_exit (loop1, exit1, &niter, false, true)
+       || niter.cmp == ERROR_MARK
+       /* We can't yet handle loops controlled by a != predicate.  */
+       || niter.cmp == NE_EXPR)
+@@ -646,10 +647,13 @@ split_loop (class loop *loop1)
+ 	fix_loop_bb_probability (loop1, loop2, true_edge, false_edge);
+ 
+ 	/* Fix first loop's exit probability after scaling.  */
+-	edge exit_to_latch1 = single_pred_edge (loop1->latch);
++	edge exit_to_latch1;
++	if (EDGE_SUCC (exit1->src, 0) == exit1)
++	  exit_to_latch1 = EDGE_SUCC (exit1->src, 1);
++	else
++	  exit_to_latch1 = EDGE_SUCC (exit1->src, 0);
+ 	exit_to_latch1->probability *= true_edge->probability;
+-	single_exit (loop1)->probability
+-	  = exit_to_latch1->probability.invert ();
++	exit1->probability = exit_to_latch1->probability.invert ();
+ 
+ 	/* Finally patch out the two copies of the condition to be always
+ 	   true/false (or opposite).  */
+-- 
+2.25.1
+

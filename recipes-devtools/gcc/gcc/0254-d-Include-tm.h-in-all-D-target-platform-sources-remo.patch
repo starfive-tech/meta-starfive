@@ -1,0 +1,124 @@
+From 490b0c669d0f8fb14931cdcf7f5318c6a842c666 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Thu, 8 Sep 2022 12:29:32 +0200
+Subject: [PATCH 254/547] d: Include tm.h in all D target platform sources,
+ remove memmodel.h
+
+The tm.h header would pull in config/elfos.h, which defines
+TARGET_D_MINFO_SECTION needed for the D module support in the front-end
+to emit data to the correct section for the run-time library to pick up.
+
+The removal of it in r13-2385 caused a stage2 bootstrap failure on all
+Solaris targets.
+
+The memmodel header has also been removed as it is no longer required
+now tm_p.h is no longer used by these sources.
+
+gcc/ChangeLog:
+
+	* config/darwin-d.cc: Include tm.h.
+	* config/dragonfly-d.cc: Likewise.
+	* config/freebsd-d.cc: Remove memmodel.h.
+	* config/glibc-d.cc: Likewise.
+	* config/netbsd-d.cc: Include tm.h.
+	* config/openbsd-d.cc: Likewise.
+	* config/sol2-d.cc: Likewise.
+
+(cherry picked from commit a7852bd30a19d29ff7986869453786d460d17877)
+---
+ gcc/config/darwin-d.cc    | 1 +
+ gcc/config/dragonfly-d.cc | 1 +
+ gcc/config/freebsd-d.cc   | 1 -
+ gcc/config/glibc-d.cc     | 1 -
+ gcc/config/netbsd-d.cc    | 1 +
+ gcc/config/openbsd-d.cc   | 1 +
+ gcc/config/sol2-d.cc      | 1 +
+ 7 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/darwin-d.cc b/gcc/config/darwin-d.cc
+index e983883dba6..2ceebc49851 100644
+--- a/gcc/config/darwin-d.cc
++++ b/gcc/config/darwin-d.cc
+@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+diff --git a/gcc/config/dragonfly-d.cc b/gcc/config/dragonfly-d.cc
+index d431638f7da..881c5e60b9a 100644
+--- a/gcc/config/dragonfly-d.cc
++++ b/gcc/config/dragonfly-d.cc
+@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+diff --git a/gcc/config/freebsd-d.cc b/gcc/config/freebsd-d.cc
+index 189e4a69e78..c795ca2978c 100644
+--- a/gcc/config/freebsd-d.cc
++++ b/gcc/config/freebsd-d.cc
+@@ -18,7 +18,6 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+-#include "memmodel.h"
+ #include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+diff --git a/gcc/config/glibc-d.cc b/gcc/config/glibc-d.cc
+index 80ef27d19c6..1411f1973e5 100644
+--- a/gcc/config/glibc-d.cc
++++ b/gcc/config/glibc-d.cc
+@@ -19,7 +19,6 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
+-#include "memmodel.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+diff --git a/gcc/config/netbsd-d.cc b/gcc/config/netbsd-d.cc
+index cd0c95568a1..dbabae7ab71 100644
+--- a/gcc/config/netbsd-d.cc
++++ b/gcc/config/netbsd-d.cc
+@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+diff --git a/gcc/config/openbsd-d.cc b/gcc/config/openbsd-d.cc
+index 33c7e41ab62..bb3a3f28f6d 100644
+--- a/gcc/config/openbsd-d.cc
++++ b/gcc/config/openbsd-d.cc
+@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+diff --git a/gcc/config/sol2-d.cc b/gcc/config/sol2-d.cc
+index 0ace79d5aae..cecb49cc826 100644
+--- a/gcc/config/sol2-d.cc
++++ b/gcc/config/sol2-d.cc
+@@ -18,6 +18,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+-- 
+2.25.1
+

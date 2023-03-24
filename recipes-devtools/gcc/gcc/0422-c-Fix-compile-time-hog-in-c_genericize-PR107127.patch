@@ -1,0 +1,62 @@
+From b585bd941ea2e5c1cca52e40210483b556ce2ed7 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 23 Nov 2022 19:09:31 +0100
+Subject: [PATCH 422/547] c: Fix compile time hog in c_genericize [PR107127]
+
+The complex multiplications result in deeply nested set of many SAVE_EXPRs,
+which takes even on fast machines over 5 minutes to walk.
+This patch fixes that by using walk_tree_without_duplicates where it is
+instant.
+
+2022-11-23  Andrew Pinski  <apinski@marvell.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/107127
+	* c-gimplify.cc (c_genericize): Use walk_tree_without_duplicates
+	instead of walk_tree for c_genericize_control_r.
+
+	* gcc.dg/pr107127.c: New test.
+
+(cherry picked from commit 8a0fce6a51915c29584427fd376b40073c328090)
+---
+ gcc/c-family/c-gimplify.cc      |  4 ++--
+ gcc/testsuite/gcc.dg/pr107127.c | 12 ++++++++++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr107127.c
+
+diff --git a/gcc/c-family/c-gimplify.cc b/gcc/c-family/c-gimplify.cc
+index a00b0a02dcc..2b683a39982 100644
+--- a/gcc/c-family/c-gimplify.cc
++++ b/gcc/c-family/c-gimplify.cc
+@@ -570,8 +570,8 @@ c_genericize (tree fndecl)
+       bc_state_t save_state;
+       push_cfun (DECL_STRUCT_FUNCTION (fndecl));
+       save_bc_state (&save_state);
+-      walk_tree (&DECL_SAVED_TREE (fndecl), c_genericize_control_r,
+-		 NULL, NULL);
++      walk_tree_without_duplicates (&DECL_SAVED_TREE (fndecl),
++				    c_genericize_control_r, NULL);
+       restore_bc_state (&save_state);
+       pop_cfun ();
+     }
+diff --git a/gcc/testsuite/gcc.dg/pr107127.c b/gcc/testsuite/gcc.dg/pr107127.c
+new file mode 100644
+index 00000000000..f7ae87db70e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr107127.c
+@@ -0,0 +1,12 @@
++/* PR c/107127 */
++/* { dg-do compile } */
++/* { dg-options "" } */
++
++int *v;
++
++_Complex double
++foo (_Complex double a, double b, double c)
++{
++  return v[0] / ((((c * (0 - 0 / a + 699.0 + 7.05 - 286.0 - +-4.65 + 1.57 + 0) * 0.1 - 3.28 + 4.22 + 0.1)) * b + 5.06)
++		 * 1.23 * 8.0 * 12.0 * 16.0 * 2.0 * 2.0 * 0.25 * 0.125 * 18.2 * -15.25 * 0.0001
++		 * 42.0 * 0.012 - 8.45 + 0 + 88.0 + 6.96 + 867.0 + 9.10 - 7.04 * -1.0);
+-- 
+2.25.1
+

@@ -1,0 +1,58 @@
+From 22462812fce7cab6ca96486dbc24b7ab1c2c3ff6 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 7 Mar 2023 00:20:24 +0000
+Subject: [PATCH 528/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 10 ++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 11 +++++++++++
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 23339e3fc86..1e28028f345 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,13 @@
++2023-03-06  Xi Ruoyao  <xry111@xry111.site>
++
++	Backported from master:
++	2023-03-06  Xi Ruoyao  <xry111@xry111.site>
++
++	PR target/109000
++	* config/loongarch/loongarch.h (FP_RETURN): Use
++	TARGET_*_FLOAT_ABI instead of TARGET_*_FLOAT.
++	(UNITS_PER_FP_ARG): Likewise.
++
+ 2023-02-27  Martin Liska  <mliska@suse.cz>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 086e055556f..c01bc02318c 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230306
++20230307
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 275041719e8..e939f4d73b8 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,14 @@
++2023-03-06  Xi Ruoyao  <xry111@xry111.site>
++
++	Backported from master:
++	2023-03-06  Xi Ruoyao  <xry111@xry111.site>
++
++	PR target/109000
++	* gcc.target/loongarch/flt-abi-isa-1.c: New test.
++	* gcc.target/loongarch/flt-abi-isa-2.c: New test.
++	* gcc.target/loongarch/flt-abi-isa-3.c: New test.
++	* gcc.target/loongarch/flt-abi-isa-4.c: New test.
++
+ 2023-03-04  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

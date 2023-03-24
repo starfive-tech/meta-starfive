@@ -1,0 +1,58 @@
+From 999638cb7b126d33d1ea6548c69ba387b7d7a270 Mon Sep 17 00:00:00 2001
+From: Jason Merrill <jason@redhat.com>
+Date: Mon, 12 Sep 2022 13:47:34 -0400
+Subject: [PATCH 060/547] c++: auto member function and auto variable
+ [PR106893]
+
+As with PR105623, we need to call mark_single_function sooner to
+resolve the type of a BASELINK.
+
+	PR c++/106893
+	PR c++/90451
+
+gcc/cp/ChangeLog:
+
+	* decl.cc (cp_finish_decl): Call mark_single_function.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1y/auto-fn65.C: New test.
+---
+ gcc/cp/decl.cc                         |  3 +++
+ gcc/testsuite/g++.dg/cpp1y/auto-fn65.C | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/auto-fn65.C
+
+diff --git a/gcc/cp/decl.cc b/gcc/cp/decl.cc
+index 9f78c500a15..cd1522f9a9f 100644
+--- a/gcc/cp/decl.cc
++++ b/gcc/cp/decl.cc
+@@ -8137,6 +8137,9 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
+ 	    d_init = build_x_compound_expr_from_list (d_init, ELK_INIT,
+ 						      tf_warning_or_error);
+ 	  d_init = resolve_nondeduced_context (d_init, tf_warning_or_error);
++	  /* Force auto deduction now.  Use tf_none to avoid redundant warnings
++	     on deprecated-14.C.  */
++	  mark_single_function (d_init, tf_none);
+ 	}
+       enum auto_deduction_context adc = adc_variable_type;
+       if (VAR_P (decl) && DECL_DECOMPOSITION_P (decl))
+diff --git a/gcc/testsuite/g++.dg/cpp1y/auto-fn65.C b/gcc/testsuite/g++.dg/cpp1y/auto-fn65.C
+new file mode 100644
+index 00000000000..78bb004303b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/auto-fn65.C
+@@ -0,0 +1,10 @@
++// PR c++/106893
++// { dg-do compile { target c++14 } }
++
++template <typename T>
++struct CoordTraits
++{
++  static auto GetX(T const &p) { return 1; }
++};
++typedef CoordTraits<int> Traits;
++static constexpr auto GetX = Traits::GetX;
+-- 
+2.25.1
+

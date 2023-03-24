@@ -1,0 +1,91 @@
+From 89daf0dd6f1748077c03fbeb27ca5980a0b9abd5 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 10 Dec 2022 16:50:39 +0100
+Subject: [PATCH 427/547] ivopts: Fix IP_END handling for asm goto [PR107997]
+
+The following testcase ICEs, because the latch bb ends with
+asm goto which has both fallthrough to the header and one or more labels
+in the header too.  In that case there is just a single edge out of the
+latch block, but still the asm goto is stmt_ends_bb_p statement, yet
+ivopts decides to emit an IV bump at the IP_END position and inserts
+it into the same bb as the asm goto after it, which then fails verification
+(control flow in the middle of bb).
+
+The following patch fixes it by splitting the latch -> header edge in that
+case and inserting into the newly created bb, where split_edge ->
+redirect_edge_and_branch is able to deal with this case correctly.
+
+2022-12-10  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/107997
+	* tree-ssa-loop-ivopts.cc: Include cfganal.h.
+	(create_new_iv) <case IP_END>: If ip_end_pos bb is non-empty and ends
+	with a stmt which ends bb, instead of adding iv update after it split
+	the latch edge and insert iterator into the new latch bb.
+
+	* gcc.c-torture/compile/pr107997.c: New test.
+
+(cherry picked from commit 7676235f690e624b7ed41a22b22ce8ccfac1492f)
+---
+ .../gcc.c-torture/compile/pr107997.c          | 23 +++++++++++++++++++
+ gcc/tree-ssa-loop-ivopts.cc                   |  7 ++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr107997.c
+
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr107997.c b/gcc/testsuite/gcc.c-torture/compile/pr107997.c
+new file mode 100644
+index 00000000000..89e1fd349c3
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr107997.c
+@@ -0,0 +1,23 @@
++/* PR tree-optimization/107997 */
++
++int a, b;
++void bar (int);
++int baz (void);
++
++void *
++foo (int x, void *y)
++{
++  asm goto ("" : : "r" (x || !a) : : l);
++l:
++  if (y)
++    return 0;
++  bar (b ? b : x);
++  while (x--)
++    {
++      if (!baz ())
++	baz ();
++      asm goto ("" : : : : l2);
++    l2:;
++    }
++  return y;
++}
+diff --git a/gcc/tree-ssa-loop-ivopts.cc b/gcc/tree-ssa-loop-ivopts.cc
+index a67f5d549e6..59e8df1b5a9 100644
+--- a/gcc/tree-ssa-loop-ivopts.cc
++++ b/gcc/tree-ssa-loop-ivopts.cc
+@@ -131,6 +131,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "builtins.h"
+ #include "tree-vectorizer.h"
+ #include "dbgcnt.h"
++#include "cfganal.h"
+ 
+ /* For lang_hooks.types.type_for_mode.  */
+ #include "langhooks.h"
+@@ -7235,6 +7236,12 @@ create_new_iv (struct ivopts_data *data, struct iv_cand *cand)
+     case IP_END:
+       incr_pos = gsi_last_bb (ip_end_pos (data->current_loop));
+       after = true;
++      if (!gsi_end_p (incr_pos) && stmt_ends_bb_p (gsi_stmt (incr_pos)))
++	{
++	  edge e = find_edge (gsi_bb (incr_pos), data->current_loop->header);
++	  incr_pos = gsi_after_labels (split_edge (e));
++	  after = false;
++	}
+       break;
+ 
+     case IP_AFTER_USE:
+-- 
+2.25.1
+

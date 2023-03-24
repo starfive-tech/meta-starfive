@@ -1,0 +1,123 @@
+From d0d72e0b1ebbac487d70281a56799bf547034ec1 Mon Sep 17 00:00:00 2001
+From: "Kewen.Lin" <linkw@gcc.gnu.org>
+Date: Tue, 16 Aug 2022 00:24:07 -0500
+Subject: [PATCH 011/547] rs6000: Adjust mov optabs for opaque modes [PR103353]
+
+As PR103353 shows, we may want to continue to expand built-in
+function __builtin_vsx_lxvp, even if we have already emitted
+error messages about some missing required conditions.  As
+shown in that PR, without one explicit mov optab on OOmode
+provided, it would call emit_move_insn recursively.
+
+So this patch is to allow the mov pattern to be generated during
+expanding phase if compiler has already seen errors.
+
+	PR target/103353
+
+gcc/ChangeLog:
+
+	* config/rs6000/mma.md (define_expand movoo): Move TARGET_MMA condition
+	check to preparation statements and add handlings for !TARGET_MMA.
+	(define_expand movxo): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr103353.c: New test.
+
+(cherry picked from commit 9367e3a65f874dffc8f8a3b6760e77fd9ed67117)
+---
+ gcc/config/rs6000/mma.md                    | 39 +++++++++++++++++----
+ gcc/testsuite/gcc.target/powerpc/pr103353.c | 22 ++++++++++++
+ 2 files changed, 55 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr103353.c
+
+diff --git a/gcc/config/rs6000/mma.md b/gcc/config/rs6000/mma.md
+index a183b6a168a..032f4263cb0 100644
+--- a/gcc/config/rs6000/mma.md
++++ b/gcc/config/rs6000/mma.md
+@@ -268,10 +268,25 @@
+ (define_expand "movoo"
+   [(set (match_operand:OO 0 "nonimmediate_operand")
+ 	(match_operand:OO 1 "input_operand"))]
+-  "TARGET_MMA"
++  ""
+ {
+-  rs6000_emit_move (operands[0], operands[1], OOmode);
+-  DONE;
++  if (TARGET_MMA)
++    {
++      rs6000_emit_move (operands[0], operands[1], OOmode);
++      DONE;
++    }
++  else if (currently_expanding_to_rtl && seen_error ())
++    {
++      /* PR103353 shows we may want to continue to expand the __builtin_vsx_lxvp
++	 built-in function, even if we have already emitted error messages about
++	 some missing required conditions.  As shown in that PR, without one
++	 explicit mov optab on OOmode provided, it would call emit_move_insn
++	 recursively.  So we allow this pattern to be generated when we are
++	 expanding to RTL and have seen errors.  It would not cause further ICEs
++	 as the compilation would stop soon after expanding.  */
++    }
++  else
++    gcc_unreachable ();
+ })
+ 
+ (define_insn_and_split "*movoo"
+@@ -300,10 +315,22 @@
+ (define_expand "movxo"
+   [(set (match_operand:XO 0 "nonimmediate_operand")
+ 	(match_operand:XO 1 "input_operand"))]
+-  "TARGET_MMA"
++  ""
+ {
+-  rs6000_emit_move (operands[0], operands[1], XOmode);
+-  DONE;
++  if (TARGET_MMA)
++    {
++      rs6000_emit_move (operands[0], operands[1], XOmode);
++      DONE;
++    }
++  else if (currently_expanding_to_rtl && seen_error ())
++    {
++      /* PR103353 shows we may want to continue to expand the __builtin_vsx_lxvp
++	 built-in function, even if we have already emitted error messages about
++	 some missing required conditions.  So do the same handlings for XOmode
++	 as OOmode here.  */
++    }
++  else
++    gcc_unreachable ();
+ })
+ 
+ (define_insn_and_split "*movxo"
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr103353.c b/gcc/testsuite/gcc.target/powerpc/pr103353.c
+new file mode 100644
+index 00000000000..5d519fb1b7b
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr103353.c
+@@ -0,0 +1,22 @@
++/* { dg-require-effective-target powerpc_altivec_ok } */
++/* If the default cpu type is power10 or later, MMA is enabled by default.
++   To keep the test point available all the time, this case specifies
++   -mdejagnu-cpu=power6 to make it be tested without MMA.  */
++/* { dg-options "-maltivec -mdejagnu-cpu=power6" } */
++
++/* Verify there is no ICE and don't check the error messages on MMA
++   requirement since they could be fragile and are not test points
++   of this case.  */
++/* { dg-excess-errors "pr103353" } */
++
++void
++foo (__vector_pair *dst, double *x)
++{
++  dst[0] = __builtin_vsx_lxvp (0, (__vector_pair *)(void *)x);
++}
++
++void
++bar (__vector_pair *src, double *x)
++{
++  __builtin_vsx_stxvp (src[0], 0, (__vector_pair *)(void *)x);
++}
+-- 
+2.25.1
+

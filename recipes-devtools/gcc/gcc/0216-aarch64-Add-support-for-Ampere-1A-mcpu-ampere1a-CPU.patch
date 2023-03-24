@@ -1,0 +1,297 @@
+From e9f0d974600ed3c1892d1fb2711142cf734f9481 Mon Sep 17 00:00:00 2001
+From: Philipp Tomsich <philipp.tomsich@vrull.eu>
+Date: Mon, 7 Nov 2022 14:22:21 +0100
+Subject: [PATCH 216/547] aarch64: Add support for Ampere-1A (-mcpu=ampere1a)
+ CPU
+
+This patch adds support for Ampere-1A CPU:
+ - recognize the name of the core and provide detection for -mcpu=native,
+ - updated extra_costs,
+ - adds a new fusion pair for (A+B+1 and A-B-1).
+
+Ampere-1A and Ampere-1 have more timing difference than the extra
+costs indicate, but these don't propagate through to the headline
+items in our extra costs (e.g. the change in latency for scalar sqrt
+doesn't have a corresponding table entry).
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64-cores.def (AARCH64_CORE): Add ampere1a.
+	* config/aarch64/aarch64-cost-tables.h: Add ampere1a_extra_costs.
+	* config/aarch64/aarch64-fusion-pairs.def (AARCH64_FUSION_PAIR):
+	Define a new fusion pair for A+B+1/A-B-1 (i.e., add/subtract two
+	registers and then +1/-1).
+	* config/aarch64/aarch64-tune.md: Regenerate.
+	* config/aarch64/aarch64.cc (aarch_macro_fusion_pair_p): Implement
+	idiom-matcher for the new fusion pair.
+	* doc/invoke.texi: Add ampere1a.
+
+(cherry picked from commit 590a06afbf0e96813b5879742f38f3665512c854)
+---
+ gcc/config/aarch64/aarch64-cores.def        |   4 +-
+ gcc/config/aarch64/aarch64-cost-tables.h    | 107 ++++++++++++++++++++
+ gcc/config/aarch64/aarch64-fusion-pairs.def |   1 +
+ gcc/config/aarch64/aarch64-tune.md          |   2 +-
+ gcc/config/aarch64/aarch64.cc               |  64 ++++++++++++
+ gcc/doc/invoke.texi                         |   3 +-
+ 6 files changed, 178 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64-cores.def b/gcc/config/aarch64/aarch64-cores.def
+index e65b8f23eb8..70b11eb8044 100644
+--- a/gcc/config/aarch64/aarch64-cores.def
++++ b/gcc/config/aarch64/aarch64-cores.def
+@@ -70,6 +70,7 @@ AARCH64_CORE("thunderxt83",   thunderxt83,   thunderx,  8A,  AARCH64_FL_FOR_ARCH
+ 
+ /* Ampere Computing ('\xC0') cores. */
+ AARCH64_CORE("ampere1", ampere1, cortexa57, 8_6A, AARCH64_FL_FOR_ARCH8_6 | AARCH64_FL_CRYPTO | AARCH64_FL_F16 | AARCH64_FL_RNG | AARCH64_FL_SHA3, ampere1, 0xC0, 0xac3, -1)
++AARCH64_CORE("ampere1a", ampere1a, cortexa57, 8_6A, AARCH64_FL_FOR_ARCH8_6 | AARCH64_FL_CRYPTO | AARCH64_FL_F16 | AARCH64_FL_RNG | AARCH64_FL_SHA3 | AARCH64_FL_MEMTAG, ampere1a, 0xC0, 0xac4, -1)
+ /* Do not swap around "emag" and "xgene1",
+    this order is required to handle variant correctly. */
+ AARCH64_CORE("emag",        emag,      xgene1,    8A,  AARCH64_FL_FOR_ARCH8 | AARCH64_FL_CRC | AARCH64_FL_CRYPTO, emag, 0x50, 0x000, 3)
+@@ -163,7 +164,8 @@ AARCH64_CORE("cortex-r82", cortexr82, cortexa53, 8R, AARCH64_FL_FOR_ARCH8_R, cor
+ /* Armv9.0-A Architecture Processors.  */
+ 
+ /* Arm ('A') cores. */
+-AARCH64_CORE("cortex-a510",  cortexa510, cortexa55, 9A,  AARCH64_FL_FOR_ARCH9 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_MEMTAG | AARCH64_FL_I8MM | AARCH64_FL_BF16, cortexa53, 0x41, 0xd46, -1)
++AARCH64_CORE("cortex-a510",  cortexa510, cortexa55, 9A,  AARCH64_FL_FOR_ARCH9 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_MEMTAG
++ | AARCH64_FL_I8MM | AARCH64_FL_BF16, cortexa53, 0x41, 0xd46, -1)
+ 
+ AARCH64_CORE("cortex-a710",  cortexa710, cortexa57, 9A,  AARCH64_FL_FOR_ARCH9 | AARCH64_FL_SVE2_BITPERM | AARCH64_FL_MEMTAG | AARCH64_FL_I8MM | AARCH64_FL_BF16, neoversen2, 0x41, 0xd47, -1)
+ 
+diff --git a/gcc/config/aarch64/aarch64-cost-tables.h b/gcc/config/aarch64/aarch64-cost-tables.h
+index 760d7b30368..48522606fbe 100644
+--- a/gcc/config/aarch64/aarch64-cost-tables.h
++++ b/gcc/config/aarch64/aarch64-cost-tables.h
+@@ -775,4 +775,111 @@ const struct cpu_cost_table ampere1_extra_costs =
+   }
+ };
+ 
++const struct cpu_cost_table ampere1a_extra_costs =
++{
++  /* ALU */
++  {
++    0,                 /* arith.  */
++    0,                 /* logical.  */
++    0,                 /* shift.  */
++    COSTS_N_INSNS (1), /* shift_reg.  */
++    0,                 /* arith_shift.  */
++    COSTS_N_INSNS (1), /* arith_shift_reg.  */
++    0,                 /* log_shift.  */
++    COSTS_N_INSNS (1), /* log_shift_reg.  */
++    0,                 /* extend.  */
++    COSTS_N_INSNS (1), /* extend_arith.  */
++    0,                 /* bfi.  */
++    0,                 /* bfx.  */
++    0,                 /* clz.  */
++    0,                 /* rev.  */
++    0,                 /* non_exec.  */
++    true               /* non_exec_costs_exec.  */
++  },
++  {
++    /* MULT SImode */
++    {
++      COSTS_N_INSNS (3),       /* simple.  */
++      COSTS_N_INSNS (3),       /* flag_setting.  */
++      COSTS_N_INSNS (3),       /* extend.  */
++      COSTS_N_INSNS (4),       /* add.  */
++      COSTS_N_INSNS (4),       /* extend_add.  */
++      COSTS_N_INSNS (19)       /* idiv.  */
++    },
++    /* MULT DImode */
++    {
++      COSTS_N_INSNS (3),       /* simple.  */
++      0,                       /* flag_setting (N/A).  */
++      COSTS_N_INSNS (3),       /* extend.  */
++      COSTS_N_INSNS (4),       /* add.  */
++      COSTS_N_INSNS (4),       /* extend_add.  */
++      COSTS_N_INSNS (35)       /* idiv.  */
++    }
++  },
++  /* LD/ST */
++  {
++    COSTS_N_INSNS (4),         /* load.  */
++    COSTS_N_INSNS (4),         /* load_sign_extend.  */
++    0,                         /* ldrd (n/a).  */
++    0,                         /* ldm_1st.  */
++    0,                         /* ldm_regs_per_insn_1st.  */
++    0,                         /* ldm_regs_per_insn_subsequent.  */
++    COSTS_N_INSNS (5),         /* loadf.  */
++    COSTS_N_INSNS (5),         /* loadd.  */
++    COSTS_N_INSNS (5),         /* load_unaligned.  */
++    0,                         /* store.  */
++    0,                         /* strd.  */
++    0,                         /* stm_1st.  */
++    0,                         /* stm_regs_per_insn_1st.  */
++    0,                         /* stm_regs_per_insn_subsequent.  */
++    COSTS_N_INSNS (2),         /* storef.  */
++    COSTS_N_INSNS (2),         /* stored.  */
++    COSTS_N_INSNS (2),         /* store_unaligned.  */
++    COSTS_N_INSNS (3),         /* loadv.  */
++    COSTS_N_INSNS (3)          /* storev.  */
++  },
++  {
++    /* FP SFmode */
++    {
++      COSTS_N_INSNS (25),      /* div.  */
++      COSTS_N_INSNS (4),       /* mult.  */
++      COSTS_N_INSNS (4),       /* mult_addsub.  */
++      COSTS_N_INSNS (4),       /* fma.  */
++      COSTS_N_INSNS (4),       /* addsub.  */
++      COSTS_N_INSNS (2),       /* fpconst.  */
++      COSTS_N_INSNS (4),       /* neg.  */
++      COSTS_N_INSNS (4),       /* compare.  */
++      COSTS_N_INSNS (4),       /* widen.  */
++      COSTS_N_INSNS (4),       /* narrow.  */
++      COSTS_N_INSNS (4),       /* toint.  */
++      COSTS_N_INSNS (4),       /* fromint.  */
++      COSTS_N_INSNS (4)        /* roundint.  */
++    },
++    /* FP DFmode */
++    {
++      COSTS_N_INSNS (34),      /* div.  */
++      COSTS_N_INSNS (5),       /* mult.  */
++      COSTS_N_INSNS (5),       /* mult_addsub.  */
++      COSTS_N_INSNS (5),       /* fma.  */
++      COSTS_N_INSNS (5),       /* addsub.  */
++      COSTS_N_INSNS (2),       /* fpconst.  */
++      COSTS_N_INSNS (5),       /* neg.  */
++      COSTS_N_INSNS (5),       /* compare.  */
++      COSTS_N_INSNS (5),       /* widen.  */
++      COSTS_N_INSNS (5),       /* narrow.  */
++      COSTS_N_INSNS (6),       /* toint.  */
++      COSTS_N_INSNS (6),       /* fromint.  */
++      COSTS_N_INSNS (5)        /* roundint.  */
++    }
++  },
++  /* Vector */
++  {
++    COSTS_N_INSNS (3),  /* alu.  */
++    COSTS_N_INSNS (3),  /* mult.  */
++    COSTS_N_INSNS (2),  /* movi.  */
++    COSTS_N_INSNS (2),  /* dup.  */
++    COSTS_N_INSNS (2)   /* extract.  */
++  }
++};
++
+ #endif
+diff --git a/gcc/config/aarch64/aarch64-fusion-pairs.def b/gcc/config/aarch64/aarch64-fusion-pairs.def
+index c064fb9b85d..d91f8a2babd 100644
+--- a/gcc/config/aarch64/aarch64-fusion-pairs.def
++++ b/gcc/config/aarch64/aarch64-fusion-pairs.def
+@@ -36,5 +36,6 @@ AARCH64_FUSION_PAIR ("cmp+branch", CMP_BRANCH)
+ AARCH64_FUSION_PAIR ("aes+aesmc", AES_AESMC)
+ AARCH64_FUSION_PAIR ("alu+branch", ALU_BRANCH)
+ AARCH64_FUSION_PAIR ("alu+cbz", ALU_CBZ)
++AARCH64_FUSION_PAIR ("addsub_2reg_const1", ADDSUB_2REG_CONST1)
+ 
+ #undef AARCH64_FUSION_PAIR
+diff --git a/gcc/config/aarch64/aarch64-tune.md b/gcc/config/aarch64/aarch64-tune.md
+index 84e9bbf44f6..9dc9adc7056 100644
+--- a/gcc/config/aarch64/aarch64-tune.md
++++ b/gcc/config/aarch64/aarch64-tune.md
+@@ -1,5 +1,5 @@
+ ;; -*- buffer-read-only: t -*-
+ ;; Generated automatically by gentune.sh from aarch64-cores.def
+ (define_attr "tune"
+-	"cortexa34,cortexa35,cortexa53,cortexa57,cortexa72,cortexa73,thunderx,thunderxt88p1,thunderxt88,octeontx,octeontxt81,octeontxt83,thunderxt81,thunderxt83,ampere1,emag,xgene1,falkor,qdf24xx,exynosm1,phecda,thunderx2t99p1,vulcan,thunderx2t99,cortexa55,cortexa75,cortexa76,cortexa76ae,cortexa77,cortexa78,cortexa78ae,cortexa78c,cortexa65,cortexa65ae,cortexx1,ares,neoversen1,neoversee1,octeontx2,octeontx2t98,octeontx2t96,octeontx2t93,octeontx2f95,octeontx2f95n,octeontx2f95mm,a64fx,tsv110,thunderx3t110,zeus,neoversev1,neoverse512tvb,saphira,cortexa57cortexa53,cortexa72cortexa53,cortexa73cortexa35,cortexa73cortexa53,cortexa75cortexa55,cortexa76cortexa55,cortexr82,cortexa510,cortexa710,cortexx2,neoversen2,demeter,neoversev2"
++	"cortexa34,cortexa35,cortexa53,cortexa57,cortexa72,cortexa73,thunderx,thunderxt88p1,thunderxt88,octeontx,octeontxt81,octeontxt83,thunderxt81,thunderxt83,ampere1,ampere1a,emag,xgene1,falkor,qdf24xx,exynosm1,phecda,thunderx2t99p1,vulcan,thunderx2t99,cortexa55,cortexa75,cortexa76,cortexa76ae,cortexa77,cortexa78,cortexa78ae,cortexa78c,cortexa65,cortexa65ae,cortexx1,ares,neoversen1,neoversee1,octeontx2,octeontx2t98,octeontx2t96,octeontx2t93,octeontx2f95,octeontx2f95n,octeontx2f95mm,a64fx,tsv110,thunderx3t110,zeus,neoversev1,neoverse512tvb,saphira,cortexa57cortexa53,cortexa72cortexa53,cortexa73cortexa35,cortexa73cortexa53,cortexa75cortexa55,cortexa76cortexa55,cortexr82,cortexa510,cortexa710,cortexx2,neoversen2,demeter,neoversev2"
+ 	(const (symbol_ref "((enum attr_tune) aarch64_tune)")))
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index 058fe9a4ec4..4a2d58bb343 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -1924,6 +1924,43 @@ static const struct tune_params ampere1_tunings =
+   &ampere1_prefetch_tune
+ };
+ 
++static const struct tune_params ampere1a_tunings =
++{
++  &ampere1a_extra_costs,
++  &generic_addrcost_table,
++  &generic_regmove_cost,
++  &ampere1_vector_cost,
++  &generic_branch_cost,
++  &generic_approx_modes,
++  SVE_NOT_IMPLEMENTED, /* sve_width  */
++  { 4, /* load_int.  */
++    4, /* store_int.  */
++    4, /* load_fp.  */
++    4, /* store_fp.  */
++    4, /* load_pred.  */
++    4 /* store_pred.  */
++  }, /* memmov_cost.  */
++  4, /* issue_rate  */
++  (AARCH64_FUSE_ADRP_ADD | AARCH64_FUSE_AES_AESMC |
++   AARCH64_FUSE_MOV_MOVK | AARCH64_FUSE_MOVK_MOVK |
++   AARCH64_FUSE_ALU_BRANCH /* adds, ands, bics, ccmp, ccmn */ |
++   AARCH64_FUSE_CMP_BRANCH | AARCH64_FUSE_ALU_CBZ |
++   AARCH64_FUSE_ADDSUB_2REG_CONST1),
++  /* fusible_ops  */
++  "32",		/* function_align.  */
++  "4",		/* jump_align.  */
++  "32:16",	/* loop_align.  */
++  2,	/* int_reassoc_width.  */
++  4,	/* fp_reassoc_width.  */
++  2,	/* vec_reassoc_width.  */
++  2,	/* min_div_recip_mul_sf.  */
++  2,	/* min_div_recip_mul_df.  */
++  0,	/* max_case_values.  */
++  tune_params::AUTOPREFETCHER_WEAK,	/* autoprefetcher_model.  */
++  (AARCH64_EXTRA_TUNE_NONE),		/* tune_flags.  */
++  &ampere1_prefetch_tune
++};
++
+ static const advsimd_vec_cost neoversev1_advsimd_vector_cost =
+ {
+   2, /* int_stmt_cost  */
+@@ -25456,6 +25493,33 @@ aarch_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
+ 	}
+     }
+ 
++  /* Fuse A+B+1 and A-B-1 */
++  if (simple_sets_p
++      && aarch64_fusion_enabled_p (AARCH64_FUSE_ADDSUB_2REG_CONST1))
++    {
++      /* We're trying to match:
++	  prev == (set (r0) (plus (r0) (r1)))
++	  curr == (set (r0) (plus (r0) (const_int 1)))
++	or:
++	  prev == (set (r0) (minus (r0) (r1)))
++	  curr == (set (r0) (plus (r0) (const_int -1))) */
++
++      rtx prev_src = SET_SRC (prev_set);
++      rtx curr_src = SET_SRC (curr_set);
++
++      int polarity = 1;
++      if (GET_CODE (prev_src) == MINUS)
++	polarity = -1;
++
++      if (GET_CODE (curr_src) == PLUS
++	  && (GET_CODE (prev_src) == PLUS || GET_CODE (prev_src) == MINUS)
++	  && CONST_INT_P (XEXP (curr_src, 1))
++	  && INTVAL (XEXP (curr_src, 1)) == polarity
++	  && REG_P (XEXP (curr_src, 0))
++	  && REGNO (SET_DEST (prev_set)) == REGNO (XEXP (curr_src, 0)))
++	return true;
++    }
++
+   return false;
+ }
+ 
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index cee057a70bf..0c177c9c529 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -19208,7 +19208,8 @@ performance of the code.  Permissible values for this option are:
+ @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},
+ @samp{cortex-a75.cortex-a55}, @samp{cortex-a76.cortex-a55},
+ @samp{cortex-r82}, @samp{cortex-x1}, @samp{cortex-x2},
+-@samp{cortex-a510}, @samp{cortex-a710}, @samp{ampere1}, @samp{native}.
++@samp{cortex-a510}, @samp{cortex-a710}, @samp{ampere1},
++@samp{ampere1a}, @samp{native}.
+ 
+ The values @samp{cortex-a57.cortex-a53}, @samp{cortex-a72.cortex-a53},
+ @samp{cortex-a73.cortex-a35}, @samp{cortex-a73.cortex-a53},
+-- 
+2.25.1
+

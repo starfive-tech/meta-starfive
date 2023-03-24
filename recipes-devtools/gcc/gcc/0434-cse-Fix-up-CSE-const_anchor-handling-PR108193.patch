@@ -1,0 +1,94 @@
+From cb8022eab6d076325495360da632321078326135 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 22 Dec 2022 12:44:13 +0100
+Subject: [PATCH 434/547] cse: Fix up CSE const_anchor handling [PR108193]
+
+The following testcase ICEs on aarch64, because insert_const_anchor
+inserts invalid CONST_INT into the CSE tables - 0x80000000 for SImode.
+The second hunk of the patch fixes that, the first one is to avoid
+triggering undefined behavior at compile time during compute_const_anchors
+computations - performing those additions and subtractions in
+HOST_WIDE_INT means it can overflow for certain constants.
+
+2022-12-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/108193
+	* cse.cc (compute_const_anchors): Change n type to
+	unsigned HOST_WIDE_INT, adjust comparison against it to avoid
+	warnings.  Formatting fix.
+	(insert_const_anchor): Use gen_int_mode instead of GEN_INT.
+
+	* gfortran.dg/pr108193.f90: New test.
+
+(cherry picked from commit 0cb5d7cdbab8e5f8359764ef5f62d93c2bc88552)
+---
+ gcc/cse.cc                             | 10 +++++-----
+ gcc/testsuite/gfortran.dg/pr108193.f90 | 24 ++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108193.f90
+
+diff --git a/gcc/cse.cc b/gcc/cse.cc
+index a18b599d324..ca53974810e 100644
+--- a/gcc/cse.cc
++++ b/gcc/cse.cc
+@@ -1169,14 +1169,14 @@ compute_const_anchors (rtx cst,
+ 		       HOST_WIDE_INT *lower_base, HOST_WIDE_INT *lower_offs,
+ 		       HOST_WIDE_INT *upper_base, HOST_WIDE_INT *upper_offs)
+ {
+-  HOST_WIDE_INT n = INTVAL (cst);
++  unsigned HOST_WIDE_INT n = UINTVAL (cst);
+ 
+   *lower_base = n & ~(targetm.const_anchor - 1);
+-  if (*lower_base == n)
++  if ((unsigned HOST_WIDE_INT) *lower_base == n)
+     return false;
+ 
+-  *upper_base =
+-    (n + (targetm.const_anchor - 1)) & ~(targetm.const_anchor - 1);
++  *upper_base = ((n + (targetm.const_anchor - 1))
++		 & ~(targetm.const_anchor - 1));
+   *upper_offs = n - *upper_base;
+   *lower_offs = n - *lower_base;
+   return true;
+@@ -1193,7 +1193,7 @@ insert_const_anchor (HOST_WIDE_INT anchor, rtx reg, HOST_WIDE_INT offs,
+   rtx anchor_exp;
+   rtx exp;
+ 
+-  anchor_exp = GEN_INT (anchor);
++  anchor_exp = gen_int_mode (anchor, mode);
+   hash = HASH (anchor_exp, mode);
+   elt = lookup (anchor_exp, hash, mode);
+   if (!elt)
+diff --git a/gcc/testsuite/gfortran.dg/pr108193.f90 b/gcc/testsuite/gfortran.dg/pr108193.f90
+new file mode 100644
+index 00000000000..3a3655f1248
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108193.f90
+@@ -0,0 +1,24 @@
++! PR rtl-optimization/108193
++! { dg-do compile { target pthread } }
++! { dg-options "-O2 -fsplit-loops -ftree-parallelize-loops=2 -fno-tree-dominator-opts" }
++
++subroutine foo (n, r)
++  implicit none
++  integer :: i, j, n
++  real :: s, r(*)
++
++  s = 0.0
++
++  do j = 1, 2
++     do i = j, n
++        s = r(i)
++     end do
++  end do
++
++  do i = 1, n
++     do j = i, n
++        s = s + 1
++     end do
++     r(i) = s
++  end do
++end subroutine foo
+-- 
+2.25.1
+

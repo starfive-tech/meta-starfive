@@ -1,0 +1,33 @@
+From 3273df31ec73c4d9587ef72352eee12faffbf09b Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Thu, 2 Feb 2023 12:28:39 +0100
+Subject: [PATCH 484/547] libstdc++: printf format string fix in testsuite
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/experimental/simd/tests/bits/verify.h
+	(verify::verify): Use %zx for size_t in format string.
+
+(cherry picked from commit 07e4648b4ab86a76ab040ea18a756e388652c882)
+---
+ libstdc++-v3/testsuite/experimental/simd/tests/bits/verify.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/testsuite/experimental/simd/tests/bits/verify.h b/libstdc++-v3/testsuite/experimental/simd/tests/bits/verify.h
+index 21988f6617d..c9b14379021 100644
+--- a/libstdc++-v3/testsuite/experimental/simd/tests/bits/verify.h
++++ b/libstdc++-v3/testsuite/experimental/simd/tests/bits/verify.h
+@@ -137,7 +137,7 @@ public:
+     {
+       if (m_failed)
+ 	[&] {
+-	  __builtin_fprintf(stderr, "%s:%d: (%s):\nInstruction Pointer: %x\n"
++	  __builtin_fprintf(stderr, "%s:%d: (%s):\nInstruction Pointer: %zx\n"
+ 				    "Assertion '%s' failed.\n",
+ 			    file, line, func, m_ip, cond);
+ 	  (print(extra_info, int()), ...);
+-- 
+2.25.1
+

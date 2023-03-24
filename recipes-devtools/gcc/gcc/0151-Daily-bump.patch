@@ -1,0 +1,94 @@
+From 0aaef83351473e8f4eb774f8f999bbe87a4866d7 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 20 Oct 2022 00:23:39 +0000
+Subject: [PATCH 151/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 19 +++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 21 +++++++++++++++++++++
+ libstdc++-v3/ChangeLog  |  8 ++++++++
+ 4 files changed, 49 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 5a83f183018..2f112be5a20 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,22 @@
++2022-10-19  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-26  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/96072
++	* config/rs6000/rs6000-logue.cc (rs6000_emit_epilogue): Update the
++	condition for adding REG_CFA_DEF_CFA reg note with
++	frame_pointer_needed_indeed.
++
++2022-10-19  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-26  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/100645
++	* config/rs6000/vector.md (vec_shr_<mode>): Replace condition
++	TARGET_ALTIVEC with VECTOR_UNIT_ALTIVEC_OR_VSX_P.
++
+ 2022-10-17  Pat Haugen  <pthaugen@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 268d1b47e9d..8b08eddd863 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221019
++20221020
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 831106e291c..f71b53e1e6e 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,24 @@
++2022-10-19  Andrew MacLeod  <amacleod@redhat.com>
++
++	PR tree-optimization/102892
++	* gcc.dg/pr102892-1.c: Remove undefined behaviour.
++
++2022-10-19  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-26  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/96072
++	* gcc.target/powerpc/pr96072.c: New test.
++
++2022-10-19  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-26  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/100645
++	* gcc.target/powerpc/pr100645.c: New test.
++
+ 2022-10-17  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index c4a29f552df..7c1f69516dc 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,11 @@
++2022-10-19  Alexandre Oliva  <oliva@adacore.com>
++
++	Backported from master:
++	2022-06-22  Alexandre Oliva  <oliva@adacore.com>
++
++	* libsupc++/eh_globals.cc [!_GLIBCXX_HAVE_TLS]
++	(__eh_globals_init::~__eh_globals_init): Clear _S_init first.
++
+ 2022-09-29  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

@@ -1,0 +1,148 @@
+From 29ac1dcd36901a094f7d698bbe244489a58e2715 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 23 Dec 2022 16:12:21 +0100
+Subject: [PATCH 436/547] tree-ssa-dom: can_infer_simple_equiv fixes [PR108068]
+
+As reported in the PR, tree-ssa-dom.cc uses real_zerop call to find
+if a floating point constant is zero and it shouldn't try to infer
+equivalences from comparison against it if signed zeros are honored.
+This doesn't work at all for decimal types, because real_zerop always
+returns false for them (one can have different representations of decimal
+zero beyond -0/+0), and it doesn't work for vector compares either,
+as real_zerop checks if all elements are zero, while we need to avoid
+infering equivalences from comparison against vector constants which have
+at least one zero element in it (if signed zeros are honored).
+Furthermore, as mentioned by Joseph, for decimal types many other values
+aren't singleton.
+
+So, this patch stops infering anything if element mode is decimal, and
+otherwise uses instead of real_zerop a new function, real_maybe_zerop,
+which will work even for decimal types and for complex or vector will
+return true if any element is or might be zero (so it returns true
+for anything but constants for now).
+
+2022-12-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108068
+	* tree.h (real_maybe_zerop): Declare.
+	* tree.cc (real_maybe_zerop): Define.
+	* tree-ssa-dom.cc (record_edge_info): Use it instead of
+	real_zerop or TREE_CODE (op1) == SSA_NAME || real_zerop.  Always set
+	can_infer_simple_equiv to false for decimal floating point types.
+
+	* gcc.dg/dfp/pr108068.c: New test.
+
+(cherry picked from commit fd1b0aefda5b65f3f841ca6e61ccea6a72daa060)
+---
+ gcc/testsuite/gcc.dg/dfp/pr108068.c | 14 ++++++++++++++
+ gcc/tree-ssa-dom.cc                 | 12 ++++++------
+ gcc/tree.cc                         | 29 +++++++++++++++++++++++++++++
+ gcc/tree.h                          |  1 +
+ 4 files changed, 50 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/dfp/pr108068.c
+
+diff --git a/gcc/testsuite/gcc.dg/dfp/pr108068.c b/gcc/testsuite/gcc.dg/dfp/pr108068.c
+new file mode 100644
+index 00000000000..6cbb0fbe602
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/dfp/pr108068.c
+@@ -0,0 +1,14 @@
++/* PR tree-optimization/108068 */
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++int
++main ()
++{
++  _Decimal64 x = -1;
++  while (x != 0)
++    x /= 10;
++  double d = x;
++  if (!__builtin_signbit (d))
++    __builtin_abort ();
++}
+diff --git a/gcc/tree-ssa-dom.cc b/gcc/tree-ssa-dom.cc
+index 21745bf31d3..0ad2e8e7f94 100644
+--- a/gcc/tree-ssa-dom.cc
++++ b/gcc/tree-ssa-dom.cc
+@@ -540,9 +540,9 @@ record_edge_info (basic_block bb)
+             {
+               tree cond = build2 (code, boolean_type_node, op0, op1);
+               tree inverted = invert_truthvalue_loc (loc, cond);
+-              bool can_infer_simple_equiv
+-                = !(HONOR_SIGNED_ZEROS (op0)
+-                    && real_zerop (op0));
++	      bool can_infer_simple_equiv
++		= !(HONOR_SIGNED_ZEROS (op0) && real_maybe_zerop (op0))
++		  && !DECIMAL_FLOAT_MODE_P (element_mode (TREE_TYPE (op0)));
+ 	      class edge_info *edge_info;
+ 
+ 	      edge_info = new class edge_info (true_edge);
+@@ -564,9 +564,9 @@ record_edge_info (basic_block bb)
+             {
+               tree cond = build2 (code, boolean_type_node, op0, op1);
+               tree inverted = invert_truthvalue_loc (loc, cond);
+-              bool can_infer_simple_equiv
+-                = !(HONOR_SIGNED_ZEROS (op1)
+-                    && (TREE_CODE (op1) == SSA_NAME || real_zerop (op1)));
++	      bool can_infer_simple_equiv
++		= !(HONOR_SIGNED_ZEROS (op1) && real_maybe_zerop (op1))
++		  && !DECIMAL_FLOAT_MODE_P (element_mode (TREE_TYPE (op1)));
+ 	      class edge_info *edge_info;
+ 
+ 	      edge_info = new class edge_info (true_edge);
+diff --git a/gcc/tree.cc b/gcc/tree.cc
+index 4cf3785270b..8b3b37cd120 100644
+--- a/gcc/tree.cc
++++ b/gcc/tree.cc
+@@ -3196,6 +3196,35 @@ real_minus_onep (const_tree expr)
+     }
+ }
+ 
++/* Return true if T could be a floating point zero.  */
++
++bool
++real_maybe_zerop (const_tree expr)
++{
++  switch (TREE_CODE (expr))
++    {
++    case REAL_CST:
++      /* Can't use real_zerop here, as it always returns false for decimal
++	 floats.  And can't use TREE_REAL_CST (expr).cl == rvc_zero
++	 either, as decimal zeros are rvc_normal.  */
++      return real_equal (&TREE_REAL_CST (expr), &dconst0);
++    case COMPLEX_CST:
++      return (real_maybe_zerop (TREE_REALPART (expr))
++	      || real_maybe_zerop (TREE_IMAGPART (expr)));
++    case VECTOR_CST:
++      {
++	unsigned count = vector_cst_encoded_nelts (expr);
++	for (unsigned int i = 0; i < count; ++i)
++	  if (real_maybe_zerop (VECTOR_CST_ENCODED_ELT (expr, i)))
++	    return true;
++	return false;
++      }
++    default:
++      /* Perhaps for SSA_NAMEs we could query frange.  */
++      return true;
++    }
++}
++
+ /* Nonzero if EXP is a constant or a cast of a constant.  */
+ 
+ bool
+diff --git a/gcc/tree.h b/gcc/tree.h
+index 8844471e9a5..f3ae6d22f8e 100644
+--- a/gcc/tree.h
++++ b/gcc/tree.h
+@@ -5398,6 +5398,7 @@ extern bool needs_to_live_in_memory (const_tree);
+ extern tree reconstruct_complex_type (tree, tree);
+ extern bool real_onep (const_tree);
+ extern bool real_minus_onep (const_tree);
++extern bool real_maybe_zerop (const_tree);
+ extern void init_ttree (void);
+ extern void build_common_tree_nodes (bool);
+ extern void build_common_builtin_nodes (void);
+-- 
+2.25.1
+

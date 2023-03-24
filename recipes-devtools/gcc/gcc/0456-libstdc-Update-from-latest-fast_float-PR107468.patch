@@ -1,0 +1,206 @@
+From 0061c84d2d85ca4c2ceca6116937f2d1fab6e10a Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 7 Nov 2022 15:17:21 +0100
+Subject: [PATCH 456/547] libstdc++: Update from latest fast_float [PR107468]
+
+The following patch partially updates from fast_float trunk.
+That way it gets fix for the incorrect rounding case,
+PR107468 aka https://github.com/fastfloat/fast_float/issues/149
+Using std::fegetround showed in benchmarks too slow, so instead of
+doing that the patch limits the fast path where it uses floating
+point multiplication rather than integral to cases where we can
+prove there will be no rounding (the multiplication will be exact, not
+just that the two multiplication or division operation arguments are
+exactly representable).
+
+2022-11-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/107468
+	* src/c++17/fast_float/fast_float.h: Partial merge from fast_float
+	662497742fea7055f0e0ee27e5a7ddc382c2c38e commit.
+	* testsuite/20_util/from_chars/pr107468.cc: New test.
+
+(cherry picked from commit cb0ceeaee9e041aaac3edd089b07b439621d0f29)
+---
+ .../src/c++17/fast_float/fast_float.h         | 83 +++++++++++++------
+ .../testsuite/20_util/from_chars/pr107468.cc  | 42 ++++++++++
+ 2 files changed, 100 insertions(+), 25 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/20_util/from_chars/pr107468.cc
+
+diff --git a/libstdc++-v3/src/c++17/fast_float/fast_float.h b/libstdc++-v3/src/c++17/fast_float/fast_float.h
+index 31fb88b8aba..5e58468d996 100644
+--- a/libstdc++-v3/src/c++17/fast_float/fast_float.h
++++ b/libstdc++-v3/src/c++17/fast_float/fast_float.h
+@@ -307,17 +307,60 @@ constexpr static double powers_of_ten_double[] = {
+     1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
+ constexpr static float powers_of_ten_float[] = {1e0, 1e1, 1e2, 1e3, 1e4, 1e5,
+                                                 1e6, 1e7, 1e8, 1e9, 1e10};
++// used for max_mantissa_double and max_mantissa_float
++constexpr uint64_t constant_55555 = 5 * 5 * 5 * 5 * 5;
++// Largest integer value v so that (5**index * v) <= 1<<53.
++// 0x10000000000000 == 1 << 53
++constexpr static uint64_t max_mantissa_double[] = {
++      0x10000000000000,
++      0x10000000000000 / 5,
++      0x10000000000000 / (5 * 5),
++      0x10000000000000 / (5 * 5 * 5),
++      0x10000000000000 / (5 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555),
++      0x10000000000000 / (constant_55555 * 5),
++      0x10000000000000 / (constant_55555 * 5 * 5),
++      0x10000000000000 / (constant_55555 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * 5 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555),
++      0x10000000000000 / (constant_55555 * constant_55555 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * 5 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * constant_55555),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * constant_55555 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * constant_55555 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * constant_55555 * 5 * 5 * 5),
++      0x10000000000000 / (constant_55555 * constant_55555 * constant_55555 * constant_55555 * 5 * 5 * 5 * 5)};
++  // Largest integer value v so that (5**index * v) <= 1<<24.
++  // 0x1000000 == 1<<24
++  constexpr static uint64_t max_mantissa_float[] = {
++      0x1000000,
++      0x1000000 / 5,
++      0x1000000 / (5 * 5),
++      0x1000000 / (5 * 5 * 5),
++      0x1000000 / (5 * 5 * 5 * 5),
++      0x1000000 / (constant_55555),
++      0x1000000 / (constant_55555 * 5),
++      0x1000000 / (constant_55555 * 5 * 5),
++      0x1000000 / (constant_55555 * 5 * 5 * 5),
++      0x1000000 / (constant_55555 * 5 * 5 * 5 * 5),
++      0x1000000 / (constant_55555 * constant_55555),
++      0x1000000 / (constant_55555 * constant_55555 * 5)};
+ 
+ template <typename T> struct binary_format {
+   static inline constexpr int mantissa_explicit_bits();
+   static inline constexpr int minimum_exponent();
+   static inline constexpr int infinite_power();
+   static inline constexpr int sign_index();
+-  static inline constexpr int min_exponent_fast_path();
+   static inline constexpr int max_exponent_fast_path();
+   static inline constexpr int max_exponent_round_to_even();
+   static inline constexpr int min_exponent_round_to_even();
+-  static inline constexpr uint64_t max_mantissa_fast_path();
++  static inline constexpr uint64_t max_mantissa_fast_path(int64_t power);
+   static inline constexpr int largest_power_of_ten();
+   static inline constexpr int smallest_power_of_ten();
+   static inline constexpr T exact_power_of_ten(int64_t power);
+@@ -364,21 +407,6 @@ template <> inline constexpr int binary_format<float>::infinite_power() {
+ template <> inline constexpr int binary_format<double>::sign_index() { return 63; }
+ template <> inline constexpr int binary_format<float>::sign_index() { return 31; }
+ 
+-template <> inline constexpr int binary_format<double>::min_exponent_fast_path() {
+-#if (FLT_EVAL_METHOD != 1) && (FLT_EVAL_METHOD != 0)
+-  return 0;
+-#else
+-  return -22;
+-#endif
+-}
+-template <> inline constexpr int binary_format<float>::min_exponent_fast_path() {
+-#if (FLT_EVAL_METHOD != 1) && (FLT_EVAL_METHOD != 0)
+-  return 0;
+-#else
+-  return -10;
+-#endif
+-}
+-
+ template <> inline constexpr int binary_format<double>::max_exponent_fast_path() {
+   return 22;
+ }
+@@ -386,11 +414,17 @@ template <> inline constexpr int binary_format<float>::max_exponent_fast_path()
+   return 10;
+ }
+ 
+-template <> inline constexpr uint64_t binary_format<double>::max_mantissa_fast_path() {
+-  return uint64_t(2) << mantissa_explicit_bits();
++template <> inline constexpr uint64_t binary_format<double>::max_mantissa_fast_path(int64_t power) {
++  // caller is responsible to ensure that
++  // power >= 0 && power <= 22
++  //
++  return max_mantissa_double[power];
+ }
+-template <> inline constexpr uint64_t binary_format<float>::max_mantissa_fast_path() {
+-  return uint64_t(2) << mantissa_explicit_bits();
++template <> inline constexpr uint64_t binary_format<float>::max_mantissa_fast_path(int64_t power) {
++  // caller is responsible to ensure that
++  // power >= 0 && power <= 10
++  //
++  return max_mantissa_float[power];
+ }
+ 
+ template <>
+@@ -2869,11 +2903,10 @@ from_chars_result from_chars_advanced(const char *first, const char *last,
+   }
+   answer.ec = std::errc(); // be optimistic
+   answer.ptr = pns.lastmatch;
+-  // Next is Clinger's fast path.
+-  if (binary_format<T>::min_exponent_fast_path() <= pns.exponent && pns.exponent <= binary_format<T>::max_exponent_fast_path() && pns.mantissa <=binary_format<T>::max_mantissa_fast_path() && !pns.too_many_digits) {
++  // Next is a modified Clinger's fast path, inspired by Jakub Jelínek's proposal
++  if (pns.exponent >= 0 && pns.exponent <= binary_format<T>::max_exponent_fast_path() && pns.mantissa <=binary_format<T>::max_mantissa_fast_path(pns.exponent) && !pns.too_many_digits) {
+     value = T(pns.mantissa);
+-    if (pns.exponent < 0) { value = value / binary_format<T>::exact_power_of_ten(-pns.exponent); }
+-    else { value = value * binary_format<T>::exact_power_of_ten(pns.exponent); }
++    value = value * binary_format<T>::exact_power_of_ten(pns.exponent);
+     if (pns.negative) { value = -value; }
+     return answer;
+   }
+diff --git a/libstdc++-v3/testsuite/20_util/from_chars/pr107468.cc b/libstdc++-v3/testsuite/20_util/from_chars/pr107468.cc
+new file mode 100644
+index 00000000000..95bf669c945
+--- /dev/null
++++ b/libstdc++-v3/testsuite/20_util/from_chars/pr107468.cc
+@@ -0,0 +1,42 @@
++// Copyright (C) 2022 Free Software Foundation, Inc.
++//
++// This file is part of the GNU ISO C++ Library.  This library is free
++// software; you can redistribute it and/or modify it under the
++// terms of the GNU General Public License as published by the
++// Free Software Foundation; either version 3, or (at your option)
++// any later version.
++
++// This library is distributed in the hope that it will be useful,
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU General Public License for more details.
++
++// You should have received a copy of the GNU General Public License along
++// with this library; see the file COPYING3.  If not see
++// <http://www.gnu.org/licenses/>.
++
++// { dg-do run { target c++17 } }
++// { dg-add-options ieee }
++
++#include <charconv>
++#include <string>
++#include <cfenv>
++#include <testsuite_hooks.h>
++
++int
++main()
++{
++  // FP from_char not available otherwise.
++#if __cpp_lib_to_chars >= 201611L \
++    && _GLIBCXX_USE_C99_FENV_TR1 \
++    && defined(FE_DOWNWARD) \
++    && defined(_GLIBCXX_FLOAT_IS_IEEE_BINARY32)
++  // PR libstdc++/107468
++  float f;
++  char buf[] = "3.355447e+07";
++  std::fesetround(FE_DOWNWARD);
++  auto [ptr, ec] = std::from_chars(buf, buf + sizeof(buf) - 1, f, std::chars_format::scientific);
++  VERIFY( ec == std::errc() && ptr == buf + sizeof(buf) - 1 );
++  VERIFY( f == 33554472.0f );
++#endif
++}
+-- 
+2.25.1
+

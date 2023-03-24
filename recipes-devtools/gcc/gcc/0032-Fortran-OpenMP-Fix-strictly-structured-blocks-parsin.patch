@@ -1,0 +1,66 @@
+From bd2bc5f78d5a423a6e0537748b01ca45edbc75e5 Mon Sep 17 00:00:00 2001
+From: Tobias Burnus <tobias@codesourcery.com>
+Date: Thu, 25 Aug 2022 08:34:03 +0200
+Subject: [PATCH 032/547] Fortran/OpenMP: Fix strictly structured blocks
+ parsing
+
+gcc/fortran/ChangeLog:
+
+	* parse.cc (parse_omp_structured_block): When parsing strictly
+	structured blocks, issue an error if the end-directive comes
+	before the 'end block'.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/gomp/strictly-structured-block-4.f90: New test.
+
+(cherry picked from commit 33f24eb58748e9db7c827662753757c5c2217eb4)
+---
+ gcc/fortran/parse.cc                          |  2 +-
+ .../gomp/strictly-structured-block-4.f90      | 21 +++++++++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/gomp/strictly-structured-block-4.f90
+
+diff --git a/gcc/fortran/parse.cc b/gcc/fortran/parse.cc
+index e6e915d2a5e..d1c72ef92e7 100644
+--- a/gcc/fortran/parse.cc
++++ b/gcc/fortran/parse.cc
+@@ -5708,7 +5708,7 @@ parse_omp_structured_block (gfc_statement omp_st, bool workshare_stmts_only)
+ 	    }
+ 	  return st;
+ 	}
+-      else if (st != omp_end_st)
++      else if (st != omp_end_st || block_construct)
+ 	{
+ 	  unexpected_statement (st);
+ 	  st = next_statement ();
+diff --git a/gcc/testsuite/gfortran.dg/gomp/strictly-structured-block-4.f90 b/gcc/testsuite/gfortran.dg/gomp/strictly-structured-block-4.f90
+new file mode 100644
+index 00000000000..66cf0a3925e
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/gomp/strictly-structured-block-4.f90
+@@ -0,0 +1,21 @@
++! { dg-do compile }
++implicit none
++integer ::x,z
++x = 42
++print '(*(z16:" "))', loc(x)
++!$omp target map(x, z)
++block
++  integer :: y
++  x = 123
++  y = 99
++  !$omp target device(ancestor:1) map(always,tofrom:x) map(y) ! { dg-error "'ancestor' device modifier not preceded by 'requires' directive with 'reverse_offload' clause" }
++    print '(*(z16:" "))', loc(x), loc(y)
++    print * ,x, y
++    x = -x
++    y = -y
++  !$omp end target ! { dg-error "Unexpected ..OMP END TARGET statement" }
++  z = y
++end block
++    print * ,x !, z
++end
++
+-- 
+2.25.1
+

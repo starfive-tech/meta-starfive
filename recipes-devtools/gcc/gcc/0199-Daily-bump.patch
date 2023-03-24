@@ -1,0 +1,35 @@
+From 0d24c71df381e40f86955c918b5ef28a0bd53d38 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 8 Nov 2022 00:21:57 +0000
+Subject: [PATCH 199/547] Daily bump.
+
+---
+ gcc/ChangeLog | 7 +++++++
+ gcc/DATESTAMP | 2 +-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 4caf735f460..aad5bc1784b 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,10 @@
++2022-11-07  Cui,Lili  <lili.cui@intel.com>
++
++	* config/i386/driver-i386.cc (host_detect_local_cpu):
++	Move sapphirerapids out of AVX512_VP2INTERSECT.
++	* config/i386/i386.h: Remove AVX512_VP2INTERSECT from PTA_SAPPHIRERAPIDS
++	* doc/invoke.texi: Remove AVX512_VP2INTERSECT from SAPPHIRERAPIDS
++
+ 2022-11-05  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 0503ed97af3..f47121e1a89 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221107
++20221108
+-- 
+2.25.1
+

@@ -1,0 +1,179 @@
+From 9f532fec01d6651cc3cc136073f044a7953d8560 Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Tue, 16 Aug 2022 00:18:51 -0500
+Subject: [PATCH 012/547] vect: Don't allow vect_emulated_vector_p type in
+ vectorizable_call [PR106322]
+
+As PR106322 shows, in some cases for some vector type whose
+TYPE_MODE is a scalar integral mode instead of a vector mode,
+it's possible to obtain wrong target support information when
+querying with the scalar integral mode.  For example, for the
+test case in PR106322, on ppc64 32bit vectorizer gets vector
+type "vector(2) short unsigned int" for scalar type "short
+unsigned int", its mode is SImode instead of V2HImode.  The
+target support querying checks umul_highpart optab with SImode
+and considers it's supported, then vectorizer further generates
+.MULH IFN call for that vector type.  Unfortunately it's wrong
+to use SImode support for that vector type multiply highpart
+here.
+
+This patch is to teach vectorizable_call analysis not to allow
+vect_emulated_vector_p type for both vectype_in and vectype_out
+as Richi suggested.
+
+	PR tree-optimization/106322
+
+gcc/ChangeLog:
+
+	* tree-vect-stmts.cc (vectorizable_call): Don't allow
+	vect_emulated_vector_p type for both vectype_in and vectype_out.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr106322.c: New test.
+	* gcc.target/powerpc/pr106322.c: New test.
+
+(cherry picked from commit 5239e2bd48fb1e6a1d1b06a1bac49bee0a742e98)
+---
+ gcc/testsuite/gcc.target/i386/pr106322.c    | 51 +++++++++++++++++++++
+ gcc/testsuite/gcc.target/powerpc/pr106322.c | 50 ++++++++++++++++++++
+ gcc/tree-vect-stmts.cc                      |  8 ++++
+ 3 files changed, 109 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr106322.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106322.c
+
+diff --git a/gcc/testsuite/gcc.target/i386/pr106322.c b/gcc/testsuite/gcc.target/i386/pr106322.c
+new file mode 100644
+index 00000000000..31333c5fdcc
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr106322.c
+@@ -0,0 +1,51 @@
++/* { dg-do run } */
++/* { dg-require-effective-target ia32 } */
++/* { dg-options "-O2 -mtune=generic -march=i686" } */
++
++/* As PR106322, verify this can execute well (not abort).  */
++
++#define N 64
++typedef unsigned short int uh;
++typedef unsigned short int uw;
++uh a[N];
++uh b[N];
++uh c[N];
++uh e[N];
++
++__attribute__ ((noipa)) void
++foo ()
++{
++  for (int i = 0; i < N; i++)
++    c[i] = ((uw) b[i] * (uw) a[i]) >> 16;
++}
++
++__attribute__ ((optimize ("-O0"))) void
++init ()
++{
++  for (int i = 0; i < N; i++)
++    {
++      a[i] = (uh) (0x7ABC - 0x5 * i);
++      b[i] = (uh) (0xEAB + 0xF * i);
++      e[i] = ((uw) b[i] * (uw) a[i]) >> 16;
++    }
++}
++
++__attribute__ ((optimize ("-O0"))) void
++check ()
++{
++  for (int i = 0; i < N; i++)
++    {
++      if (c[i] != e[i])
++	__builtin_abort ();
++    }
++}
++
++int
++main ()
++{
++  init ();
++  foo ();
++  check ();
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106322.c b/gcc/testsuite/gcc.target/powerpc/pr106322.c
+new file mode 100644
+index 00000000000..c05072d3416
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106322.c
+@@ -0,0 +1,50 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -mdejagnu-cpu=power4" } */
++
++/* As PR106322, verify this can execute well (not abort).  */
++
++#define N 64
++typedef unsigned short int uh;
++typedef unsigned short int uw;
++uh a[N];
++uh b[N];
++uh c[N];
++uh e[N];
++
++__attribute__ ((noipa)) void
++foo ()
++{
++  for (int i = 0; i < N; i++)
++    c[i] = ((uw) b[i] * (uw) a[i]) >> 16;
++}
++
++__attribute__ ((optimize ("-O0"))) void
++init ()
++{
++  for (int i = 0; i < N; i++)
++    {
++      a[i] = (uh) (0x7ABC - 0x5 * i);
++      b[i] = (uh) (0xEAB + 0xF * i);
++      e[i] = ((uw) b[i] * (uw) a[i]) >> 16;
++    }
++}
++
++__attribute__ ((optimize ("-O0"))) void
++check ()
++{
++  for (int i = 0; i < N; i++)
++    {
++      if (c[i] != e[i])
++	__builtin_abort ();
++    }
++}
++
++int
++main ()
++{
++  init ();
++  foo ();
++  check ();
++
++  return 0;
++}
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index d8da13e312a..4c5d20a0e2c 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -3419,6 +3419,14 @@ vectorizable_call (vec_info *vinfo,
+       return false;
+     }
+ 
++  if (vect_emulated_vector_p (vectype_in) || vect_emulated_vector_p (vectype_out))
++  {
++      if (dump_enabled_p ())
++	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
++			 "use emulated vector type for call\n");
++      return false;
++  }
++
+   /* FORNOW */
+   nunits_in = TYPE_VECTOR_SUBPARTS (vectype_in);
+   nunits_out = TYPE_VECTOR_SUBPARTS (vectype_out);
+-- 
+2.25.1
+

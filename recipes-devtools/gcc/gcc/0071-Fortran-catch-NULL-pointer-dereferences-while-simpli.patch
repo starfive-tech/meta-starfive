@@ -1,0 +1,58 @@
+From f5023ce74f882b7f7c8cf41e70cc7380ba0eba06 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Thu, 15 Sep 2022 22:39:24 +0200
+Subject: [PATCH 071/547] Fortran: catch NULL pointer dereferences while
+ simplifying PACK [PR106857]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/106857
+	* simplify.cc (gfc_simplify_pack): Check for NULL pointer dereferences
+	while walking through constructors (error recovery).
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/106857
+	* gfortran.dg/pr106857.f90: New test.
+
+(cherry picked from commit 2b75d5f533b9d6b39f4055949aff64ed0d22dd24)
+---
+ gcc/fortran/simplify.cc                |  2 +-
+ gcc/testsuite/gfortran.dg/pr106857.f90 | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr106857.f90
+
+diff --git a/gcc/fortran/simplify.cc b/gcc/fortran/simplify.cc
+index 1d74cf35a25..0eff5a546cc 100644
+--- a/gcc/fortran/simplify.cc
++++ b/gcc/fortran/simplify.cc
+@@ -6393,7 +6393,7 @@ gfc_simplify_pack (gfc_expr *array, gfc_expr *mask, gfc_expr *vector)
+       /* Copy only those elements of ARRAY to RESULT whose
+ 	 MASK equals .TRUE..  */
+       mask_ctor = gfc_constructor_first (mask->value.constructor);
+-      while (mask_ctor)
++      while (mask_ctor && array_ctor)
+ 	{
+ 	  if (mask_ctor->expr->value.logical)
+ 	    {
+diff --git a/gcc/testsuite/gfortran.dg/pr106857.f90 b/gcc/testsuite/gfortran.dg/pr106857.f90
+new file mode 100644
+index 00000000000..4b0f86a75a6
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr106857.f90
+@@ -0,0 +1,12 @@
++! { dg-do compile }
++! PR fortran/106857 - ICE in gfc_simplify_pack
++! Contributed by G.Steinmetz
++
++program p
++  type t
++     integer :: n
++  end type
++  type(t), parameter :: a(2,2) = t(1)
++  type(t), parameter :: b(4) = reshape(a, [2])                          ! { dg-error "Different shape" }
++  type(t), parameter :: c(2) = pack(b, [.false.,.true.,.false.,.true.]) ! { dg-error "Different shape" }
++end
+-- 
+2.25.1
+

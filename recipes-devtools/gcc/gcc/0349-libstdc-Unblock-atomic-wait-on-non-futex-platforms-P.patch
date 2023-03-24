@@ -1,0 +1,112 @@
+From 1dfe15e534adba21e680b8128f0631e8054a5e42 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 28 Jul 2022 16:15:58 +0100
+Subject: [PATCH 349/547] libstdc++: Unblock atomic wait on non-futex platforms
+ [PR106183]
+
+When using a mutex and condition variable, the notifying thread needs to
+increment _M_ver while holding the mutex lock, and the waiting thread
+needs to re-check after locking the mutex. This avoids a missed
+notification as described in the PR.
+
+By moving the increment of _M_ver to the base _M_notify we can make the
+use of the mutex local to the use of the condition variable, and
+simplify the code a little. We can use a relaxed store because the mutex
+already provides sequential consistency. Also we don't need to check
+whether __addr == &_M_ver because we know that's always true for
+platforms that use a condition variable, and so we also know that we
+always need to use notify_all() not notify_one().
+
+Reviewed-by: Thomas Rodgers <trodgers@redhat.com>
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/106183
+	* include/bits/atomic_wait.h (__waiter_pool_base::_M_notify):
+	Move increment of _M_ver here.
+	[!_GLIBCXX_HAVE_PLATFORM_WAIT]: Lock mutex around increment.
+	Use relaxed memory order and always notify all waiters.
+	(__waiter_base::_M_do_wait) [!_GLIBCXX_HAVE_PLATFORM_WAIT]:
+	Check value again after locking mutex.
+	(__waiter_base::_M_notify): Remove increment of _M_ver.
+
+(cherry picked from commit af98cb88eb4be6a1668ddf966e975149bf8610b1)
+---
+ libstdc++-v3/include/bits/atomic_wait.h | 42 ++++++++++++-------------
+ 1 file changed, 20 insertions(+), 22 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/atomic_wait.h b/libstdc++-v3/include/bits/atomic_wait.h
+index a6d55d3af8a..76ed7409937 100644
+--- a/libstdc++-v3/include/bits/atomic_wait.h
++++ b/libstdc++-v3/include/bits/atomic_wait.h
+@@ -221,18 +221,25 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+       }
+ 
+       void
+-      _M_notify(const __platform_wait_t* __addr, bool __all, bool __bare) noexcept
++      _M_notify(__platform_wait_t* __addr, [[maybe_unused]] bool __all,
++		bool __bare) noexcept
+       {
+-	if (!(__bare || _M_waiting()))
+-	  return;
+-
+ #ifdef _GLIBCXX_HAVE_PLATFORM_WAIT
+-	__platform_notify(__addr, __all);
++	if (__addr == &_M_ver)
++	  {
++	    __atomic_fetch_add(__addr, 1, __ATOMIC_SEQ_CST);
++	    __all = true;
++	  }
++
++	if (__bare || _M_waiting())
++	  __platform_notify(__addr, __all);
+ #else
+-	if (__all)
++	{
++	  lock_guard<mutex> __l(_M_mtx);
++	  __atomic_fetch_add(__addr, 1, __ATOMIC_RELAXED);
++	}
++	if (__bare || _M_waiting())
+ 	  _M_cv.notify_all();
+-	else
+-	  _M_cv.notify_one();
+ #endif
+       }
+ 
+@@ -259,7 +266,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	if (__val == __old)
+ 	  {
+ 	    lock_guard<mutex> __l(_M_mtx);
+-	    _M_cv.wait(_M_mtx);
++	    __atomic_load(__addr, &__val, __ATOMIC_RELAXED);
++	    if (__val == __old)
++	      _M_cv.wait(_M_mtx);
+ 	  }
+ #endif // __GLIBCXX_HAVE_PLATFORM_WAIT
+       }
+@@ -297,20 +306,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	    , _M_addr(_S_wait_addr(__addr, &_M_w._M_ver))
+ 	  { }
+ 
+-	bool
+-	_M_laundered() const
+-	{ return _M_addr == &_M_w._M_ver; }
+-
+ 	void
+-	_M_notify(bool __all, bool __bare = false)
+-	{
+-	  if (_M_laundered())
+-	    {
+-	      __atomic_fetch_add(_M_addr, 1, __ATOMIC_SEQ_CST);
+-	      __all = true;
+-	    }
+-	  _M_w._M_notify(_M_addr, __all, __bare);
+-	}
++	_M_notify(bool __all, bool __bare = false) noexcept
++	{ _M_w._M_notify(_M_addr, __all, __bare); }
+ 
+ 	template<typename _Up, typename _ValFn,
+ 		 typename _Spin = __default_spin_policy>
+-- 
+2.25.1
+

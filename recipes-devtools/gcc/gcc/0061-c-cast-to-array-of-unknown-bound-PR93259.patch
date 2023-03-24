@@ -1,0 +1,89 @@
+From 8f37a44483870e0db8cd6437ae9716cbe28b7f59 Mon Sep 17 00:00:00 2001
+From: Jason Merrill <jason@redhat.com>
+Date: Mon, 12 Sep 2022 14:14:24 -0400
+Subject: [PATCH 061/547] c++: cast to array of unknown bound [PR93259]
+
+We already know to treat a variable of array-of-unknown-bound type as
+dependent, we should do the same for arr{}.
+
+	PR c++/93259
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (type_dependent_expression_p): Treat a compound
+	literal of array-of-unknown-bound type like a variable.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/initlist-array17.C: New test.
+---
+ gcc/cp/pt.cc                                  |  6 +--
+ gcc/testsuite/g++.dg/cpp0x/initlist-array17.C | 37 +++++++++++++++++++
+ 2 files changed, 40 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/initlist-array17.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index bef31416fb7..2f3cbf4895d 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -27952,11 +27952,11 @@ type_dependent_expression_p (tree expression)
+      If the array has no length and has an initializer, it must be that
+      we couldn't determine its length in cp_complete_array_type because
+      it is dependent.  */
+-  if (VAR_P (expression)
++  if (((VAR_P (expression) && DECL_INITIAL (expression))
++       || COMPOUND_LITERAL_P (expression))
+       && TREE_TYPE (expression) != NULL_TREE
+       && TREE_CODE (TREE_TYPE (expression)) == ARRAY_TYPE
+-      && !TYPE_DOMAIN (TREE_TYPE (expression))
+-      && DECL_INITIAL (expression))
++      && !TYPE_DOMAIN (TREE_TYPE (expression)))
+    return true;
+ 
+   /* Pull a FUNCTION_DECL out of a BASELINK if we can.  */
+diff --git a/gcc/testsuite/g++.dg/cpp0x/initlist-array17.C b/gcc/testsuite/g++.dg/cpp0x/initlist-array17.C
+new file mode 100644
+index 00000000000..c4284a7b391
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/initlist-array17.C
+@@ -0,0 +1,37 @@
++// PR c++/93259
++// { dg-do compile { target c++11 } }
++
++template <class T, class U> struct is_same;
++template <class T> struct is_same<T,T> { };
++
++using Array = int[];
++
++template <typename ...Ts>
++void bar1(Ts ...)
++{
++  auto && array = Array{ 1, 2, 3 };
++
++  is_same<int (&&)[3], decltype(array)>{}; // this fails, deduces array as int (&&) []
++}
++
++template <typename T>
++void bar2()
++{
++  auto && array = Array{ 1, 2, 3 };
++
++  is_same<int (&&)[3], decltype(array)>{};  // this fails, deduces array as int (&&) []
++}
++
++void bar3()
++{
++  auto && array = Array{ 1, 2, 3 };
++
++  is_same<int (&&)[3], decltype(array)>{}; // OK
++}
++
++int main()
++{
++  bar1<int>(1, 2, 3);
++  bar2<int>();
++  bar3();
++}
+-- 
+2.25.1
+

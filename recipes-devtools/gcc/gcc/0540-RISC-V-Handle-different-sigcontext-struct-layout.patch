@@ -1,0 +1,80 @@
+From edde2bb03bbc24ecd3ed8849d08570a303ec6465 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Tue, 18 Jan 2022 17:44:18 +0800
+Subject: [PATCH 540/547] RISC-V: Handle different sigcontext struct layout.
+
+RISC-V glibc intend to removed its own `sigcontext.h`[1] and use the linux
+kernel's one, however the struct layout is slightly different between those two
+version, fortunately they have identical layout, so we just need a
+magical way to detect which one we are used.
+
+libgcc/ChangeLog:
+
+	* config/riscv/linux-unwind.h (SIGCONTEXT_PC): New.
+	(riscv_fallback_frame_state): Use SIGCONTEXT_PC rather than
+	sc->gregs[i].
+
+[1] https://sourceware.org/pipermail/libc-alpha/2022-January/135417.html
+---
+ libgcc/config/riscv/linux-unwind.h | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/libgcc/config/riscv/linux-unwind.h b/libgcc/config/riscv/linux-unwind.h
+index c86df2f85bc..4919facb36b 100644
+--- a/libgcc/config/riscv/linux-unwind.h
++++ b/libgcc/config/riscv/linux-unwind.h
+@@ -30,6 +30,16 @@
+ 
+ #define MD_FALLBACK_FRAME_STATE_FOR riscv_fallback_frame_state
+ 
++/* RISC-V Glibc has removed its own sigcontext.h and use the linux kernel's
++   one, however the struct layout is little different between those two
++   version, fortunately they have identical layout, so we just need a
++   magical way to detect which one we are used.  */
++#ifdef _ASM_RISCV_SIGCONTEXT_H
++#define SIGCONTEXT_PC(SC) (SC)->sc_regs.pc
++#else
++#define SIGCONTEXT_PC(SC) (SC)->gregs[0]
++#endif
++
+ static _Unwind_Reason_Code
+ riscv_fallback_frame_state (struct _Unwind_Context *context,
+ 			    _Unwind_FrameState * fs)
+@@ -50,6 +60,8 @@ riscv_fallback_frame_state (struct _Unwind_Context *context,
+   uint16_t *pc = context->ra;
+   struct sigcontext *sc;
+   int i;
++  /* Get regsister offest from register size.  */
++  _Unwind_Ptr reg_offset = __riscv_xlen / 8;
+ 
+   /* A signal frame will have a return address pointing to
+      __default_sa_restorer. This code is hardwired as:
+@@ -73,17 +85,23 @@ riscv_fallback_frame_state (struct _Unwind_Context *context,
+ 
+   for (i = 0; i < 32; i++)
+     {
++      /* Restore all registers value from kernel structures.
++	 The corresponding bits in the Linux kernel are in
++	 arch/riscv/include/asm/ptrace.h.  */
+       fs->regs.reg[i].how = REG_SAVED_OFFSET;
+-      fs->regs.reg[i].loc.offset = (_Unwind_Ptr) &sc->gregs[i] - new_cfa;
++      fs->regs.reg[i].loc.offset
++	= (_Unwind_Ptr) &SIGCONTEXT_PC (sc) + (i * reg_offset) - new_cfa;
+     }
+ 
+   fs->signal_frame = 1;
+   fs->retaddr_column = __LIBGCC_DWARF_ALT_FRAME_RETURN_COLUMN__;
+   fs->regs.reg[fs->retaddr_column].how = REG_SAVED_VAL_OFFSET;
+   fs->regs.reg[fs->retaddr_column].loc.offset =
+-    (_Unwind_Ptr) sc->gregs[0] - new_cfa;
++    (_Unwind_Ptr) SIGCONTEXT_PC (sc) - new_cfa;
+ 
+   return _URC_NO_REASON;
+ }
+ 
++#undef SIGCONTEXT_PC
++
+ #endif
+-- 
+2.25.1
+

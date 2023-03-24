@@ -1,0 +1,60 @@
+From 1f682c96048456379729d495b41551a00eac5a3f Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 23 Aug 2022 22:16:14 +0200
+Subject: [PATCH 018/547] Fortran: improve error recovery while simplifying
+ size of bad array [PR103694]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/103694
+	* simplify.cc (simplify_size): The size expression of an array cannot
+	be simplified if an error occurs while resolving the array spec.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/103694
+	* gfortran.dg/pr103694.f90: New test.
+
+(cherry picked from commit 55d8c5409325001c89c35c3d04d425dec9127146)
+---
+ gcc/fortran/simplify.cc                |  5 +++--
+ gcc/testsuite/gfortran.dg/pr103694.f90 | 11 +++++++++++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr103694.f90
+
+diff --git a/gcc/fortran/simplify.cc b/gcc/fortran/simplify.cc
+index 2f4f13b6a83..1d74cf35a25 100644
+--- a/gcc/fortran/simplify.cc
++++ b/gcc/fortran/simplify.cc
+@@ -7498,8 +7498,9 @@ simplify_size (gfc_expr *array, gfc_expr *dim, int k)
+     }
+ 
+   for (ref = array->ref; ref; ref = ref->next)
+-    if (ref->type == REF_ARRAY && ref->u.ar.as)
+-      gfc_resolve_array_spec (ref->u.ar.as, 0);
++    if (ref->type == REF_ARRAY && ref->u.ar.as
++	&& !gfc_resolve_array_spec (ref->u.ar.as, 0))
++      return NULL;
+ 
+   if (dim == NULL)
+     {
+diff --git a/gcc/testsuite/gfortran.dg/pr103694.f90 b/gcc/testsuite/gfortran.dg/pr103694.f90
+new file mode 100644
+index 00000000000..3ed8b2088da
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr103694.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/103694 - ICE in gfc_conv_expr_op
++! Contributed by G.Steinmetz
++
++subroutine s
++  type t
++     integer :: a(2)
++  end type
++  type(t) :: x((0.)/0)
++  integer :: n = size(x(1)%a) ! { dg-error "does not reduce to a constant expression" }
++end
+-- 
+2.25.1
+

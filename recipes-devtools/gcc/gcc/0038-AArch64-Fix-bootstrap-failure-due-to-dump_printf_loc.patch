@@ -1,0 +1,38 @@
+From e69134e12551a4289292e3955525f84d99773d31 Mon Sep 17 00:00:00 2001
+From: Tamar Christina <tamar.christina@arm.com>
+Date: Thu, 1 Sep 2022 22:04:57 +0100
+Subject: [PATCH 038/547] AArch64: Fix bootstrap failure due to dump_printf_loc
+ format attribute uses [PR106782]
+
+This fixes the bootstrap failure on AArch64 following -Werror=format by
+correcting the print format modifiers in the backend.
+
+gcc/ChangeLog:
+
+	PR other/106782
+	* config/aarch64/aarch64.cc
+	(aarch64_vector_costs::prefer_unrolled_loop): Replace %u with
+	HOST_WIDE_INT_PRINT_UNSIGNED.
+
+(cherry picked from commit b98c5262d02c13cdbbf3b985859b436adec94d90)
+---
+ gcc/config/aarch64/aarch64.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index 5c9e7791a12..ac1153e31af 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -16677,7 +16677,8 @@ aarch64_vector_costs::prefer_unrolled_loop () const
+ 
+   if (dump_enabled_p ())
+     dump_printf_loc (MSG_NOTE, vect_location, "Number of insns in"
+-		     " unrolled Advanced SIMD loop = %d\n",
++		     " unrolled Advanced SIMD loop = "
++		     HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+ 		     m_unrolled_advsimd_stmts);
+ 
+   /* The balance here is tricky.  On the one hand, we can't be sure whether
+-- 
+2.25.1
+

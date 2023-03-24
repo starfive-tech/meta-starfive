@@ -1,0 +1,162 @@
+From 786923f74d6adfaf572f3d7c0307c51c522567f9 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 25 Jan 2023 17:19:54 -0500
+Subject: [PATCH 373/547] opts: SANITIZE_ADDRESS wrongly cleared [PR108543]
+
+Here we crash on a null fndecl ultimately because we haven't defined
+the built-ins described in sanitizer.def.  So
+builtin_decl_explicit (BUILT_IN_ASAN_POINTER_SUBTRACT);
+returns NULL_TREE, causing an ICE later.
+
+DEF_SANITIZER_BUILTIN only actually defines the built-ins when flag_sanitize
+has SANITIZE_ADDRESS, or some of the other SANITIZE_*, but it doesn't check
+SANITIZE_KERNEL_ADDRESS or SANITIZE_USER_ADDRESS.  Unfortunately, with
+-fsanitize=address -fno-sanitize=kernel-address
+or
+-fsanitize=kernel-address -fno-sanitize=address
+SANITIZE_ADDRESS ends up being unset from flag_sanitize even though
+_USER/_KERNEL are set.  That's because -fsanitize=address means
+SANITIZE_ADDRESS | SANITIZE_USER_ADDRESS and -fsanitize=kernel-address
+is SANITIZE_ADDRESS | SANITIZE_KERNEL_ADDRESS but parse_sanitizer_options
+does
+  flags &= ~sanitizer_opts[i].flag;
+so the subsequent -fno- unsets SANITIZE_ADDRESS.  Then no sanitizer
+built-ins are actually defined.
+
+I'm not sure why SANITIZE_ADDRESS isn't just SANITIZE_USER_ADDRESS |
+SANITIZE_KERNEL_ADDRESS, I don't think we need 3 bits.
+
+	PR middle-end/108543
+
+gcc/ChangeLog:
+
+	* opts.cc (parse_sanitizer_options): Don't always clear SANITIZE_ADDRESS
+	if it was previously set.
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/asan/pointer-subtract-5.c: New test.
+	* c-c++-common/asan/pointer-subtract-6.c: New test.
+	* c-c++-common/asan/pointer-subtract-7.c: New test.
+	* c-c++-common/asan/pointer-subtract-8.c: New test.
+
+(cherry picked from commit a82ce9c8d155ecda2d1c647d5c588f29e21ef4a3)
+---
+ gcc/opts.cc                                       |  9 ++++++++-
+ .../c-c++-common/asan/pointer-subtract-5.c        | 15 +++++++++++++++
+ .../c-c++-common/asan/pointer-subtract-6.c        | 15 +++++++++++++++
+ .../c-c++-common/asan/pointer-subtract-7.c        | 15 +++++++++++++++
+ .../c-c++-common/asan/pointer-subtract-8.c        | 15 +++++++++++++++
+ 5 files changed, 68 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/c-c++-common/asan/pointer-subtract-5.c
+ create mode 100644 gcc/testsuite/c-c++-common/asan/pointer-subtract-6.c
+ create mode 100644 gcc/testsuite/c-c++-common/asan/pointer-subtract-7.c
+ create mode 100644 gcc/testsuite/c-c++-common/asan/pointer-subtract-8.c
+
+diff --git a/gcc/opts.cc b/gcc/opts.cc
+index 3a89da2dd03..a97630d1c9a 100644
+--- a/gcc/opts.cc
++++ b/gcc/opts.cc
+@@ -2201,7 +2201,14 @@ parse_sanitizer_options (const char *p, location_t loc, int scode,
+ 		  flags |= sanitizer_opts[i].flag;
+ 	      }
+ 	    else
+-	      flags &= ~sanitizer_opts[i].flag;
++	      {
++		flags &= ~sanitizer_opts[i].flag;
++		/* Don't always clear SANITIZE_ADDRESS if it was previously
++		   set: -fsanitize=address -fno-sanitize=kernel-address should
++		   leave SANITIZE_ADDRESS set.  */
++		if (flags & (SANITIZE_KERNEL_ADDRESS | SANITIZE_USER_ADDRESS))
++		  flags |= SANITIZE_ADDRESS;
++	      }
+ 	    found = true;
+ 	    break;
+ 	  }
+diff --git a/gcc/testsuite/c-c++-common/asan/pointer-subtract-5.c b/gcc/testsuite/c-c++-common/asan/pointer-subtract-5.c
+new file mode 100644
+index 00000000000..867eda0e61e
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/asan/pointer-subtract-5.c
+@@ -0,0 +1,15 @@
++/* PR middle-end/108543 */
++/* { dg-do compile  } */
++/* { dg-options "-fsanitize=address -fno-sanitize=kernel-address -fsanitize=pointer-subtract" } */
++
++struct S {
++  long _M_p;
++};
++
++typedef struct S S;
++
++__PTRDIFF_TYPE__
++f (S __x, S __y)
++{
++  return &__x._M_p - &__y._M_p;
++}
+diff --git a/gcc/testsuite/c-c++-common/asan/pointer-subtract-6.c b/gcc/testsuite/c-c++-common/asan/pointer-subtract-6.c
+new file mode 100644
+index 00000000000..785b90b3d98
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/asan/pointer-subtract-6.c
+@@ -0,0 +1,15 @@
++/* PR middle-end/108543 */
++/* { dg-do compile  } */
++/* { dg-options "-fsanitize=kernel-address -fno-sanitize=address -fsanitize=pointer-subtract" } */
++
++struct S {
++  long _M_p;
++};
++
++typedef struct S S;
++
++__PTRDIFF_TYPE__
++f (S __x, S __y)
++{
++  return &__x._M_p - &__y._M_p;
++}
+diff --git a/gcc/testsuite/c-c++-common/asan/pointer-subtract-7.c b/gcc/testsuite/c-c++-common/asan/pointer-subtract-7.c
+new file mode 100644
+index 00000000000..11b63401b8c
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/asan/pointer-subtract-7.c
+@@ -0,0 +1,15 @@
++/* PR middle-end/108543 */
++/* { dg-do compile  } */
++/* { dg-options "-fno-sanitize=kernel-address -fsanitize=address -fsanitize=pointer-subtract" } */
++
++struct S {
++  long _M_p;
++};
++
++typedef struct S S;
++
++__PTRDIFF_TYPE__
++f (S __x, S __y)
++{
++  return &__x._M_p - &__y._M_p;
++}
+diff --git a/gcc/testsuite/c-c++-common/asan/pointer-subtract-8.c b/gcc/testsuite/c-c++-common/asan/pointer-subtract-8.c
+new file mode 100644
+index 00000000000..ac2b9c3c1d9
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/asan/pointer-subtract-8.c
+@@ -0,0 +1,15 @@
++/* PR middle-end/108543 */
++/* { dg-do compile  } */
++/* { dg-options "-fno-sanitize=address -fsanitize=kernel-address -fsanitize=pointer-subtract" } */
++
++struct S {
++  long _M_p;
++};
++
++typedef struct S S;
++
++__PTRDIFF_TYPE__
++f (S __x, S __y)
++{
++  return &__x._M_p - &__y._M_p;
++}
+-- 
+2.25.1
+

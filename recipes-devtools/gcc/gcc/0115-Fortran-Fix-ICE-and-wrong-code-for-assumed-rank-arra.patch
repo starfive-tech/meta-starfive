@@ -1,0 +1,188 @@
+From 07da38566232cc11901c3eeb9fc2860f02f2e31f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Rui=20Faustino=20de=20Sousa?=
+ <jrfsousa@gmail.com>
+Date: Sun, 25 Sep 2022 22:48:55 +0200
+Subject: [PATCH 115/547] Fortran: Fix ICE and wrong code for assumed-rank
+ arrays [PR100029, PR100040]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/100040
+	PR fortran/100029
+	* trans-expr.cc (gfc_conv_class_to_class): Add code to have
+	assumed-rank arrays recognized as full arrays and fix the type
+	of the array assignment.
+	(gfc_conv_procedure_call): Change order of code blocks such that
+	the free of ALLOCATABLE dummy arguments with INTENT(OUT) occurs
+	first.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/100029
+	* gfortran.dg/PR100029.f90: New test.
+
+	PR fortran/100040
+	* gfortran.dg/PR100040.f90: New test.
+
+(cherry picked from commit 5299155bb80e90df822e1eebc9f9a0c8e4505a46)
+---
+ gcc/fortran/trans-expr.cc              | 48 +++++++++++++++-----------
+ gcc/testsuite/gfortran.dg/PR100029.f90 | 22 ++++++++++++
+ gcc/testsuite/gfortran.dg/PR100040.f90 | 36 +++++++++++++++++++
+ 3 files changed, 85 insertions(+), 21 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/PR100029.f90
+ create mode 100644 gcc/testsuite/gfortran.dg/PR100040.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index 7895d034610..16e232da537 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -1178,8 +1178,10 @@ gfc_conv_class_to_class (gfc_se *parmse, gfc_expr *e, gfc_typespec class_ts,
+     return;
+ 
+   /* Test for FULL_ARRAY.  */
+-  if (e->rank == 0 && gfc_expr_attr (e).codimension
+-      && gfc_expr_attr (e).dimension)
++  if (e->rank == 0
++      && ((gfc_expr_attr (e).codimension && gfc_expr_attr (e).dimension)
++	  || (class_ts.u.derived->components->as
++	      && class_ts.u.derived->components->as->type == AS_ASSUMED_RANK)))
+     full_array = true;
+   else
+     gfc_is_class_array_ref (e, &full_array);
+@@ -1227,8 +1229,12 @@ gfc_conv_class_to_class (gfc_se *parmse, gfc_expr *e, gfc_typespec class_ts,
+ 	  && e->rank != class_ts.u.derived->components->as->rank)
+ 	{
+ 	  if (e->rank == 0)
+-	    gfc_add_modify (&parmse->post, gfc_class_data_get (parmse->expr),
+-			    gfc_conv_descriptor_data_get (ctree));
++	    {
++	      tmp = gfc_class_data_get (parmse->expr);
++	      gfc_add_modify (&parmse->post, tmp,
++			      fold_convert (TREE_TYPE (tmp),
++					 gfc_conv_descriptor_data_get (ctree)));
++	    }
+ 	  else
+ 	    class_array_data_assign (&parmse->post, parmse->expr, ctree, true);
+ 	}
+@@ -6526,23 +6532,6 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 		    base_object = build_fold_indirect_ref_loc (input_location,
+ 							       parmse.expr);
+ 
+-		  /* A class array element needs converting back to be a
+-		     class object, if the formal argument is a class object.  */
+-		  if (fsym && fsym->ts.type == BT_CLASS
+-			&& e->ts.type == BT_CLASS
+-			&& ((CLASS_DATA (fsym)->as
+-			     && CLASS_DATA (fsym)->as->type == AS_ASSUMED_RANK)
+-			    || CLASS_DATA (e)->attr.dimension))
+-		    gfc_conv_class_to_class (&parmse, e, fsym->ts, false,
+-				     fsym->attr.intent != INTENT_IN
+-				     && (CLASS_DATA (fsym)->attr.class_pointer
+-					 || CLASS_DATA (fsym)->attr.allocatable),
+-				     fsym->attr.optional
+-				     && e->expr_type == EXPR_VARIABLE
+-				     && e->symtree->n.sym->attr.optional,
+-				     CLASS_DATA (fsym)->attr.class_pointer
+-				     || CLASS_DATA (fsym)->attr.allocatable);
+-
+ 		  /* If an ALLOCATABLE dummy argument has INTENT(OUT) and is
+ 		     allocated on entry, it must be deallocated.  */
+ 		  if (fsym && fsym->attr.intent == INTENT_OUT
+@@ -6603,6 +6592,23 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 		      gfc_add_expr_to_block (&se->pre, tmp);
+ 		    }
+ 
++		  /* A class array element needs converting back to be a
++		     class object, if the formal argument is a class object.  */
++		  if (fsym && fsym->ts.type == BT_CLASS
++			&& e->ts.type == BT_CLASS
++			&& ((CLASS_DATA (fsym)->as
++			     && CLASS_DATA (fsym)->as->type == AS_ASSUMED_RANK)
++			    || CLASS_DATA (e)->attr.dimension))
++		    gfc_conv_class_to_class (&parmse, e, fsym->ts, false,
++				     fsym->attr.intent != INTENT_IN
++				     && (CLASS_DATA (fsym)->attr.class_pointer
++					 || CLASS_DATA (fsym)->attr.allocatable),
++				     fsym->attr.optional
++				     && e->expr_type == EXPR_VARIABLE
++				     && e->symtree->n.sym->attr.optional,
++				     CLASS_DATA (fsym)->attr.class_pointer
++				     || CLASS_DATA (fsym)->attr.allocatable);
++
+ 		  if (fsym && (fsym->ts.type == BT_DERIVED
+ 			       || fsym->ts.type == BT_ASSUMED)
+ 		      && e->ts.type == BT_CLASS
+diff --git a/gcc/testsuite/gfortran.dg/PR100029.f90 b/gcc/testsuite/gfortran.dg/PR100029.f90
+new file mode 100644
+index 00000000000..fd7e4c46032
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/PR100029.f90
+@@ -0,0 +1,22 @@
++! { dg-do run }
++!
++! Test the fix for PR100029
++!
++
++program foo_p
++  implicit none
++
++  type :: foo_t
++  end type foo_t
++  
++  class(foo_t), allocatable :: pout
++
++  call foo_s(pout)
++
++contains
++
++  subroutine foo_s(that)
++    class(foo_t), allocatable, intent(out) :: that(..)
++  end subroutine foo_s
++
++end program foo_p
+diff --git a/gcc/testsuite/gfortran.dg/PR100040.f90 b/gcc/testsuite/gfortran.dg/PR100040.f90
+new file mode 100644
+index 00000000000..0a135ff30a3
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/PR100040.f90
+@@ -0,0 +1,36 @@
++! { dg-do run }
++!
++! Test the fix for PR100040
++!
++
++program foo_p
++  implicit none
++
++  integer, parameter :: n = 11
++
++  type :: foo_t
++    integer :: i
++  end type foo_t
++  
++  type(foo_t), parameter :: a = foo_t(n)
++  
++  class(foo_t), allocatable :: pout
++
++  call foo_s(pout)
++  if(.not.allocated(pout)) stop 1
++  if(pout%i/=n) stop 2
++
++contains
++
++  subroutine foo_s(that)
++    class(foo_t), allocatable, intent(out) :: that(..)
++
++    select rank(that)
++    rank(0)
++      that = a
++    rank default
++      stop 3
++    end select
++  end subroutine foo_s
++
++end program foo_p
+-- 
+2.25.1
+

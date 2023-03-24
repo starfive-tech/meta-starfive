@@ -1,0 +1,71 @@
+From 6dc4f984dd14ffad34e0540f2030f553579adefd Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Thu, 14 Jul 2022 22:24:55 +0200
+Subject: [PATCH 381/547] Fortran: error recovery for bad initializers of
+ implied-shape arrays [PR106209]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/106209
+	* decl.cc (add_init_expr_to_sym): Handle bad initializers for
+	implied-shape arrays.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/106209
+	* gfortran.dg/pr106209.f90: New test.
+
+Co-authored-by: Steven G. Kargl <kargl@gcc.gnu.org>
+(cherry picked from commit 748f8a8b145dde59c7b63aa68b5a59515b7efc49)
+---
+ gcc/fortran/decl.cc                    | 15 +++++++++++++--
+ gcc/testsuite/gfortran.dg/pr106209.f90 |  9 +++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr106209.f90
+
+diff --git a/gcc/fortran/decl.cc b/gcc/fortran/decl.cc
+index 339f8b15035..b6400514731 100644
+--- a/gcc/fortran/decl.cc
++++ b/gcc/fortran/decl.cc
+@@ -2129,10 +2129,21 @@ add_init_expr_to_sym (const char *name, gfc_expr **initp, locus *var_locus)
+ 	  /* The shape may be NULL for EXPR_ARRAY, set it.  */
+ 	  if (init->shape == NULL)
+ 	    {
+-	      gcc_assert (init->expr_type == EXPR_ARRAY);
++	      if (init->expr_type != EXPR_ARRAY)
++		{
++		  gfc_error ("Bad shape of initializer at %L", &init->where);
++		  return false;
++		}
++
+ 	      init->shape = gfc_get_shape (1);
+ 	      if (!gfc_array_size (init, &init->shape[0]))
+-		  gfc_internal_error ("gfc_array_size failed");
++		{
++		  gfc_error ("Cannot determine shape of initializer at %L",
++			     &init->where);
++		  free (init->shape);
++		  init->shape = NULL;
++		  return false;
++		}
+ 	    }
+ 
+ 	  for (dim = 0; dim < sym->as->rank; ++dim)
+diff --git a/gcc/testsuite/gfortran.dg/pr106209.f90 b/gcc/testsuite/gfortran.dg/pr106209.f90
+new file mode 100644
+index 00000000000..44f9233ec2f
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr106209.f90
+@@ -0,0 +1,9 @@
++! { dg-do compile }
++! PR fortran/106209 - ICE in add_init_expr_to_sym
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a(:) = 0   ! { dg-error "of deferred shape" }
++  integer, parameter :: b(*) = a   ! { dg-error "Bad shape of initializer" }
++  integer, parameter :: c(*) = [a] ! { dg-error "Cannot determine shape" }
++end
+-- 
+2.25.1
+

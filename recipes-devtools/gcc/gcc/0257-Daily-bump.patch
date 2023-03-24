@@ -1,0 +1,47 @@
+From f3b52a80fe3b06f021f86d3341c97c63e6709148 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 2 Dec 2022 00:21:49 +0000
+Subject: [PATCH 257/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 6 ++++++
+ gcc/DATESTAMP           | 2 +-
+ gcc/testsuite/ChangeLog | 4 ++++
+ 3 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 48a7b4f94e5..23f821acc2f 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,9 @@
++2022-12-01  liuhongt  <hongtao.liu@intel.com>
++
++	PR target/107863
++	* config/i386/i386-expand.cc (ix86_expand_vec_set_builtin):
++	Convert op1 to target mode whenever mode mismatch.
++
+ 2022-11-30  Iain Buclaw  <ibuclaw@gdcproject.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f0a26d37c16..c7106babaa0 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221201
++20221202
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 50ffb272093..3039da0da9f 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,7 @@
++2022-12-01  liuhongt  <hongtao.liu@intel.com>
++
++	* gcc.target/i386/pr107863.c: New test.
++
+ 2022-11-30  Iain Buclaw  <ibuclaw@gdcproject.org>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

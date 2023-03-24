@@ -1,0 +1,240 @@
+From a6b1f6126de5e45777610699b6d634605c17711c Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 21 Nov 2022 10:28:27 +0100
+Subject: [PATCH 226/547] i386: Uglify some local identifiers in *intrin.h
+ [PR107748]
+
+While reporting PR107748 (where is a problem with non-uglified names,
+but I've left it out because it needs fixing anyway), I've noticed
+various spots where identifiers in *intrin.h headers weren't uglified.
+The following patch fixed those that are related to unions (I've grepped
+for [a-zA-Z]\.[a-zA-Z] spots).
+The reason we need those to be uglified is the same as why the arguments
+of the inlines are __ prefixed and most of automatic vars in the inlines
+- say a, v or u aren't part of implementation namespace and so users could
+ #define u whatever->something
+ #include <x86intrin.h>
+and it should still work, as long as u is not e.g. one of the names
+of the functions/macros the header provides (_mm* etc.).
+
+2022-11-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/107748
+	* config/i386/avx512fp16intrin.h (_mm512_castph512_ph128,
+	_mm512_castph512_ph256, _mm512_castph128_ph512,
+	_mm512_castph256_ph512, _mm512_set1_pch): Uglify names of local
+	variables and union members.
+	* config/i386/avx512fp16vlintrin.h (_mm256_castph256_ph128,
+	_mm256_castph128_ph256, _mm256_set1_pch, _mm_set1_pch): Likewise.
+	* config/i386/smmintrin.h (_mm_extract_ps): Likewise.
+	* config/i386/avx512bf16intrin.h (_mm_cvtsbh_ss): Likewise.
+
+(cherry picked from commit ec8ec09f9414be871e322fecf4ebf53e3687bd22)
+---
+ gcc/config/i386/avx512bf16intrin.h   |  6 ++--
+ gcc/config/i386/avx512fp16intrin.h   | 44 ++++++++++++++--------------
+ gcc/config/i386/avx512fp16vlintrin.h | 34 ++++++++++-----------
+ gcc/config/i386/smmintrin.h          | 13 ++++----
+ 4 files changed, 49 insertions(+), 48 deletions(-)
+
+diff --git a/gcc/config/i386/avx512bf16intrin.h b/gcc/config/i386/avx512bf16intrin.h
+index b6e9ddad157..ecfff8ebfef 100644
+--- a/gcc/config/i386/avx512bf16intrin.h
++++ b/gcc/config/i386/avx512bf16intrin.h
+@@ -46,9 +46,9 @@ extern __inline float
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm_cvtsbh_ss (__bfloat16 __A)
+ {
+-  union{ float a; unsigned int b;} __tmp;
+-  __tmp.b = ((unsigned int)(__A)) << 16;
+-  return __tmp.a;
++  union{ float __a; unsigned int __b;} __tmp;
++  __tmp.__b = ((unsigned int)(__A)) << 16;
++  return __tmp.__a;
+ }
+ 
+ /* vcvtne2ps2bf16 */
+diff --git a/gcc/config/i386/avx512fp16intrin.h b/gcc/config/i386/avx512fp16intrin.h
+index 28041516bac..e43acaab12a 100644
+--- a/gcc/config/i386/avx512fp16intrin.h
++++ b/gcc/config/i386/avx512fp16intrin.h
+@@ -272,10 +272,10 @@ _mm512_castph512_ph128 (__m512h __A)
+ {
+   union
+   {
+-    __m128h a[4];
+-    __m512h v;
+-  } u = { .v = __A };
+-  return u.a[0];
++    __m128h __a[4];
++    __m512h __v;
++  } __u = { .__v = __A };
++  return __u.__a[0];
+ }
+ 
+ extern __inline __m256h
+@@ -284,10 +284,10 @@ _mm512_castph512_ph256 (__m512h __A)
+ {
+   union
+   {
+-    __m256h a[2];
+-    __m512h v;
+-  } u = { .v = __A };
+-  return u.a[0];
++    __m256h __a[2];
++    __m512h __v;
++  } __u = { .__v = __A };
++  return __u.__a[0];
+ }
+ 
+ extern __inline __m512h
+@@ -296,11 +296,11 @@ _mm512_castph128_ph512 (__m128h __A)
+ {
+   union
+   {
+-    __m128h a[4];
+-    __m512h v;
+-  } u;
+-  u.a[0] = __A;
+-  return u.v;
++    __m128h __a[4];
++    __m512h __v;
++  } __u;
++  __u.__a[0] = __A;
++  return __u.__v;
+ }
+ 
+ extern __inline __m512h
+@@ -309,11 +309,11 @@ _mm512_castph256_ph512 (__m256h __A)
+ {
+   union
+   {
+-    __m256h a[2];
+-    __m512h v;
+-  } u;
+-  u.a[0] = __A;
+-  return u.v;
++    __m256h __a[2];
++    __m512h __v;
++  } __u;
++  __u.__a[0] = __A;
++  return __u.__v;
+ }
+ 
+ extern __inline __m512h
+@@ -7155,11 +7155,11 @@ _mm512_set1_pch (_Float16 _Complex __A)
+ {
+   union
+   {
+-    _Float16 _Complex a;
+-    float b;
+-  } u = { .a = __A};
++    _Float16 _Complex __a;
++    float __b;
++  } __u = { .__a = __A};
+ 
+-  return (__m512h) _mm512_set1_ps (u.b);
++  return (__m512h) _mm512_set1_ps (__u.__b);
+ }
+ 
+ // intrinsics below are alias for f*mul_*ch
+diff --git a/gcc/config/i386/avx512fp16vlintrin.h b/gcc/config/i386/avx512fp16vlintrin.h
+index 0794498a3d6..2783971accb 100644
+--- a/gcc/config/i386/avx512fp16vlintrin.h
++++ b/gcc/config/i386/avx512fp16vlintrin.h
+@@ -124,10 +124,10 @@ _mm256_castph256_ph128 (__m256h __A)
+ {
+   union
+   {
+-    __m128h a[2];
+-    __m256h v;
+-  } u = { .v = __A };
+-  return u.a[0];
++    __m128h __a[2];
++    __m256h __v;
++  } __u = { .__v = __A };
++  return __u.__a[0];
+ }
+ 
+ extern __inline __m256h
+@@ -136,11 +136,11 @@ _mm256_castph128_ph256 (__m128h __A)
+ {
+   union
+   {
+-    __m128h a[2];
+-    __m256h v;
+-  } u;
+-  u.a[0] = __A;
+-  return u.v;
++    __m128h __a[2];
++    __m256h __v;
++  } __u;
++  __u.__a[0] = __A;
++  return __u.__v;
+ }
+ 
+ extern __inline __m256h
+@@ -3317,11 +3317,11 @@ _mm256_set1_pch (_Float16 _Complex __A)
+ {
+   union
+   {
+-    _Float16 _Complex a;
+-    float b;
+-  } u = { .a = __A };
++    _Float16 _Complex __a;
++    float __b;
++  } __u = { .__a = __A };
+ 
+-  return (__m256h) _mm256_set1_ps (u.b);
++  return (__m256h) _mm256_set1_ps (__u.__b);
+ }
+ 
+ extern __inline __m128h
+@@ -3330,11 +3330,11 @@ _mm_set1_pch (_Float16 _Complex __A)
+ {
+   union
+   {
+-    _Float16 _Complex a;
+-    float b;
+-  } u = { .a = __A };
++    _Float16 _Complex __a;
++    float __b;
++  } __u = { .__a = __A };
+ 
+-  return (__m128h) _mm_set1_ps (u.b);
++  return (__m128h) _mm_set1_ps (__u.__b);
+ }
+ 
+ // intrinsics below are alias for f*mul_*ch
+diff --git a/gcc/config/i386/smmintrin.h b/gcc/config/i386/smmintrin.h
+index eb6a451c10a..47fd9b8a2c6 100644
+--- a/gcc/config/i386/smmintrin.h
++++ b/gcc/config/i386/smmintrin.h
+@@ -365,17 +365,18 @@ _mm_insert_ps (__m128 __D, __m128 __S, const int __N)
+ extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+ _mm_extract_ps (__m128 __X, const int __N)
+ {
+-  union { int i; float f; } __tmp;
+-  __tmp.f = __builtin_ia32_vec_ext_v4sf ((__v4sf)__X, __N);
+-  return __tmp.i;
++  union { int __i; float __f; } __tmp;
++  __tmp.__f = __builtin_ia32_vec_ext_v4sf ((__v4sf)__X, __N);
++  return __tmp.__i;
+ }
+ #else
+ #define _mm_extract_ps(X, N)						\
+   (__extension__							\
+    ({									\
+-     union { int i; float f; } __tmp;					\
+-     __tmp.f = __builtin_ia32_vec_ext_v4sf ((__v4sf)(__m128)(X), (int)(N)); \
+-     __tmp.i;								\
++     union { int __i; float __f; } __tmp;				\
++     __tmp.__f = __builtin_ia32_vec_ext_v4sf ((__v4sf)(__m128)(X),	\
++					      (int)(N));		\
++     __tmp.__i;								\
+    }))
+ #endif
+ 
+-- 
+2.25.1
+

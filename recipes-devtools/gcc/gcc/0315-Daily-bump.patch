@@ -1,0 +1,34 @@
+From c082e49dce2562aae33399b7bf54bf010e6b49e1 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 25 Dec 2022 00:20:15 +0000
+Subject: [PATCH 315/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/testsuite/ChangeLog | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 84446d7ccd5..afa39b22a00 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221224
++20221225
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index bbc9f6fba38..15145b9276b 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,9 @@
++2022-12-24  John David Anglin  <danglin@gcc.gnu.org>
++
++	* g++.dg/guality/guality.exp: Skip on hppa*-*-hpux*.
++	* gcc.dg/guality/guality.exp: Likewise.
++	* gfortran.dg/guality/guality.exp: Likewise.
++
+ 2022-12-19  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

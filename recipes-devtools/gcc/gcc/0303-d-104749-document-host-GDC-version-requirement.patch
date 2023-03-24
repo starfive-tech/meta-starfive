@@ -1,0 +1,33 @@
+From 1bdb13071f0ead3c83390ac9fcc0be73a2607a42 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 20 Dec 2022 14:34:01 +0100
+Subject: [PATCH 303/547] d/104749 - document host GDC version requirement
+
+This documents that GDC 9.4 or later is required to build the D
+language rather than GDC 9.1 which suffers from PR94240.
+
+	PR d/104749
+	* doc/install.texi (GDC): Document GDC 9.4 or later is required
+	to build the D language frontend.
+
+(cherry picked from commit 05b7cf52e1b640271900894a894da2d27ef90092)
+---
+ gcc/doc/install.texi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/doc/install.texi b/gcc/doc/install.texi
+index b609d832db5..cd9607b2759 100644
+--- a/gcc/doc/install.texi
++++ b/gcc/doc/install.texi
+@@ -287,7 +287,7 @@ section.
+ @item @anchor{GDC-prerequisite}GDC
+ 
+ In order to build GDC, the D compiler, you need a working GDC
+-compiler (GCC version 9.1 or later) and D runtime library,
++compiler (GCC version 9.4 or later) and D runtime library,
+ @samp{libphobos}, as the D front end is written in D.
+ 
+ Versions of GDC prior to 12 can be built with an ISO C++11 compiler, which can
+-- 
+2.25.1
+

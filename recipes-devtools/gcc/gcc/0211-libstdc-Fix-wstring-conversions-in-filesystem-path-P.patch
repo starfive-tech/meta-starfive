@@ -1,0 +1,470 @@
+From c6bd8fac5e3bc6003f889fbd6042c0d8aa9c40ed Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 11 Nov 2022 15:22:02 +0000
+Subject: [PATCH 211/547] libstdc++: Fix wstring conversions in
+ filesystem::path [PR95048]
+
+In commit r9-7381-g91756c4abc1757 I changed filesystem::path to use
+std::codecvt<CharT, char, mbstate_t> for conversions from all wide
+strings to UTF-8, instead of using std::codecvt_utf8<CharT>. This was
+done because for 16-bit wchar_t, std::codecvt_utf8<wchar_t> only
+supports UCS-2 and not UTF-16. The rationale for the change was sound,
+but the actual fix was not. It's OK to use std::codecvt for char16_t or
+char32_t, because the specializations for those types always use UTF-8 ,
+but std::codecvt<wchar_t, char, mbstate_t> uses the current locale's
+encodings, and the narrow encoding is probably ASCII and can't support
+non-ASCII characters.
+
+The correct fix is to use std::codecvt only for char16_t and char32_t.
+For 32-bit wchar_t we could have continued using std::codecvt_utf8
+because that uses UTF-32 which is fine, switching to std::codecvt broke
+non-Windows targets with 32-bit wchar_t. For 16-bit wchar_t we did need
+to change, but should have changed to std::codecvt_utf8_utf16<wchar_t>
+instead, as that always uses UTF-16 not UCS-2. I actually noted that in
+the commit message for r9-7381-g91756c4abc1757 but didn't use that
+option. Oops.
+
+This replaces the unconditional std::codecvt<CharT, char, mbstate_t>
+with a type defined via template specialization, so it can vary
+depending on the wide character type. The code is also simplified to
+remove some of the mess of #ifdef and if-constexpr conditions.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/95048
+	* include/bits/fs_path.h (path::_Codecvt): New class template
+	that selects the kind of code conversion done.
+	(path::_Codecvt<wchar_t>): Select based on sizeof(wchar_t).
+	(_GLIBCXX_CONV_FROM_UTF8): New macro to allow the same code to
+	be used for Windows and POSIX.
+	(path::_S_convert(const EcharT*, const EcharT*)): Simplify by
+	using _Codecvt and _GLIBCXX_CONV_FROM_UTF8 abstractions.
+	(path::_S_str_convert(basic_string_view<value_type>, const A&)):
+	Simplify nested conditions.
+	* include/experimental/bits/fs_path.h (path::_Cvt): Define
+	nested typedef controlling type of code conversion done.
+	(path::_Cvt::_S_wconvert): Use new typedef.
+	(path::string(const A&)): Likewise.
+	* testsuite/27_io/filesystem/path/construct/95048.cc: New test.
+	* testsuite/experimental/filesystem/path/construct/95048.cc: New
+	test.
+
+(cherry picked from commit b331bf303bdc1edead41e2b3d11d1a7804b433cf)
+---
+ libstdc++-v3/include/bits/fs_path.h           | 126 ++++++++++--------
+ .../include/experimental/bits/fs_path.h       |  52 ++++++--
+ .../27_io/filesystem/path/construct/95048.cc  |  45 +++++++
+ .../filesystem/path/construct/95048.cc        |  47 +++++++
+ 4 files changed, 203 insertions(+), 67 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/27_io/filesystem/path/construct/95048.cc
+ create mode 100644 libstdc++-v3/testsuite/experimental/filesystem/path/construct/95048.cc
+
+diff --git a/libstdc++-v3/include/bits/fs_path.h b/libstdc++-v3/include/bits/fs_path.h
+index d6202fd275a..65682c2a185 100644
+--- a/libstdc++-v3/include/bits/fs_path.h
++++ b/libstdc++-v3/include/bits/fs_path.h
+@@ -730,6 +730,8 @@ namespace __detail
+     _List _M_cmpts;
+ 
+     struct _Parser;
++
++    template<typename _EcharT> struct _Codecvt;
+   };
+ 
+   /// @{
+@@ -858,55 +860,72 @@ namespace __detail
+     size_t _M_pos;
+   };
+ 
++  // path::_Codecvt<C> Performs conversions between C and path::string_type.
++  // The native encoding of char strings is the OS-dependent current
++  // encoding for pathnames. FIXME: We assume this is UTF-8 everywhere,
++  // but should use a Windows API to query it.
++
++  // Converts between native pathname encoding and char16_t or char32_t.
++  template<typename _EcharT>
++    struct path::_Codecvt
++    // Need derived class here because std::codecvt has protected destructor.
++    : std::codecvt<_EcharT, char, mbstate_t>
++    { };
++
++  // Converts between native pathname encoding and native wide encoding.
++  // The native encoding for wide strings is the execution wide-character
++  // set encoding. FIXME: We assume that this is either UTF-32 or UTF-16
++  // (depending on the width of wchar_t). That matches GCC's default,
++  // but can be changed with -fwide-exec-charset.
++  // We need a custom codecvt converting the native pathname encoding
++  // to/from the native wide encoding.
++  template<>
++    struct path::_Codecvt<wchar_t>
++    : __conditional_t<sizeof(wchar_t) == sizeof(char32_t),
++		      std::codecvt_utf8<wchar_t>,       // UTF-8 <-> UTF-32
++		      std::codecvt_utf8_utf16<wchar_t>> // UTF-8 <-> UTF-16
++    { };
++
+   template<typename _EcharT>
+     auto
+     path::_S_convert(const _EcharT* __f, const _EcharT* __l)
+     {
+       static_assert(__detail::__is_encoded_char<_EcharT>);
+ 
++#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
++# define _GLIBCXX_CONV_FROM_UTF8(S) __detail::__wstr_from_utf8(S)
++#else
++# define _GLIBCXX_CONV_FROM_UTF8(S) S
++#endif
++
+       if constexpr (is_same_v<_EcharT, value_type>)
+ 	return basic_string_view<value_type>(__f, __l - __f);
+-#if !defined _GLIBCXX_FILESYSTEM_IS_WINDOWS && defined _GLIBCXX_USE_CHAR8_T
++#ifdef _GLIBCXX_USE_CHAR8_T
+       else if constexpr (is_same_v<_EcharT, char8_t>)
+-	// For POSIX converting from char8_t to char is also 'noconv'
+-	return string_view(reinterpret_cast<const char*>(__f), __l - __f);
+-#endif
+-      else
+ 	{
++	  string_view __str(reinterpret_cast<const char*>(__f), __l - __f);
++	  return _GLIBCXX_CONV_FROM_UTF8(__str);
++	}
++#endif
+ #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
++      else if constexpr (is_same_v<_EcharT, char>)
++	{
+ 	  std::wstring __wstr;
+-	  if constexpr (is_same_v<_EcharT, char>)
+-	    {
+-	      struct _UCvt : std::codecvt<wchar_t, char, std::mbstate_t>
+-	      { } __cvt;
+-	      if (__str_codecvt_in_all(__f, __l, __wstr, __cvt))
+-		return __wstr;
+-	    }
+-#ifdef _GLIBCXX_USE_CHAR8_T
+-	  else if constexpr (is_same_v<_EcharT, char8_t>)
+-	    {
+-	      const auto __f2 = reinterpret_cast<const char*>(__f);
+-	      return __detail::__wstr_from_utf8(string_view(__f2, __l - __f));
+-	    }
++	  path::_Codecvt<wchar_t> __cvt;
++	  if (__str_codecvt_in_all(__f, __l, __wstr, __cvt))
++	    return __wstr;
++	}
+ #endif
+-	  else // char16_t or char32_t
+-	    {
+-	      struct _UCvt : std::codecvt<_EcharT, char, std::mbstate_t>
+-	      { } __cvt;
+-	      std::string __str;
+-	      if (__str_codecvt_out_all(__f, __l, __str, __cvt))
+-		return __detail::__wstr_from_utf8(__str);
+-	    }
+-#else // ! windows
+-	  struct _UCvt : std::codecvt<_EcharT, char, std::mbstate_t>
+-	  { } __cvt;
++      else
++	{
++	  path::_Codecvt<_EcharT> __cvt;
+ 	  std::string __str;
+ 	  if (__str_codecvt_out_all(__f, __l, __str, __cvt))
+-	    return __str;
+-#endif
+-	  __detail::__throw_conversion_error();
++	    return _GLIBCXX_CONV_FROM_UTF8(__str);
+ 	}
++      __detail::__throw_conversion_error();
+     }
++#undef _GLIBCXX_CONV_FROM_UTF8
+ 
+   /// @endcond
+ 
+@@ -1088,7 +1107,9 @@ namespace __detail
+       if (__str.size() == 0)
+ 	return _WString(__a);
+ 
+-#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
++#ifndef _GLIBCXX_FILESYSTEM_IS_WINDOWS
++      string_view __u8str = __str;
++#else
+       // First convert native string from UTF-16 to to UTF-8.
+       // XXX This assumes that the execution wide-character set is UTF-16.
+       std::codecvt_utf8_utf16<value_type> __cvt;
+@@ -1098,35 +1119,30 @@ namespace __detail
+       _String __u8str{_CharAlloc{__a}};
+       const value_type* __wfirst = __str.data();
+       const value_type* __wlast = __wfirst + __str.size();
+-      if (__str_codecvt_out_all(__wfirst, __wlast, __u8str, __cvt)) {
++      if (!__str_codecvt_out_all(__wfirst, __wlast, __u8str, __cvt))
++	__detail::__throw_conversion_error();
+       if constexpr (is_same_v<_CharT, char>)
+ 	return __u8str; // XXX assumes native ordinary encoding is UTF-8.
+-      else {
+-
+-      const char* __first = __u8str.data();
+-      const char* __last = __first + __u8str.size();
+-#else
+-      const value_type* __first = __str.data();
+-      const value_type* __last = __first + __str.size();
+-#endif
+-
+-      // Convert UTF-8 string to requested format.
+-#ifdef _GLIBCXX_USE_CHAR8_T
+-      if constexpr (is_same_v<_CharT, char8_t>)
+-	return _WString(__first, __last, __a);
+       else
+ #endif
+ 	{
+-	  // Convert UTF-8 to wide string.
+-	  _WString __wstr(__a);
+-	  struct _UCvt : std::codecvt<_CharT, char, std::mbstate_t> { } __cvt;
+-	  if (__str_codecvt_in_all(__first, __last, __wstr, __cvt))
+-	    return __wstr;
+-	}
++	  const char* __first = __u8str.data();
++	  const char* __last = __first + __u8str.size();
+ 
+-#ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
+-      } }
++	  // Convert UTF-8 string to requested format.
++#ifdef _GLIBCXX_USE_CHAR8_T
++	  if constexpr (is_same_v<_CharT, char8_t>)
++	    return _WString(__first, __last, __a);
++	  else
+ #endif
++	    {
++	      // Convert UTF-8 to wide string.
++	      _WString __wstr(__a);
++	      path::_Codecvt<_CharT> __cvt;
++	      if (__str_codecvt_in_all(__first, __last, __wstr, __cvt))
++		return __wstr;
++	    }
++	}
+       __detail::__throw_conversion_error();
+     }
+   /// @endcond
+diff --git a/libstdc++-v3/include/experimental/bits/fs_path.h b/libstdc++-v3/include/experimental/bits/fs_path.h
+index 19d246100cb..a493e17a37e 100644
+--- a/libstdc++-v3/include/experimental/bits/fs_path.h
++++ b/libstdc++-v3/include/experimental/bits/fs_path.h
+@@ -734,15 +734,47 @@ namespace __detail
+   template<>
+     struct path::_Cvt<path::value_type>
+     {
++      // We need this type to be defined because we don't have `if constexpr`
++      // in C++11 and so path::string<C,T,A>(const A&) needs to be able to
++      // declare a variable of this type and pass it to __str_codecvt_in_all.
++      using __codecvt_utf8_to_wide = _Cvt;
++      // Dummy overload used for unreachable calls in path::string<C,T,A>.
++      template<typename _WStr>
++	friend bool
++	__str_codecvt_in_all(const char*, const char*,
++			     _WStr&, __codecvt_utf8_to_wide&) noexcept
++	{ return true; }
++
+       template<typename _Iter>
+ 	static string_type
+ 	_S_convert(_Iter __first, _Iter __last)
+ 	{ return string_type{__first, __last}; }
+     };
+ 
++  // Performs conversions from _CharT to path::string_type.
+   template<typename _CharT>
+     struct path::_Cvt
+     {
++      // FIXME: We currently assume that the native wide encoding for wchar_t
++      // is either UTF-32 or UTF-16 (depending on the width of wchar_t).
++      // See comments in <bits/fs_path.h> for further details.
++      using __codecvt_utf8_to_wchar
++	= __conditional_t<sizeof(wchar_t) == sizeof(char32_t),
++			  std::codecvt_utf8<wchar_t>,        // from UTF-32
++			  std::codecvt_utf8_utf16<wchar_t>>; // from UTF-16
++
++      // Converts from char16_t or char32_t using std::codecvt<charNN_t, char>.
++      // Need derived class here because std::codecvt has protected destructor.
++      struct __codecvt_utf8_to_utfNN : std::codecvt<_CharT, char, mbstate_t>
++      { };
++
++      // Convert from native pathname format (assumed to be UTF-8 everywhere)
++      // to the encoding implied by the wide character type _CharT.
++      using __codecvt_utf8_to_wide
++	= __conditional_t<is_same<_CharT, wchar_t>::value,
++			  __codecvt_utf8_to_wchar,
++			  __codecvt_utf8_to_utfNN>;
++
+ #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
+ #ifdef _GLIBCXX_USE_CHAR8_T
+       static string_type
+@@ -760,8 +792,7 @@ namespace __detail
+       static string_type
+       _S_wconvert(const char* __f, const char* __l, const char*)
+       {
+-	using _Cvt = std::codecvt<wchar_t, char, mbstate_t>;
+-	const auto& __cvt = std::use_facet<_Cvt>(std::locale{});
++	std::codecvt_utf8_utf16<wchar_t> __cvt;
+ 	std::wstring __wstr;
+ 	if (__str_codecvt_in_all(__f, __l, __wstr, __cvt))
+ 	    return __wstr;
+@@ -773,8 +804,7 @@ namespace __detail
+       static string_type
+       _S_wconvert(const _CharT* __f, const _CharT* __l, const void*)
+       {
+-	struct _UCvt : std::codecvt<_CharT, char, std::mbstate_t>
+-	{ } __cvt;
++	__codecvt_utf8_to_wide __cvt;
+ 	std::string __str;
+ 	if (__str_codecvt_out_all(__f, __l, __str, __cvt))
+ 	  {
+@@ -805,8 +835,7 @@ namespace __detail
+ 	else
+ #endif
+ 	  {
+-	    struct _UCvt : std::codecvt<_CharT, char, std::mbstate_t>
+-	    { } __cvt;
++	    __codecvt_utf8_to_wide __cvt;
+ 	    std::string __str;
+ 	    if (__str_codecvt_out_all(__f, __l, __str, __cvt))
+ 	      return __str;
+@@ -1013,7 +1042,7 @@ namespace __detail
+     inline std::basic_string<_CharT, _Traits, _Allocator>
+     path::string(const _Allocator& __a) const
+     {
+-      if (is_same<_CharT, value_type>::value)
++      if _GLIBCXX_CONSTEXPR (is_same<_CharT, value_type>::value)
+ 	return { _M_pathname.begin(), _M_pathname.end(), __a };
+ 
+       using _WString = basic_string<_CharT, _Traits, _Allocator>;
+@@ -1049,9 +1078,8 @@ namespace __detail
+ 	      else
+ #endif
+ 	        {
+-	          // Convert UTF-8 to wide string.
+-	          struct _UCvt : std::codecvt<_CharT, char, std::mbstate_t>
+-		  { } __cvt;
++		  // Convert UTF-8 to char16_t or char32_t string.
++		  typename path::_Cvt<_CharT>::__codecvt_utf8_to_wide __cvt;
+ 	          const char* __f = __from.data();
+ 	          const char* __l = __f + __from.size();
+ 	          if (__str_codecvt_in_all(__f, __l, __to, __cvt))
+@@ -1064,14 +1092,14 @@ namespace __detail
+ 	  if (auto* __p = __dispatch(__u8str, __wstr, is_same<_CharT, char>{}))
+ 	    return *__p;
+ 	}
+-#else
++#else // ! Windows
+ #ifdef _GLIBCXX_USE_CHAR8_T
+       if constexpr (is_same<_CharT, char8_t>::value)
+           return _WString(__first, __last, __a);
+       else
+ #endif
+         {
+-          struct _UCvt : std::codecvt<_CharT, char, std::mbstate_t> { } __cvt;
++	  typename path::_Cvt<_CharT>::__codecvt_utf8_to_wide __cvt;
+           _WString __wstr(__a);
+           if (__str_codecvt_in_all(__first, __last, __wstr, __cvt))
+ 	    return __wstr;
+diff --git a/libstdc++-v3/testsuite/27_io/filesystem/path/construct/95048.cc b/libstdc++-v3/testsuite/27_io/filesystem/path/construct/95048.cc
+new file mode 100644
+index 00000000000..c1a382d1420
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/filesystem/path/construct/95048.cc
+@@ -0,0 +1,45 @@
++// { dg-do run { target c++17 } }
++
++// C++17 30.10.8.4.1 path constructors [fs.path.construct]
++
++#include <filesystem>
++#include <testsuite_hooks.h>
++
++using std::filesystem::path;
++
++#define CHECK(E, S) (path(E##S) == path(u8##S))
++
++void
++test_wide()
++{
++  VERIFY( CHECK(L, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(L, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(L, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(L, "\U0001F4C4") ); // filing cabient
++}
++
++void
++test_u16()
++{
++  VERIFY( CHECK(u, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(u, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(u, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(u, "\U0001F4C4") ); // filing cabient
++}
++
++void
++test_u32()
++{
++  VERIFY( CHECK(U, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(U, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(U, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(U, "\U0001F4C4") ); // filing cabient
++}
++
++int
++main()
++{
++  test_wide();
++  test_u16();
++  test_u32();
++}
+diff --git a/libstdc++-v3/testsuite/experimental/filesystem/path/construct/95048.cc b/libstdc++-v3/testsuite/experimental/filesystem/path/construct/95048.cc
+new file mode 100644
+index 00000000000..b7a93f3c985
+--- /dev/null
++++ b/libstdc++-v3/testsuite/experimental/filesystem/path/construct/95048.cc
+@@ -0,0 +1,47 @@
++// { dg-options "-lstdc++fs" }
++// { dg-do run { target c++11 } }
++// { dg-require-filesystem-ts "" }
++
++// 8.4.1 path constructors [path.construct]
++
++#include <experimental/filesystem>
++#include <testsuite_hooks.h>
++
++using std::experimental::filesystem::path;
++
++#define CHECK(E, S) (path(E##S) == path(u8##S))
++
++void
++test_wide()
++{
++  VERIFY( CHECK(L, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(L, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(L, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(L, "\U0001F4C4") ); // filing cabient
++}
++
++void
++test_u16()
++{
++  VERIFY( CHECK(u, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(u, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(u, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(u, "\U0001F4C4") ); // filing cabient
++}
++
++void
++test_u32()
++{
++  VERIFY( CHECK(U, "\u00E4") ); // PR libstdc++/95048
++  VERIFY( CHECK(U, "\U0001F4C1") ); // folder
++  VERIFY( CHECK(U, "\U0001F4C2") ); // open folder
++  VERIFY( CHECK(U, "\U0001F4C4") ); // filing cabient
++}
++
++int
++main()
++{
++  test_wide();
++  test_u16();
++  test_u32();
++}
+-- 
+2.25.1
+

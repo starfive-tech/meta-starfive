@@ -1,0 +1,192 @@
+From a0c07ddfc0c7ec413f9dbf380fdcb5c428e00abe Mon Sep 17 00:00:00 2001
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Thu, 20 Oct 2022 15:34:09 +0100
+Subject: [PATCH 153/547] aarch64: Fix matching of BRKNS
+
+Unlike other flag-setting SVE instructions, BRKNS sets the flags
+based on an all-true governing predicate, rather than the GP operand.
+
+gcc/
+	* config/aarch64/iterators.md (SVE_BRKP): New iterator.
+	* config/aarch64/aarch64-sve.md (*aarch64_brkn_cc): New pattern.
+	(*aarch64_brkn_ptest): Likewise.
+	(*aarch64_brk<brk_op>_cc): Restrict to SVE_BRKP.
+	(*aarch64_brk<brk_op>_ptest): Likewise.
+
+gcc/testsuite/
+	* gcc.target/aarch64/sve/acle/general/brkn_1.c: Expect separate
+	PTEST instructions.
+	* gcc.target/aarch64/sve/acle/general/brkn_2.c: New test.
+
+(cherry picked from commit 6bec66640597e2604f51fc1642c7d279164cd442)
+---
+ gcc/config/aarch64/aarch64-sve.md             | 70 ++++++++++++++++---
+ gcc/config/aarch64/iterators.md               |  2 +
+ .../aarch64/sve/acle/general/brkn_1.c         |  5 +-
+ .../aarch64/sve/acle/general/brkn_2.c         | 23 ++++++
+ 4 files changed, 90 insertions(+), 10 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_2.c
+
+diff --git a/gcc/config/aarch64/aarch64-sve.md b/gcc/config/aarch64/aarch64-sve.md
+index e08bee197d8..e2bb80268e5 100644
+--- a/gcc/config/aarch64/aarch64-sve.md
++++ b/gcc/config/aarch64/aarch64-sve.md
+@@ -9677,7 +9677,61 @@
+   "brk<brk_op>\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
+ )
+ 
+-;; Same, but also producing a flags result.
++;; BRKN, producing both a predicate and a flags result.  Unlike other
++;; flag-setting instructions, these flags are always set wrt a ptrue.
++(define_insn_and_rewrite "*aarch64_brkn_cc"
++  [(set (reg:CC_NZC CC_REGNUM)
++	(unspec:CC_NZC
++	  [(match_operand:VNx16BI 4)
++	   (match_operand:VNx16BI 5)
++	   (const_int SVE_KNOWN_PTRUE)
++	   (unspec:VNx16BI
++	     [(match_operand:VNx16BI 1 "register_operand" "Upa")
++	      (match_operand:VNx16BI 2 "register_operand" "Upa")
++	      (match_operand:VNx16BI 3 "register_operand" "0")]
++	     UNSPEC_BRKN)]
++	  UNSPEC_PTEST))
++   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
++	(unspec:VNx16BI
++	  [(match_dup 1)
++	   (match_dup 2)
++	   (match_dup 3)]
++	  UNSPEC_BRKN))]
++  "TARGET_SVE"
++  "brkns\t%0.b, %1/z, %2.b, %0.b"
++  "&& (operands[4] != CONST0_RTX (VNx16BImode)
++       || operands[5] != CONST0_RTX (VNx16BImode))"
++  {
++    operands[4] = CONST0_RTX (VNx16BImode);
++    operands[5] = CONST0_RTX (VNx16BImode);
++  }
++)
++
++;; Same, but with only the flags result being interesting.
++(define_insn_and_rewrite "*aarch64_brkn_ptest"
++  [(set (reg:CC_NZC CC_REGNUM)
++	(unspec:CC_NZC
++	  [(match_operand:VNx16BI 4)
++	   (match_operand:VNx16BI 5)
++	   (const_int SVE_KNOWN_PTRUE)
++	   (unspec:VNx16BI
++	     [(match_operand:VNx16BI 1 "register_operand" "Upa")
++	      (match_operand:VNx16BI 2 "register_operand" "Upa")
++	      (match_operand:VNx16BI 3 "register_operand" "0")]
++	     UNSPEC_BRKN)]
++	  UNSPEC_PTEST))
++   (clobber (match_scratch:VNx16BI 0 "=Upa"))]
++  "TARGET_SVE"
++  "brkns\t%0.b, %1/z, %2.b, %0.b"
++  "&& (operands[4] != CONST0_RTX (VNx16BImode)
++       || operands[5] != CONST0_RTX (VNx16BImode))"
++  {
++    operands[4] = CONST0_RTX (VNx16BImode);
++    operands[5] = CONST0_RTX (VNx16BImode);
++  }
++)
++
++;; BRKPA and BRKPB, producing both a predicate and a flags result.
+ (define_insn "*aarch64_brk<brk_op>_cc"
+   [(set (reg:CC_NZC CC_REGNUM)
+ 	(unspec:CC_NZC
+@@ -9687,17 +9741,17 @@
+ 	   (unspec:VNx16BI
+ 	     [(match_dup 1)
+ 	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+-	      (match_operand:VNx16BI 3 "register_operand" "<brk_reg_con>")]
+-	     SVE_BRK_BINARY)]
++	      (match_operand:VNx16BI 3 "register_operand" "Upa")]
++	     SVE_BRKP)]
+ 	  UNSPEC_PTEST))
+    (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+ 	(unspec:VNx16BI
+ 	  [(match_dup 1)
+ 	   (match_dup 2)
+ 	   (match_dup 3)]
+-	  SVE_BRK_BINARY))]
++	  SVE_BRKP))]
+   "TARGET_SVE"
+-  "brk<brk_op>s\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
++  "brk<brk_op>s\t%0.b, %1/z, %2.b, %3.b"
+ )
+ 
+ ;; Same, but with only the flags result being interesting.
+@@ -9710,12 +9764,12 @@
+ 	   (unspec:VNx16BI
+ 	     [(match_dup 1)
+ 	      (match_operand:VNx16BI 2 "register_operand" "Upa")
+-	      (match_operand:VNx16BI 3 "register_operand" "<brk_reg_con>")]
+-	     SVE_BRK_BINARY)]
++	      (match_operand:VNx16BI 3 "register_operand" "Upa")]
++	     SVE_BRKP)]
+ 	  UNSPEC_PTEST))
+    (clobber (match_scratch:VNx16BI 0 "=Upa"))]
+   "TARGET_SVE"
+-  "brk<brk_op>s\t%0.b, %1/z, %2.b, %<brk_reg_opno>.b"
++  "brk<brk_op>s\t%0.b, %1/z, %2.b, %3.b"
+ )
+ 
+ ;; -------------------------------------------------------------------------
+diff --git a/gcc/config/aarch64/iterators.md b/gcc/config/aarch64/iterators.md
+index e72fdf35a82..26a840d7fe9 100644
+--- a/gcc/config/aarch64/iterators.md
++++ b/gcc/config/aarch64/iterators.md
+@@ -3112,6 +3112,8 @@
+ 
+ (define_int_iterator SVE_BRK_UNARY [UNSPEC_BRKA UNSPEC_BRKB])
+ 
++(define_int_iterator SVE_BRKP [UNSPEC_BRKPA UNSPEC_BRKPB])
++
+ (define_int_iterator SVE_BRK_BINARY [UNSPEC_BRKN UNSPEC_BRKPA UNSPEC_BRKPB])
+ 
+ (define_int_iterator SVE_PITER [UNSPEC_PFIRST UNSPEC_PNEXT])
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_1.c b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_1.c
+index 7fd9318c13f..c548810f169 100644
+--- a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_1.c
++++ b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_1.c
+@@ -18,5 +18,6 @@ test2 (svbool_t pg, svbool_t x, svbool_t y, int *any)
+   return svptest_any (pg, res);
+ }
+ 
+-/* { dg-final { scan-assembler-times {\tbrkns\t} 2 } } */
+-/* { dg-final { scan-assembler-not {\tbrkn\t} } } */
++/* { dg-final { scan-assembler-times {\tbrkn\t} 2 } } */
++/* { dg-final { scan-assembler-times {\tptest\t} 2 } } */
++/* { dg-final { scan-assembler-not {\tbrkns\t} } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_2.c b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_2.c
+new file mode 100644
+index 00000000000..74b6927410a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkn_2.c
+@@ -0,0 +1,23 @@
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++#include <arm_sve.h>
++
++void
++test1 (svbool_t pg, svbool_t x, svbool_t y, int *any, svbool_t *ptr)
++{
++  svbool_t res = svbrkn_z (pg, x, y);
++  *any = svptest_any (svptrue_b8 (), res);
++  *ptr = res;
++}
++
++int
++test2 (svbool_t pg, svbool_t x, svbool_t y, int *any)
++{
++  svbool_t res = svbrkn_z (pg, x, y);
++  return svptest_any (svptrue_b8 (), res);
++}
++
++/* { dg-final { scan-assembler-times {\tbrkns\t} 2 } } */
++/* { dg-final { scan-assembler-not {\tbrkn\t} } } */
++/* { dg-final { scan-assembler-not {\tptest\t} } } */
+-- 
+2.25.1
+

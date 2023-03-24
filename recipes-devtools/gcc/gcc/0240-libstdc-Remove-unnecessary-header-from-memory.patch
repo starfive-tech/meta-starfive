@@ -1,0 +1,35 @@
+From 37a7b2e8a73a4ce19e25fd067fbe311547e112a1 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 15 Sep 2022 18:21:32 +0100
+Subject: [PATCH 240/547] libstdc++: Remove unnecessary header from <memory>
+
+Previously <memory> included <bits/stl_algobase.h> so that std::copy,
+std::fill etc. could be used by <bits/stl_uninitialized.h>. But that
+includes it explicitly now, so that it can be compiled as a header unit.
+There's no need to include it in <memory>, where its purpose isn't
+obvious.
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/memory: Do not include <bits/stl_algobase.h>.
+
+(cherry picked from commit d6ccad7641da10d9c5f1f6cfc676d5f5b9d2d126)
+---
+ libstdc++-v3/include/std/memory | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/memory b/libstdc++-v3/include/std/memory
+index 481fa42a618..20a55020a36 100644
+--- a/libstdc++-v3/include/std/memory
++++ b/libstdc++-v3/include/std/memory
+@@ -60,7 +60,6 @@
+  * Smart pointers, etc.
+  */
+ 
+-#include <bits/stl_algobase.h>
+ #include <bits/allocator.h>
+ #include <bits/stl_construct.h>
+ #include <bits/stl_uninitialized.h>
+-- 
+2.25.1
+

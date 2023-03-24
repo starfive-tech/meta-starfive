@@ -1,0 +1,82 @@
+From 87da20c6e280925d885c5472de9189515f46880b Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Mon, 22 Aug 2022 15:16:16 +0100
+Subject: [PATCH 048/547] libstdc++: Check for overflow in regex back-reference
+ [PR106607]
+
+Currently we fail to notice integer overflow when parsing a
+back-reference expression, or when converting the parsed result from
+long to int. This changes the result to be int, so no conversion is
+needed, and uses the overflow-checking built-ins to detect an
+out-of-range back-reference.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/106607
+	* include/bits/regex_compiler.tcc (_Compiler::_M_cur_int_value):
+	Use built-ins to check for integer overflow in back-reference
+	number.
+	* testsuite/28_regex/basic_regex/106607.cc: New test.
+
+(cherry picked from commit 1b09eea33f2bf9d1eae73b25cc25efb05ea1dc3f)
+---
+ libstdc++-v3/include/bits/regex_compiler.tcc  | 10 +++++---
+ .../testsuite/28_regex/basic_regex/106607.cc  | 25 +++++++++++++++++++
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/28_regex/basic_regex/106607.cc
+
+diff --git a/libstdc++-v3/include/bits/regex_compiler.tcc b/libstdc++-v3/include/bits/regex_compiler.tcc
+index c12f7502538..9f3ca63af51 100644
+--- a/libstdc++-v3/include/bits/regex_compiler.tcc
++++ b/libstdc++-v3/include/bits/regex_compiler.tcc
+@@ -583,10 +583,12 @@ namespace __detail
+     _Compiler<_TraitsT>::
+     _M_cur_int_value(int __radix)
+     {
+-      long __v = 0;
+-      for (typename _StringT::size_type __i = 0;
+-	   __i < _M_value.length(); ++__i)
+-	__v =__v * __radix + _M_traits.value(_M_value[__i], __radix);
++      int __v = 0;
++      for (_CharT __c : _M_value)
++	if (__builtin_mul_overflow(__v, __radix, &__v)
++	    || __builtin_add_overflow(__v, _M_traits.value(__c, __radix), &__v))
++	    std::__throw_regex_error(regex_constants::error_backref,
++				     "invalid back reference");
+       return __v;
+     }
+ 
+diff --git a/libstdc++-v3/testsuite/28_regex/basic_regex/106607.cc b/libstdc++-v3/testsuite/28_regex/basic_regex/106607.cc
+new file mode 100644
+index 00000000000..f8e7fb2364d
+--- /dev/null
++++ b/libstdc++-v3/testsuite/28_regex/basic_regex/106607.cc
+@@ -0,0 +1,25 @@
++// { dg-do run { target c++11 } }
++
++#include <regex>
++#include <string>
++#include <climits>
++#include <testsuite_hooks.h>
++
++// PR libstdc++/106607 - Regex integer overflow on large backreference value
++
++int main()
++{
++  std::regex r("(.)\\1"); // OK
++
++  try
++  {
++    long long n = (unsigned)-1 + 2LL;          // 4294967297 for 32-bit int
++    VERIFY( (int)n == 1 );                     // 4294967297 % 2^32 == 1
++    std::regex r("(.)\\" + std::to_string(n)); // Invalid back reference.
++    VERIFY(false);
++  }
++  catch (const std::regex_error& e)
++  {
++    VERIFY( e.code() == std::regex_constants::error_backref );
++  }
++}
+-- 
+2.25.1
+

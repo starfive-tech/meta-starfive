@@ -1,0 +1,114 @@
+From 8e74c4389ce242b571cc182b19e88b7c08656145 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 2 Feb 2023 09:54:18 +0100
+Subject: [PATCH 452/547] nested, openmp: Wrap OMP_CLAUSE_*_GIMPLE_SEQ into
+ GIMPLE_BIND for declare_vars [PR108435]
+
+When gimplifying OMP_CLAUSE_{LASTPRIVATE,LINEAR}_STMT, we wrap it always
+into a GIMPLE_BIND, but when putting statements directly into
+OMP_CLAUSE_{LASTPRIVATE,LINEAR}_GIMPLE_SEQ, we do it only if needed (there
+are any temporaries that need to be declared in the sequence).
+convert_nonlocal_omp_clauses was relying on the GIMPLE_BIND to be there always
+because it called declare_vars on it.
+
+The following patch wraps it into GIMPLE_BIND in tree-nested if we need to
+declare_vars on it on demand.
+
+2023-02-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108435
+	* tree-nested.cc (convert_nonlocal_omp_clauses)
+	<case OMP_CLAUSE_LASTPRIVATE>: If info->new_local_var_chain and *seq
+	is not a GIMPLE_BIND, wrap the sequence into a new GIMPLE_BIND
+	before calling declare_vars.
+	(convert_nonlocal_omp_clauses) <case OMP_CLAUSE_LINEAR>: Merge
+	with the OMP_CLAUSE_LASTPRIVATE handling except for whether
+	seq is initialized to &OMP_CLAUSE_LASTPRIVATE_GIMPLE_SEQ (clause)
+	or &OMP_CLAUSE_LINEAR_GIMPLE_SEQ (clause).
+
+	* gcc.dg/gomp/pr108435.c: New test.
+
+(cherry picked from commit 0f349928e16fdc7dba52561e8d40347909f9f0ff)
+---
+ gcc/testsuite/gcc.dg/gomp/pr108435.c | 18 ++++++++++++++++
+ gcc/tree-nested.cc                   | 32 ++++++++++++++--------------
+ 2 files changed, 34 insertions(+), 16 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/gomp/pr108435.c
+
+diff --git a/gcc/testsuite/gcc.dg/gomp/pr108435.c b/gcc/testsuite/gcc.dg/gomp/pr108435.c
+new file mode 100644
+index 00000000000..ca692ad0451
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/gomp/pr108435.c
+@@ -0,0 +1,18 @@
++/* PR middle-end/108435 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fopenmp" } */
++
++int
++main ()
++{
++  int i, j;
++  void
++  bar (void)
++  {
++    #pragma omp for simd collapse(2)
++     for (i = 1; i <= 16; i++)
++       for (j = 1; j <= 16; j++)
++	 ;
++  }
++  bar ();
++}
+diff --git a/gcc/tree-nested.cc b/gcc/tree-nested.cc
+index 078ceab3ca3..3956e495f92 100644
+--- a/gcc/tree-nested.cc
++++ b/gcc/tree-nested.cc
+@@ -1565,29 +1565,29 @@ convert_nonlocal_omp_clauses (tree *pclauses, struct walk_stmt_info *wi)
+ 	  break;
+ 
+ 	case OMP_CLAUSE_LASTPRIVATE:
+-	  {
+-	    tree save_local_var_chain = info->new_local_var_chain;
+-	    info->new_local_var_chain = NULL;
+-	    gimple_seq *seq = &OMP_CLAUSE_LASTPRIVATE_GIMPLE_SEQ (clause);
+-	    walk_body (convert_nonlocal_reference_stmt,
+-		       convert_nonlocal_reference_op, info, seq);
+-	    if (info->new_local_var_chain)
+-	      declare_vars (info->new_local_var_chain,
+-			    gimple_seq_first_stmt (*seq), false);
+-	    info->new_local_var_chain = save_local_var_chain;
+-	  }
+-	  break;
+-
+ 	case OMP_CLAUSE_LINEAR:
+ 	  {
+ 	    tree save_local_var_chain = info->new_local_var_chain;
+ 	    info->new_local_var_chain = NULL;
+-	    gimple_seq *seq = &OMP_CLAUSE_LINEAR_GIMPLE_SEQ (clause);
++	    gimple_seq *seq;
++	    if (OMP_CLAUSE_CODE (clause) == OMP_CLAUSE_LASTPRIVATE)
++	      seq = &OMP_CLAUSE_LASTPRIVATE_GIMPLE_SEQ (clause);
++	    else
++	      seq = &OMP_CLAUSE_LINEAR_GIMPLE_SEQ (clause);
+ 	    walk_body (convert_nonlocal_reference_stmt,
+ 		       convert_nonlocal_reference_op, info, seq);
+ 	    if (info->new_local_var_chain)
+-	      declare_vars (info->new_local_var_chain,
+-			    gimple_seq_first_stmt (*seq), false);
++	      {
++		gimple *g = gimple_seq_first_stmt (*seq);
++		if (gimple_code (g) != GIMPLE_BIND)
++		  {
++		    g = gimple_build_bind (NULL_TREE, *seq, NULL_TREE);
++		    *seq = NULL;
++		    gimple_seq_add_stmt_without_update (seq, g);
++		  }
++		declare_vars (info->new_local_var_chain,
++			      gimple_seq_first_stmt (*seq), false);
++	      }
+ 	    info->new_local_var_chain = save_local_var_chain;
+ 	  }
+ 	  break;
+-- 
+2.25.1
+

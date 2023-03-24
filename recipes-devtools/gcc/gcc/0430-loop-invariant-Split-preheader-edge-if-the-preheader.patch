@@ -1,0 +1,70 @@
+From 4db6e1bf2f1647521dcd709bc3673f565fc327a5 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 16 Dec 2022 10:19:22 +0100
+Subject: [PATCH 430/547] loop-invariant: Split preheader edge if the preheader
+ bb ends with jump [PR106751]
+
+The RTL loop passes only request simple preheaders, but don't require
+fallthru preheaders, while move_invariant_reg apparently assumes the
+latter, that it can just append instruction(s) to the end of the preheader
+basic block.
+
+The following patch fixes that by splitting the preheader edge if
+the preheader bb ends with a JUMP_INSN (asm goto in this case).
+Without that we get control flow in the middle of a bb.
+
+2022-12-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/106751
+	* loop-invariant.cc (move_invariant_reg): If preheader bb ends
+	with a JUMP_INSN, split the preheader edge and emit invariants
+	into the new preheader basic block.
+
+	* gcc.c-torture/compile/pr106751.c: New test.
+
+(cherry picked from commit ddcaa60983b50378bde1b7e327086fe0ce101795)
+---
+ gcc/loop-invariant.cc                          |  2 ++
+ gcc/testsuite/gcc.c-torture/compile/pr106751.c | 17 +++++++++++++++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr106751.c
+
+diff --git a/gcc/loop-invariant.cc b/gcc/loop-invariant.cc
+index f3248540fb1..9b5f6cd3223 100644
+--- a/gcc/loop-invariant.cc
++++ b/gcc/loop-invariant.cc
+@@ -1837,6 +1837,8 @@ move_invariant_reg (class loop *loop, unsigned invno)
+       else if (dump_file)
+ 	fprintf (dump_file, "Invariant %d moved without introducing a new "
+ 			    "temporary register\n", invno);
++      if (JUMP_P (BB_END (preheader)))
++	preheader = split_edge (loop_preheader_edge (loop));
+       reorder_insns (inv->insn, inv->insn, BB_END (preheader));
+       df_recompute_luids (preheader);
+ 
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr106751.c b/gcc/testsuite/gcc.c-torture/compile/pr106751.c
+new file mode 100644
+index 00000000000..5fbf93bd332
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr106751.c
+@@ -0,0 +1,17 @@
++/* PR rtl-optimization/106751 */
++
++int *foo (void);
++
++void
++bar (void)
++{
++  asm goto ("" : : : : lab);
++  __builtin_unreachable ();
++lab:
++  while (1)
++    {
++      int o;
++      asm ("" : "=r" (o) : "g" (1));
++      *foo () = o;
++    }
++}
+-- 
+2.25.1
+

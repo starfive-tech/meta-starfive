@@ -1,0 +1,123 @@
+From 12cdc0e266f02c3ba4e80c3d971463ff507e049b Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 16 Feb 2023 17:41:24 -0500
+Subject: [PATCH 493/547] c++: ICE with redundant capture [PR108829]
+
+Here we crash in is_capture_proxy:
+
+  /* Location wrappers should be stripped or otherwise handled by the
+     caller before using this predicate.  */
+  gcc_checking_assert (!location_wrapper_p (decl));
+
+We only crash with the redundant capture:
+
+  int abyPage = [=, abyPage] { ... }
+
+because prune_lambda_captures is only called when there was a default
+capture, and with [=] only abyPage won't be in LAMBDA_EXPR_CAPTURE_LIST.
+
+The problem is that LAMBDA_CAPTURE_EXPLICIT_P wasn't propagated
+correctly and so var_to_maybe_prune proceeded where it shouldn't.
+
+Co-Authored by: Patrick Palka <ppalka@redhat.com>
+
+	PR c++/108829
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (prepend_one_capture): Set LAMBDA_CAPTURE_EXPLICIT_P.
+	(tsubst_lambda_expr): Pass LAMBDA_CAPTURE_EXPLICIT_P to
+	prepend_one_capture.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/lambda/lambda-108829-2.C: New test.
+	* g++.dg/cpp0x/lambda/lambda-108829.C: New test.
+
+(cherry picked from commit 02d8ab3e4e2f3d9dc12157a98c976d6698e71e29)
+---
+ gcc/cp/pt.cc                                        |  9 ++++++---
+ gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829-2.C | 11 +++++++++++
+ gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829.C   | 11 +++++++++++
+ 3 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829-2.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 71b7b1ed6f3..10aa88f5518 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -19677,10 +19677,11 @@ tsubst_non_call_postfix_expression (tree t, tree args,
+ 
+ /* Subroutine of tsubst_lambda_expr: add the FIELD/INIT capture pair to the
+    LAMBDA_EXPR_CAPTURE_LIST passed in LIST.  Do deduction for a previously
+-   dependent init-capture.  */
++   dependent init-capture.  EXPLICIT_P is true if the original list had
++   explicit captures.  */
+ 
+ static void
+-prepend_one_capture (tree field, tree init, tree &list,
++prepend_one_capture (tree field, tree init, tree &list, bool explicit_p,
+ 		     tsubst_flags_t complain)
+ {
+   if (tree auto_node = type_uses_auto (TREE_TYPE (field)))
+@@ -19700,6 +19701,7 @@ prepend_one_capture (tree field, tree init, tree &list,
+       cp_apply_type_quals_to_decl (cp_type_quals (type), field);
+     }
+   list = tree_cons (field, init, list);
++  LAMBDA_CAPTURE_EXPLICIT_P (list) = explicit_p;
+ }
+ 
+ /* T is a LAMBDA_EXPR.  Generate a new LAMBDA_EXPR for the current
+@@ -19790,12 +19792,13 @@ tsubst_lambda_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 	    prepend_one_capture (TREE_VEC_ELT (field, i),
+ 				 TREE_VEC_ELT (init, i),
+ 				 LAMBDA_EXPR_CAPTURE_LIST (r),
++				 LAMBDA_CAPTURE_EXPLICIT_P (cap),
+ 				 complain);
+ 	}
+       else
+ 	{
+ 	  prepend_one_capture (field, init, LAMBDA_EXPR_CAPTURE_LIST (r),
+-			       complain);
++			       LAMBDA_CAPTURE_EXPLICIT_P (cap), complain);
+ 
+ 	  if (id_equal (DECL_NAME (field), "__this"))
+ 	    LAMBDA_EXPR_THIS_CAPTURE (r) = field;
+diff --git a/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829-2.C b/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829-2.C
+new file mode 100644
+index 00000000000..4e24470514d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829-2.C
+@@ -0,0 +1,11 @@
++// PR c++/108829
++// { dg-do compile { target c++11 } }
++
++template<int, class... Ts>
++void f(Ts... ts) {
++  constexpr int IDX_PAGE_SIZE = 4096;
++  int abyPage = [=, ts...] { return IDX_PAGE_SIZE; }();  // { dg-error "redundant" }
++}
++void h() {
++  f<1>(0, 1);
++}
+diff --git a/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829.C b/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829.C
+new file mode 100644
+index 00000000000..e621a0d14d0
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/lambda/lambda-108829.C
+@@ -0,0 +1,11 @@
++// PR c++/108829
++// { dg-do compile { target c++11 } }
++
++template <int>
++void f(void) {
++  constexpr int IDX_PAGE_SIZE = 4096;
++  int abyPage = [=, abyPage] { return IDX_PAGE_SIZE; }(); // { dg-error "redundant" }
++}
++void h() {
++  f<1>();
++}
+-- 
+2.25.1
+

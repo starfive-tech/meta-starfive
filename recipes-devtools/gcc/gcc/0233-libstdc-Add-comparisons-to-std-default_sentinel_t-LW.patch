@@ -1,0 +1,368 @@
+From 019c72ae7577040dd36d8412612cdbe8aa6deee2 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 4 Aug 2022 12:48:22 +0100
+Subject: [PATCH 233/547] libstdc++: Add comparisons to std::default_sentinel_t
+ (LWG 3719)
+
+This library defect was recently approved for C++23.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/fs_dir.h (directory_iterator): Add comparison
+	with std::default_sentinel_t. Remove redundant operator!= for
+	C++20.
+	* (recursive_directory_iterator): Likewise.
+	* include/bits/iterator_concepts.h [!__cpp_lib_concepts]
+	(default_sentinel_t, default_sentinel): Define even if concepts
+	are not supported.
+	* include/bits/regex.h (regex_iterator): Add comparison with
+	std::default_sentinel_t. Remove redundant operator!= for C++20.
+	(regex_token_iterator): Likewise.
+	(regex_token_iterator::_M_end_of_seq()): Add noexcept.
+	* testsuite/27_io/filesystem/iterators/lwg3719.cc: New test.
+	* testsuite/28_regex/iterators/regex_iterator/lwg3719.cc:
+	New test.
+	* testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc:
+	New test.
+
+(cherry picked from commit db33daa4677997399485176303406794dc900987)
+---
+ libstdc++-v3/include/bits/fs_dir.h            | 33 ++++++++++++----
+ libstdc++-v3/include/bits/iterator_concepts.h | 28 ++++++++++---
+ libstdc++-v3/include/bits/regex.h             | 24 +++++++++++-
+ .../27_io/filesystem/iterators/lwg3719.cc     | 39 +++++++++++++++++++
+ .../iterators/regex_iterator/lwg3719.cc       | 29 ++++++++++++++
+ .../iterators/regex_token_iterator/lwg3719.cc | 29 ++++++++++++++
+ 6 files changed, 169 insertions(+), 13 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/27_io/filesystem/iterators/lwg3719.cc
+ create mode 100644 libstdc++-v3/testsuite/28_regex/iterators/regex_iterator/lwg3719.cc
+ create mode 100644 libstdc++-v3/testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc
+
+diff --git a/libstdc++-v3/include/bits/fs_dir.h b/libstdc++-v3/include/bits/fs_dir.h
+index ca37952ec17..bec2b7674ef 100644
+--- a/libstdc++-v3/include/bits/fs_dir.h
++++ b/libstdc++-v3/include/bits/fs_dir.h
+@@ -36,8 +36,9 @@
+ # include <bits/unique_ptr.h>
+ # include <bits/shared_ptr.h>
+ 
+-#if __cplusplus > 201703L
++#if __cplusplus >= 202002L
+ # include <compare>	// std::strong_ordering
++# include <bits/iterator_concepts.h>	// std::default_sentinel_t
+ #endif
+ 
+ namespace std _GLIBCXX_VISIBILITY(default)
+@@ -420,9 +421,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+       return __pr;
+     }
+ 
+-  private:
+-    directory_iterator(const path&, directory_options, error_code*);
+-
+     friend bool
+     operator==(const directory_iterator& __lhs,
+                const directory_iterator& __rhs) noexcept
+@@ -431,10 +429,22 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+ 	&& !__lhs._M_dir.owner_before(__rhs._M_dir);
+     }
+ 
++#if __cplusplus >= 202002L
++      // _GLIBCXX_RESOLVE_LIB_DEFECTS
++      // 3719. Directory iterators should be usable with default sentinel
++      bool operator==(default_sentinel_t) const noexcept
++      { return !_M_dir; }
++#endif
++
++#if __cpp_impl_three_way_comparison < 201907L
+     friend bool
+     operator!=(const directory_iterator& __lhs,
+ 	       const directory_iterator& __rhs) noexcept
+     { return !(__lhs == __rhs); }
++#endif
++
++  private:
++    directory_iterator(const path&, directory_options, error_code*);
+ 
+     friend class recursive_directory_iterator;
+ 
+@@ -519,9 +529,6 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+ 
+     void disable_recursion_pending() noexcept;
+ 
+-  private:
+-    recursive_directory_iterator(const path&, directory_options, error_code*);
+-
+     friend bool
+     operator==(const recursive_directory_iterator& __lhs,
+                const recursive_directory_iterator& __rhs) noexcept
+@@ -530,10 +537,22 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+ 	&& !__lhs._M_dirs.owner_before(__rhs._M_dirs);
+     }
+ 
++#if __cplusplus >= 202002L
++      // _GLIBCXX_RESOLVE_LIB_DEFECTS
++      // 3719. Directory iterators should be usable with default sentinel
++      bool operator==(default_sentinel_t) const noexcept
++      { return !_M_dirs; }
++#endif
++
++#if __cpp_impl_three_way_comparison < 201907L
+     friend bool
+     operator!=(const recursive_directory_iterator& __lhs,
+                const recursive_directory_iterator& __rhs) noexcept
+     { return !(__lhs == __rhs); }
++#endif
++
++  private:
++    recursive_directory_iterator(const path&, directory_options, error_code*);
+ 
+     struct _Dir_stack;
+     std::__shared_ptr<_Dir_stack> _M_dirs;
+diff --git a/libstdc++-v3/include/bits/iterator_concepts.h b/libstdc++-v3/include/bits/iterator_concepts.h
+index a04c970b03b..cf66c63f395 100644
+--- a/libstdc++-v3/include/bits/iterator_concepts.h
++++ b/libstdc++-v3/include/bits/iterator_concepts.h
+@@ -32,15 +32,35 @@
+ 
+ #pragma GCC system_header
+ 
++#if __cplusplus >= 202002L
+ #include <concepts>
+ #include <bits/ptr_traits.h>	// to_address
+ #include <bits/ranges_cmp.h>	// identity, ranges::less
+ 
+-#if __cpp_lib_concepts
+ namespace std _GLIBCXX_VISIBILITY(default)
+ {
+ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
++  /** A sentinel type that can be used to check for the end of a range.
++   *
++   * For some iterator types the past-the-end sentinel value is independent
++   * of the underlying sequence, and a default sentinel can be used with them.
++   * For example, a `std::counted_iterator` keeps a count of how many elements
++   * remain, and so checking for the past-the-end value only requires checking
++   * if that count has reached zero. A past-the-end `std::istream_iterator` is
++   * equal to the default-constructed value, which can be easily checked.
++   *
++   * Comparing iterators of these types to `std::default_sentinel` is a
++   * convenient way to check if the end has been reached.
++   *
++   * @since C++20
++   */
++  struct default_sentinel_t { };
++
++  /// A default sentinel value.
++  inline constexpr default_sentinel_t default_sentinel{};
++
++#if __cpp_lib_concepts
+   struct input_iterator_tag;
+   struct output_iterator_tag;
+   struct forward_iterator_tag;
+@@ -924,9 +944,6 @@ namespace ranges
+ 
+   inline constexpr unreachable_sentinel_t unreachable_sentinel{};
+ 
+-  struct default_sentinel_t { };
+-  inline constexpr default_sentinel_t default_sentinel{};
+-
+   // This is the namespace for [range.access] CPOs.
+   namespace ranges::__cust_access
+   {
+@@ -983,7 +1000,8 @@ namespace ranges
+ 
+   } // namespace __detail
+ 
++#endif // C++20 library concepts
+ _GLIBCXX_END_NAMESPACE_VERSION
+ } // namespace std
+-#endif // C++20 library concepts
++#endif // C++20
+ #endif // _ITERATOR_CONCEPTS_H
+diff --git a/libstdc++-v3/include/bits/regex.h b/libstdc++-v3/include/bits/regex.h
+index 46c168010bf..a94ef190012 100644
+--- a/libstdc++-v3/include/bits/regex.h
++++ b/libstdc++-v3/include/bits/regex.h
+@@ -28,6 +28,10 @@
+  *  Do not attempt to use it directly. @headername{regex}
+  */
+ 
++#if __cplusplus >= 202002L
++# include <bits/iterator_concepts.h>	// std::default_sentinel_t
++#endif
++
+ namespace std _GLIBCXX_VISIBILITY(default)
+ {
+ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+@@ -2719,12 +2723,21 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+       bool
+       operator==(const regex_iterator&) const noexcept;
+ 
++#if __cplusplus >= 202002L
++      // _GLIBCXX_RESOLVE_LIB_DEFECTS
++      // 3719. Directory iterators should be usable with default sentinel
++      bool operator==(default_sentinel_t) const noexcept
++      { return _M_pregex == nullptr; }
++#endif
++
++#if __cpp_impl_three_way_comparison < 201907L
+       /**
+        * @brief Tests the inequivalence of two regex iterators.
+        */
+       bool
+       operator!=(const regex_iterator& __rhs) const noexcept
+       { return !(*this == __rhs); }
++#endif
+ 
+       /**
+        * @brief Dereferences a %regex_iterator.
+@@ -2924,12 +2937,21 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+       bool
+       operator==(const regex_token_iterator& __rhs) const;
+ 
++#if __cplusplus >= 202002L
++      // _GLIBCXX_RESOLVE_LIB_DEFECTS
++      // 3719. Directory iterators should be usable with default sentinel
++      bool operator==(default_sentinel_t) const noexcept
++      { return _M_end_of_seq(); }
++#endif
++
++#if __cpp_impl_three_way_comparison < 201907L
+       /**
+        * @brief Compares a %regex_token_iterator to another for inequality.
+        */
+       bool
+       operator!=(const regex_token_iterator& __rhs) const
+       { return !(*this == __rhs); }
++#endif
+ 
+       /**
+        * @brief Dereferences a %regex_token_iterator.
+@@ -2978,7 +3000,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
+       }
+ 
+       constexpr bool
+-      _M_end_of_seq() const
++      _M_end_of_seq() const noexcept
+       { return _M_result == nullptr; }
+ 
+       // [28.12.2.2.4]
+diff --git a/libstdc++-v3/testsuite/27_io/filesystem/iterators/lwg3719.cc b/libstdc++-v3/testsuite/27_io/filesystem/iterators/lwg3719.cc
+new file mode 100644
+index 00000000000..c19cddc74f9
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/filesystem/iterators/lwg3719.cc
+@@ -0,0 +1,39 @@
++// { dg-options "-std=gnu++20" }
++// { dg-do run { target c++20 } }
++// { dg-require-filesystem-ts "" }
++
++#include <filesystem>
++#include <iterator>
++#include <testsuite_hooks.h>
++
++// LWG 3719. Directory iterators should be usable with default sentinel
++
++void
++test_dir_iter()
++{
++  std::filesystem::directory_iterator d0;
++  VERIFY( d0 == std::default_sentinel );
++  std::filesystem::directory_iterator d1(".");
++  VERIFY( d1 != std::default_sentinel );
++
++  static_assert( noexcept(d0 == std::default_sentinel) );
++  static_assert( noexcept(d0 != std::default_sentinel) );
++}
++
++void
++test_recursive_dir_iter()
++{
++  std::filesystem::recursive_directory_iterator d0;
++  VERIFY( d0 == std::default_sentinel );
++  std::filesystem::recursive_directory_iterator d1(".");
++  VERIFY( d1 != std::default_sentinel );
++
++  static_assert( noexcept(d0 == std::default_sentinel) );
++  static_assert( noexcept(d0 != std::default_sentinel) );
++}
++
++int main()
++{
++  test_dir_iter();
++  test_recursive_dir_iter();
++}
+diff --git a/libstdc++-v3/testsuite/28_regex/iterators/regex_iterator/lwg3719.cc b/libstdc++-v3/testsuite/28_regex/iterators/regex_iterator/lwg3719.cc
+new file mode 100644
+index 00000000000..e8c8f79364a
+--- /dev/null
++++ b/libstdc++-v3/testsuite/28_regex/iterators/regex_iterator/lwg3719.cc
+@@ -0,0 +1,29 @@
++// { dg-options "-std=gnu++20" }
++// { dg-do run { target c++20 } }
++
++#include <regex>
++#include <iterator>
++#include <testsuite_hooks.h>
++
++// LWG 3719. Directory iterators should be usable with default sentinel
++
++void
++test_iter()
++{
++  std::sregex_token_iterator r0;
++  VERIFY( r0 == std::default_sentinel );
++  std::string haystack = "a needle in a haystack";
++  std::regex needle("needle");
++  std::sregex_iterator r1(haystack.begin(), haystack.end(), needle);
++  VERIFY( r1 != std::default_sentinel );
++  ++r1;
++  VERIFY( r1 == std::default_sentinel );
++
++  static_assert( noexcept(r0 == std::default_sentinel) ); // GCC extension
++  static_assert( noexcept(r0 != std::default_sentinel) ); // GCC extension
++}
++
++int main()
++{
++  test_iter();
++}
+diff --git a/libstdc++-v3/testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc b/libstdc++-v3/testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc
+new file mode 100644
+index 00000000000..5c36acead74
+--- /dev/null
++++ b/libstdc++-v3/testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc
+@@ -0,0 +1,29 @@
++// { dg-options "-std=gnu++20" }
++// { dg-do run { target c++20 } }
++
++#include <regex>
++#include <iterator>
++#include <testsuite_hooks.h>
++
++// LWG 3719. Directory iterators should be usable with default sentinel
++
++void
++test_iter()
++{
++  std::sregex_iterator r0;
++  VERIFY( r0 == std::default_sentinel );
++  std::string haystack = "a needle in a haystack";
++  std::regex needle("needle");
++  std::sregex_iterator r1(haystack.begin(), haystack.end(), needle);
++  VERIFY( r1 != std::default_sentinel );
++  ++r1;
++  VERIFY( r1 == std::default_sentinel );
++
++  static_assert( noexcept(r0 == std::default_sentinel) ); // GCC extension
++  static_assert( noexcept(r0 != std::default_sentinel) ); // GCC extension
++}
++
++int main()
++{
++  test_iter();
++}
+-- 
+2.25.1
+

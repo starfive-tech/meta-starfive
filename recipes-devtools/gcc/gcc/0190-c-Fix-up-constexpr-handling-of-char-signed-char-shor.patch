@@ -1,0 +1,90 @@
+From 20ef7d7c578dab0585d70fbea571a74e8e8d4b47 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 24 Oct 2022 16:25:29 +0200
+Subject: [PATCH 190/547] c++: Fix up constexpr handling of char/signed
+ char/short pre/post inc/decrement [PR105774]
+
+signed char, char or short int pre/post inc/decrement are represented by
+normal {PRE,POST}_{INC,DEC}REMENT_EXPRs in the FE and only gimplification
+ensures that the {PLUS,MINUS}_EXPR is done in unsigned version of those
+types:
+    case PREINCREMENT_EXPR:
+    case PREDECREMENT_EXPR:
+    case POSTINCREMENT_EXPR:
+    case POSTDECREMENT_EXPR:
+      {
+        tree type = TREE_TYPE (TREE_OPERAND (*expr_p, 0));
+        if (INTEGRAL_TYPE_P (type) && c_promoting_integer_type_p (type))
+          {
+            if (!TYPE_OVERFLOW_WRAPS (type))
+              type = unsigned_type_for (type);
+            return gimplify_self_mod_expr (expr_p, pre_p, post_p, 1, type);
+          }
+        break;
+      }
+This means during constant evaluation we need to do it similarly (either
+using unsigned_type_for or using widening to integer_type_node).
+The following patch does the latter.
+
+2022-10-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/105774
+	* constexpr.cc (cxx_eval_increment_expression): For signed types
+	that promote to int, evaluate PLUS_EXPR or MINUS_EXPR in int type.
+
+	* g++.dg/cpp1y/constexpr-105774.C: New test.
+
+(cherry picked from commit da8c362c4c18cff2f2dfd5c4706bdda7576899a4)
+---
+ gcc/cp/constexpr.cc                           | 12 ++++++++++++
+ gcc/testsuite/g++.dg/cpp1y/constexpr-105774.C | 15 +++++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/constexpr-105774.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 28f8785dea3..3566f6ef724 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -6040,6 +6040,18 @@ cxx_eval_increment_expression (const constexpr_ctx *ctx, tree t,
+ 	offset = fold_build1 (NEGATE_EXPR, TREE_TYPE (offset), offset);
+       mod = fold_build2 (POINTER_PLUS_EXPR, type, val, offset);
+     }
++  else if (c_promoting_integer_type_p (type)
++	   && !TYPE_UNSIGNED (type)
++	   && TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node))
++    {
++      offset = fold_convert (integer_type_node, offset);
++      mod = fold_convert (integer_type_node, val);
++      tree t = fold_build2 (inc ? PLUS_EXPR : MINUS_EXPR, integer_type_node,
++			    mod, offset);
++      mod = fold_convert (type, t);
++      if (TREE_OVERFLOW_P (mod) && !TREE_OVERFLOW_P (t))
++	TREE_OVERFLOW (mod) = false;
++    }
+   else
+     mod = fold_build2 (inc ? PLUS_EXPR : MINUS_EXPR, type, val, offset);
+   if (!ptr)
+diff --git a/gcc/testsuite/g++.dg/cpp1y/constexpr-105774.C b/gcc/testsuite/g++.dg/cpp1y/constexpr-105774.C
+new file mode 100644
+index 00000000000..8ca6fce7570
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/constexpr-105774.C
+@@ -0,0 +1,15 @@
++// PR c++/105774
++// { dg-do compile { target c++14 } }
++
++constexpr signed char
++foo ()
++{
++#if __SCHAR_MAX__ < __INT_MAX__
++  signed char x = __SCHAR_MAX__;
++#else
++  signed char x = 0;
++#endif
++  return ++x;
++}
++
++constexpr auto a = foo ();
+-- 
+2.25.1
+

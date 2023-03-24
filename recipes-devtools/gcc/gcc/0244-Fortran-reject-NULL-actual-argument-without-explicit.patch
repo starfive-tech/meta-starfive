@@ -1,0 +1,70 @@
+From 2a7a103dd46cc079252302be69cfef188caee74d Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Thu, 17 Nov 2022 21:36:49 +0100
+Subject: [PATCH 244/547] Fortran: reject NULL actual argument without explicit
+ interface [PR107576]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/107576
+	* interface.cc (gfc_procedure_use): Reject NULL as actual argument
+	when there is no explicit procedure interface.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/107576
+	* gfortran.dg/null_actual_3.f90: New test.
+
+(cherry picked from commit 820c25c83561085f54268bd536f9d216d03c3e18)
+---
+ gcc/fortran/interface.cc                    |  8 ++++++++
+ gcc/testsuite/gfortran.dg/null_actual_3.f90 | 18 ++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/null_actual_3.f90
+
+diff --git a/gcc/fortran/interface.cc b/gcc/fortran/interface.cc
+index 71eec78259b..0acd78d5f2e 100644
+--- a/gcc/fortran/interface.cc
++++ b/gcc/fortran/interface.cc
+@@ -4137,6 +4137,14 @@ gfc_procedure_use (gfc_symbol *sym, gfc_actual_arglist **ap, locus *where)
+ 	      return false;
+ 	    }
+ 
++	  if (a->expr && a->expr->expr_type == EXPR_NULL)
++	    {
++	      gfc_error ("Passing intrinsic NULL as actual argument at %L "
++			 "requires an explicit interface", &a->expr->where);
++	      a->expr->error = 1;
++	      return false;
++	    }
++
+ 	  /* TS 29113, C407b.  */
+ 	  if (a->expr && a->expr->expr_type == EXPR_VARIABLE
+ 	      && symbol_rank (a->expr->symtree->n.sym) == -1)
+diff --git a/gcc/testsuite/gfortran.dg/null_actual_3.f90 b/gcc/testsuite/gfortran.dg/null_actual_3.f90
+new file mode 100644
+index 00000000000..ea49f9630c9
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/null_actual_3.f90
+@@ -0,0 +1,18 @@
++! { dg-do compile }
++! { dg-options "-fallow-argument-mismatch -w" }
++! PR fortran/107576
++! Contributed by G.Steinmetz
++
++program p
++  implicit none
++  interface
++     subroutine r(y)
++       integer, pointer :: y(:)
++     end subroutine r
++  end interface
++  integer, pointer :: z(:) => null()
++  call r(z)
++  call s(z)
++  call r(null(z))
++  call s(null(z)) ! { dg-error "requires an explicit interface" }
++end
+-- 
+2.25.1
+

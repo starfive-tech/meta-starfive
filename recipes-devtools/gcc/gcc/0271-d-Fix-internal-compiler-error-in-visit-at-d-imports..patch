@@ -1,0 +1,124 @@
+From f12c82222f93111e2fb0bd73d1bad52325001990 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Sat, 10 Dec 2022 19:12:43 +0100
+Subject: [PATCH 271/547] d: Fix internal compiler error: in visit, at
+ d/imports.cc:72 (PR108050)
+
+The visitor for lowering IMPORTED_DECLs did not have an override for
+dealing with importing OverloadSet symbols.  This has now been
+implemented in the code generator.
+
+	PR d/108050
+
+gcc/d/ChangeLog:
+
+	* decl.cc (DeclVisitor::visit (Import *)): Handle build_import_decl
+	returning a TREE_LIST.
+	* imports.cc (ImportVisitor::visit (OverloadSet *)): New override.
+
+gcc/testsuite/ChangeLog:
+
+	* gdc.dg/imports/pr108050/mod1.d: New.
+	* gdc.dg/imports/pr108050/mod2.d: New.
+	* gdc.dg/imports/pr108050/package.d: New.
+	* gdc.dg/pr108050.d: New test.
+
+(cherry picked from commit d9d8c9674ad3ad3aa38419d24b1aaaffe31f5d3f)
+---
+ gcc/d/decl.cc                                   | 12 ++++++++++--
+ gcc/d/imports.cc                                | 14 ++++++++++++++
+ gcc/testsuite/gdc.dg/imports/pr108050/mod1.d    |  2 ++
+ gcc/testsuite/gdc.dg/imports/pr108050/mod2.d    |  2 ++
+ gcc/testsuite/gdc.dg/imports/pr108050/package.d |  2 ++
+ gcc/testsuite/gdc.dg/pr108050.d                 |  4 ++++
+ 6 files changed, 34 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gdc.dg/imports/pr108050/mod1.d
+ create mode 100644 gcc/testsuite/gdc.dg/imports/pr108050/mod2.d
+ create mode 100644 gcc/testsuite/gdc.dg/imports/pr108050/package.d
+ create mode 100644 gcc/testsuite/gdc.dg/pr108050.d
+
+diff --git a/gcc/d/decl.cc b/gcc/d/decl.cc
+index 0f1dad95ba3..e62be0c580a 100644
+--- a/gcc/d/decl.cc
++++ b/gcc/d/decl.cc
+@@ -197,8 +197,16 @@ public:
+ 	    tree name = (alias != NULL)
+ 	      ? get_identifier (alias->toChars ()) : NULL_TREE;
+ 
+-	    debug_hooks->imported_module_or_decl (decl, name, context,
+-						  false, false);
++	    if (TREE_CODE (decl) != TREE_LIST)
++	      debug_hooks->imported_module_or_decl (decl, name, context,
++						    false, false);
++	    else
++	      {
++		/* Overload sets return a list of imported decls.  */
++		for (; decl != NULL_TREE; decl = TREE_CHAIN (decl))
++		  debug_hooks->imported_module_or_decl (TREE_VALUE (decl), name,
++							context, false, false);
++	      }
+ 	  }
+       }
+     else
+diff --git a/gcc/d/imports.cc b/gcc/d/imports.cc
+index 6747ee5df27..4ce6f026b29 100644
+--- a/gcc/d/imports.cc
++++ b/gcc/d/imports.cc
+@@ -160,6 +160,20 @@ public:
+       d->aliassym->accept (this);
+   }
+ 
++  /* Build IMPORTED_DECLs for all overloads in a set.  */
++  void visit (OverloadSet *d) final override
++  {
++    vec<tree, va_gc> *tset = NULL;
++
++    vec_alloc (tset, d->a.length);
++
++    for (size_t i = 0; i < d->a.length; i++)
++      vec_safe_push (tset, build_import_decl (d->a[i]));
++
++    this->result_ = build_tree_list_vec (tset);
++    tset->truncate (0);
++  }
++
+   /* Function aliases are the same as alias symbols.  */
+   void visit (FuncAliasDeclaration *d)
+   {
+diff --git a/gcc/testsuite/gdc.dg/imports/pr108050/mod1.d b/gcc/testsuite/gdc.dg/imports/pr108050/mod1.d
+new file mode 100644
+index 00000000000..f27a13dc051
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/imports/pr108050/mod1.d
+@@ -0,0 +1,2 @@
++module imports.pr108050.mod1;
++string[] split() { return null; }
+diff --git a/gcc/testsuite/gdc.dg/imports/pr108050/mod2.d b/gcc/testsuite/gdc.dg/imports/pr108050/mod2.d
+new file mode 100644
+index 00000000000..29d8aa8f53e
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/imports/pr108050/mod2.d
+@@ -0,0 +1,2 @@
++module imports.pr108050.mod2;
++string[] split() { return null; }
+diff --git a/gcc/testsuite/gdc.dg/imports/pr108050/package.d b/gcc/testsuite/gdc.dg/imports/pr108050/package.d
+new file mode 100644
+index 00000000000..b8b03b832af
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/imports/pr108050/package.d
+@@ -0,0 +1,2 @@
++module imports.pr108050;
++public import imports.pr108050.mod1, imports.pr108050.mod2;
+diff --git a/gcc/testsuite/gdc.dg/pr108050.d b/gcc/testsuite/gdc.dg/pr108050.d
+new file mode 100644
+index 00000000000..69134e73137
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/pr108050.d
+@@ -0,0 +1,4 @@
++// { dg-do compile }
++// { dg-additional-sources "imports/pr108050/package.d imports/pr108050/mod1.d imports/pr108050/mod2.d" }
++// { dg-options "-g" }
++import imports.pr108050 : split;
+-- 
+2.25.1
+

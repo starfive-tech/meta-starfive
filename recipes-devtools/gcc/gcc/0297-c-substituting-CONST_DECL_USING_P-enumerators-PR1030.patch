@@ -1,0 +1,111 @@
+From 648db321893acabd06c24da149c09fceab4daeff Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Sat, 3 Dec 2022 10:28:25 -0500
+Subject: [PATCH 297/547] c++: substituting CONST_DECL_USING_P enumerators
+ [PR103081]
+
+We implement class-scope using enum by injecting clones of the enum's
+CONST_DECLs as fields of the class, for which CONST_DECL_USING_P is
+true, so that qualified lookup naturally finds the enumerators.
+Substitution into such a CONST_DECL currently ICEs however, because we
+assume the DECL_CONTEXT is always the ENUMERAL_TYPE (which has
+TYPE_VALUES) but in this case it's the RECORD_TYPE for the class scope
+(which has TYPE_FIELDS).
+
+Since these CONST_DECLs appear to always be non-dependent, this patch
+fixes this by shortcutting substitution for CONST_DECLs that have
+non-dependent DECL_CONTEXT.  This subsumes the existing (and seemingly
+dead) DECL_NAMESPACE_SCOPE_P early exit test and also benefits
+substitution into ordinary non-dependent CONST_DECLs.
+
+	PR c++/103081
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (tsubst_copy) <case CONST_DECL>: Generalize
+	early exit test for namespace-scope decls to check dependence of
+	the enclosing scope instead.  Remove dead early exit test.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/using-enum-10.C: New test.
+	* g++.dg/cpp2a/using-enum-10a.C: New test.
+
+(cherry picked from commit b3912122c9dfaba6c8229e8f095885f69782ceda)
+---
+ gcc/cp/pt.cc                                |  7 +------
+ gcc/testsuite/g++.dg/cpp2a/using-enum-10.C  | 16 ++++++++++++++++
+ gcc/testsuite/g++.dg/cpp2a/using-enum-10a.C | 19 +++++++++++++++++++
+ 3 files changed, 36 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/using-enum-10.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/using-enum-10a.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 2f3cbf4895d..cb674cc2258 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -16967,13 +16967,8 @@ tsubst_copy (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 
+ 	if (DECL_TEMPLATE_PARM_P (t))
+ 	  return tsubst_copy (DECL_INITIAL (t), args, complain, in_decl);
+-	/* There is no need to substitute into namespace-scope
+-	   enumerators.  */
+-	if (DECL_NAMESPACE_SCOPE_P (t))
++	if (!uses_template_parms (DECL_CONTEXT (t)))
+ 	  return t;
+-	/* If ARGS is NULL, then T is known to be non-dependent.  */
+-	if (args == NULL_TREE)
+-	  return scalar_constant_value (t);
+ 
+ 	if (tree ref = maybe_dependent_member_ref (t, args, complain, in_decl))
+ 	  return ref;
+diff --git a/gcc/testsuite/g++.dg/cpp2a/using-enum-10.C b/gcc/testsuite/g++.dg/cpp2a/using-enum-10.C
+new file mode 100644
+index 00000000000..98fe0644729
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/using-enum-10.C
+@@ -0,0 +1,16 @@
++// PR c++/103081
++// { dg-do compile { target c++20 } }
++
++enum class Pig { OINK };
++
++struct Hog {
++  using enum Pig;
++  Hog(Pig) { }
++};
++
++template<int>
++void pen() {
++  Hog(Hog::OINK);
++}
++
++template void pen<0>();
+diff --git a/gcc/testsuite/g++.dg/cpp2a/using-enum-10a.C b/gcc/testsuite/g++.dg/cpp2a/using-enum-10a.C
+new file mode 100644
+index 00000000000..daa3221b77a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/using-enum-10a.C
+@@ -0,0 +1,19 @@
++// A version of using-enum-10.C where Hog is a template.
++// PR c++/103081
++// { dg-do compile { target c++20 } }
++
++enum class Pig { OINK };
++
++template<int>
++struct Hog {
++  using enum Pig;
++  Hog(Pig) { OINK; }
++};
++
++template<int N>
++void pen() {
++  Hog<1>(Hog<1>::OINK);
++  Hog<N>(Hog<N>::OINK);
++}
++
++template void pen<0>();
+-- 
+2.25.1
+

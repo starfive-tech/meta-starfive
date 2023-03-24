@@ -1,0 +1,38 @@
+From 61ef24af3ce8ec9c5eb65770f8047d98f42a93bf Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 19 Jan 2023 00:21:17 +0000
+Subject: [PATCH 354/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 5943f2b395d..847dee113d4 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230118
++20230119
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 248b99d6041..8399993fd50 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,13 @@
++2023-01-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-12-22  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/105730
++	* src/c++11/compatibility-condvar.cc (__nothrow_wait_cv::wait):
++	Access private data member of base class and call its wait
++	member.
++
+ 2023-01-16  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

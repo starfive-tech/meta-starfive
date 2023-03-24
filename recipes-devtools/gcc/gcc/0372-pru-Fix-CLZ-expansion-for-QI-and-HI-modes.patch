@@ -1,0 +1,91 @@
+From 96cf4658b2d97251602f6865b18329ff72ee8228 Mon Sep 17 00:00:00 2001
+From: Dimitar Dimitrov <dimitar@dinux.eu>
+Date: Sat, 21 Jan 2023 18:10:59 +0200
+Subject: [PATCH 372/547] pru: Fix CLZ expansion for QI and HI modes
+
+The recent gcc.dg/tree-ssa/clz-char.c test case failed for PRU target,
+exposing a wrong code generation bug in the PRU backend.  The "clz"
+pattern did not produce correct output for QI and HI input operand
+modes.  SI mode is ok.
+
+The "clz" pattern is expanded to an LMBD instruction to get the
+left-most bit position having value "1".  In turn, to get the correct
+"clz" value, that bit position must be subtracted from the MSB bit
+position of the input operand.  The old behaviour of hard-coding 31
+for MSB bit position is wrong.
+
+The LMBD instruction returns 32 if input operand is zero, irrespective
+of its register mode.  This maps nicely for SI mode, where the "clz"
+pattern outputs -1.  It also leads to peculiar (but valid!) output
+values from the "clz" pattern for QI and HI zero-valued inputs.
+
+The corresponding commit in trunk contains two new test cases, which
+have been removed here because they depend on r13-5195-g4798080d4a3530.
+Regtested for pru-unknown-elf.
+
+gcc/ChangeLog:
+
+	* config/pru/pru.h (CLZ_DEFINED_VALUE_AT_ZERO): Fix value for QI
+	and HI input modes.
+	* config/pru/pru.md (clz): Fix generated code for QI and HI
+	input modes.
+
+Signed-off-by: Dimitar Dimitrov <dimitar@dinux.eu>
+(cherry picked from commit c517295940a23db8ca165dfd5d0edea4457eda49)
+---
+ gcc/config/pru/pru.h  |  5 +++--
+ gcc/config/pru/pru.md | 15 ++++++++++++---
+ 2 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/gcc/config/pru/pru.h b/gcc/config/pru/pru.h
+index 8498859de53..fa0343f79c7 100644
+--- a/gcc/config/pru/pru.h
++++ b/gcc/config/pru/pru.h
+@@ -566,8 +566,9 @@ do {									\
+ 
+ #define CASE_VECTOR_MODE Pmode
+ 
+-/* See definition of clz pattern for rationale of value -1.  */
+-#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE) ((VALUE) = -1, 2)
++/* See definition of clz pattern for rationale of the value.  */
++#define CLZ_DEFINED_VALUE_AT_ZERO(MODE, VALUE)	\
++	((VALUE) = GET_MODE_BITSIZE (MODE) - 1 - 32, 2)
+ 
+ /* Jumps are cheap on PRU.  */
+ #define LOGICAL_OP_NON_SHORT_CIRCUIT		0
+diff --git a/gcc/config/pru/pru.md b/gcc/config/pru/pru.md
+index 68dcab234b0..69a275fa310 100644
+--- a/gcc/config/pru/pru.md
++++ b/gcc/config/pru/pru.md
+@@ -1127,8 +1127,16 @@
+   [(set_attr "type" "control")])
+ 
+ ;; Count Leading Zeros implemented using LMBD.
+-;; LMBD returns 32 if bit value is not present, and we subtract 31 to get CLZ.
+-;; Hence we get a defined value -1 for CLZ_DEFINED_VALUE_AT_ZERO.
++;;
++;; LMBD returns 32 if bit value is not present, for any kind of input MODE.
++;; The LMBD's search result for a "1" bit is subtracted from the
++;; mode bit size minus one, in order to get CLZ.
++;;
++;; Hence for SImode we get a defined value -1 for CLZ_DEFINED_VALUE_AT_ZERO.
++;;
++;; The QImode and HImode defined values for zero inputs end up to be
++;; non-standard (-25 and -17).  But this is considered acceptable in
++;; order to keep the CLZ expansion to only two instructions.
+ (define_expand "clz<mode>2"
+   [(set (match_operand:QISI 0 "register_operand")
+ 	(clz:QISI (match_operand:QISI 1 "register_operand")))]
+@@ -1139,7 +1147,8 @@
+   rtx tmpval = gen_reg_rtx (<MODE>mode);
+ 
+   emit_insn (gen_pru_lmbd (<MODE>mode, tmpval, src, const1_rtx));
+-  emit_insn (gen_sub3_insn (dst, GEN_INT (31), tmpval));
++  int msb_bitn = GET_MODE_BITSIZE (<MODE>mode) - 1;
++  emit_insn (gen_sub3_insn (dst, GEN_INT (msb_bitn), tmpval));
+   DONE;
+ })
+ 
+-- 
+2.25.1
+

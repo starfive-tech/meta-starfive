@@ -1,0 +1,102 @@
+From d3bdc33784c857668503b30368ae50a8d2fca274 Mon Sep 17 00:00:00 2001
+From: Thomas Schwinge <thomas@codesourcery.com>
+Date: Mon, 2 May 2022 15:15:26 +0200
+Subject: [PATCH 155/547] Make
+ 'c-c++-common/goacc/kernels-decompose-pr100400-1-*.c' behave consistently,
+ regardless of checking level
+
+Fix-up for commit c14ea6a72fb1ae66e3d32ac8329558497c6e4403
+"Catch 'GIMPLE_DEBUG' misbehavior in OpenACC 'kernels' decomposition
+[PR100400, PR103836, PR104061]".
+
+For C++ compilation of 'c-c++-common/goacc/kernels-decompose-pr100400-1-2.c',
+we first emit a 'sorry' diagnostic, and then a 'gcc_unreachable' (or
+'internal_error', see below) diagnostic, but for example, for
+'--enable-checking=release' (thus, '!CHECKING_P'), the second one may actually
+be turned into a 'confused by earlier errors, bailing out' diagnostic.  (See
+'gcc/diagnostic.cc:diagnostic_report_diagnostic': "When not checking, ICEs are
+converted to fatal errors when an error has already occurred.")  Thus, make
+'c-c++-common/goacc/kernels-decompose-pr100400-1-2.c' behave consistently via
+'-Wfatal-errors', and thus only matching the 'sorry' diagnostic.
+
+For example, for '--enable-checking=no' (thus, '!ENABLE_ASSERT_CHECKING'), a
+call to 'gcc_unreachable' cannot be assumed emit an 'internal_error'-like
+diagnostic, so explicitly call 'internal_error' in
+'gcc/omp-oacc-kernels-decompose.cc:visit_loops_in_gang_single_region', in the
+'GIMPLE_OMP_FOR' case, to avoid regressing
+'c-c++-common/goacc/kernels-decompose-pr100400-1-3.c', and
+'c-c++-common/goacc/kernels-decompose-pr100400-1-4.c'.
+
+	PR middle-end/100400
+	gcc/
+	* omp-oacc-kernels-decompose.cc
+	(visit_loops_in_gang_single_region) <GIMPLE_OMP_FOR>: Explicitly
+	call 'internal_error'.
+	gcc/testsuite/
+	* c-c++-common/goacc/kernels-decompose-pr100400-1-2.c: Specify
+	'-Wfatal-errors'.
+
+(cherry picked from commit da6305558bab9e24943848e4fc5bd8738d7e8f9b)
+---
+ gcc/omp-oacc-kernels-decompose.cc                    |  6 ++++++
+ .../goacc/kernels-decompose-pr100400-1-2.c           | 12 +++++-------
+ 2 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/gcc/omp-oacc-kernels-decompose.cc b/gcc/omp-oacc-kernels-decompose.cc
+index 4386787ba3c..ec9b0faab0a 100644
+--- a/gcc/omp-oacc-kernels-decompose.cc
++++ b/gcc/omp-oacc-kernels-decompose.cc
+@@ -239,7 +239,13 @@ visit_loops_in_gang_single_region (gimple_stmt_iterator *gsi_p,
+     case GIMPLE_OMP_FOR:
+       /*TODO Given the current 'adjust_region_code' algorithm, this is
+ 	actually...  */
++#if 0
+       gcc_unreachable ();
++#else
++      /* ..., but due to bugs (PR100400), we may actually come here.
++	 Reliably catch this, regardless of checking level.  */
++      internal_error ("PR100400");
++#endif
+ 
+       {
+ 	tree clauses = gimple_omp_for_clauses (stmt);
+diff --git a/gcc/testsuite/c-c++-common/goacc/kernels-decompose-pr100400-1-2.c b/gcc/testsuite/c-c++-common/goacc/kernels-decompose-pr100400-1-2.c
+index a643f109bf1..8b65e07c623 100644
+--- a/gcc/testsuite/c-c++-common/goacc/kernels-decompose-pr100400-1-2.c
++++ b/gcc/testsuite/c-c++-common/goacc/kernels-decompose-pr100400-1-2.c
+@@ -1,8 +1,8 @@
+ /* { dg-additional-options "--param openacc-kernels=decompose" } */
+ 
+-/* { dg-additional-options "-fchecking" }
+-   { dg-ice TODO { c++ } }
+-   { dg-prune-output "during GIMPLE pass: omp_oacc_kernels_decompose" } */
++/* Ensure consistent diagnostics, regardless of checking level:
++   { dg-additional-options -Wfatal-errors }
++   { dg-message {terminated due to -Wfatal-errors} TODO { target *-*-* } 0 } */
+ 
+ /* { dg-additional-options "-g" } */
+ /* { dg-additional-options "-O1" } so that we may get some 'GIMPLE_DEBUG's.  */
+@@ -19,18 +19,16 @@ foo (void)
+   /* { dg-bogus {sorry, unimplemented: 'gimple_debug' not yet supported} TODO { xfail *-*-* } .+1 } */
+ #pragma acc kernels /* { dg-line l_compute1 } */
+   /* { dg-note {OpenACC 'kernels' decomposition: variable 'p' in 'copy' clause requested to be made addressable} {} { target *-*-* } l_compute1 }
+-     { dg-note {variable 'p' made addressable} {} { target *-*-* xfail c++ } l_compute1 } */
++     { dg-note {variable 'p' made addressable} {} { xfail *-*-* } l_compute1 } */
+   /* { dg-note {variable 'c' declared in block is candidate for adjusting OpenACC privatization level} {} { xfail *-*-* } l_compute1 } */
+   /* { dg-note {variable 'c\.0' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} {} { xfail *-*-* } l_compute1 } */
+   {
+-    /* { dg-bogus {note: beginning 'gang-single' part in OpenACC 'kernels' region} {w/ debug} { xfail c++ } .-1 }
+-       { dg-bogus {note: beginning 'gang-single' part in OpenACC 'kernels' region} {w/ debug} { xfail c } .+1 } */
+     int c;
+ 
+     /* { dg-note {beginning 'gang-single' part in OpenACC 'kernels' region} {} { xfail *-*-* } .+1 } */
+     p = &c;
+ 
+-    /* { dg-note {parallelized loop nest in OpenACC 'kernels' region} {} { xfail c++ } .+1 } */
++    /* { dg-note {parallelized loop nest in OpenACC 'kernels' region} {} { xfail *-*-* } .+1 } */
+ #pragma acc loop independent /* { dg-line l_loop_c1 } */
+     /* { dg-note {variable 'c\.0' in 'private' clause isn't candidate for adjusting OpenACC privatization level: not addressable} {} { xfail *-*-* } l_loop_c1 } */
+     /* { dg-note {variable 'c' in 'private' clause is candidate for adjusting OpenACC privatization level} {} { xfail *-*-* } l_loop_c1 }
+-- 
+2.25.1
+

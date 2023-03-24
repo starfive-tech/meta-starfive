@@ -1,0 +1,100 @@
+From 7d7f275ebe7295264a0406876c0670e25a50169a Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 31 Jan 2023 10:12:19 +0100
+Subject: [PATCH 449/547] i386: Fix up ix86_convert_const_wide_int_to_broadcast
+ [PR108599]
+
+The following testcase is miscompiled.  The problem is that during
+RTL DSE we see a V4DI register is being loaded { 16, 16, 0, 0 }
+value and DSE mostly works in terms of scalar modes, so it calls
+movoi to set an OImode REG to (const_wide_int 0x100000000000000010)
+and ix86_convert_const_wide_int_to_broadcast thinks it can compute
+that value by broadcasting DImode 0x10.  While it is true that
+for TImode result the broadcast could be used, for OImode/XImode
+it can't be, because all but the lowest 2 HOST_WIDE_INTs aren't
+present (so are 0 or -1 depending on sign), not 0x10 in this case.
+The function checks if the least significant HOST_WIDE_INT elt
+of the CONST_WIDE_INT is broadcastable from QI/HI/SI/DImode and then
+  /* Check if OP can be broadcasted from VAL.  */
+  for (int i = 1; i < CONST_WIDE_INT_NUNITS (op); i++)
+    if (val != CONST_WIDE_INT_ELT (op, i))
+      return nullptr;
+That is needed of course, but nothing checks that
+CONST_WIDE_INT_NUNITS (op) isn't too small for the mode in question.
+I think if op would be 0 or -1, it ought to be never CONST_WIDE_INT,
+but CONST_INT and so we can just punt whenever the number of
+CONST_WIDE_INT elts is not the expected one.
+
+2023-01-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/108599
+	* config/i386/i386-expand.cc
+	(ix86_convert_const_wide_int_to_broadcast): Return nullptr if
+	CONST_WIDE_INT_NUNITS (op) times HOST_BITS_PER_WIDE_INT isn't
+	equal to bitsize of mode.
+
+	* gcc.target/i386/avx2-pr108599.c: New test.
+
+(cherry picked from commit 963315a922e228c4f6853826666151fc540f111a)
+---
+ gcc/config/i386/i386-expand.cc                |  4 ++-
+ gcc/testsuite/gcc.target/i386/avx2-pr108599.c | 32 +++++++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/avx2-pr108599.c
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index c967817726c..77dda5dd44e 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -223,7 +223,9 @@ ix86_convert_const_wide_int_to_broadcast (machine_mode mode, rtx op)
+      broadcast only if vector broadcast is available.  */
+   if (!TARGET_AVX
+       || !CONST_WIDE_INT_P (op)
+-      || standard_sse_constant_p (op, mode))
++      || standard_sse_constant_p (op, mode)
++      || (CONST_WIDE_INT_NUNITS (op) * HOST_BITS_PER_WIDE_INT
++	  != GET_MODE_BITSIZE (mode)))
+     return nullptr;
+ 
+   HOST_WIDE_INT val = CONST_WIDE_INT_ELT (op, 0);
+diff --git a/gcc/testsuite/gcc.target/i386/avx2-pr108599.c b/gcc/testsuite/gcc.target/i386/avx2-pr108599.c
+new file mode 100644
+index 00000000000..d5ddab7609f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/avx2-pr108599.c
+@@ -0,0 +1,32 @@
++/* PR target/108599 */
++/* { dg-do run { target avx2 } } */
++/* { dg-options "-O2 -mavx2 -mtune=skylake-avx512" } */
++
++#include "avx2-check.h"
++
++struct S { unsigned long long a, b, c, d; };
++
++__attribute__((noipa)) void
++foo (unsigned long long x, unsigned long long y,
++     unsigned long long z, unsigned long long w, const struct S s)
++{
++  if (s.a != x || s.b != y || s.c != z || s.d != w)
++    abort ();
++}
++
++typedef unsigned long long V __attribute__((may_alias, vector_size (4 * sizeof (unsigned long long))));
++
++static void
++avx2_test (void)
++{
++  {
++    struct S s;
++    *(V *)&s = (V) { 16, 0, 0, 0 };
++    foo (16, 0, 0, 0, s);
++  }
++  {
++    struct S s;
++    *(V *)&s = (V) { 16, 16, 0, 0 };
++    foo (16, 16, 0, 0, s);
++  }
++}
+-- 
+2.25.1
+

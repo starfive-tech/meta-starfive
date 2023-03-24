@@ -1,0 +1,147 @@
+From 5ec102e3290ff1cac457420a1219fa1ca3bbbb70 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Fri, 25 Nov 2022 13:05:56 +0100
+Subject: [PATCH 268/547] i386: fix assert (__builtin_cpu_supports ("x86-64")
+ >= 0)
+
+Similar story as PR103661, we again return a negative number
+for __builtin_cpu_supports:
+
+Documentation says:
+
+int __builtin_cpu_supports(const char *feature)
+This function returns a positive integer if the run-time CPU supports feature and returns 0 otherwise.
+while we return -2147483648.
+
+Moreover, I noticed "x86-64" is not a valid option for __builtin_cpu_is,
+but for __builtin_cpu_supports.
+
+PR target/107551
+
+gcc/ChangeLog:
+
+	* config/i386/i386-builtins.cc (fold_builtin_cpu): Use same path
+	as for PR103661.
+	* doc/extend.texi: Fix "x86-64" use.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/builtin_target.c: Add more checks.
+
+(cherry picked from commit d71b20fc30965ba8326ad9363d0aca9d61eb4ed3)
+---
+ gcc/config/i386/i386-builtins.cc              | 25 ++++++++-----------
+ gcc/doc/extend.texi                           | 22 ++++++++--------
+ .../gcc.target/i386/builtin_target.c          |  5 ++++
+ 3 files changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/gcc/config/i386/i386-builtins.cc b/gcc/config/i386/i386-builtins.cc
+index 59c7da25a14..050c6228a18 100644
+--- a/gcc/config/i386/i386-builtins.cc
++++ b/gcc/config/i386/i386-builtins.cc
+@@ -2324,18 +2324,14 @@ fold_builtin_cpu (tree fndecl, tree *args)
+ 	      varpool_node::add (ix86_cpu_features2_var);
+ 	    }
+ 
++	  /* Skip __cpu_features[0].  */
+ 	  feature -= INT_TYPE_SIZE;
+-	  field_val = 1U << (feature % INT_TYPE_SIZE);
+ 	  tree index = size_int (feature / INT_TYPE_SIZE);
++	  feature = feature % INT_TYPE_SIZE;
+ 	  array_elt = build4 (ARRAY_REF, unsigned_type_node,
+ 			      ix86_cpu_features2_var,
+ 			      index, NULL_TREE, NULL_TREE);
+ 	  /* Return __cpu_features2[index] & field_val  */
+-	  final = build2 (BIT_AND_EXPR, unsigned_type_node,
+-			  array_elt,
+-			  build_int_cstu (unsigned_type_node,
+-					  field_val));
+-	  return build1 (NOP_EXPR, integer_type_node, final);
+ 	}
+       else
+ 	{
+@@ -2352,16 +2348,17 @@ fold_builtin_cpu (tree fndecl, tree *args)
+ 	  array_elt = build4 (ARRAY_REF, unsigned_type_node, ref,
+ 			      integer_zero_node, NULL_TREE, NULL_TREE);
+ 
+-	  field_val = (1U << feature);
+ 	  /* Return __cpu_model.__cpu_features[0] & field_val  */
+-	  final = build2 (BIT_AND_EXPR, unsigned_type_node, array_elt,
+-			  build_int_cstu (unsigned_type_node, field_val));
+-	  if (feature == (INT_TYPE_SIZE - 1))
+-	    return build2 (NE_EXPR, integer_type_node, final,
+-			   build_int_cst (unsigned_type_node, 0));
+-	  else
+-	    return build1 (NOP_EXPR, integer_type_node, final);
+ 	}
++
++      field_val = 1U << feature;
++      final = build2 (BIT_AND_EXPR, unsigned_type_node, array_elt,
++		      build_int_cstu (unsigned_type_node, field_val));
++      if (feature == INT_TYPE_SIZE - 1)
++	return build2 (NE_EXPR, integer_type_node, final,
++		       build_int_cst (unsigned_type_node, 0));
++      else
++	return build1 (NOP_EXPR, integer_type_node, final);
+     }
+   gcc_unreachable ();
+ }
+diff --git a/gcc/doc/extend.texi b/gcc/doc/extend.texi
+index 84e6f6694ab..e705e94603f 100644
+--- a/gcc/doc/extend.texi
++++ b/gcc/doc/extend.texi
+@@ -21887,18 +21887,6 @@ AMD Family 19h CPU.
+ 
+ @item znver3
+ AMD Family 19h Zen version 3.
+-
+-@item x86-64
+-Baseline x86-64 microarchitecture level (as defined in x86-64 psABI).
+-
+-@item x86-64-v2
+-x86-64-v2 microarchitecture level.
+-
+-@item x86-64-v3
+-x86-64-v3 microarchitecture level.
+-
+-@item x86-64-v4
+-x86-64-v4 microarchitecture level.
+ @end table
+ 
+ Here is an example:
+@@ -21992,6 +21980,16 @@ VPCLMULQDQ instructions.
+ AVX512VNNI instructions.
+ @item avx512bitalg
+ AVX512BITALG instructions.
++@item x86-64
++Baseline x86-64 microarchitecture level (as defined in x86-64 psABI).
++@item x86-64-v2
++x86-64-v2 microarchitecture level.
++@item x86-64-v3
++x86-64-v3 microarchitecture level.
++@item x86-64-v4
++x86-64-v4 microarchitecture level.
++
++
+ @end table
+ 
+ Here is an example:
+diff --git a/gcc/testsuite/gcc.target/i386/builtin_target.c b/gcc/testsuite/gcc.target/i386/builtin_target.c
+index 3e7505a8c3a..fff643c13b0 100644
+--- a/gcc/testsuite/gcc.target/i386/builtin_target.c
++++ b/gcc/testsuite/gcc.target/i386/builtin_target.c
+@@ -95,6 +95,11 @@ quick_check ()
+ 
+   assert (__builtin_cpu_supports ("avx512vpopcntdq") >= 0);
+ 
++  assert (__builtin_cpu_supports ("x86-64") >= 0);
++  assert (__builtin_cpu_supports ("x86-64-v2") >= 0);
++  assert (__builtin_cpu_supports ("x86-64-v3") >= 0);
++  assert (__builtin_cpu_supports ("x86-64-v4") >= 0);
++
+   /* Check CPU type.  */
+   assert (__builtin_cpu_is ("amd") >= 0);
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,126 @@
+From 35e8b889af144faad074c0fceed0390143ec37dd Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Thu, 3 Nov 2022 14:17:42 +0100
+Subject: [PATCH 192/547] i386: Fix uninitialized register after peephole2
+ conversion [PR107404]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The eliminate reg-reg move by inverting the condition of
+a cmove #2 peephole2 converts the following sequence:
+
+  473: bx:DI=[r14:DI*0x8+r12:DI]
+  960: r15:DI=r8:DI
+  485: {flags:CCC=cmp(r15:DI+bx:DI,bx:DI);r15:DI=r15:DI+bx:DI;}
+  737: r15:DI={(geu(flags:CCC,0))?r15:DI:bx:DI}
+
+to:
+
+ 1110: {flags:CCC=cmp(r8:DI+bx:DI,bx:DI);r8:DI=r8:DI+bx:DI;}
+ 1111: r15:DI=[r14:DI*0x8+r12:DI]
+ 1112: r15:DI={(geu(flags:CCC,0))?r8:DI:r15:DI}
+
+Please note that(insn 1110) uses register BX, but its
+initialization was eliminated.
+
+Avoid conversion if eliminated move intialized a register, used
+in the moved instruction.
+
+2022-11-03  Uroš Bizjak  <ubizjak@gmail.com>
+
+gcc/ChangeLog:
+
+	PR target/107404
+	* config/i386/i386.md (eliminate reg-reg move by inverting the
+	condition of a cmove #2 peephole2): Check if eliminated move
+	initialized a register, used in the moved instruction.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/107404
+	* g++.target/i386/pr107404.C: New test.
+
+(cherry picked from commit 553b1d3dd5b9253ebdf66ee3260c717d5b807dd1)
+---
+ gcc/config/i386/i386.md                  |  3 +-
+ gcc/testsuite/g++.target/i386/pr107404.C | 53 ++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.target/i386/pr107404.C
+
+diff --git a/gcc/config/i386/i386.md b/gcc/config/i386/i386.md
+index 1c4781d26f7..624d85ca7f0 100644
+--- a/gcc/config/i386/i386.md
++++ b/gcc/config/i386/i386.md
+@@ -20745,7 +20745,8 @@
+   && REGNO (operands[2]) != REGNO (operands[1])
+   && peep2_reg_dead_p (2, operands[1])
+   && peep2_reg_dead_p (4, operands[2])
+-  && !reg_overlap_mentioned_p (operands[0], operands[3])"
++  && !reg_overlap_mentioned_p (operands[0], operands[3])
++  && !reg_mentioned_p (operands[2], operands[6])"
+  [(parallel [(set (match_dup 7) (match_dup 8))
+ 	     (set (match_dup 1) (match_dup 9))])
+   (set (match_dup 0) (match_dup 3))
+diff --git a/gcc/testsuite/g++.target/i386/pr107404.C b/gcc/testsuite/g++.target/i386/pr107404.C
+new file mode 100644
+index 00000000000..e47d0fd779d
+--- /dev/null
++++ b/gcc/testsuite/g++.target/i386/pr107404.C
+@@ -0,0 +1,53 @@
++// PR target/107404
++// { dg-do run }
++// { dg-options "-O3" }
++
++unsigned long long a;
++void b(unsigned long long *f, int p2) { *f ^= p2; }
++long c;
++char e, i;
++short g, m;
++long long ab[1][25][21][22];
++unsigned long long aa[1][21][22];
++unsigned long long ae[1][25][21][21];
++long long ac[129360];
++char ad[25][1][21];
++char ah[1][25][1][21];
++short af[100];
++long max(long f, unsigned long p2) { return f < p2 ? p2 : f; }
++const int &max2(const int &f, const int &p2) { return f < p2 ? p2 : f; }
++void foo(unsigned f, unsigned p2, char l, char p4, long long n[][25][21][22],
++        unsigned long long p6[][21][22], unsigned long long u[][25][21][21]) {
++  long an;
++  for (int j = 0; j < 4; j = p2)
++    for (short k = 0; k < 7; k += 2)
++      for (short o = 0; o < (short)p2 + 21742; o = l) {
++        for (signed char p = 2; p < 9; p += p4)
++          if (p6[j][o][p])
++            for (long q(3); 4 ? n[0][k][o][0] : 0;
++                 q += p6[0][o][0] ? p6[j][0][p] : 0)
++              ac[j + q] = 5066799590;
++        for (long r(p4 - 16); r < 21; r += 4) {
++          ad[k][o][r] = max(u[j][k][o][r], f + u[j][k][o][r]);
++          long d = u[j][k][o][r];
++          an = d < p2 ? p2 : d;
++          e = ah[j][k][o][r] = an;
++          af[o * r] = i;
++        }
++        for (short s(c); s < (short)p2; s = 2)
++          for (short am(m); am; am = max2(3, p2))
++            for (long y = 0; y; y = 3)
++              for (short t(0); t < max2(g, 0);)
++                ;
++      }
++}
++int main() {
++  foo(7, 1558227751, 104, 16, ab, aa, ae);
++  for (unsigned long v = 0; v < 5; ++v)
++    for (unsigned long w = 0; w < 1; ++w)
++      for (unsigned long x = 0; x < 21; ++x)
++        b(&a, ad[v][w][x]);
++
++  if (a)
++    __builtin_abort();
++}
+-- 
+2.25.1
+

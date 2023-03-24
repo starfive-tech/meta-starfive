@@ -1,0 +1,127 @@
+From 40a727379f3e8e6a83aea4e94c38dfa5dd8ef33d Mon Sep 17 00:00:00 2001
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Thu, 20 Oct 2022 15:34:08 +0100
+Subject: [PATCH 152/547] aarch64: Define __ARM_FEATURE_RCPC
+
+https://github.com/ARM-software/acle/pull/199 adds a new feature
+macro for RCPC, for use in things like inline assembly.  This patch
+adds the associated support to GCC.
+
+Also, RCPC is required for Armv8.3-A and later, but the armv8.3-a
+entry didn't include it.  This was probably harmless in practice
+since GCC simply ignored the extension until now.  (The GAS
+definition is OK.)
+
+gcc/
+	* config/aarch64/aarch64.h (AARCH64_FL_FOR_ARCH8_3): Add
+	AARCH64_FL_RCPC.
+	(AARCH64_ISA_RCPC): New macro.
+	* config/aarch64/aarch64-cores.def (thunderx3t110, zeus, neoverse-v1)
+	(neoverse-512tvb, saphira): Remove RCPC from these Armv8.3-A+ cores.
+	* config/aarch64/aarch64-c.cc (aarch64_update_cpp_builtins): Define
+	__ARM_FEATURE_RCPC when appropriate.
+
+gcc/testsuite/
+	* gcc.target/aarch64/pragma_cpp_predefs_1.c: Add RCPC tests.
+---
+ gcc/config/aarch64/aarch64-c.cc               |  1 +
+ gcc/config/aarch64/aarch64-cores.def          | 10 +++++-----
+ gcc/config/aarch64/aarch64.h                  |  4 +++-
+ .../gcc.target/aarch64/pragma_cpp_predefs_1.c | 20 +++++++++++++++++++
+ 4 files changed, 29 insertions(+), 6 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64-c.cc b/gcc/config/aarch64/aarch64-c.cc
+index 767ee0c763c..a4c407724a7 100644
+--- a/gcc/config/aarch64/aarch64-c.cc
++++ b/gcc/config/aarch64/aarch64-c.cc
+@@ -202,6 +202,7 @@ aarch64_update_cpp_builtins (cpp_reader *pfile)
+ 			"__ARM_FEATURE_BF16_SCALAR_ARITHMETIC", pfile);
+   aarch64_def_or_undef (TARGET_LS64,
+ 			"__ARM_FEATURE_LS64", pfile);
++  aarch64_def_or_undef (AARCH64_ISA_RCPC, "__ARM_FEATURE_RCPC", pfile);
+ 
+   /* Not for ACLE, but required to keep "float.h" correct if we switch
+      target between implementations that do or do not support ARMv8.2-A
+diff --git a/gcc/config/aarch64/aarch64-cores.def b/gcc/config/aarch64/aarch64-cores.def
+index 0402bfb748f..8da254f6924 100644
+--- a/gcc/config/aarch64/aarch64-cores.def
++++ b/gcc/config/aarch64/aarch64-cores.def
+@@ -133,17 +133,17 @@ AARCH64_CORE("tsv110",  tsv110, tsv110, 8_2A,  AARCH64_FL_FOR_ARCH8_2 | AARCH64_
+ /* ARMv8.3-A Architecture Processors.  */
+ 
+ /* Marvell cores (TX3). */
+-AARCH64_CORE("thunderx3t110",  thunderx3t110,  thunderx3t110, 8_3A,  AARCH64_FL_FOR_ARCH8_3 | AARCH64_FL_CRYPTO | AARCH64_FL_RCPC | AARCH64_FL_SM4 | AARCH64_FL_SHA3 | AARCH64_FL_F16FML | AARCH64_FL_RCPC8_4, thunderx3t110, 0x43, 0x0b8, 0x0a)
++AARCH64_CORE("thunderx3t110",  thunderx3t110,  thunderx3t110, 8_3A,  AARCH64_FL_FOR_ARCH8_3 | AARCH64_FL_CRYPTO | AARCH64_FL_SM4 | AARCH64_FL_SHA3 | AARCH64_FL_F16FML | AARCH64_FL_RCPC8_4, thunderx3t110, 0x43, 0x0b8, 0x0a)
+ 
+ /* ARMv8.4-A Architecture Processors.  */
+ 
+ /* Arm ('A') cores.  */
+-AARCH64_CORE("zeus", zeus, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_RCPC | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoversev1, 0x41, 0xd40, -1)
+-AARCH64_CORE("neoverse-v1", neoversev1, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_RCPC | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoversev1, 0x41, 0xd40, -1)
+-AARCH64_CORE("neoverse-512tvb", neoverse512tvb, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_RCPC | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoverse512tvb, INVALID_IMP, INVALID_CORE, -1)
++AARCH64_CORE("zeus", zeus, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoversev1, 0x41, 0xd40, -1)
++AARCH64_CORE("neoverse-v1", neoversev1, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoversev1, 0x41, 0xd40, -1)
++AARCH64_CORE("neoverse-512tvb", neoverse512tvb, cortexa57, 8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_SVE | AARCH64_FL_I8MM | AARCH64_FL_BF16 | AARCH64_FL_F16 | AARCH64_FL_PROFILE | AARCH64_FL_SSBS | AARCH64_FL_RNG, neoverse512tvb, INVALID_IMP, INVALID_CORE, -1)
+ 
+ /* Qualcomm ('Q') cores. */
+-AARCH64_CORE("saphira",     saphira,    saphira,    8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_CRYPTO | AARCH64_FL_RCPC, saphira,   0x51, 0xC01, -1)
++AARCH64_CORE("saphira",     saphira,    saphira,    8_4A,  AARCH64_FL_FOR_ARCH8_4 | AARCH64_FL_CRYPTO, saphira,   0x51, 0xC01, -1)
+ 
+ /* ARMv8-A big.LITTLE implementations.  */
+ 
+diff --git a/gcc/config/aarch64/aarch64.h b/gcc/config/aarch64/aarch64.h
+index 359b6e8561f..3e308ad6239 100644
+--- a/gcc/config/aarch64/aarch64.h
++++ b/gcc/config/aarch64/aarch64.h
+@@ -260,7 +260,8 @@ extern unsigned aarch64_architecture_version;
+ #define AARCH64_FL_FOR_ARCH8_2			\
+   (AARCH64_FL_FOR_ARCH8_1 | AARCH64_FL_V8_2)
+ #define AARCH64_FL_FOR_ARCH8_3			\
+-  (AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_V8_3 | AARCH64_FL_PAUTH)
++  (AARCH64_FL_FOR_ARCH8_2 | AARCH64_FL_V8_3 | AARCH64_FL_PAUTH \
++   | AARCH64_FL_RCPC)
+ #define AARCH64_FL_FOR_ARCH8_4			\
+   (AARCH64_FL_FOR_ARCH8_3 | AARCH64_FL_V8_4 | AARCH64_FL_F16FML \
+    | AARCH64_FL_DOTPROD | AARCH64_FL_RCPC8_4 | AARCH64_FL_FLAGM)
+@@ -305,6 +306,7 @@ extern unsigned aarch64_architecture_version;
+ #define AARCH64_ISA_SM4	           (aarch64_isa_flags & AARCH64_FL_SM4)
+ #define AARCH64_ISA_SHA3	   (aarch64_isa_flags & AARCH64_FL_SHA3)
+ #define AARCH64_ISA_F16FML	   (aarch64_isa_flags & AARCH64_FL_F16FML)
++#define AARCH64_ISA_RCPC	   (aarch64_isa_flags & AARCH64_FL_RCPC)
+ #define AARCH64_ISA_RCPC8_4	   (aarch64_isa_flags & AARCH64_FL_RCPC8_4)
+ #define AARCH64_ISA_RNG		   (aarch64_isa_flags & AARCH64_FL_RNG)
+ #define AARCH64_ISA_V8_5	   (aarch64_isa_flags & AARCH64_FL_V8_5)
+diff --git a/gcc/testsuite/gcc.target/aarch64/pragma_cpp_predefs_1.c b/gcc/testsuite/gcc.target/aarch64/pragma_cpp_predefs_1.c
+index bfb044f5d14..307fa3d67da 100644
+--- a/gcc/testsuite/gcc.target/aarch64/pragma_cpp_predefs_1.c
++++ b/gcc/testsuite/gcc.target/aarch64/pragma_cpp_predefs_1.c
+@@ -248,6 +248,26 @@
+ #error "__ARM_FEATURE_CRC32 is not defined but should be!"
+ #endif
+ 
++#pragma GCC target ("arch=armv8.2-a")
++#ifdef __ARM_FEATURE_RCPC
++#error "__ARM_FEATURE_RCPC is defined but should not be!"
++#endif
++
++#pragma GCC target ("arch=armv8.2-a+rcpc")
++#ifndef __ARM_FEATURE_RCPC
++#error "__ARM_FEATURE_RCPC is not defined but should be!"
++#endif
++
++#pragma GCC target ("+norcpc")
++#ifdef __ARM_FEATURE_RCPC
++#error "__ARM_FEATURE_RCPC is defined but should not be!"
++#endif
++
++#pragma GCC target ("arch=armv8.3-a")
++#ifndef __ARM_FEATURE_RCPC
++#error "__ARM_FEATURE_RCPC is not defined but should be!"
++#endif
++
+ int
+ foo (int a)
+ {
+-- 
+2.25.1
+

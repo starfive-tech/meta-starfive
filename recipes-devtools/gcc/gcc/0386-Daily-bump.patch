@@ -1,0 +1,211 @@
+From 43677fe6e2effddb6cab80e1a984807494343efc Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 29 Jan 2023 00:22:12 +0000
+Subject: [PATCH 386/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 52 +++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 56 ++++++++++++++++++++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 57 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 166 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d18a3ad20e6..5acdd4af62a 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,55 @@
++2023-01-28  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	Backported from master:
++	2023-01-05  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	* common/config/i386/i386-common.cc (processor_alias_table):
++	Use CPU_ZNVER4 for znver4.
++	* config/i386/i386.md: Add znver4.md.
++	* config/i386/znver4.md: New.
++
++2023-01-28  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	Backported from master:
++	2022-10-25  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	* common/config/i386/i386-common.cc (processor_alias_table): Use
++	CPU_ZNVER3 for znver4.
++	* config/i386/znver.md: Remove znver4 reservations.
++
++2023-01-28  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	Backported from master:
++	2022-10-21  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	* common/config/i386/cpuinfo.h (get_amd_cpu): Recognize znver4.
++	* common/config/i386/i386-common.cc (processor_names): Add znver4.
++	(processor_alias_table): Add znver4 and modularize old znvers.
++	* common/config/i386/i386-cpuinfo.h (processor_subtypes):
++	AMDFAM19H_ZNVER4.
++	* config.gcc (x86_64-*-* |...): Likewise.
++	* config/i386/driver-i386.cc (host_detect_local_cpu): Let
++	-march=native recognize znver4 cpus.
++	* config/i386/i386-c.cc (ix86_target_macros_internal): Add znver4.
++	* config/i386/i386-options.cc (m_ZNVER4): New definition.
++	(m_ZNVER): Include m_ZNVER4.
++	(processor_cost_table): Add znver4.
++	* config/i386/i386.cc (ix86_reassociation_width): Likewise.
++	* config/i386/i386.h (processor_type): Add PROCESSOR_ZNVER4.
++	(PTA_ZNVER1): New definition.
++	(PTA_ZNVER2): Likewise.
++	(PTA_ZNVER3): Likewise.
++	(PTA_ZNVER4): Likewise.
++	* config/i386/i386.md (define_attr "cpu"): Add znver4 and rename
++	md file.
++	* config/i386/x86-tune-costs.h (znver4_cost): New definition.
++	* config/i386/x86-tune-sched.cc (ix86_issue_rate): Add znver4.
++	(ix86_adjust_cost): Likewise.
++	* config/i386/znver1.md: Rename to znver.md.
++	* config/i386/znver.md: Add new reservations for znver4.
++	* doc/extend.texi: Add details about znver4.
++	* doc/invoke.texi: Likewise.
++
+ 2023-01-27  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 9348a4afb6a..4a549ed9f6b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230128
++20230129
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 378666372d1..f6361d3ebcd 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,59 @@
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-24  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108529
++	* simplify.cc (simplify_transformation): Do not try to simplify
++	transformational intrinsic when the ARRAY argument has a NULL shape.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-07-14  Harald Anlauf  <anlauf@gmx.de>
++		    Steven G. Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/106209
++	* decl.cc (add_init_expr_to_sym): Handle bad initializers for
++	implied-shape arrays.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-17  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108421
++	* interface.cc (get_expr_storage_size): Check that we actually have
++	an integer value before trying to extract it with mpz_get_si.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108420
++	* iresolve.cc (check_charlen_present): Preserve character length if
++	there is no array constructor.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108501
++	* interface.cc (get_expr_storage_size): Check array subscript triplets
++	that we actually have integer values before trying to extract with
++	mpz_get_si.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108502
++	* dependency.cc (gfc_check_dependency): Prevent NULL pointer
++	dereference while recursively checking expressions.
++
+ 2023-01-23  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index e76bc54520b..f0535c6096e 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,60 @@
++2023-01-28  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	Backported from master:
++	2022-10-21  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
++
++	* gcc.target/i386/funcspec-56.inc: Handle new march.
++	* g++.target/i386/mv29.C: Likewise.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-24  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108529
++	* gfortran.dg/pr108529.f90: New test.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-07-14  Harald Anlauf  <anlauf@gmx.de>
++		    Steven G. Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/106209
++	* gfortran.dg/pr106209.f90: New test.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-17  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108421
++	* gfortran.dg/pr108421.f90: New test.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108420
++	* gfortran.dg/pr108420.f90: New test.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108501
++	* gfortran.dg/pr108501.f90: New test.
++
++2023-01-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108502
++	* gfortran.dg/pr108502.f90: New test.
++
+ 2023-01-27  Andre Vieira  <andre.simoesdiasvieira@arm.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

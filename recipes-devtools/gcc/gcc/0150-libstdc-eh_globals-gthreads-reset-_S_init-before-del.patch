@@ -1,0 +1,46 @@
+From 362e56d042f2d37337eea50b97b993f5ac6db86d Mon Sep 17 00:00:00 2001
+From: Alexandre Oliva <oliva@adacore.com>
+Date: Tue, 21 Jun 2022 23:11:02 -0300
+Subject: [PATCH 150/547] libstdc++: eh_globals: gthreads: reset _S_init before
+ deleting key
+
+Clear __eh_globals_init's _S_init in the dtor before deleting the
+gthread key.
+
+This ensures that, in case any code involved in deleting the key
+interacts with eh_globals, the key that is being deleted won't be
+used, and the non-thread-specific eh_globals fallback will.
+
+for  libstdc++-v3/ChangeLog
+
+	* libsupc++/eh_globals.cc [!_GLIBCXX_HAVE_TLS]
+	(__eh_globals_init::~__eh_globals_init): Clear _S_init first.
+
+(cherry picked from commit a33dda016e5acf9c6325ce8a72a1b0238130374e)
+---
+ libstdc++-v3/libsupc++/eh_globals.cc | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/libsupc++/eh_globals.cc b/libstdc++-v3/libsupc++/eh_globals.cc
+index 768425c0f40..0aadb692a96 100644
+--- a/libstdc++-v3/libsupc++/eh_globals.cc
++++ b/libstdc++-v3/libsupc++/eh_globals.cc
+@@ -119,8 +119,13 @@ struct __eh_globals_init
+   ~__eh_globals_init()
+   {
+     if (_S_init)
+-      __gthread_key_delete(_M_key);
+-    _S_init = false;
++      {
++	/* Set it before the call, so that, should
++	   __gthread_key_delete throw an exception, it won't rely on
++	   the key being deleted.  */
++	_S_init = false;
++	__gthread_key_delete(_M_key);
++      }
+   }
+ 
+   __eh_globals_init(const __eh_globals_init&) = delete;
+-- 
+2.25.1
+

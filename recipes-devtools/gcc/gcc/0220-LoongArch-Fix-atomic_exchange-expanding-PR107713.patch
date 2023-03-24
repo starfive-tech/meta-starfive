@@ -1,0 +1,161 @@
+From 2adcbcc69a1d5d9554042f09ec35e72bf39fb56f Mon Sep 17 00:00:00 2001
+From: Jinyang He <hejinyang@loongson.cn>
+Date: Thu, 17 Nov 2022 14:38:52 +0800
+Subject: [PATCH 220/547] LoongArch: Fix atomic_exchange expanding [PR107713]
+
+We used to expand atomic_exchange_n(ptr, new, mem_order) for subword types
+into something like:
+
+    {
+      __typeof__(*ptr) t = atomic_load_n(ptr, mem_order);
+      atomic_compare_exchange_n(ptr, &t, new, true, mem_order, mem_order);
+      return t;
+    }
+
+It's incorrect because another thread may store a different value into *ptr
+after atomic_load_n.  Then atomic_compare_exchange_n will not store into
+*ptr, but atomic_exchange_n should always perform the store.
+
+gcc/ChangeLog:
+
+	PR target/107713
+	* config/loongarch/sync.md
+	(atomic_cas_value_exchange_7_<mode>): New define_insn.
+	(atomic_exchange): Use atomic_cas_value_exchange_7_si instead of
+	atomic_cas_value_cmp_and_7_si.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/107713
+	* gcc.target/loongarch/pr107713-1.c: New test.
+	* gcc.target/loongarch/pr107713-2.c: New test.
+
+(cherry picked from commit f0024bfb228f94e60e06dc32a4983e40a9b90be5)
+---
+ gcc/config/loongarch/sync.md                  | 27 +++++++++-
+ .../gcc.target/loongarch/pr107713-1.c         | 50 +++++++++++++++++++
+ .../gcc.target/loongarch/pr107713-2.c         |  9 ++++
+ 3 files changed, 84 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/pr107713-1.c
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/pr107713-2.c
+
+diff --git a/gcc/config/loongarch/sync.md b/gcc/config/loongarch/sync.md
+index 0c4f1983e88..45be1442439 100644
+--- a/gcc/config/loongarch/sync.md
++++ b/gcc/config/loongarch/sync.md
+@@ -448,6 +448,29 @@
+ }
+   [(set (attr "length") (const_int 32))])
+ 
++(define_insn "atomic_cas_value_exchange_7_<mode>"
++  [(set (match_operand:GPR 0 "register_operand" "=&r")
++	(match_operand:GPR 1 "memory_operand" "+ZC"))
++   (set (match_dup 1)
++	(unspec_volatile:GPR [(match_operand:GPR 2 "reg_or_0_operand" "rJ")
++			      (match_operand:GPR 3 "reg_or_0_operand" "rJ")
++			      (match_operand:GPR 4 "reg_or_0_operand" "rJ")
++			      (match_operand:GPR 5 "reg_or_0_operand"  "rJ")
++			      (match_operand:SI 6 "const_int_operand")] ;; model
++	 UNSPEC_SYNC_EXCHANGE))
++   (clobber (match_scratch:GPR 7 "=&r"))]
++  ""
++{
++  return "%G6\\n\\t"
++	 "1:\\n\\t"
++	 "ll.<amo>\\t%0,%1\\n\\t"
++	 "and\\t%7,%0,%z3\\n\\t"
++	 "or%i5\\t%7,%7,%5\\n\\t"
++	 "sc.<amo>\\t%7,%1\\n\\t"
++	 "beqz\\t%7,1b\\n\\t";
++}
++  [(set (attr "length") (const_int 20))])
++
+ (define_expand "atomic_exchange<mode>"
+   [(set (match_operand:SHORT 0 "register_operand")
+ 	(unspec_volatile:SHORT
+@@ -459,9 +482,9 @@
+   ""
+ {
+   union loongarch_gen_fn_ptrs generator;
+-  generator.fn_7 = gen_atomic_cas_value_cmp_and_7_si;
++  generator.fn_7 = gen_atomic_cas_value_exchange_7_si;
+   loongarch_expand_atomic_qihi (generator, operands[0], operands[1],
+-				operands[1], operands[2], operands[3]);
++				const0_rtx, operands[2], operands[3]);
+   DONE;
+ })
+ 
+diff --git a/gcc/testsuite/gcc.target/loongarch/pr107713-1.c b/gcc/testsuite/gcc.target/loongarch/pr107713-1.c
+new file mode 100644
+index 00000000000..d1536c95b27
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/pr107713-1.c
+@@ -0,0 +1,50 @@
++/* { dg-do run } */
++/* { dg-require-effective-target pthread } */
++/* { dg-options "-pthread" } */
++
++#include <pthread.h>
++
++char x, x1, x2;
++
++void *
++work1 (void *)
++{
++  for (int i = 0; i < 100; i++)
++    x1 = __atomic_exchange_n (&x, x1, __ATOMIC_SEQ_CST);
++  return NULL;
++}
++
++void *
++work2 (void *)
++{
++  for (int i = 0; i < 100; i++)
++    x2 = __atomic_exchange_n (&x, x2, __ATOMIC_SEQ_CST);
++  return NULL;
++}
++
++void
++test (void)
++{
++  x = 0;
++  x1 = 1;
++  x2 = 2;
++  pthread_t w1, w2;
++  if (pthread_create (&w1, NULL, work1, NULL) != 0)
++    __builtin_abort ();
++  if (pthread_create (&w2, NULL, work2, NULL) != 0)
++    __builtin_abort ();
++  if (pthread_join (w1, NULL) != 0)
++    __builtin_abort ();
++  if (pthread_join (w2, NULL) != 0)
++    __builtin_abort ();
++  if ((x ^ x1 ^ x2) != 3)
++    __builtin_abort ();
++}
++
++int
++main ()
++{
++  int i;
++  for (i = 0; i < 10000; i++)
++    test ();
++}
+diff --git a/gcc/testsuite/gcc.target/loongarch/pr107713-2.c b/gcc/testsuite/gcc.target/loongarch/pr107713-2.c
+new file mode 100644
+index 00000000000..82d44db3d51
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/pr107713-2.c
+@@ -0,0 +1,9 @@
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++/* { dg-final { scan-assembler-times "beq|bne" 1 } } */
++
++char
++t (char *p, char x)
++{
++  return __atomic_exchange_n (p, x, __ATOMIC_RELAXED);
++}
+-- 
+2.25.1
+

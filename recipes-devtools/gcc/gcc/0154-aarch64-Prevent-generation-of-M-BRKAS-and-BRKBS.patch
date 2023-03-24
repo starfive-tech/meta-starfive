@@ -1,0 +1,116 @@
+From b166eb4ff0a8f7f6362229e551313a31974e2959 Mon Sep 17 00:00:00 2001
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Thu, 20 Oct 2022 15:34:09 +0100
+Subject: [PATCH 154/547] aarch64: Prevent generation of /M BRKAS and BRKBS
+
+Bit of a brown-paper-bag bug, but: GCC was generating
+non-existent merging forms of BRKAS and BRKBS.  Those
+instructions only support zero predication (although
+BRKA and BRKB support both).
+
+gcc/
+	* config/aarch64/aarch64-sve.md (*aarch64_brk<brk_op>_cc): Remove
+	merging alternative.
+	(*aarch64_brk<brk_op>_ptest): Likewise.
+
+gcc/testsuite/
+	* gcc.target/aarch64/sve/acle/general/brka_1.c: Expect a separate
+	PTEST instruction.
+	* gcc.target/aarch64/sve/acle/general/brkb_1.c: Likewise.
+
+(cherry picked from commit 57675c7f92a3bd3ca8dae1faac7f2f51d40e0f9e)
+---
+ gcc/config/aarch64/aarch64-sve.md             | 24 ++++++++-----------
+ .../aarch64/sve/acle/general/brka_1.c         |  5 ++--
+ .../aarch64/sve/acle/general/brkb_1.c         |  5 ++--
+ 3 files changed, 16 insertions(+), 18 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64-sve.md b/gcc/config/aarch64/aarch64-sve.md
+index e2bb80268e5..b8cc47ef5fc 100644
+--- a/gcc/config/aarch64/aarch64-sve.md
++++ b/gcc/config/aarch64/aarch64-sve.md
+@@ -9612,45 +9612,41 @@
+ (define_insn "*aarch64_brk<brk_op>_cc"
+   [(set (reg:CC_NZC CC_REGNUM)
+ 	(unspec:CC_NZC
+-	  [(match_operand:VNx16BI 1 "register_operand" "Upa, Upa")
++	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
+ 	   (match_dup 1)
+ 	   (match_operand:SI 4 "aarch64_sve_ptrue_flag")
+ 	   (unspec:VNx16BI
+ 	     [(match_dup 1)
+-	      (match_operand:VNx16BI 2 "register_operand" "Upa, Upa")
+-	      (match_operand:VNx16BI 3 "aarch64_simd_reg_or_zero" "Dz, 0")]
++	      (match_operand:VNx16BI 2 "register_operand" "Upa")
++	      (match_operand:VNx16BI 3 "aarch64_simd_imm_zero")]
+ 	     SVE_BRK_UNARY)]
+ 	  UNSPEC_PTEST))
+-   (set (match_operand:VNx16BI 0 "register_operand" "=Upa, Upa")
++   (set (match_operand:VNx16BI 0 "register_operand" "=Upa")
+ 	(unspec:VNx16BI
+ 	  [(match_dup 1)
+ 	   (match_dup 2)
+ 	   (match_dup 3)]
+ 	  SVE_BRK_UNARY))]
+   "TARGET_SVE"
+-  "@
+-   brk<brk_op>s\t%0.b, %1/z, %2.b
+-   brk<brk_op>s\t%0.b, %1/m, %2.b"
++  "brk<brk_op>s\t%0.b, %1/z, %2.b"
+ )
+ 
+ ;; Same, but with only the flags result being interesting.
+ (define_insn "*aarch64_brk<brk_op>_ptest"
+   [(set (reg:CC_NZC CC_REGNUM)
+ 	(unspec:CC_NZC
+-	  [(match_operand:VNx16BI 1 "register_operand" "Upa, Upa")
++	  [(match_operand:VNx16BI 1 "register_operand" "Upa")
+ 	   (match_dup 1)
+ 	   (match_operand:SI 4 "aarch64_sve_ptrue_flag")
+ 	   (unspec:VNx16BI
+ 	     [(match_dup 1)
+-	      (match_operand:VNx16BI 2 "register_operand" "Upa, Upa")
+-	      (match_operand:VNx16BI 3 "aarch64_simd_reg_or_zero" "Dz, 0")]
++	      (match_operand:VNx16BI 2 "register_operand" "Upa")
++	      (match_operand:VNx16BI 3 "aarch64_simd_imm_zero")]
+ 	     SVE_BRK_UNARY)]
+ 	  UNSPEC_PTEST))
+-   (clobber (match_scratch:VNx16BI 0 "=Upa, Upa"))]
++   (clobber (match_scratch:VNx16BI 0 "=Upa"))]
+   "TARGET_SVE"
+-  "@
+-   brk<brk_op>s\t%0.b, %1/z, %2.b
+-   brk<brk_op>s\t%0.b, %1/m, %2.b"
++  "brk<brk_op>s\t%0.b, %1/z, %2.b"
+ )
+ 
+ ;; -------------------------------------------------------------------------
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brka_1.c b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brka_1.c
+index 24aa8f317c4..6146ef82849 100644
+--- a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brka_1.c
++++ b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brka_1.c
+@@ -18,5 +18,6 @@ test2 (svbool_t pg, svbool_t x, svbool_t y, int *any)
+   return svptest_any (pg, res);
+ }
+ 
+-/* { dg-final { scan-assembler-times {\tbrkas\tp[0-9]+\.b, p[0-9]+/m,} 2 } } */
+-/* { dg-final { scan-assembler-not {\tbrka\t} } } */
++/* { dg-final { scan-assembler-times {\tbrka\t} 2 } } */
++/* { dg-final { scan-assembler-times {\tptest\t} 2 } } */
++/* { dg-final { scan-assembler-not {\tbrkas\t} } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkb_1.c b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkb_1.c
+index 07e3622ed6a..7f1c75837de 100644
+--- a/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkb_1.c
++++ b/gcc/testsuite/gcc.target/aarch64/sve/acle/general/brkb_1.c
+@@ -18,5 +18,6 @@ test2 (svbool_t pg, svbool_t x, svbool_t y, int *any)
+   return svptest_any (pg, res);
+ }
+ 
+-/* { dg-final { scan-assembler-times {\tbrkbs\tp[0-9]+\.b, p[0-9]+/m,} 2 } } */
+-/* { dg-final { scan-assembler-not {\tbrkb\t} } } */
++/* { dg-final { scan-assembler-times {\tbrkb\t} 2 } } */
++/* { dg-final { scan-assembler-times {\tptest\t} 2 } } */
++/* { dg-final { scan-assembler-not {\tbrkbs\t} } } */
+-- 
+2.25.1
+

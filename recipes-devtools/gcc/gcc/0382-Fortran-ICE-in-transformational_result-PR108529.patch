@@ -1,0 +1,53 @@
+From a8ef7eec0c323a8752ad5babde6e4add4f224898 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 24 Jan 2023 21:39:43 +0100
+Subject: [PATCH 382/547] Fortran: ICE in transformational_result [PR108529]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108529
+	* simplify.cc (simplify_transformation): Do not try to simplify
+	transformational intrinsic when the ARRAY argument has a NULL shape.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108529
+	* gfortran.dg/pr108529.f90: New test.
+
+(cherry picked from commit 6c96382eed96a9285611f2e3e2e59557094172b8)
+---
+ gcc/fortran/simplify.cc                | 1 +
+ gcc/testsuite/gfortran.dg/pr108529.f90 | 9 +++++++++
+ 2 files changed, 10 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108529.f90
+
+diff --git a/gcc/fortran/simplify.cc b/gcc/fortran/simplify.cc
+index d48ae1af584..0300586fd28 100644
+--- a/gcc/fortran/simplify.cc
++++ b/gcc/fortran/simplify.cc
+@@ -708,6 +708,7 @@ simplify_transformation (gfc_expr *array, gfc_expr *dim, gfc_expr *mask,
+   size_zero = gfc_is_size_zero_array (array);
+ 
+   if (!(is_constant_array_expr (array) || size_zero)
++      || array->shape == NULL
+       || !gfc_is_constant_expr (dim))
+     return NULL;
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr108529.f90 b/gcc/testsuite/gfortran.dg/pr108529.f90
+new file mode 100644
+index 00000000000..34c9691fae1
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108529.f90
+@@ -0,0 +1,9 @@
++! { dg-do compile }
++! PR fortran/108529 - ICE in transformational_result
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a(*,*) = reshape([1, 2, 3, 4], [2, 2])
++  logical, parameter :: b(2,*) = a > 2     ! { dg-error "Assumed size" }
++  logical, parameter :: c(*)   = all(b, 1) ! { dg-error "Bad shape" }
++end
+-- 
+2.25.1
+

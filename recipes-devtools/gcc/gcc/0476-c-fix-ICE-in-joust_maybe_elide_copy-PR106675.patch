@@ -1,0 +1,82 @@
+From 1721d85708116a1edbe5ba30f055d47e6c1e29b6 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Fri, 10 Feb 2023 17:26:57 -0500
+Subject: [PATCH 476/547] c++: fix ICE in joust_maybe_elide_copy [PR106675]
+
+joust_maybe_elide_copy checks that the last conversion in the ICS for
+the first argument is ck_ref_bind, which is reasonable, because we've
+checked that we're dealing with a copy/move constructor.  But it can
+also happen that we couldn't figure out which conversion function is
+better to convert the argument, as in this testcase: joust couldn't
+decide if we should go with
+
+  operator foo &()
+
+or
+
+  operator foo const &()
+
+so we get a ck_ambig, which then upsets joust_maybe_elide_copy.  Since
+a ck_ambig can validly occur, I think we should just return early, as
+in the patch below.
+
+	PR c++/106675
+
+gcc/cp/ChangeLog:
+
+	* call.cc (joust_maybe_elide_copy): Return false for ck_ambig.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/overload-conv-5.C: New test.
+
+(cherry picked from commit cce62625025380c2ea2a220deb10f8f355f83abf)
+---
+ gcc/cp/call.cc                               |  2 ++
+ gcc/testsuite/g++.dg/cpp0x/overload-conv-5.C | 21 ++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/overload-conv-5.C
+
+diff --git a/gcc/cp/call.cc b/gcc/cp/call.cc
+index ae9a029ee56..64677315e02 100644
+--- a/gcc/cp/call.cc
++++ b/gcc/cp/call.cc
+@@ -11966,6 +11966,8 @@ joust_maybe_elide_copy (z_candidate *&cand)
+   if (!DECL_COPY_CONSTRUCTOR_P (fn) && !DECL_MOVE_CONSTRUCTOR_P (fn))
+     return false;
+   conversion *conv = cand->convs[0];
++  if (conv->kind == ck_ambig)
++    return false;
+   gcc_checking_assert (conv->kind == ck_ref_bind);
+   conv = next_conversion (conv);
+   if (conv->kind == ck_user && !TYPE_REF_P (conv->type))
+diff --git a/gcc/testsuite/g++.dg/cpp0x/overload-conv-5.C b/gcc/testsuite/g++.dg/cpp0x/overload-conv-5.C
+new file mode 100644
+index 00000000000..b1e7766e42b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/overload-conv-5.C
+@@ -0,0 +1,21 @@
++// PR c++/106675
++// { dg-do compile { target c++11 } }
++
++struct foo {
++    int n_;
++    foo(int n) : n_(n) {}
++};
++
++struct bar {
++    int n_;
++
++    operator foo() const {
++        return foo(n_);
++    }
++    operator foo &() { return *reinterpret_cast<foo *>(n_); }
++    operator foo const &() = delete;
++
++    void crashgcc() {
++        foo tmp(*this); // { dg-error "ambiguous" }
++    }
++};
+-- 
+2.25.1
+

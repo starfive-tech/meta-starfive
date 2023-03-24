@@ -1,0 +1,49 @@
+From 691012693aaa831e4cd1ab5180195792e32baceb Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 22 Nov 2022 09:53:36 +0000
+Subject: [PATCH 228/547] libstdc++: Fix pool resource build errors for H8
+ [PR107801]
+
+The array of pool sizes was previously adjusted to work for msp430-elf
+which has 16-bit int and either 16-bit size_t or 20-bit size_t. The
+largest pool sizes were disabled unless size_t has more than 20 bits.
+
+The H8 family has 16-bit int but 32-bit size_t, which means that the
+largest sizes are enabled, but 1<<15 produces a negative number that
+then cannot be narrowed to size_t.
+
+Replace the test for 32-bit size_t with a test for 32-bit int, which
+means we won't use the 4kiB to 4MiB pools for targets with 16-bit int
+even if they have a wider size_t.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/107801
+	* src/c++17/memory_resource.cc (pool_sizes): Disable large pools
+	for targets with 16-bit int.
+
+(cherry picked from commit 0f9659e770304d3c44cfa0e793833a461bc487aa)
+---
+ libstdc++-v3/src/c++17/memory_resource.cc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/src/c++17/memory_resource.cc b/libstdc++-v3/src/c++17/memory_resource.cc
+index bb6334c9694..d6555aa8823 100644
+--- a/libstdc++-v3/src/c++17/memory_resource.cc
++++ b/libstdc++-v3/src/c++17/memory_resource.cc
+@@ -874,9 +874,11 @@ namespace pmr
+       256, 320, 384, 448,
+       512, 768,
+ #if __SIZE_WIDTH__ > 16
++      // Use bigger pools if size_t has at least 20 bits.
+       1024, 1536,
+       2048, 3072,
+-#if __SIZE_WIDTH__ > 20
++#if __INT_WIDTH__ >= 32
++      // Use even bigger pools if int has at least 32 bits.
+       1<<12, 1<<13, 1<<14,
+       1<<15, 1<<16, 1<<17,
+       1<<20, 1<<21, 1<<22 // 4MB should be enough for anybody
+-- 
+2.25.1
+

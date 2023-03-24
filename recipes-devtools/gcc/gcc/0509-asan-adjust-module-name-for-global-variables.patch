@@ -1,0 +1,67 @@
+From b8e496d132ec087c9db5951fea23551dcc831d8c Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Fri, 17 Feb 2023 15:11:02 +0100
+Subject: [PATCH 509/547] asan: adjust module name for global variables
+
+As mentioned in the PR, when we use LTO, we wrongly use ltrans output
+file name as a module name of a global variable. That leads to a
+non-reproducible output.
+
+After the suggested change, we emit context name of normal global
+variables. And for artificial variables (like .Lubsan_data3), we use
+aux_base_name (e.g. "./a.ltrans0.ltrans").
+
+	PR sanitizer/108834
+
+gcc/ChangeLog:
+
+	* asan.cc (asan_add_global): Use proper TU name for normal
+	global variables (and aux_base_name for the artificial one).
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/asan/global-overflow-1.c: Test line and column
+	info for a global variable.
+
+(cherry picked from commit 94c9b1bb79f63d000ebb05efc155c149325e332d)
+---
+ gcc/asan.cc                                         | 12 +++++++++++-
+ gcc/testsuite/c-c++-common/asan/global-overflow-1.c |  2 +-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/asan.cc b/gcc/asan.cc
+index f0dca99507d..20e5ef9d378 100644
+--- a/gcc/asan.cc
++++ b/gcc/asan.cc
+@@ -3246,7 +3246,17 @@ asan_add_global (tree decl, tree type, vec<constructor_elt, va_gc> *v)
+     pp_string (&asan_pp, "<unknown>");
+   str_cst = asan_pp_string (&asan_pp);
+ 
+-  pp_string (&module_name_pp, main_input_filename);
++  if (!in_lto_p)
++    pp_string (&module_name_pp, main_input_filename);
++  else
++    {
++      const_tree tu = get_ultimate_context ((const_tree)decl);
++      if (tu != NULL_TREE)
++	pp_string (&module_name_pp, IDENTIFIER_POINTER (DECL_NAME (tu)));
++      else
++	pp_string (&module_name_pp, aux_base_name);
++    }
++
+   module_name_cst = asan_pp_string (&module_name_pp);
+ 
+   if (asan_needs_local_alias (decl))
+diff --git a/gcc/testsuite/c-c++-common/asan/global-overflow-1.c b/gcc/testsuite/c-c++-common/asan/global-overflow-1.c
+index ec412231be0..ad5dbfc649d 100644
+--- a/gcc/testsuite/c-c++-common/asan/global-overflow-1.c
++++ b/gcc/testsuite/c-c++-common/asan/global-overflow-1.c
+@@ -26,4 +26,4 @@ int main() {
+ /* { dg-output "READ of size 1 at 0x\[0-9a-f\]+ thread T0.*(\n|\r\n|\r)" } */
+ /* { dg-output "    #0 0x\[0-9a-f\]+ +(in _*main (\[^\n\r]*global-overflow-1.c:20|\[^\n\r]*:0|\[^\n\r]*\\+0x\[0-9a-z\]*)|\[(\])\[^\n\r]*(\n|\r\n|\r).*" } */
+ /* { dg-output "0x\[0-9a-f\]+ is located 0 bytes to the right of global variable" } */
+-/* { dg-output ".*YYY\[^\n\r]* of size 10\[^\n\r]*(\n|\r\n|\r)" } */
++/* { dg-output ".*YYY\[^\n\r]*asan/global-overflow-1.c:15:15'\[^\n\r]*of size 10\[^\n\r]*(\n|\r\n|\r)" } */
+-- 
+2.25.1
+

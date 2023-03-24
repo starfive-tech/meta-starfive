@@ -1,0 +1,47 @@
+From 72717ec3ab66ba04e16ea84bd092f987a415672e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Torbj=C3=B6rn=20SVENSSON?= <torbjorn.svensson@foss.st.com>
+Date: Tue, 25 Oct 2022 11:45:40 +0200
+Subject: [PATCH 173/547] IRA: Make sure array is big enough
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+In commit 081c96621da, the call to resize_reg_info() was moved before
+the call to remove_scratches() and the latter one can increase the
+number of regs and that would cause an out of bounds usage on the
+reg_renumber global array.
+
+Without this patch, the following testcase randomly fails with:
+during RTL pass: ira
+In file included from /src/gcc/testsuite/gcc.dg/compat/struct-by-value-5b_y.c:13:
+/src/gcc/testsuite/gcc.dg/compat/struct-by-value-5b_y.c: In function 'checkgSf13':
+/src/gcc/testsuite/gcc.dg/compat/fp-struct-test-by-value-y.h:28:1: internal compiler error: Segmentation fault
+/src/gcc/testsuite/gcc.dg/compat/struct-by-value-5b_y.c:22:1: note: in expansion of macro 'TEST'
+
+gcc/ChangeLog:
+
+	* ira.cc: Resize array after reg number increased.
+
+Co-Authored-By: Yvan ROUX <yvan.roux@foss.st.com>
+Signed-off-by: Torbjörn SVENSSON <torbjorn.svensson@foss.st.com>
+
+(cherry picked from commit 4e1d704243a4f3c4ded47cd0d02427bb7efef069)
+---
+ gcc/ira.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/ira.cc b/gcc/ira.cc
+index e3b3c549120..a287026a275 100644
+--- a/gcc/ira.cc
++++ b/gcc/ira.cc
+@@ -5718,6 +5718,7 @@ ira (FILE *f)
+     regstat_free_ri ();
+     regstat_init_n_sets_and_refs ();
+     regstat_compute_ri ();
++    resize_reg_info ();
+   };
+ 
+   int max_regno_before_rm = max_reg_num ();
+-- 
+2.25.1
+

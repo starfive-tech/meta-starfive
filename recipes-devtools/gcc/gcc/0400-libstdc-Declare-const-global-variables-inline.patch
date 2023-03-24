@@ -1,0 +1,207 @@
+From 953c3c68f8940d03bfded87dc79635451e1892b0 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Sun, 6 Nov 2022 11:30:47 -0500
+Subject: [PATCH 400/547] libstdc++: Declare const global variables inline
+
+The changes inside the regex_constants and execution namespaces seem to
+be (the only) unimplemented parts of P0607R0 "Inline Variable for the
+Standard Library"; the rest of the changes are to implementation details.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/atomic_wait.h (_detail::__platform_wait_alignment):
+	Declare inline.  Remove redundant static specifier.
+	(__detail::__atomic_spin_count_relax): Declare inline.
+	(__detail::__atomic_spin_count): Likewise.
+	* include/bits/regex_automaton.h (__detail::_S_invalid_state_id):
+	Declare inline for C++17.  Declare constexpr.  Remove
+	redundant const and static specifiers.
+	* include/bits/regex_error.h (regex_constants::error_collate):
+	Declare inline for C++17 as per P0607R0.
+	(regex_constants::error_ctype): Likewise.
+	(regex_constants::error_escape): Likewise.
+	(regex_constants::error_backref): Likewise.
+	(regex_constants::error_brack): Likewise.
+	(regex_constants::error_paren): Likewise.
+	(regex_constants::error_brace): Likewise.
+	(regex_constants::error_badbrace): Likewise.
+	(regex_constants::error_range): Likewise.
+	(regex_constants::error_space): Likewise.
+	(regex_constants::error_badrepeat): Likewise.
+	(regex_constants::error_complexity): Likewise.
+	(regex_constants::error_stack): Likewise.
+	* include/ext/concurrence.h (__gnu_cxx::__default_lock_policy):
+	Likewise.  Remove redundant static specifier.
+	* include/pstl/execution_defs.h (execution::seq): Declare inline
+	for C++17 as per P0607R0.
+	(execution::par): Likewise.
+	(execution::par_unseq): Likewise.
+	(execution::unseq): Likewise.
+
+(cherry picked from commit e3b10249119fb4258fb83d21d805a04f30b63152)
+---
+ libstdc++-v3/include/bits/atomic_wait.h     |  8 +++----
+ libstdc++-v3/include/bits/regex_automaton.h |  2 +-
+ libstdc++-v3/include/bits/regex_error.h     | 26 ++++++++++-----------
+ libstdc++-v3/include/ext/concurrence.h      |  2 +-
+ libstdc++-v3/include/pstl/execution_defs.h  |  8 +++----
+ 5 files changed, 23 insertions(+), 23 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/atomic_wait.h b/libstdc++-v3/include/bits/atomic_wait.h
+index 76ed7409937..bd1ed56d157 100644
+--- a/libstdc++-v3/include/bits/atomic_wait.h
++++ b/libstdc++-v3/include/bits/atomic_wait.h
+@@ -58,14 +58,14 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ #ifdef _GLIBCXX_HAVE_LINUX_FUTEX
+ #define _GLIBCXX_HAVE_PLATFORM_WAIT 1
+     using __platform_wait_t = int;
+-    static constexpr size_t __platform_wait_alignment = 4;
++    inline constexpr size_t __platform_wait_alignment = 4;
+ #else
+ // define _GLIBCX_HAVE_PLATFORM_WAIT and implement __platform_wait()
+ // and __platform_notify() if there is a more efficient primitive supported
+ // by the platform (e.g. __ulock_wait()/__ulock_wake()) which is better than
+ // a mutex/condvar based wait.
+     using __platform_wait_t = uint64_t;
+-    static constexpr size_t __platform_wait_alignment
++    inline constexpr size_t __platform_wait_alignment
+       = __alignof__(__platform_wait_t);
+ #endif
+   } // namespace __detail
+@@ -142,8 +142,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ #endif
+     }
+ 
+-    constexpr auto __atomic_spin_count_relax = 12;
+-    constexpr auto __atomic_spin_count = 16;
++    inline constexpr auto __atomic_spin_count_relax = 12;
++    inline constexpr auto __atomic_spin_count = 16;
+ 
+     struct __default_spin_policy
+     {
+diff --git a/libstdc++-v3/include/bits/regex_automaton.h b/libstdc++-v3/include/bits/regex_automaton.h
+index f95eb7dad6d..44bde42e212 100644
+--- a/libstdc++-v3/include/bits/regex_automaton.h
++++ b/libstdc++-v3/include/bits/regex_automaton.h
+@@ -46,7 +46,7 @@ namespace __detail
+    */
+ 
+   typedef long _StateIdT;
+-  static const _StateIdT _S_invalid_state_id  = -1;
++  _GLIBCXX17_INLINE constexpr _StateIdT _S_invalid_state_id  = -1;
+ 
+   template<typename _CharT>
+     using _Matcher = std::function<bool (_CharT)>;
+diff --git a/libstdc++-v3/include/bits/regex_error.h b/libstdc++-v3/include/bits/regex_error.h
+index 77d4925921b..f0be8d8302c 100644
+--- a/libstdc++-v3/include/bits/regex_error.h
++++ b/libstdc++-v3/include/bits/regex_error.h
+@@ -66,60 +66,60 @@ namespace regex_constants
+     };
+ 
+   /** The expression contained an invalid collating element name. */
+-  constexpr error_type error_collate(_S_error_collate);
++  _GLIBCXX17_INLINE constexpr error_type error_collate(_S_error_collate);
+ 
+   /** The expression contained an invalid character class name. */
+-  constexpr error_type error_ctype(_S_error_ctype);
++  _GLIBCXX17_INLINE constexpr error_type error_ctype(_S_error_ctype);
+ 
+   /**
+    * The expression contained an invalid escaped character, or a trailing
+    * escape.
+    */
+-  constexpr error_type error_escape(_S_error_escape);
++  _GLIBCXX17_INLINE constexpr error_type error_escape(_S_error_escape);
+ 
+   /** The expression contained an invalid back reference. */
+-  constexpr error_type error_backref(_S_error_backref);
++  _GLIBCXX17_INLINE constexpr error_type error_backref(_S_error_backref);
+ 
+   /** The expression contained mismatched [ and ]. */
+-  constexpr error_type error_brack(_S_error_brack);
++  _GLIBCXX17_INLINE constexpr error_type error_brack(_S_error_brack);
+ 
+   /** The expression contained mismatched ( and ). */
+-  constexpr error_type error_paren(_S_error_paren);
++  _GLIBCXX17_INLINE constexpr error_type error_paren(_S_error_paren);
+ 
+   /** The expression contained mismatched { and } */
+-  constexpr error_type error_brace(_S_error_brace);
++  _GLIBCXX17_INLINE constexpr error_type error_brace(_S_error_brace);
+ 
+   /** The expression contained an invalid range in a {} expression. */
+-  constexpr error_type error_badbrace(_S_error_badbrace);
++  _GLIBCXX17_INLINE constexpr error_type error_badbrace(_S_error_badbrace);
+ 
+   /**
+    * The expression contained an invalid character range,
+    * such as [b-a] in most encodings.
+    */
+-  constexpr error_type error_range(_S_error_range);
++  _GLIBCXX17_INLINE constexpr error_type error_range(_S_error_range);
+ 
+   /**
+    * There was insufficient memory to convert the expression into a
+    * finite state machine.
+    */
+-  constexpr error_type error_space(_S_error_space);
++  _GLIBCXX17_INLINE constexpr error_type error_space(_S_error_space);
+ 
+   /**
+    * One of <em>*?+{</em> was not preceded by a valid regular expression.
+    */
+-  constexpr error_type error_badrepeat(_S_error_badrepeat);
++  _GLIBCXX17_INLINE constexpr error_type error_badrepeat(_S_error_badrepeat);
+ 
+   /**
+    * The complexity of an attempted match against a regular expression
+    * exceeded a pre-set level.
+    */
+-  constexpr error_type error_complexity(_S_error_complexity);
++  _GLIBCXX17_INLINE constexpr error_type error_complexity(_S_error_complexity);
+ 
+   /**
+    * There was insufficient memory to determine whether the
+    * regular expression could match the specified character sequence.
+    */
+-  constexpr error_type error_stack(_S_error_stack);
++  _GLIBCXX17_INLINE constexpr error_type error_stack(_S_error_stack);
+ 
+   ///@}
+ } // namespace regex_constants
+diff --git a/libstdc++-v3/include/ext/concurrence.h b/libstdc++-v3/include/ext/concurrence.h
+index aea861b534f..7fd81490eff 100644
+--- a/libstdc++-v3/include/ext/concurrence.h
++++ b/libstdc++-v3/include/ext/concurrence.h
+@@ -50,7 +50,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+   // Compile time constant that indicates prefered locking policy in
+   // the current configuration.
+-  static const _Lock_policy __default_lock_policy = 
++  _GLIBCXX17_INLINE const _Lock_policy __default_lock_policy =
+ #ifndef __GTHREADS
+   _S_single;
+ #elif defined _GLIBCXX_HAVE_ATOMIC_LOCK_POLICY
+diff --git a/libstdc++-v3/include/pstl/execution_defs.h b/libstdc++-v3/include/pstl/execution_defs.h
+index 13b002931e8..3eca558dac2 100644
+--- a/libstdc++-v3/include/pstl/execution_defs.h
++++ b/libstdc++-v3/include/pstl/execution_defs.h
+@@ -107,10 +107,10 @@ class unsequenced_policy
+ };
+ 
+ // 2.8, Execution policy objects
+-constexpr sequenced_policy seq{};
+-constexpr parallel_policy par{};
+-constexpr parallel_unsequenced_policy par_unseq{};
+-constexpr unsequenced_policy unseq{};
++_GLIBCXX17_INLINE constexpr sequenced_policy seq{};
++_GLIBCXX17_INLINE constexpr parallel_policy par{};
++_GLIBCXX17_INLINE constexpr parallel_unsequenced_policy par_unseq{};
++_GLIBCXX17_INLINE constexpr unsequenced_policy unseq{};
+ 
+ // 2.3, Execution policy type trait
+ template <class _Tp>
+-- 
+2.25.1
+

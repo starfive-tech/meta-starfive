@@ -1,0 +1,89 @@
+From d282dd56275485a88e1fe9c4ae1939b62d23b20b Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 13 Oct 2022 14:24:05 +0200
+Subject: [PATCH 141/547] tree-optimization/107160 - avoid reusing multiple
+ accumulators
+
+Epilogue vectorization is not set up to re-use a vectorized
+accumulator consisting of more than one vector.  For non-SLP
+we always reduce to a single but for SLP that isn't happening.
+In such case we currenlty miscompile the epilog so avoid this.
+
+	PR tree-optimization/107160
+	* tree-vect-loop.cc (vect_create_epilog_for_reduction):
+	Do not register accumulator if we failed to reduce it
+	to a single vector.
+
+	* gcc.dg/vect/pr107160.c: New testcase.
+
+(cherry picked from commit 5cbaf84c191b9a3e3cb26545c808d208bdbf2ab5)
+---
+ gcc/testsuite/gcc.dg/vect/pr107160.c | 41 ++++++++++++++++++++++++++++
+ gcc/tree-vect-loop.cc                |  3 +-
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/pr107160.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/pr107160.c b/gcc/testsuite/gcc.dg/vect/pr107160.c
+new file mode 100644
+index 00000000000..4f9f853cafb
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/pr107160.c
+@@ -0,0 +1,41 @@
++/* { dg-do run } */
++
++#include <math.h>
++
++#define N 128
++float fl[N];
++
++__attribute__ ((noipa)) void
++init ()
++{
++  for (int i = 0; i < N; i++)
++    fl[i] = i;
++}
++
++__attribute__ ((noipa)) float
++foo (int n1)
++{
++  float sum0, sum1, sum2, sum3;
++  sum0 = sum1 = sum2 = sum3 = 0.0f;
++
++  int n = (n1 / 4) * 4;
++  for (int i = 0; i < n; i += 4)
++    {
++      sum0 += fabs (fl[i]);
++      sum1 += fabs (fl[i + 1]);
++      sum2 += fabs (fl[i + 2]);
++      sum3 += fabs (fl[i + 3]);
++    }
++
++  return sum0 + sum1 + sum2 + sum3;
++}
++
++int
++main ()
++{
++  init ();
++  float res = foo (80);
++  if (res != 3160)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-loop.cc b/gcc/tree-vect-loop.cc
+index d1c19ce23fa..442679836ee 100644
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -6083,7 +6083,8 @@ vect_create_epilog_for_reduction (loop_vec_info loop_vinfo,
+     }
+ 
+   /* Record this operation if it could be reused by the epilogue loop.  */
+-  if (STMT_VINFO_REDUC_TYPE (reduc_info) == TREE_CODE_REDUCTION)
++  if (STMT_VINFO_REDUC_TYPE (reduc_info) == TREE_CODE_REDUCTION
++      && vec_num == 1)
+     loop_vinfo->reusable_accumulators.put (scalar_results[0],
+ 					   { orig_reduc_input, reduc_info });
+ 
+-- 
+2.25.1
+

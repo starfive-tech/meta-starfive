@@ -1,0 +1,61 @@
+From 4c6475148ac5d53449948665d7d94cfee5b549ac Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Mon, 23 Jan 2023 22:13:44 +0100
+Subject: [PATCH 377/547] Fortran: fix NULL pointer dereference in
+ gfc_check_dependency [PR108502]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108502
+	* dependency.cc (gfc_check_dependency): Prevent NULL pointer
+	dereference while recursively checking expressions.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108502
+	* gfortran.dg/pr108502.f90: New test.
+
+(cherry picked from commit 51767f31878a95161142254dca7119b409699670)
+---
+ gcc/fortran/dependency.cc              |  5 +++++
+ gcc/testsuite/gfortran.dg/pr108502.f90 | 12 ++++++++++++
+ 2 files changed, 17 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108502.f90
+
+diff --git a/gcc/fortran/dependency.cc b/gcc/fortran/dependency.cc
+index ab3bd36f74e..3aa696cefe6 100644
+--- a/gcc/fortran/dependency.cc
++++ b/gcc/fortran/dependency.cc
+@@ -1292,6 +1292,11 @@ gfc_check_dependency (gfc_expr *expr1, gfc_expr *expr2, bool identical)
+   if (expr1->expr_type != EXPR_VARIABLE)
+     gfc_internal_error ("gfc_check_dependency: expecting an EXPR_VARIABLE");
+ 
++  /* Prevent NULL pointer dereference while recursively analyzing invalid
++     expressions.  */
++  if (expr2 == NULL)
++    return 0;
++
+   switch (expr2->expr_type)
+     {
+     case EXPR_OP:
+diff --git a/gcc/testsuite/gfortran.dg/pr108502.f90 b/gcc/testsuite/gfortran.dg/pr108502.f90
+new file mode 100644
+index 00000000000..45f73849c57
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108502.f90
+@@ -0,0 +1,12 @@
++! { dg-do compile }
++! { dg-options "-O2 -ffrontend-optimize" }
++! PR fortran/108502 - ICE in gfc_check_dependency
++! Contributed by G.Steinmetz
++
++integer function n()
++  integer :: a(1)
++  a = [1] / 0
++end
++program p
++  integer :: b = n() ! { dg-error "must be an intrinsic function" }
++end
+-- 
+2.25.1
+

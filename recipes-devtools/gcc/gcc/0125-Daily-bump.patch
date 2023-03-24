@@ -1,0 +1,132 @@
+From 3cea0a0e39eebaf8cb9590785a2ce53cbd69e415 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 12 Oct 2022 00:20:45 +0000
+Subject: [PATCH 125/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 63 +++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 32 +++++++++++++++++++++
+ 3 files changed, 96 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d2b7bc15911..3c485b12735 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,66 @@
++2022-10-11  Christophe Lyon  <christophe.lyon@arm.com>
++
++	* config/arm/mve.md (mve_vqshluq_n_s<mode>): Use
++	MVE_pred/MVE_constraint instead of mve_imm_7/Ra.
++	(mve_vqshluq_m_n_s<mode>): Likewise.
++	(mve_vqrshrnbq_n_<supf><mode>): Use MVE_pred3/MVE_constraint3
++	instead of mve_imm_8/Rb.
++	(mve_vqrshrunbq_n_s<mode>): Likewise.
++	(mve_vqrshrntq_n_<supf><mode>): Likewise.
++	(mve_vqrshruntq_n_s<mode>): Likewise.
++	(mve_vrshrnbq_n_<supf><mode>): Likewise.
++	(mve_vrshrntq_n_<supf><mode>): Likewise.
++	(mve_vqrshrnbq_m_n_<supf><mode>): Likewise.
++	(mve_vqrshrntq_m_n_<supf><mode>): Likewise.
++	(mve_vrshrnbq_m_n_<supf><mode>): Likewise.
++	(mve_vrshrntq_m_n_<supf><mode>): Likewise.
++	(mve_vqrshrunbq_m_n_s<mode>): Likewise.
++	(mve_vsriq_n_<supf><mode): Use MVE_pred2/MVE_constraint2 instead
++	of mve_imm_selective_upto_8/Rg.
++	(mve_vsriq_m_n_<supf><mode>): Likewise.
++	(cherry-picked from c3fb6658c7670e446f2fd00984404d971e416b3c)
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106934
++	* tree-ssa.cc (non_rewritable_mem_ref_base): Avoid BIT_FIELD_REFs
++	of bitfields.
++	(maybe_rewrite_mem_ref_base): Likewise.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* tree-ssa-pre.cc (translate_vuse_through_block): Only
++	keep the VUSE if its def dominates PHIBLOCK.
++	(prune_clobbered_mems): Rewrite logic so we check whether
++	a value dies in a block when the VUSE def doesn't dominate it.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106892
++	* tree-predcom.cc (ref_at_iteration): Do not associate the
++	constant part of the offset into the MEM_REF offset
++	operand, across a non-zero offset.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-08-22  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/105937
++	* tree-ssa-uninit.cc (find_uninit_use): Do not queue PHIs
++	on backedges.
++	(execute_late_warn_uninitialized): Mark backedges.
++
+ 2022-10-03  Sergei Trofimovich  <siarheit@google.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index ee52440e2ce..6f50c16be9c 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221011
++20221012
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 8a09e5ccbde..7e16d300759 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,35 @@
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106934
++	* gfortran.dg/pr106934.f90: New testcase.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* g++.dg/tree-ssa/pr106922.C: New testcase.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106892
++	* gcc.dg/torture/pr106892.c: New testcase.
++
++2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-08-22  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/105937
++	* g++.dg/uninit-pr105937.C: New testcase.
++
+ 2022-10-08  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

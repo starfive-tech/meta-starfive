@@ -1,0 +1,19 @@
+From f23ad9cca48a156cd53c3c4f2e44d2a8ba53cbdb Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 14 Jan 2023 00:20:27 +0000
+Subject: [PATCH 346/547] Daily bump.
+
+---
+ gcc/DATESTAMP | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e47d85a2bca..7ed2c4ba61e 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230113
++20230114
+-- 
+2.25.1
+

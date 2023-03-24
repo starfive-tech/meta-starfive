@@ -1,0 +1,41 @@
+From 9ed2a8784bc2c8e88a3c7f5e76b3f2e74dd54f97 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 19 Feb 2023 00:20:53 +0000
+Subject: [PATCH 490/547] Daily bump.
+
+---
+ gcc/ChangeLog | 13 +++++++++++++
+ gcc/DATESTAMP |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a52cdf67f19..569b0a7406b 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,16 @@
++2023-02-18  Xi Ruoyao  <xry111@xry111.site>
++
++	Backported from master:
++	2023-02-18  Xi Ruoyao  <xry111@xry111.site>
++
++	* config.gcc (triplet_abi): Set its value based on $with_abi,
++	instead of $target.
++	(la_canonical_triplet): Set it after $triplet_abi is set
++	correctly.
++	* config/loongarch/t-linux (MULTILIB_OSDIRNAMES): Make the
++	multiarch tuple for lp64d "loongarch64-linux-gnu" (without
++	"f64" suffix).
++
+ 2023-02-15  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR target/90458
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index ac1301f036f..03e603a86b9 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230218
++20230219
+-- 
+2.25.1
+

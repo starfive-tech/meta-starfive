@@ -1,0 +1,71 @@
+From 2773a90c0f4f323e8ace0593893bc8fcbd2266cf Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 27 Sep 2022 20:54:28 +0200
+Subject: [PATCH 100/547] Fortran: error recovery while simplifying intrinsic
+ UNPACK [PR107054]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/107054
+	* simplify.cc (gfc_simplify_unpack): Replace assert by condition
+	that terminates simplification when there are not enough elements
+	in the constructor of argument VECTOR.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/107054
+	* gfortran.dg/pr107054.f90: New test.
+
+(cherry picked from commit 78bc6497fc61bbdacfb416ee0246a775360d9af6)
+---
+ gcc/fortran/simplify.cc                | 13 ++++++++++---
+ gcc/testsuite/gfortran.dg/pr107054.f90 | 13 +++++++++++++
+ 2 files changed, 23 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr107054.f90
+
+diff --git a/gcc/fortran/simplify.cc b/gcc/fortran/simplify.cc
+index a6a3e94fbd9..d48ae1af584 100644
+--- a/gcc/fortran/simplify.cc
++++ b/gcc/fortran/simplify.cc
+@@ -8420,9 +8420,16 @@ gfc_simplify_unpack (gfc_expr *vector, gfc_expr *mask, gfc_expr *field)
+     {
+       if (mask_ctor->expr->value.logical)
+ 	{
+-	  gcc_assert (vector_ctor);
+-	  e = gfc_copy_expr (vector_ctor->expr);
+-	  vector_ctor = gfc_constructor_next (vector_ctor);
++	  if (vector_ctor)
++	    {
++	      e = gfc_copy_expr (vector_ctor->expr);
++	      vector_ctor = gfc_constructor_next (vector_ctor);
++	    }
++	  else
++	    {
++	      gfc_free_expr (result);
++	      return NULL;
++	    }
+ 	}
+       else if (field->expr_type == EXPR_ARRAY)
+ 	e = gfc_copy_expr (field_ctor->expr);
+diff --git a/gcc/testsuite/gfortran.dg/pr107054.f90 b/gcc/testsuite/gfortran.dg/pr107054.f90
+new file mode 100644
+index 00000000000..bbfe646beba
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr107054.f90
+@@ -0,0 +1,13 @@
++! { dg-do compile }
++! PR fortran/107054 - ICE in gfc_simplify_unpack
++! Contributed by G.Steinmetz
++
++program p
++  type t
++     integer :: n = 0
++  end type
++  type(t), parameter :: a(4) = t(2)
++  type(t), parameter :: b(4) = reshape(a,[2]) ! { dg-error "Different shape" }
++  type(t), parameter :: c(2) = pack(b,[.false.,.true.,.false.,.true.]) ! { dg-error "Different shape" }
++  type(t), parameter :: d(4) = unpack(c,[.false.,.true.,.false.,.true.],a)
++end
+-- 
+2.25.1
+

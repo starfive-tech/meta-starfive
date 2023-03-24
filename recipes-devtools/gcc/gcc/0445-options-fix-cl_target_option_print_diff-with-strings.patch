@@ -1,0 +1,37 @@
+From db09666c7a014a86693bebcf4e8487f40937f999 Mon Sep 17 00:00:00 2001
+From: Eric Biggers <ebiggers@google.com>
+Date: Tue, 24 Jan 2023 11:54:41 +0100
+Subject: [PATCH 445/547] options: fix cl_target_option_print_diff() with
+ strings
+
+Fix an obvious copy-and-paste error where ptr1 was used instead of ptr2.
+This bug caused the dump file produced by -fdump-ipa-inline-details to
+not correctly show the difference in target options when a function
+could not be inlined due to a target option mismatch.
+
+gcc/ChangeLog:
+	PR bootstrap/90543
+	* optc-save-gen.awk: Fix copy-and-paste error.
+
+Signed-off-by: Eric Biggers <ebiggers@google.com>
+(cherry picked from commit 9f0cb3368af735e95776769c4f28fa9cbb60eaf8)
+---
+ gcc/optc-save-gen.awk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/optc-save-gen.awk b/gcc/optc-save-gen.awk
+index 9911bab6668..76e9b3cb940 100644
+--- a/gcc/optc-save-gen.awk
++++ b/gcc/optc-save-gen.awk
+@@ -1013,7 +1013,7 @@ for (i = 0; i < n_target_string; i++) {
+ 	print "             indent, \"\",";
+ 	print "             \"" name "\",";
+ 	print "             ptr1->x_" name " ? ptr1->x_" name " : \"(null)\",";
+-	print "             ptr2->x_" name " ? ptr1->x_" name " : \"(null)\");";
++	print "             ptr2->x_" name " ? ptr2->x_" name " : \"(null)\");";
+ 	print "";
+ }
+ 
+-- 
+2.25.1
+

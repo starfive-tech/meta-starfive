@@ -1,0 +1,68 @@
+From e927d1cf141f221c5a32574bde0913307e140984 Mon Sep 17 00:00:00 2001
+From: Tamar Christina <tamar.christina@arm.com>
+Date: Fri, 12 Aug 2022 12:28:41 +0100
+Subject: [PATCH 030/547] sve: Fix fcmuo combine patterns [PR106524]
+
+There's no encoding for fcmuo with zero.  This restricts the combine patterns
+from accepting zero registers.
+
+gcc/ChangeLog:
+
+	PR target/106524
+	* config/aarch64/aarch64-sve.md (*fcmuo<mode>_nor_combine,
+	*fcmuo<mode>_bic_combine): Don't accept comparisons against zero.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/106524
+	* gcc.target/aarch64/sve/pr106524.c: New test.
+
+(cherry picked from commit f4ff20d464f90c85919ce2e7fa63e204dcda4e40)
+---
+ gcc/config/aarch64/aarch64-sve.md               |  4 ++--
+ gcc/testsuite/gcc.target/aarch64/sve/pr106524.c | 11 +++++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/pr106524.c
+
+diff --git a/gcc/config/aarch64/aarch64-sve.md b/gcc/config/aarch64/aarch64-sve.md
+index bd60e65b0c3..e08bee197d8 100644
+--- a/gcc/config/aarch64/aarch64-sve.md
++++ b/gcc/config/aarch64/aarch64-sve.md
+@@ -8231,7 +8231,7 @@
+ 	        [(match_operand:<VPRED> 1)
+ 	         (const_int SVE_KNOWN_PTRUE)
+ 	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+-	         (match_operand:SVE_FULL_F 3 "aarch64_simd_reg_or_zero" "wDz")]
++	         (match_operand:SVE_FULL_F 3 "register_operand" "w")]
+ 	        UNSPEC_COND_FCMUO))
+ 	    (match_operand:<VPRED> 4 "register_operand" "Upa"))
+ 	  (match_dup:<VPRED> 1)))
+@@ -8267,7 +8267,7 @@
+ 	        [(match_operand:<VPRED> 1)
+ 	         (const_int SVE_KNOWN_PTRUE)
+ 	         (match_operand:SVE_FULL_F 2 "register_operand" "w")
+-	         (match_operand:SVE_FULL_F 3 "aarch64_simd_reg_or_zero" "wDz")]
++	         (match_operand:SVE_FULL_F 3 "register_operand" "w")]
+ 	        UNSPEC_COND_FCMUO))
+ 	    (not:<VPRED>
+ 	      (match_operand:<VPRED> 4 "register_operand" "Upa")))
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/pr106524.c b/gcc/testsuite/gcc.target/aarch64/sve/pr106524.c
+new file mode 100644
+index 00000000000..a9f650f971a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/pr106524.c
+@@ -0,0 +1,11 @@
++/* { dg-do compile } */
++/* { dg-options "-march=armv8-a+sve -O2 -fno-move-loop-invariants" } */
++
++void
++test__zero (int *restrict dest, int *restrict src, float *a, int count)
++{
++  int i;
++
++  for (i = 0; i < count; ++i)
++    dest[i] = !__builtin_isunordered (a[i], 0) ? src[i] : 0;
++}
+-- 
+2.25.1
+

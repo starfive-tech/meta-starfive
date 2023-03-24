@@ -1,0 +1,71 @@
+From e4b5fec75aa8d0d01f6e042ec2888ef92eaa932a Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 9 Aug 2022 13:59:36 +0200
+Subject: [PATCH 310/547] lto: support --jobserver-style=fifo for recent GNU
+ make
+
+gcc/ChangeLog:
+
+	* opts-jobserver.h: Add one member.
+	* opts-common.cc (jobserver_info::jobserver_info): Parse FIFO
+	format of --jobserver-auth.
+
+(cherry picked from commit 53e3b2bf16a486c15c20991c6095f7be09012b55)
+---
+ gcc/opts-common.cc   | 17 +++++++++++++++--
+ gcc/opts-jobserver.h |  2 ++
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/opts-common.cc b/gcc/opts-common.cc
+index 8a4d32de3e5..7c07d504696 100644
+--- a/gcc/opts-common.cc
++++ b/gcc/opts-common.cc
+@@ -2008,8 +2008,14 @@ void prepend_xassembler_to_collect_as_options (const char *collect_as_options,
+ 
+ jobserver_info::jobserver_info ()
+ {
++  /* Traditionally, GNU make uses opened pipes for jobserver-auth,
++    e.g. --jobserver-auth=3,4.
++    Starting with GNU make 4.4, one can use --jobserver-style=fifo
++    and then named pipe is used: --jobserver-auth=fifo:/tmp/hcsparta.  */
++
+   /* Detect jobserver and drop it if it's not working.  */
+   string js_needle = "--jobserver-auth=";
++  string fifo_prefix = "fifo:";
+ 
+   const char *envval = getenv ("MAKEFLAGS");
+   if (envval != NULL)
+@@ -2018,8 +2024,15 @@ jobserver_info::jobserver_info ()
+       size_t n = makeflags.rfind (js_needle);
+       if (n != string::npos)
+ 	{
+-	  if (sscanf (makeflags.c_str () + n + js_needle.size (),
+-		      "%d,%d", &rfd, &wfd) == 2
++	  string ending = makeflags.substr (n + js_needle.size ());
++	  if (ending.find (fifo_prefix) == 0)
++	    {
++	      ending = ending.substr (fifo_prefix.size ());
++	      pipe_path = ending.substr (0, ending.find (' '));
++	      is_active = true;
++	    }
++	  else if (sscanf (makeflags.c_str () + n + js_needle.size (),
++			   "%d,%d", &rfd, &wfd) == 2
+ 	      && rfd > 0
+ 	      && wfd > 0
+ 	      && is_valid_fd (rfd)
+diff --git a/gcc/opts-jobserver.h b/gcc/opts-jobserver.h
+index 68ce188b84a..98ea2579962 100644
+--- a/gcc/opts-jobserver.h
++++ b/gcc/opts-jobserver.h
+@@ -37,6 +37,8 @@ struct jobserver_info
+   int rfd = -1;
+   /* File descriptor for writing used for jobserver communication.  */
+   int wfd = -1;
++  /* Named pipe path.  */
++  string pipe_path = "";
+   /* Return true if jobserver is active.  */
+   bool is_active = false;
+ };
+-- 
+2.25.1
+

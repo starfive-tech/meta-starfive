@@ -1,0 +1,19 @@
+From e5d19e37e2ac6ff26d293cb89495da3b71a2f78e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 28 Dec 2022 00:20:23 +0000
+Subject: [PATCH 318/547] Daily bump.
+
+---
+ gcc/DATESTAMP | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 154fbb15dde..e65d79fa1d5 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221227
++20221228
+-- 
+2.25.1
+

@@ -1,0 +1,56 @@
+From 4f1ece58a79fbe9ad1d5934e9ea9a03665c2d89a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 29 Dec 2022 00:20:57 +0000
+Subject: [PATCH 320/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 10 ++++++++++
+ gcc/testsuite/ChangeLog |  9 +++++++++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e65d79fa1d5..cf083afb247 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221228
++20221229
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index c20b7345e55..2f89c6d8c25 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,13 @@
++2022-12-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-12-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108131
++	* array.cc (match_array_element_spec): Avoid too early simplification
++	of matched array element specs that can lead to a misinterpretation
++	when used as array bounds in array declarations.
++
+ 2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 15145b9276b..059a8f0da90 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,12 @@
++2022-12-28  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-12-23  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108131
++	* gfortran.dg/pr103505.f90: Adjust expected patterns.
++	* gfortran.dg/pr108131.f90: New test.
++
+ 2022-12-24  John David Anglin  <danglin@gcc.gnu.org>
+ 
+ 	* g++.dg/guality/guality.exp: Skip on hppa*-*-hpux*.
+-- 
+2.25.1
+

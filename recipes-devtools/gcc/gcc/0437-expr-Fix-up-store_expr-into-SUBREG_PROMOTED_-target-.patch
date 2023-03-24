@@ -1,0 +1,84 @@
+From ee25e54233c6a1548eda06aa9a11f09cd7eb32ac Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 3 Jan 2023 12:13:24 +0100
+Subject: [PATCH 437/547] expr: Fix up store_expr into SUBREG_PROMOTED_* target
+ [PR108264]
+
+The following testcase ICEs on s390x-linux (e.g. with -march=z13).
+The problem is that target is (subreg/s/u:SI (reg/v:DI 66 [ x+-4 ]) 4)
+and we call convert_move from temp to the SUBREG_REG of that, expecting
+to extend the value properly.  That works nicely if temp has some
+scalar integer mode (or partial one), but ICEs when temp has V4QImode
+on the assertion that from and to modes have the same bitsize.
+store_expr generally allows say store from V4QI to SI target because
+they have the same size and if temp is a CONST_INT, we already have code
+to convert the constant properly, so the following patch just adds handling
+of non-scalar integer modes by converting them to the mode of target
+first before convert_move extends them.
+
+2023-01-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/108264
+	* expr.cc (store_expr): For stores into SUBREG_PROMOTED_* targets
+	from source which doesn't have scalar integral mode first convert
+	it to outer_mode.
+
+	* gcc.dg/pr108264.c: New test.
+
+(cherry picked from commit 226a498733e7919de72eb6f1bf3e16883ad159f6)
+---
+ gcc/expr.cc                     |  3 +++
+ gcc/testsuite/gcc.dg/pr108264.c | 27 +++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108264.c
+
+diff --git a/gcc/expr.cc b/gcc/expr.cc
+index 880ed89cb34..e7804d52656 100644
+--- a/gcc/expr.cc
++++ b/gcc/expr.cc
+@@ -5994,6 +5994,9 @@ store_expr (tree exp, rtx target, int call_param_p,
+ 	  temp = convert_modes (inner_mode, outer_mode, temp,
+ 				SUBREG_PROMOTED_SIGN (target));
+ 	}
++      else if (!SCALAR_INT_MODE_P (GET_MODE (temp)))
++	temp = convert_modes (outer_mode, TYPE_MODE (TREE_TYPE (exp)),
++			      temp, SUBREG_PROMOTED_SIGN (target));
+ 
+       convert_move (SUBREG_REG (target), temp,
+ 		    SUBREG_PROMOTED_SIGN (target));
+diff --git a/gcc/testsuite/gcc.dg/pr108264.c b/gcc/testsuite/gcc.dg/pr108264.c
+new file mode 100644
+index 00000000000..ff9aa261d67
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108264.c
+@@ -0,0 +1,27 @@
++/* PR middle-end/108264 */
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++/* { dg-additional-options "-fpic" { target fpic } } */
++
++int v;
++extern int bar (void);
++
++static inline void
++foo (char *d)
++{
++  switch (bar ())
++    {
++    case 2:
++      d[0] = d[1] = d[2] = d[3] = v;
++      break;
++    case 4:
++      d[0] = 0;
++    }
++}
++
++int
++baz (int x)
++{
++  foo ((char *) &x);
++  return x;
++}
+-- 
+2.25.1
+

@@ -1,0 +1,94 @@
+From 31f25cf4ef9a0a0ccc0b0f9158773c5a71e74cc5 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 24 Oct 2022 17:53:16 +0200
+Subject: [PATCH 191/547] c, c++: Fix up excess precision handling of
+ scalar_to_vector conversion [PR107358]
+
+As mentioned earlier in the C++ excess precision support mail, the following
+testcase is broken with excess precision both in C and C++ (though just in C++
+it was triggered in real-world code).
+scalar_to_vector is called in both FEs after the excess precision promotions
+(or stripping of EXCESS_PRECISION_EXPR), so we can then get invalid
+diagnostics that say float vector + float involves truncation (on ia32
+from long double to float).
+
+The following patch fixes that by calling scalar_to_vector on the operands
+before the excess precision promotions, let scalar_to_vector just do the
+diagnostics (it does e.g. fold_for_warn so it will fold
+EXCESS_PRECISION_EXPR around REAL_CST to constants etc.) but will then
+do the actual conversions using the excess precision promoted operands
+(so say if we have vector double + (float + float) we don't actually do
+vector double + (float) ((long double) float + (long double) float)
+but
+vector double + (double) ((long double) float + (long double) float)
+
+2022-10-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/107358
+gcc/c/
+	* c-typeck.cc (build_binary_op): Pass operands before excess precision
+	promotions to scalar_to_vector call.
+gcc/testsuite/
+	* c-c++-common/pr107358.c: New test.
+
+(cherry picked from commit 65e3274e363cb2c6bfe6b5e648916eb7696f7e2f)
+---
+ gcc/c/c-typeck.cc                     |  4 ++--
+ gcc/testsuite/c-c++-common/pr107358.c | 30 +++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/pr107358.c
+
+diff --git a/gcc/c/c-typeck.cc b/gcc/c/c-typeck.cc
+index 5ad49479370..603b03fe1a5 100644
+--- a/gcc/c/c-typeck.cc
++++ b/gcc/c/c-typeck.cc
+@@ -11918,8 +11918,8 @@ build_binary_op (location_t location, enum tree_code code,
+   if ((gnu_vector_type_p (type0) && code1 != VECTOR_TYPE)
+       || (gnu_vector_type_p (type1) && code0 != VECTOR_TYPE))
+     {
+-      enum stv_conv convert_flag = scalar_to_vector (location, code, op0, op1,
+-						     true);
++      enum stv_conv convert_flag = scalar_to_vector (location, code, orig_op0,
++						     orig_op1, true);
+ 
+       switch (convert_flag)
+ 	{
+diff --git a/gcc/testsuite/c-c++-common/pr107358.c b/gcc/testsuite/c-c++-common/pr107358.c
+new file mode 100644
+index 00000000000..d976da7393a
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/pr107358.c
+@@ -0,0 +1,30 @@
++/* PR c++/107358 */
++/* { dg-do compile { target c } } */
++/* { dg-options "-O2 -fexcess-precision=standard" } */
++
++typedef float __attribute__((vector_size (4 * sizeof (float)))) A;
++typedef double __attribute__((vector_size (2 * sizeof (double)))) B;
++
++void
++foo (A *x)
++{
++  *x = *x - 124.225514990f;
++}
++
++void
++bar (A *x, float y)
++{
++  *x = *x - y;
++}
++
++void
++baz (B *x)
++{
++  *x = *x + 124.225514990f;
++}
++
++void
++qux (B *x, double y)
++{
++  *x = *x + y;
++}
+-- 
+2.25.1
+

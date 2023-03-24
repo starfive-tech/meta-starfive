@@ -1,0 +1,82 @@
+From f9593025a290c68c0916dc6fa569eb38eda00535 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 1 Sep 2022 11:07:44 +0200
+Subject: [PATCH 036/547] Fix up dump_printf_loc format attribute and adjust
+ uses [PR106782]
+
+As discussed on IRC, the r13-2299-g68c61c2daa1f bug only got missed
+because dump_printf_loc had incorrect format attribute and therefore
+almost no -Wformat=* checking was performed on it.
+3, 0 are suitable for function with (whatever, whatever, const char *, va_list)
+arguments, not for (whatever, whatever, const char *, ...), that one should
+use 3, 4.
+
+There are 3 spots where the mismatch was worse though, two using %u or %d
+for unsigned HOST_WIDE_INT argument and one %T for enum argument (promoted
+to int) and this backport just fixes those spots.
+
+2022-09-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR other/106782
+	* tree-vect-slp.cc (vect_print_slp_tree): Use
+	HOST_WIDE_INT_PRINT_UNSIGNED instead of %u.
+	* tree-vect-loop.cc (vect_estimate_min_profitable_iters): Use
+	HOST_WIDE_INT_PRINT_UNSIGNED instead of %d.
+	* tree-vect-slp-patterns.cc (vect_pattern_validate_optab): Use %G
+	instead of %T and STMT_VINFO_STMT (SLP_TREE_REPRESENTATIVE (node))
+	instead of SLP_TREE_DEF_TYPE (node).
+
+(cherry picked from commit 953e08fde44a596e4ec2491efd15cd645e1ddc48)
+---
+ gcc/tree-vect-loop.cc         | 3 ++-
+ gcc/tree-vect-slp-patterns.cc | 4 ++--
+ gcc/tree-vect-slp.cc          | 4 +++-
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/tree-vect-loop.cc b/gcc/tree-vect-loop.cc
+index aed14e9b686..d1c19ce23fa 100644
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -4287,7 +4287,8 @@ vect_estimate_min_profitable_iters (loop_vec_info loop_vinfo,
+       if (dump_enabled_p ())
+ 	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+ 			 "can't unroll as unrolled vectorization factor larger"
+-			 " than maximum vectorization factor: %d\n",
++			 " than maximum vectorization factor: "
++			 HOST_WIDE_INT_PRINT_UNSIGNED "\n",
+ 			 LOOP_VINFO_MAX_VECT_FACTOR (loop_vinfo));
+       *suggested_unroll_factor = 1;
+     }
+diff --git a/gcc/tree-vect-slp-patterns.cc b/gcc/tree-vect-slp-patterns.cc
+index 879d17fd947..4b6384d7e25 100644
+--- a/gcc/tree-vect-slp-patterns.cc
++++ b/gcc/tree-vect-slp-patterns.cc
+@@ -96,8 +96,8 @@ vect_pattern_validate_optab (internal_fn ifn, slp_tree node)
+         {
+ 	  if (!vectype)
+ 	    dump_printf_loc (MSG_NOTE, vect_location,
+-			     "Target does not support vector type for %T\n",
+-			     SLP_TREE_DEF_TYPE (node));
++			     "Target does not support vector type for %G\n",
++			     STMT_VINFO_STMT (SLP_TREE_REPRESENTATIVE (node)));
+ 	  else
+ 	    dump_printf_loc (MSG_NOTE, vect_location,
+ 			     "Target does not support %s for vector type "
+diff --git a/gcc/tree-vect-slp.cc b/gcc/tree-vect-slp.cc
+index 0d400c00df1..b89a417711b 100644
+--- a/gcc/tree-vect-slp.cc
++++ b/gcc/tree-vect-slp.cc
+@@ -2468,7 +2468,9 @@ vect_print_slp_tree (dump_flags_t dump_kind, dump_location_t loc,
+ 
+   dump_metadata_t metadata (dump_kind, loc.get_impl_location ());
+   dump_user_location_t user_loc = loc.get_user_location ();
+-  dump_printf_loc (metadata, user_loc, "node%s %p (max_nunits=%u, refcnt=%u)",
++  dump_printf_loc (metadata, user_loc,
++		   "node%s %p (max_nunits=" HOST_WIDE_INT_PRINT_UNSIGNED
++		   ", refcnt=%u)",
+ 		   SLP_TREE_DEF_TYPE (node) == vect_external_def
+ 		   ? " (external)"
+ 		   : (SLP_TREE_DEF_TYPE (node) == vect_constant_def
+-- 
+2.25.1
+

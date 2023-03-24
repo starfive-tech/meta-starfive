@@ -1,0 +1,90 @@
+From 7ec291e86b2fce0e0d9f2f495af449f3c844bf6f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 24 Jan 2023 00:21:31 +0000
+Subject: [PATCH 362/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 18 ++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 10 ++++++++++
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 4 files changed, 45 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index e9e0b550e93..147ee79ec63 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,21 @@
++2023-01-23  Andreas Krebbel  <krebbel@linux.ibm.com>
++
++	Backported from master:
++	2022-08-25  Andreas Krebbel  <krebbel@linux.ibm.com>
++
++	PR target/106101
++	* config/s390/predicates.md (subreg_register_operand): New
++	predicate.
++	* config/s390/s390-protos.h (s390_gen_lowpart_subreg): New
++	function prototype.
++	* config/s390/s390.cc (s390_gen_lowpart_subreg): New function.
++	(s390_expand_insv): Use s390_gen_lowpart_subreg instead of
++	gen_lowpart.
++	* config/s390/s390.md ("*get_tp_64", "*zero_extendhisi2_31")
++	("*zero_extendqisi2_31", "*zero_extendqihi2_31"): Likewise.
++	("movstrictqi", "movstricthi", "movstrictsi"): Use the
++	subreg_register_operand predicate instead of register_operand.
++
+ 2023-01-11  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR tree-optimization/108199
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 3426cc88910..9ed1bcf7f8f 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230123
++20230124
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 0a4565123b4..378666372d1 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,13 @@
++2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-19  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108434
++	* expr.cc (class_allocatable): Prevent NULL pointer dereference
++	or invalid read.
++	(class_pointer): Likewise.
++
+ 2023-01-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	PR fortran/106731
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 6b3a9f3b121..7c7297608d3 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2023-01-23  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-01-19  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108434
++	* gfortran.dg/pr108434.f90: New test.
++
++2023-01-23  Andreas Krebbel  <krebbel@linux.ibm.com>
++
++	Backported from master:
++	2022-08-25  Andreas Krebbel  <krebbel@linux.ibm.com>
++
++	PR target/106101
++	* gcc.c-torture/compile/pr106101.c: New test.
++
+ 2023-01-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	PR fortran/106731
+-- 
+2.25.1
+

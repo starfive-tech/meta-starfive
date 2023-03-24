@@ -1,0 +1,75 @@
+From 3a34f1f56ad27ac6e1c4765433c06ebd3492b51b Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 22 Nov 2022 19:03:49 +0100
+Subject: [PATCH 241/547] Fix wrong array type conversion with different
+ storage orde
+
+When two arrays of scalars have a different storage order in Ada, the
+front-end makes sure that the conversion is performed component-wise
+so that each component can be reversed.  So it's a little bit counter
+productive that the ldist pass performs the opposite transformation
+and synthesizes a memcpy/memmove in this case.
+
+gcc/
+	* tree-loop-distribution.cc (loop_distribution::classify_builtin_ldst):
+	Bail out if source and destination do not have the same storage order.
+
+gcc/testsuite/
+	* gnat.dg/sso18.adb: New test.
+---
+ gcc/testsuite/gnat.dg/sso18.adb | 21 +++++++++++++++++++++
+ gcc/tree-loop-distribution.cc   |  7 ++++++-
+ 2 files changed, 27 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gnat.dg/sso18.adb
+
+diff --git a/gcc/testsuite/gnat.dg/sso18.adb b/gcc/testsuite/gnat.dg/sso18.adb
+new file mode 100644
+index 00000000000..7496e965fd3
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/sso18.adb
+@@ -0,0 +1,21 @@
++--  { dg-do run }
++--  { dg-options "-O2" }
++
++with System;
++
++procedure SSO18 is
++
++  type Arr is array (1..32) of Short_Integer;
++  type Rev_Arr is array (1..32) of Short_Integer
++    with Scalar_Storage_Order => System.High_Order_First;
++  C : constant Arr := (others => 16);
++  RA : Rev_Arr;
++  A  : Arr;
++
++begin
++  RA := Rev_Arr(C);
++  A := Arr (RA);
++  if A /= C or else RA(1) /= 16 then
++     raise Program_Error;
++  end if;
++end;
+diff --git a/gcc/tree-loop-distribution.cc b/gcc/tree-loop-distribution.cc
+index bd8d3847fd9..606eb05e64a 100644
+--- a/gcc/tree-loop-distribution.cc
++++ b/gcc/tree-loop-distribution.cc
+@@ -1770,10 +1770,15 @@ loop_distribution::classify_builtin_ldst (loop_p loop, struct graph *rdg,
+   if (res != 2)
+     return;
+ 
+-  /* They much have the same access size.  */
++  /* They must have the same access size.  */
+   if (!operand_equal_p (size, src_size, 0))
+     return;
+ 
++  /* They must have the same storage order.  */
++  if (reverse_storage_order_for_component_p (DR_REF (dst_dr))
++      != reverse_storage_order_for_component_p (DR_REF (src_dr)))
++    return;
++
+   /* Load and store in loop nest must access memory in the same way, i.e,
+      their must have the same steps in each loop of the nest.  */
+   if (dst_steps.length () != src_steps.length ())
+-- 
+2.25.1
+

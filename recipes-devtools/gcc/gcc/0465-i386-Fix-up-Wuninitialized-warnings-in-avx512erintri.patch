@@ -1,0 +1,130 @@
+From c3ba6680492ee1ddef6ae8493787c36c45c2d20e Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 31 Jan 2023 09:20:34 +0100
+Subject: [PATCH 465/547] i386: Fix up -Wuninitialized warnings in
+ avx512erintrin.h [PR105593]
+
+As reported in the PR, there are some -Wuninitialized warnings in
+avx512erintrin.h.  One can see that by compiling sse-23.c testcase with
+-Wuninitialized (or when actually using those intrinsics).
+Those 6 spots use an uninitialized variable and pass it as one of the
+argument to a builtin with constant mask -1, because there is no unmasked
+builtin.  It is true that expansion of those builtins into RTL will see
+mask is all ones and ignore the unneeded argument, but -Wuninitialized
+is diagnosed on GIMPLE and on GIMPLE these builtins are just builtin calls.
+avx512fintrin.h and other headers use in these cases the _mm*_undefined_* ()
+intrinsics, like:
+  return (__m512i) __builtin_ia32_psrav8di_mask ((__v8di) __X,
+                                                 (__v8di) __Y,
+                                                 (__v8di)
+                                                 _mm512_undefined_epi32 (),
+                                                 (__mmask8) -1);
+etc. and the following patch does the same for avx512erintrin.h.
+With the recent changes in C++ FE and the _mm*_undefined_* intrinsics,
+we don't emit -Wuninitialized warnings for those (previously we didn't
+just in C due to self-initialization).  Of course we could also
+just self-initialize these uninitialized vars and add the #pragma GCC
+diagnostic dances around it, but using the intrinsics is consistent with
+the rest and IMHO cleaner.
+
+2023-01-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/105593
+	* config/i386/avx512erintrin.h (_mm512_exp2a23_round_pd,
+	_mm512_exp2a23_round_ps, _mm512_rcp28_round_pd, _mm512_rcp28_round_ps,
+	_mm512_rsqrt28_round_pd, _mm512_rsqrt28_round_ps): Use
+	_mm512_undefined_pd () or _mm512_undefined_ps () instead of using
+	uninitialized automatic variable __W.
+
+	* gcc.target/i386/sse-23.c: Add -Wuninitialized to dg-options.
+
+(cherry picked from commit 41602390456901c14ecdfa2fa64c3cebd5b6ff09)
+---
+ gcc/config/i386/avx512erintrin.h       | 18 ++++++------------
+ gcc/testsuite/gcc.target/i386/sse-23.c |  2 +-
+ 2 files changed, 7 insertions(+), 13 deletions(-)
+
+diff --git a/gcc/config/i386/avx512erintrin.h b/gcc/config/i386/avx512erintrin.h
+index 6b3b679a176..f6ec9051206 100644
+--- a/gcc/config/i386/avx512erintrin.h
++++ b/gcc/config/i386/avx512erintrin.h
+@@ -51,9 +51,8 @@ extern __inline __m512d
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_exp2a23_round_pd (__m512d __A, int __R)
+ {
+-  __m512d __W;
+   return (__m512d) __builtin_ia32_exp2pd_mask ((__v8df) __A,
+-					       (__v8df) __W,
++					       (__v8df) _mm512_undefined_pd (),
+ 					       (__mmask8) -1, __R);
+ }
+ 
+@@ -79,9 +78,8 @@ extern __inline __m512
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_exp2a23_round_ps (__m512 __A, int __R)
+ {
+-  __m512 __W;
+   return (__m512) __builtin_ia32_exp2ps_mask ((__v16sf) __A,
+-					      (__v16sf) __W,
++					      (__v16sf) _mm512_undefined_ps (),
+ 					      (__mmask16) -1, __R);
+ }
+ 
+@@ -107,9 +105,8 @@ extern __inline __m512d
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_rcp28_round_pd (__m512d __A, int __R)
+ {
+-  __m512d __W;
+   return (__m512d) __builtin_ia32_rcp28pd_mask ((__v8df) __A,
+-						(__v8df) __W,
++						(__v8df) _mm512_undefined_pd (),
+ 						(__mmask8) -1, __R);
+ }
+ 
+@@ -135,9 +132,8 @@ extern __inline __m512
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_rcp28_round_ps (__m512 __A, int __R)
+ {
+-  __m512 __W;
+   return (__m512) __builtin_ia32_rcp28ps_mask ((__v16sf) __A,
+-					       (__v16sf) __W,
++					       (__v16sf) _mm512_undefined_ps (),
+ 					       (__mmask16) -1, __R);
+ }
+ 
+@@ -229,9 +225,8 @@ extern __inline __m512d
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_rsqrt28_round_pd (__m512d __A, int __R)
+ {
+-  __m512d __W;
+   return (__m512d) __builtin_ia32_rsqrt28pd_mask ((__v8df) __A,
+-						  (__v8df) __W,
++						  (__v8df) _mm512_undefined_pd (),
+ 						  (__mmask8) -1, __R);
+ }
+ 
+@@ -257,9 +252,8 @@ extern __inline __m512
+ __attribute__ ((__gnu_inline__, __always_inline__, __artificial__))
+ _mm512_rsqrt28_round_ps (__m512 __A, int __R)
+ {
+-  __m512 __W;
+   return (__m512) __builtin_ia32_rsqrt28ps_mask ((__v16sf) __A,
+-						 (__v16sf) __W,
++						 (__v16sf) _mm512_undefined_ps (),
+ 						 (__mmask16) -1, __R);
+ }
+ 
+diff --git a/gcc/testsuite/gcc.target/i386/sse-23.c b/gcc/testsuite/gcc.target/i386/sse-23.c
+index f71a7b29157..b398fd14408 100644
+--- a/gcc/testsuite/gcc.target/i386/sse-23.c
++++ b/gcc/testsuite/gcc.target/i386/sse-23.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -Werror-implicit-function-declaration -march=k8" } */
++/* { dg-options "-O2 -Werror-implicit-function-declaration -Wuninitialized -march=k8" } */
+ /* { dg-add-options bind_pic_locally } */
+ 
+ #include <mm_malloc.h>
+-- 
+2.25.1
+

@@ -1,0 +1,206 @@
+From 07ef737cf1ab08f5c36786c7ab1ffc596fe52138 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 31 Jan 2023 11:54:03 -0500
+Subject: [PATCH 395/547] c++: fix ICE with -Wduplicated-cond [PR107593]
+
+Here we crash because a CAST_EXPR, representing T(), doesn't have
+its operand, and operand_equal_p's STRIP_ANY_LOCATION_WRAPPER doesn't
+expect that.  (o_e_p is called from warn_duplicated_cond_add_or_warn.)
+
+In the past we've adjusted o_e_p to better cope with template codes,
+but in this case I think we just want to avoid attempting to warn
+about inst-dependent expressions; I don't think I've ever envisioned
+-Wduplicated-cond to warn about them.  Also destroy the chain when
+an inst-dependent expression is encountered to not warn in
+Wduplicated-cond4.C.
+
+The ICE started with r12-6022, two-stage name lookup for overloaded
+operators, which gave dependent operators a TREE_TYPE (in particular,
+DEPENDENT_OPERATOR_TYPE), so we no longer bail out here in o_e_p:
+
+  /* Similar, if either does not have a type (like a template id),
+     they aren't equal.  */
+  if (!TREE_TYPE (arg0) || !TREE_TYPE (arg1))
+    return false;
+
+	PR c++/107593
+	PR c++/108597
+
+gcc/c-family/ChangeLog:
+
+	* c-common.h (instantiation_dependent_expression_p): Declare.
+	* c-warn.cc (warn_duplicated_cond_add_or_warn): If the condition
+	is dependent, invalidate the chain.
+
+gcc/c/ChangeLog:
+
+	* c-objc-common.cc (instantiation_dependent_expression_p): New.
+
+gcc/cp/ChangeLog:
+
+	* cp-tree.h (instantiation_dependent_expression_p): Don't
+	declare here.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/warn/Wduplicated-cond3.C: New test.
+	* g++.dg/warn/Wduplicated-cond4.C: New test.
+	* g++.dg/warn/Wduplicated-cond5.C: New test.
+---
+ gcc/c-family/c-common.h                       |  1 +
+ gcc/c-family/c-warn.cc                        |  2 +-
+ gcc/c/c-objc-common.cc                        |  8 ++++
+ gcc/cp/cp-tree.h                              |  1 -
+ gcc/testsuite/g++.dg/warn/Wduplicated-cond3.C | 38 +++++++++++++++++++
+ gcc/testsuite/g++.dg/warn/Wduplicated-cond4.C | 17 +++++++++
+ gcc/testsuite/g++.dg/warn/Wduplicated-cond5.C | 16 ++++++++
+ 7 files changed, 81 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wduplicated-cond3.C
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wduplicated-cond4.C
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wduplicated-cond5.C
+
+diff --git a/gcc/c-family/c-common.h b/gcc/c-family/c-common.h
+index 52a85bfb783..3d5b9c40e6b 100644
+--- a/gcc/c-family/c-common.h
++++ b/gcc/c-family/c-common.h
+@@ -1049,6 +1049,7 @@ extern tree finish_label_address_expr (tree, location_t);
+ extern tree lookup_label (tree);
+ extern tree lookup_name (tree);
+ extern bool lvalue_p (const_tree);
++extern bool instantiation_dependent_expression_p (tree);
+ 
+ extern bool vector_targets_convertible_p (const_tree t1, const_tree t2);
+ extern bool vector_types_convertible_p (const_tree t1, const_tree t2, bool emit_lax_note);
+diff --git a/gcc/c-family/c-warn.cc b/gcc/c-family/c-warn.cc
+index f24ac5d0539..0ad0034180b 100644
+--- a/gcc/c-family/c-warn.cc
++++ b/gcc/c-family/c-warn.cc
+@@ -2521,7 +2521,7 @@ warn_duplicated_cond_add_or_warn (location_t loc, tree cond, vec<tree> **chain)
+   if (*chain == NULL)
+     return;
+ 
+-  if (TREE_SIDE_EFFECTS (cond))
++  if (TREE_SIDE_EFFECTS (cond) || instantiation_dependent_expression_p (cond))
+     {
+       /* Uh-oh!  This condition has a side-effect, thus invalidates
+ 	 the whole chain.  */
+diff --git a/gcc/c/c-objc-common.cc b/gcc/c/c-objc-common.cc
+index 97850ada2c8..cba01f4d5f3 100644
+--- a/gcc/c/c-objc-common.cc
++++ b/gcc/c/c-objc-common.cc
+@@ -394,3 +394,11 @@ c_get_alias_set (tree t)
+ 
+   return c_common_get_alias_set (t);
+ }
++
++/* In C, no expression is dependent.  */
++
++bool
++instantiation_dependent_expression_p (tree)
++{
++  return false;
++}
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index cb434af789d..cd51dd288b0 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -7390,7 +7390,6 @@ extern bool any_type_dependent_arguments_p      (const vec<tree, va_gc> *);
+ extern bool any_type_dependent_elements_p       (const_tree);
+ extern bool type_dependent_expression_p_push	(tree);
+ extern bool value_dependent_expression_p	(tree);
+-extern bool instantiation_dependent_expression_p (tree);
+ extern bool instantiation_dependent_uneval_expression_p (tree);
+ extern bool any_value_dependent_elements_p      (const_tree);
+ extern bool dependent_omp_for_p			(tree, tree, tree, tree);
+diff --git a/gcc/testsuite/g++.dg/warn/Wduplicated-cond3.C b/gcc/testsuite/g++.dg/warn/Wduplicated-cond3.C
+new file mode 100644
+index 00000000000..3da054e5485
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wduplicated-cond3.C
+@@ -0,0 +1,38 @@
++// PR c++/107593
++// { dg-do compile }
++// { dg-options "-Wduplicated-cond" }
++
++template <typename T>
++void
++foo ()
++{
++  if (T() && T() && int())
++    ;
++  else if (T() && T() && int())
++    ;
++}
++
++template <typename T>
++void bar(T a)
++{
++  if (a)
++    ;
++  else if (a)
++    ;
++}
++
++template <typename>
++void baz(int a)
++{
++  if (a)
++    ;
++  else if (a) // { dg-warning "duplicated" }
++    ;
++}
++void
++f ()
++{
++  foo<int>();
++  bar(1);
++  baz<int>(1);
++}
+diff --git a/gcc/testsuite/g++.dg/warn/Wduplicated-cond4.C b/gcc/testsuite/g++.dg/warn/Wduplicated-cond4.C
+new file mode 100644
+index 00000000000..41bb9f09b4f
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wduplicated-cond4.C
+@@ -0,0 +1,17 @@
++// PR c++/107593
++// { dg-do compile }
++// { dg-options "-Wduplicated-cond" }
++
++int n;
++
++template<class T> bool g() { n = 42; return false; }
++
++template<class T>
++void f() {
++  if (n)
++    ;
++  else if (g<T>())
++    ;
++  else if (n)
++    ;
++}
+diff --git a/gcc/testsuite/g++.dg/warn/Wduplicated-cond5.C b/gcc/testsuite/g++.dg/warn/Wduplicated-cond5.C
+new file mode 100644
+index 00000000000..23a0bf212b5
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wduplicated-cond5.C
+@@ -0,0 +1,16 @@
++// PR c++/108597
++// { dg-do compile }
++// { dg-options "-Wduplicated-cond" }
++
++template <typename T>
++struct MyStruct {
++
++    void check(int &x) {
++        if (&x == &_a) {
++        } else if (&x == &_b) {
++        }
++    }
++
++    int _a;
++    int _b;
++};
+-- 
+2.25.1
+

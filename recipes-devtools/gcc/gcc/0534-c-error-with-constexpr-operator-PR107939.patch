@@ -1,0 +1,116 @@
+From 19ed6bf44c3fec882cf4c825f3ffa4f2ecdc78e6 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Fri, 3 Mar 2023 11:24:24 -0500
+Subject: [PATCH 534/547] c++: error with constexpr operator() [PR107939]
+
+Similarly to PR107938, this also started with r11-557, whereby cp_finish_decl
+can call check_initializer even in a template for a constexpr initializer.
+
+Here we are rejecting
+
+  extern const Q q;
+
+  template<int>
+  constexpr auto p = q(0);
+
+even though q has a constexpr operator().  It's deemed non-const by
+decl_maybe_constant_var_p because even though 'q' is const it is not
+of integral/enum type.
+
+If fun is not a function pointer, we don't know if we're using it as an
+lvalue or rvalue, so with this patch we pass 'any' for want_rval.  With
+that, p_c_e/VAR_DECL doesn't flat out reject the underlying VAR_DECL.
+
+	PR c++/107939
+
+gcc/cp/ChangeLog:
+
+	* constexpr.cc (potential_constant_expression_1) <case CALL_EXPR>: Pass
+	'any' when recursing on a VAR_DECL and not a pointer to function.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1y/var-templ74.C: Remove dg-error.
+	* g++.dg/cpp1y/var-templ77.C: New test.
+
+(cherry picked from commit e09bc034d1b4d692b409fa5af52ae34480a6f4dc)
+---
+ gcc/cp/constexpr.cc                      |  8 ++++--
+ gcc/testsuite/g++.dg/cpp1y/var-templ74.C |  2 +-
+ gcc/testsuite/g++.dg/cpp1y/var-templ77.C | 32 ++++++++++++++++++++++++
+ 3 files changed, 39 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/var-templ77.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 79acec6e713..eefcebd28c5 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -8750,8 +8750,12 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
+ 	  }
+ 	else if (fun)
+           {
+-	    if (RECUR (fun, rval))
+-	      /* Might end up being a constant function pointer.  */;
++	    if (RECUR (fun, FUNCTION_POINTER_TYPE_P (fun) ? rval : any))
++	      /* Might end up being a constant function pointer.  But it
++		 could also be a function object with constexpr op(), so
++		 we pass 'any' so that the underlying VAR_DECL is deemed
++		 as potentially-constant even though it wasn't declared
++		 constexpr.  */;
+ 	    else
+ 	      return false;
+           }
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ74.C b/gcc/testsuite/g++.dg/cpp1y/var-templ74.C
+index 4e2e800a6eb..c76a7d949ac 100644
+--- a/gcc/testsuite/g++.dg/cpp1y/var-templ74.C
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ74.C
+@@ -9,7 +9,7 @@ struct Q {
+ extern const Q q;
+ 
+ template<int>
+-constexpr const Q* p = q(0); // { dg-bogus "not usable" "PR107939" { xfail *-*-* } }
++constexpr const Q* p = q(0);
+ 
+ void
+ g ()
+diff --git a/gcc/testsuite/g++.dg/cpp1y/var-templ77.C b/gcc/testsuite/g++.dg/cpp1y/var-templ77.C
+new file mode 100644
+index 00000000000..0c56d70a034
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/var-templ77.C
+@@ -0,0 +1,32 @@
++// PR c++/107939
++// { dg-do compile { target c++14 } }
++
++struct Q {
++  struct P {
++    const Q* p;
++  };
++  int n;
++  constexpr P operator()(int) const { return {this}; }
++};
++
++extern const Q q;
++template<int>
++constexpr auto p = q(0);
++static_assert(p<0>.p == &q, "");
++
++constexpr int
++fn (int)
++{
++  return 42;
++}
++
++struct Sur {
++  using FN = int(int);
++  constexpr operator FN*() const { return &fn; }
++};
++
++extern const Sur sur;
++template<int>
++constexpr int aja = sur (0);
++static_assert(aja<0> == 42, "");
++static_assert(sur(1) == 42, "");
+-- 
+2.25.1
+

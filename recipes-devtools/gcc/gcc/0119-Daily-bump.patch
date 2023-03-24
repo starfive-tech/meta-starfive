@@ -1,0 +1,32 @@
+From 97374f25e1ee7ea45293c244f29425c9f9abcf5a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 11 Oct 2022 00:20:28 +0000
+Subject: [PATCH 119/547] Daily bump.
+
+---
+ gcc/DATESTAMP       | 2 +-
+ libcpp/po/ChangeLog | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 836fdacb295..ee52440e2ce 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221010
++20221011
+diff --git a/libcpp/po/ChangeLog b/libcpp/po/ChangeLog
+index 1dff84d4094..ffe71140a6e 100644
+--- a/libcpp/po/ChangeLog
++++ b/libcpp/po/ChangeLog
+@@ -1,3 +1,7 @@
++2022-10-10  Joseph Myers  <joseph@codesourcery.com>
++
++	* ro.po: New.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

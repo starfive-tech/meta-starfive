@@ -1,0 +1,64 @@
+From 897dbe9f17e9768da4d7ec86e6de472ab7abedd7 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 24 Feb 2023 00:22:05 +0000
+Subject: [PATCH 503/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 40fc3374943..fb96f27d182 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230223
++20230224
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 179367e2798..dd4121bca11 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,39 @@
++2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	PR libstdc++/108030
++	* include/experimental/bits/simd.h (__vector_broadcast):
++	Implement via __vector_broadcast_impl instead of
++	__call_with_n_evaluations + 2 lambdas.
++	(__vector_broadcast_impl): New.
++
++2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd_builtin.h (_S_set): Compare as
++	int. The actual range of these indexes is very small.
++
++2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd_x86.h (_S_bit_shift_left)
++	(_S_bit_shift_right): Declare constexpr. The implementation was
++	already expecting constexpr evaluation.
++
++2023-02-23  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-20  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd.h (__extract_part, split):
++	Use reserved name for template parameter.
++
+ 2023-02-21  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

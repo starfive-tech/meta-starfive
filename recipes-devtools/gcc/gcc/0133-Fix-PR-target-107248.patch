@@ -1,0 +1,92 @@
+From a5a6598d5b1d29741993371310c0bb8ca57e190c Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Fri, 14 Oct 2022 11:52:04 +0200
+Subject: [PATCH 133/547] Fix PR target/107248
+
+This is the infamous PR rtl-optimization/38644 rearing its ugly head for
+leaf functions on SPARC more than a decade later...  Richard E.'s generic
+solution has never been implemented so let's do as other RISC back-ends did.
+
+gcc/
+	PR target/107248
+	* config/sparc/sparc.cc (sparc_expand_prologue): Emit a frame
+	blockage for leaf functions.
+	(sparc_flat_expand_prologue): Emit frame instead of full blockage.
+	(sparc_expand_epilogue): Emit a frame blockage for leaf functions.
+	(sparc_flat_expand_epilogue): Emit frame instead of full blockage.
+---
+ gcc/config/sparc/sparc.cc | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/gcc/config/sparc/sparc.cc b/gcc/config/sparc/sparc.cc
+index aca925befe1..a47537365a8 100644
+--- a/gcc/config/sparc/sparc.cc
++++ b/gcc/config/sparc/sparc.cc
+@@ -6050,6 +6050,9 @@ sparc_expand_prologue (void)
+ 	}
+ 
+       RTX_FRAME_RELATED_P (insn) = 1;
++
++      /* Ensure no memory access is done before the frame is established.  */
++      emit_insn (gen_frame_blockage ());
+     }
+   else
+     {
+@@ -6064,13 +6067,7 @@ sparc_expand_prologue (void)
+ 	  /* %sp is not the CFA register anymore.  */
+ 	  emit_insn (gen_stack_pointer_inc (GEN_INT (4096 - size)));
+ 
+-	  /* Make sure no %fp-based store is issued until after the frame is
+-	     established.  The offset between the frame pointer and the stack
+-	     pointer is calculated relative to the value of the stack pointer
+-	     at the end of the function prologue, and moving instructions that
+-	     access the stack via the frame pointer between the instructions
+-	     that decrement the stack pointer could result in accessing the
+-	     register window save area, which is volatile.  */
++	  /* Likewise.  */
+ 	  emit_insn (gen_frame_blockage ());
+ 	}
+       else
+@@ -6166,8 +6163,8 @@ sparc_flat_expand_prologue (void)
+ 	}
+       RTX_FRAME_RELATED_P (insn) = 1;
+ 
+-      /* Ensure nothing is scheduled until after the frame is established.  */
+-      emit_insn (gen_blockage ());
++      /* Ensure no memory access is done before the frame is established.  */
++      emit_insn (gen_frame_blockage ());
+ 
+       if (frame_pointer_needed)
+ 	{
+@@ -6254,6 +6251,9 @@ sparc_expand_epilogue (bool for_eh)
+     ; /* do nothing.  */
+   else if (sparc_leaf_function_p)
+     {
++      /* Ensure no memory access is done after the frame is destroyed.  */
++      emit_insn (gen_frame_blockage ());
++
+       if (size <= 4096)
+ 	emit_insn (gen_stack_pointer_inc (GEN_INT (size)));
+       else if (size <= 8192)
+@@ -6304,15 +6304,15 @@ sparc_flat_expand_epilogue (bool for_eh)
+     ; /* do nothing.  */
+   else if (frame_pointer_needed)
+     {
+-      /* Make sure the frame is destroyed after everything else is done.  */
+-      emit_insn (gen_blockage ());
++      /* Ensure no memory access is done after the frame is destroyed.  */
++      emit_insn (gen_frame_blockage ());
+ 
+       emit_move_insn (stack_pointer_rtx, gen_rtx_REG (Pmode, 1));
+     }
+   else
+     {
+       /* Likewise.  */
+-      emit_insn (gen_blockage ());
++      emit_insn (gen_frame_blockage ());
+ 
+       if (size <= 4096)
+ 	emit_insn (gen_stack_pointer_inc (GEN_INT (size)));
+-- 
+2.25.1
+

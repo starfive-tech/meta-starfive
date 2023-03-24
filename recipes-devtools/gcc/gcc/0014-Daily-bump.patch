@@ -1,0 +1,92 @@
+From cce15df5287dd0a4c3afd3c46ec6cb37f45fde2a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 25 Aug 2022 00:19:50 +0000
+Subject: [PATCH 014/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 19 +++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 17 +++++++++++++++++
+ libstdc++-v3/ChangeLog  | 10 ++++++++++
+ 4 files changed, 47 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 45c79de7e03..e8e781a740a 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,22 @@
++2022-08-24  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-08-16  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR tree-optimization/106322
++	* tree-vect-stmts.cc (vectorizable_call): Don't allow
++	vect_emulated_vector_p type for both vectype_in and vectype_out.
++
++2022-08-24  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	Backported from master:
++	2022-08-16  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	PR target/103353
++	* config/rs6000/mma.md (define_expand movoo): Move TARGET_MMA condition
++	check to preparation statements and add handlings for !TARGET_MMA.
++	(define_expand movxo): Likewise.
++
+ 2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index a8087bc572d..359f4ea53a5 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220824
++20220825
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 874d74c97a5..954fc0b9b25 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,20 @@
++2022-08-24  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-08-16  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR tree-optimization/106322
++	* gcc.target/i386/pr106322.c: New test.
++	* gcc.target/powerpc/pr106322.c: New test.
++
++2022-08-24  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	Backported from master:
++	2022-08-16  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	PR target/103353
++	* gcc.target/powerpc/pr103353.c: New test.
++
+ 2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 3021f68edb1..a2d49420ea4 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,13 @@
++2022-08-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-23  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/106589
++	* include/std/variant (__do_visit): Handle is_void<R> for zero
++	argument case.
++	* testsuite/20_util/variant/visit_r.cc: Check std::visit<void>(v).
++
+ 2022-08-23  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

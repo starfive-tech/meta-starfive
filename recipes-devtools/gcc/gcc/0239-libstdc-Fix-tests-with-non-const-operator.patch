@@ -1,0 +1,54 @@
+From 905047145425c0cf072d3b965e18dc0c1c1ced7a Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 10 Nov 2022 14:11:27 +0000
+Subject: [PATCH 239/547] libstdc++: Fix tests with non-const operator==
+
+These tests fail in strict -std=c++20 mode but their equality ops don't
+need to be non-const, it looks like an accident.
+
+This fixes two FAILs with -std=c++20:
+FAIL: 20_util/tuple/swap.cc (test for excess errors)
+FAIL: 26_numerics/valarray/87641.cc (test for excess errors)
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/20_util/tuple/swap.cc (MoveOnly::operator==): Add
+	const qualifier.
+	* testsuite/26_numerics/valarray/87641.cc (X::operator==):
+	Likewise.
+
+(cherry picked from commit fbad7a74aaaddea3d7b39045a09dd3860603658e)
+---
+ libstdc++-v3/testsuite/20_util/tuple/swap.cc         | 2 +-
+ libstdc++-v3/testsuite/26_numerics/valarray/87641.cc | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/testsuite/20_util/tuple/swap.cc b/libstdc++-v3/testsuite/20_util/tuple/swap.cc
+index c086a4f1a8e..30c8322f01c 100644
+--- a/libstdc++-v3/testsuite/20_util/tuple/swap.cc
++++ b/libstdc++-v3/testsuite/20_util/tuple/swap.cc
+@@ -38,7 +38,7 @@ struct MoveOnly
+   MoveOnly(MoveOnly const&) = delete;
+   MoveOnly& operator=(MoveOnly const&) = delete;
+ 
+-  bool operator==(MoveOnly const& m)
++  bool operator==(MoveOnly const& m) const
+   { return i == m.i; }
+ 
+   void swap(MoveOnly& m)
+diff --git a/libstdc++-v3/testsuite/26_numerics/valarray/87641.cc b/libstdc++-v3/testsuite/26_numerics/valarray/87641.cc
+index 38c35851716..4a6e402831d 100644
+--- a/libstdc++-v3/testsuite/26_numerics/valarray/87641.cc
++++ b/libstdc++-v3/testsuite/26_numerics/valarray/87641.cc
+@@ -39,7 +39,7 @@ struct X
+   X() : val(1) { }
+ 
+   X& operator+=(const X& x) { val += x.val; return *this; }
+-  bool operator==(const X& x) { return val == x.val; }
++  bool operator==(const X& x) const { return val == x.val; }
+ 
+   int val;
+ };
+-- 
+2.25.1
+

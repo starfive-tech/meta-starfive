@@ -1,0 +1,358 @@
+From a015ebe382cd6d0beab9db4ad33fbd252b7e2339 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 19 Jan 2023 10:00:51 +0100
+Subject: [PATCH 460/547] forwprop: Further fixes for simplify_rotate
+ [PR108440]
+
+As mentioned in the simplify_rotate comment, for e.g.
+   ((T) ((T2) X << (Y & (B - 1)))) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+we already emit
+   X r<< (Y & (B - 1))
+as replacement.  This PR is about the
+   ((T) ((T2) X << Y)) OP ((T) ((T2) X >> (B - Y)))
+   ((T) ((T2) X << (int) Y)) OP ((T) ((T2) X >> (int) (B - Y)))
+forms if T2 is wider than T.  Unlike e.g.
+   (X << Y) OP (X >> (B - Y))
+which is valid just for Y in [1, B - 1], the above 2 forms are actually
+valid and do the rotates for Y in [0, B] - for Y 0 the X value is preserved
+by the left shift and right logical shift by B adds just zeros (but because
+the shift is in wider precision B is still valid shift count), while for
+Y equal to B X is preserved through the latter shift and the former adds
+just zeros.
+Now, it is unclear if we in the middle-end treat rotates with rotate count
+equal or larger than precision as UB or not, unlike shifts there are less
+reasons to do so, but e.g. expansion of X r<< Y if there is no rotate optab
+for the mode is emitted as (X << Y) | (((unsigned) X) >> ((-Y) & (B - 1)))
+and so with UB on Y == B.
+
+The following patch does multiple things:
+1) for the above 2, asks the ranger if Y could be equal to B and if so,
+   instead of using X r<< Y uses X r<< (Y & (B - 1))
+2) for the
+   ((T) ((T2) X << Y)) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+   ((T) ((T2) X << (int) Y)) | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+   forms that were fixed 2 days ago it only punts if Y might be in the
+   [B,B2-1] range but isn't known to be in the
+   [0,B][2*B,2*B][3*B,3*B]... range.  Because for Y which is a multiple
+   of B but smaller than B2 it acts as a rotate too, left shift provides
+   0 and (-Y) & (B - 1) is 0 and so preserves X.  Though, for the cases
+   where Y is not known to be in [0,B-1] the patch also uses
+   X r<< (Y & (B - 1)) rather than X r<< Y
+3) as discussed with Aldy, instead of using global ranger it uses a pass
+   specific copy but lazily created on first simplify_rotate that needs it;
+   this e.g. handles rotate inside of if body where the guarding condition
+   limits the shift count to some range which will not work with the
+   global ranger (unless there is some SSA_NAME to attach the range to).
+
+Note, e.g. on x86 X r<< (Y & (B - 1)) and X r<< Y actually emit the
+same assembly because rotates work the same even for larger rotate counts,
+but that is handled only during combine.
+
+2023-01-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108440
+	* tree-ssa-forwprop.cc: Include gimple-range.h.
+	(simplify_rotate): For the forms with T2 wider than T and shift counts of
+	Y and B - Y add & (B - 1) masking for the rotate count if Y could be equal
+	to B.  For the forms with T2 wider than T and shift counts of
+	Y and (-Y) & (B - 1), don't punt if range could be [B, B2], but only if
+	range doesn't guarantee Y < B or Y = N * B.  If range doesn't guarantee
+	Y < B, also add & (B - 1) masking for the rotate count.  Use lazily created
+	pass specific ranger instead of get_global_range_query.
+	(pass_forwprop::execute): Disable that ranger at the end of pass if it has
+	been created.
+
+	* c-c++-common/rotate-10.c: New test.
+	* c-c++-common/rotate-11.c: New test.
+
+(cherry picked from commit 05b9868b182bb9ed2013b39a0bc6297354a0db49)
+---
+ gcc/testsuite/c-c++-common/rotate-10.c | 53 +++++++++++++++++++
+ gcc/testsuite/c-c++-common/rotate-11.c | 53 +++++++++++++++++++
+ gcc/tree-ssa-forwprop.cc               | 73 ++++++++++++++++++++++----
+ 3 files changed, 170 insertions(+), 9 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/rotate-10.c
+ create mode 100644 gcc/testsuite/c-c++-common/rotate-11.c
+
+diff --git a/gcc/testsuite/c-c++-common/rotate-10.c b/gcc/testsuite/c-c++-common/rotate-10.c
+new file mode 100644
+index 00000000000..683d2cbc96b
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/rotate-10.c
+@@ -0,0 +1,53 @@
++/* PR tree-optimization/108440 */
++/* { dg-do compile { target { { ilp32 || lp64 } || llp64 } } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* { dg-final { scan-tree-dump-times " r<< " 5 "optimized" } } */
++/* { dg-final { scan-tree-dump-times " \\\& 7;" 4 "optimized" } } */
++
++unsigned char
++foo (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__)
++    __builtin_unreachable ();
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++bar (unsigned char x, unsigned int y)
++{
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++baz (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__ && y != 2 * __CHAR_BIT__)
++    __builtin_unreachable ();
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++qux (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__ && y != 2 * __CHAR_BIT__ && y != __CHAR_BIT__ + 2)
++    __builtin_unreachable ();
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++quux (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__)
++    __builtin_unreachable ();
++  return (x << y) | (x >> (__CHAR_BIT__ - y));
++}
++
++unsigned char
++corge (unsigned char x, unsigned int y)
++{
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
++  return (x << y) | (x >> (__CHAR_BIT__ - y));
++}
+diff --git a/gcc/testsuite/c-c++-common/rotate-11.c b/gcc/testsuite/c-c++-common/rotate-11.c
+new file mode 100644
+index 00000000000..e57db19d949
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/rotate-11.c
+@@ -0,0 +1,53 @@
++/* PR tree-optimization/108440 */
++/* { dg-do compile { target { { ilp32 || lp64 } || llp64 } } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* { dg-final { scan-tree-dump-times " r<< " 5 "optimized" } } */
++/* { dg-final { scan-tree-dump-times " \\\& 7;" 4 "optimized" } } */
++
++unsigned char
++foo (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__)
++    return 42;
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++bar (unsigned char x, unsigned int y)
++{
++  if (y >= __CHAR_BIT__)
++    return 42;
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++baz (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__ && y != 2 * __CHAR_BIT__)
++    return 42;
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++qux (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__ && y != 2 * __CHAR_BIT__ && y != __CHAR_BIT__ + 2)
++    return 42;
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++quux (unsigned char x, unsigned int y)
++{
++  if (y > __CHAR_BIT__)
++    return 42;
++  return (x << y) | (x >> (__CHAR_BIT__ - y));
++}
++
++unsigned char
++corge (unsigned char x, unsigned int y)
++{
++  if (y >= __CHAR_BIT__)
++    return 42;
++  return (x << y) | (x >> (__CHAR_BIT__ - y));
++}
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index c8a867ae828..9290d1558e5 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -51,6 +51,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "internal-fn.h"
+ #include "cgraph.h"
+ #include "tree-ssa.h"
++#include "gimple-range.h"
+ 
+ /* This pass propagates the RHS of assignment statements into use
+    sites of the LHS of the assignment.  It's basically a specialized
+@@ -1831,8 +1832,12 @@ defcodefor_name (tree name, enum tree_code *code, tree *arg1, tree *arg2)
+    ((T) ((T2) X << Y)) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+    ((T) ((T2) X << (int) Y)) | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+ 
+-   transform these into (last 2 only if ranger can prove Y < B):
++   transform these into (last 2 only if ranger can prove Y < B
++   or Y = N * B):
+    X r<< Y
++   or
++   X r<< (& & (B - 1))
++   The latter for the forms with T2 wider than T if ranger can't prove Y < B.
+ 
+    Or for:
+    (X << (Y & (B - 1))) | (X >> ((-Y) & (B - 1)))
+@@ -1862,6 +1867,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+   gimple *g;
+   gimple *def_arg_stmt[2] = { NULL, NULL };
+   int wider_prec = 0;
++  bool add_masking = false;
+ 
+   arg[0] = gimple_assign_rhs1 (stmt);
+   arg[1] = gimple_assign_rhs2 (stmt);
+@@ -1989,7 +1995,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+       tree cdef_arg1[2], cdef_arg2[2], def_arg2_alt[2];
+       enum tree_code cdef_code[2];
+       gimple *def_arg_alt_stmt[2] = { NULL, NULL };
+-      bool check_range = false;
++      int check_range = 0;
+       gimple *check_range_stmt = NULL;
+       /* Look through conversion of the shift count argument.
+ 	 The C/C++ FE cast any shift count argument to integer_type_node.
+@@ -2030,6 +2036,11 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 		|| cdef_arg2[i] == def_arg2_alt[1 - i])
+ 	      {
+ 		rotcnt = cdef_arg2[i];
++		check_range = -1;
++		if (cdef_arg2[i] == def_arg2[1 - i])
++		  check_range_stmt = def_arg_stmt[1 - i];
++		else
++		  check_range_stmt = def_arg_alt_stmt[1 - i];
+ 		break;
+ 	      }
+ 	    defcodefor_name (cdef_arg2[i], &code, &tem, NULL);
+@@ -2042,6 +2053,11 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 		    || tem == def_arg2_alt[1 - i]))
+ 	      {
+ 		rotcnt = tem;
++		check_range = -1;
++		if (tem == def_arg2[1 - i])
++		  check_range_stmt = def_arg_stmt[1 - i];
++		else
++		  check_range_stmt = def_arg_alt_stmt[1 - i];
+ 		break;
+ 	      }
+ 	  }
+@@ -2074,7 +2090,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 		if (tem == def_arg2[1 - i] || tem == def_arg2_alt[1 - i])
+ 		  {
+ 		    rotcnt = tem;
+-		    check_range = true;
++		    check_range = 1;
+ 		    if (tem == def_arg2[1 - i])
+ 		      check_range_stmt = def_arg_stmt[1 - i];
+ 		    else
+@@ -2093,7 +2109,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 			|| tem2 == def_arg2_alt[1 - i])
+ 		      {
+ 			rotcnt = tem2;
+-			check_range = true;
++			check_range = 1;
+ 			if (tem2 == def_arg2[1 - i])
+ 			  check_range_stmt = def_arg_stmt[1 - i];
+ 			else
+@@ -2138,17 +2154,44 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 	  if (TREE_CODE (rotcnt) != SSA_NAME)
+ 	    return false;
+ 	  int_range_max r;
+-	  if (!get_global_range_query ()->range_of_expr (r, rotcnt,
+-							 check_range_stmt))
+-	    return false;
++	  range_query *q = get_range_query (cfun);
++	  if (q == get_global_range_query ())
++	    q = enable_ranger (cfun);
++	  if (!q->range_of_expr (r, rotcnt, check_range_stmt))
++	    {
++	      if (check_range > 0)
++		return false;
++	      r.set_varying (TREE_TYPE (rotcnt));
++	    }
+ 	  int prec = TYPE_PRECISION (TREE_TYPE (rotcnt));
+ 	  signop sign = TYPE_SIGN (TREE_TYPE (rotcnt));
+ 	  wide_int min = wide_int::from (TYPE_PRECISION (rtype), prec, sign);
+ 	  wide_int max = wide_int::from (wider_prec - 1, prec, sign);
+-	  int_range<2> r2 (TREE_TYPE (rotcnt), min, max);
++	  if (check_range < 0)
++	    max = min;
++	  int_range<1> r2 (TREE_TYPE (rotcnt), min, max);
+ 	  r.intersect (r2);
+ 	  if (!r.undefined_p ())
+-	    return false;
++	    {
++	      if (check_range > 0)
++		{
++		  int_range_max r3;
++		  for (int i = TYPE_PRECISION (rtype) + 1; i < wider_prec;
++		       i += TYPE_PRECISION (rtype))
++		    {
++		      int j = i + TYPE_PRECISION (rtype) - 2;
++		      min = wide_int::from (i, prec, sign);
++		      max = wide_int::from (MIN (j, wider_prec - 1),
++					    prec, sign);
++		      int_range<1> r4 (TREE_TYPE (rotcnt), min, max);
++		      r3.union_ (r4);
++		    }
++		  r.intersect (r3);
++		  if (!r.undefined_p ())
++		    return false;
++		}
++	      add_masking = true;
++	    }
+ 	}
+       if (rotcnt == NULL_TREE)
+ 	return false;
+@@ -2163,6 +2206,15 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+       gsi_insert_before (gsi, g, GSI_SAME_STMT);
+       rotcnt = gimple_assign_lhs (g);
+     }
++  if (add_masking)
++    {
++      g = gimple_build_assign (make_ssa_name (TREE_TYPE (rotcnt)),
++			       BIT_AND_EXPR, rotcnt,
++			       build_int_cst (TREE_TYPE (rotcnt),
++					      TYPE_PRECISION (rtype) - 1));
++      gsi_insert_before (gsi, g, GSI_SAME_STMT);
++      rotcnt = gimple_assign_lhs (g);
++    }
+   lhs = gimple_assign_lhs (stmt);
+   if (!useless_type_conversion_p (rtype, TREE_TYPE (def_arg1[0])))
+     lhs = make_ssa_name (TREE_TYPE (def_arg1[0]));
+@@ -3908,6 +3960,9 @@ pass_forwprop::execute (function *fun)
+   cfg_changed |= gimple_purge_all_dead_eh_edges (to_purge);
+   BITMAP_FREE (to_purge);
+ 
++  if (get_range_query (cfun) != get_global_range_query ())
++    disable_ranger (cfun);
++
+   if (cfg_changed)
+     todoflags |= TODO_cleanup_cfg;
+ 
+-- 
+2.25.1
+

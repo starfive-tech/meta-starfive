@@ -1,0 +1,65 @@
+From 232305bd0c8dd37b17b815864e730aa630714606 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 16 Nov 2022 15:27:13 +0100
+Subject: [PATCH 278/547] tree-optimization/107686 - fix bitfield ref through
+ vec_unpack optimization
+
+The following propely restricts the bitfield access to integral types
+when we look through VEC_UNPACK with the intent to emit a widening
+conversion.
+
+	PR tree-optimization/107686
+	* tree-ssa-forwprop.cc (optimize_vector_load): Restrict
+	VEC_UNPACK support to integral typed bitfield refs.
+
+	* gcc.dg/pr107686.c: New testcase.
+
+(cherry picked from commit 246bbdaa5f536b7a199dda9860c473137f40d622)
+---
+ gcc/testsuite/gcc.dg/pr107686.c | 16 ++++++++++++++++
+ gcc/tree-ssa-forwprop.cc        |  6 +++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr107686.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr107686.c b/gcc/testsuite/gcc.dg/pr107686.c
+new file mode 100644
+index 00000000000..2378103c555
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr107686.c
+@@ -0,0 +1,16 @@
++/* { dg-do compile { target { dfp && longlong64 } } } */
++/* { dg-options "-O" } */
++/* { dg-additional-options "-mavx2" { target x86_64-*-* i?86-*-* } } */
++
++typedef _Decimal64 __attribute__((__vector_size__ (64))) D;
++typedef __INT32_TYPE__ __attribute__((__vector_size__ (32))) U;
++typedef __INT64_TYPE__ __attribute__((__vector_size__ (64))) V;
++
++U u;
++D d;
++
++void
++foo (void)
++{
++  d = d < (D) __builtin_convertvector (u, V);
++}
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index 484491fa1c5..260d5dac83b 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -3118,7 +3118,11 @@ optimize_vector_load (gimple_stmt_iterator *gsi)
+ 	      && (def == lhs
+ 		  || (known_eq (bit_field_size (use_rhs), def_eltsize)
+ 		      && constant_multiple_p (bit_field_offset (use_rhs),
+-					      def_eltsize))))
++					      def_eltsize)
++		      /* We can simulate the VEC_UNPACK_{HI,LO}_EXPR
++			 via a NOP_EXPR only for integral types.
++			 ???  Support VEC_UNPACK_FLOAT_{HI,LO}_EXPR.  */
++		      && INTEGRAL_TYPE_P (TREE_TYPE (use_rhs)))))
+ 	    {
+ 	      bf_stmts.safe_push (use_stmt);
+ 	      continue;
+-- 
+2.25.1
+

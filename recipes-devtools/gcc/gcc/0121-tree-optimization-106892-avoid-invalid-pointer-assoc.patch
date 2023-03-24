@@ -1,0 +1,95 @@
+From 2b9e1f7ff476059724cca4b11d39972655d4468f Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 9 Sep 2022 12:06:38 +0200
+Subject: [PATCH 121/547] tree-optimization/106892 - avoid invalid pointer
+ association in predcom
+
+When predictive commoning builds a reference for iteration N it
+prematurely associates a constant offset into the MEM_REF offset
+operand which can be invalid if the base pointer then points
+outside of an object which alias-analysis does not consider valid.
+
+	PR tree-optimization/106892
+	* tree-predcom.cc (ref_at_iteration): Do not associate the
+	constant part of the offset into the MEM_REF offset
+	operand, across a non-zero offset.
+
+	* gcc.dg/torture/pr106892.c: New testcase.
+
+(cherry picked from commit a8b0b13da7379feb31950a9d2ad74b98a29c547f)
+---
+ gcc/testsuite/gcc.dg/torture/pr106892.c | 30 +++++++++++++++++++++++++
+ gcc/tree-predcom.cc                     | 18 +++++++++++++--
+ 2 files changed, 46 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr106892.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr106892.c b/gcc/testsuite/gcc.dg/torture/pr106892.c
+new file mode 100644
+index 00000000000..73a66a037b7
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr106892.c
+@@ -0,0 +1,30 @@
++/* { dg-do run } */
++
++int a, b, c, d, e;
++int f[8];
++static int g() {
++  while (a)
++    a >>= 4;
++  return 0;
++}
++static int h(int i) {
++  if (i >= '0')
++    return i - '0';
++  //__builtin_unreachable ();
++}
++void __attribute__((noipa)) j(int i) {
++  for (b = 2; g() <= 7; b++)
++    if (i) {
++      for (; e <= 7; e++)
++        for (c = 1; c <= 7; c++) {
++          d = h(b + '0');
++          f[-d + 4] ^= 3;
++        }
++      return;
++    }
++}
++int main() {
++  j(1);
++  if (f[2] != 0)
++    __builtin_abort ();
++}
+diff --git a/gcc/tree-predcom.cc b/gcc/tree-predcom.cc
+index fb457250bbd..3666b90ba5c 100644
+--- a/gcc/tree-predcom.cc
++++ b/gcc/tree-predcom.cc
+@@ -1771,10 +1771,24 @@ ref_at_iteration (data_reference_p dr, int iter,
+ 	  ref = TREE_OPERAND (ref, 0);
+ 	}
+     }
+-  tree addr = fold_build_pointer_plus (DR_BASE_ADDRESS (dr), off);
++  /* We may not associate the constant offset across the pointer plus
++     expression because that might form a pointer to before the object
++     then.  But for some cases we can retain that to allow tree_could_trap_p
++     to return false - see gcc.dg/tree-ssa/predcom-1.c  */
++  tree addr, alias_ptr;
++  if (integer_zerop  (off))
++    {
++      alias_ptr = fold_convert (reference_alias_ptr_type (ref), coff);
++      addr = DR_BASE_ADDRESS (dr);
++    }
++  else
++    {
++      alias_ptr = build_zero_cst (reference_alias_ptr_type (ref));
++      off = size_binop (PLUS_EXPR, off, coff);
++      addr = fold_build_pointer_plus (DR_BASE_ADDRESS (dr), off);
++    }
+   addr = force_gimple_operand_1 (unshare_expr (addr), stmts,
+ 				 is_gimple_mem_ref_addr, NULL_TREE);
+-  tree alias_ptr = fold_convert (reference_alias_ptr_type (ref), coff);
+   tree type = build_aligned_type (TREE_TYPE (ref),
+ 				  get_object_alignment (ref));
+   ref = build2 (MEM_REF, type, addr, alias_ptr);
+-- 
+2.25.1
+

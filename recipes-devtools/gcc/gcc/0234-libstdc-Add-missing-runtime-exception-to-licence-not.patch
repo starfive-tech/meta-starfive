@@ -1,0 +1,41 @@
+From 9ea0f924f4ad70cbde7f47228f12757b48e996ef Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 6 Sep 2022 11:58:21 +0100
+Subject: [PATCH 234/547] libstdc++: Add missing runtime exception to licence
+ notice
+
+This file is missing the GCC Runtime Library Exception text in the
+licence header. That is unintentional, and it should have been present.
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/barrier: Add missing runtime exception.
+
+(cherry picked from commit d7f282c4243e24f567b11a5cb6048a27a3df733d)
+---
+ libstdc++-v3/include/std/barrier | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/include/std/barrier b/libstdc++-v3/include/std/barrier
+index 2a2650546ad..997e0a8f7ab 100644
+--- a/libstdc++-v3/include/std/barrier
++++ b/libstdc++-v3/include/std/barrier
+@@ -13,8 +13,13 @@
+ // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ // GNU General Public License for more details.
+ 
+-// You should have received a copy of the GNU General Public License along
+-// with this library; see the file COPYING3.  If not see
++// Under Section 7 of GPL version 3, you are granted additional
++// permissions described in the GCC Runtime Library Exception, version
++// 3.1, as published by the Free Software Foundation.
++
++// You should have received a copy of the GNU General Public License and
++// a copy of the GCC Runtime Library Exception along with this program;
++// see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ // <http://www.gnu.org/licenses/>.
+ 
+ // This implementation is based on libcxx/include/barrier
+-- 
+2.25.1
+

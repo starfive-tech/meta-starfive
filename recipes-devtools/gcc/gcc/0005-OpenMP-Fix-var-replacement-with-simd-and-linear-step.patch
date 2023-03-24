@@ -1,0 +1,300 @@
+From 2413eed009878c347c65950c649c0da59e759238 Mon Sep 17 00:00:00 2001
+From: Tobias Burnus <tobias@codesourcery.com>
+Date: Wed, 17 Aug 2022 15:45:56 +0200
+Subject: [PATCH 005/547] OpenMP: Fix var replacement with 'simd' and
+ linear-step vars [PR106548]
+
+gcc/ChangeLog:
+
+	PR middle-end/106548
+	* omp-low.cc (lower_rec_input_clauses): Use build_outer_var_ref
+	for 'simd' linear-step values that are variable.
+
+libgomp/ChangeLog:
+
+	PR middle-end/106548
+	* testsuite/libgomp.c/linear-2.c: New test.
+
+(cherry picked from commit d9c9424d2c4f7b25acfc00db0076a65882c8a99f)
+---
+ gcc/omp-low.cc                         |   2 +
+ libgomp/testsuite/libgomp.c/linear-2.c | 254 +++++++++++++++++++++++++
+ 2 files changed, 256 insertions(+)
+ create mode 100644 libgomp/testsuite/libgomp.c/linear-2.c
+
+diff --git a/gcc/omp-low.cc b/gcc/omp-low.cc
+index eefd9107b89..584ec09d31b 100644
+--- a/gcc/omp-low.cc
++++ b/gcc/omp-low.cc
+@@ -6152,6 +6152,8 @@ lower_rec_input_clauses (tree clauses, gimple_seq *ilist, gimple_seq *dlist,
+ 		      && gimple_omp_for_combined_into_p (ctx->stmt))
+ 		    {
+ 		      tree t = OMP_CLAUSE_LINEAR_STEP (c);
++		      if (DECL_P (t))
++			t = build_outer_var_ref (t, ctx);
+ 		      tree stept = TREE_TYPE (t);
+ 		      tree ct = omp_find_clause (clauses,
+ 						 OMP_CLAUSE__LOOPTEMP_);
+diff --git a/libgomp/testsuite/libgomp.c/linear-2.c b/libgomp/testsuite/libgomp.c/linear-2.c
+new file mode 100644
+index 00000000000..fd549a89490
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c/linear-2.c
+@@ -0,0 +1,254 @@
++/* PR middle-end/106548.  */
++/* { dg-additional-options "-msse2" { target sse2_runtime } } */
++/* { dg-additional-options "-mavx" { target avx_runtime } } */
++
++int a[256];
++
++__attribute__((noinline, noclone)) int
++f1 (int i)
++{
++  #pragma omp parallel for simd linear (i: 4)
++  for (int j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f2 (short int i, char k)
++{
++  #pragma omp parallel for simd linear (i: k + 1)
++  for (long j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f3 (long long int i, long long int k)
++{
++  #pragma omp parallel for simd linear (i: k)
++  for (short j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) int
++f4 (int i)
++{
++  #pragma omp parallel for simd linear (i: 4) schedule(static, 3)
++  for (int j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f5 (short int i, char k)
++{
++  #pragma omp parallel for simd linear (i: k + 1) schedule(static, 5)
++  for (long j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f6 (long long int i, long long int k)
++{
++  #pragma omp parallel for simd linear (i: k) schedule(static, 7)
++  for (short j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) int
++f7 (int i)
++{
++  #pragma omp parallel for simd linear (i: 4) schedule(dynamic, 3)
++  for (int j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f8 (short int i, char k)
++{
++  #pragma omp parallel for simd linear (i: k + 1) schedule(dynamic, 5)
++  for (long j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f9 (long long int i, long long int k)
++{
++  #pragma omp parallel for simd linear (i: k) schedule(dynamic, 7)
++  for (short j = 16; j < 64; j++)
++    {
++      a[i] = j;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) int
++f10 (int i, long step)
++{
++  #pragma omp parallel for simd linear (i: 4)
++  for (int j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f11 (short int i, char k, char step)
++{
++  #pragma omp parallel for simd linear (i: k + 1)
++  for (long j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f12 (long long int i, long long int k, int step)
++{
++  #pragma omp parallel for simd linear (i: k)
++  for (short j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) int
++f13 (int i, long long int step)
++{
++  #pragma omp parallel for simd linear (i: 4) schedule(static, 3)
++  for (int j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f14 (short int i, char k, int step)
++{
++  #pragma omp parallel for simd linear (i: k + 1) schedule(static, 5)
++  for (long j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f15 (long long int i, long long int k, long int step)
++{
++  #pragma omp parallel for simd linear (i: k) schedule(static, 7)
++  for (short j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) int
++f16 (int i, long long int step)
++{
++  #pragma omp parallel for simd linear (i: 4) schedule(dynamic, 3)
++  for (int j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) short int
++f17 (short int i, char k, int step)
++{
++  #pragma omp parallel for simd linear (i: k + 1) schedule(dynamic, 5)
++  for (long j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++__attribute__((noinline, noclone)) long long int
++f18 (long long int i, long long int k, long int step)
++{
++  #pragma omp parallel for simd linear (i: k) schedule(dynamic, 7)
++  for (short j = 16; j < 112; j += step)
++    {
++      a[i] = j / 2 + 8;
++      i += 4;
++    }
++  return i;
++}
++
++int
++main ()
++{
++#define TEST(x) \
++  if (x != 8 + 48 * 4)				\
++    __builtin_abort ();				\
++  for (int i = 0; i < 256; i++)			\
++    if (a[i] != (((i & 3) == 0 && i >= 8	\
++		  && i < 8 + 48 * 4)		\
++		 ? ((i - 8) / 4) + 16 : 0))	\
++      __builtin_abort ();			\
++  __builtin_memset (a, 0, sizeof (a))
++  TEST (f1 (8));
++  TEST (f2 (8, 3));
++  TEST (f3 (8LL, 4LL));
++  TEST (f4 (8));
++  TEST (f5 (8, 3));
++  TEST (f6 (8LL, 4LL));
++  TEST (f7 (8));
++  TEST (f8 (8, 3));
++  TEST (f9 (8LL, 4LL));
++  TEST (f10 (8, 2));
++  TEST (f11 (8, 3, 2));
++  TEST (f12 (8LL, 4LL, 2));
++  TEST (f13 (8, 2));
++  TEST (f14 (8, 3, 2));
++  TEST (f15 (8LL, 4LL, 2));
++  TEST (f16 (8, 2));
++  TEST (f17 (8, 3, 2));
++  TEST (f18 (8LL, 4LL, 2));
++  return 0;
++}
+-- 
+2.25.1
+

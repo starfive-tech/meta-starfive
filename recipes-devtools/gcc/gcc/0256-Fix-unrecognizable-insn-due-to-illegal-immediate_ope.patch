@@ -1,0 +1,61 @@
+From b7306f02da33695bec90f153f6725a51d7c0ac71 Mon Sep 17 00:00:00 2001
+From: liuhongt <hongtao.liu@intel.com>
+Date: Mon, 28 Nov 2022 09:59:47 +0800
+Subject: [PATCH 256/547] Fix unrecognizable insn due to illegal
+ immediate_operand (const_int 255) of QImode.
+
+For __builtin_ia32_vec_set_v16qi (a, -1, 2) with
+!flag_signed_char. it's transformed to
+__builtin_ia32_vec_set_v16qi (_4, 255, 2) in the gimple,
+and expanded to (const_int 255) in the rtl. But for immediate_operand,
+it expects (const_int 255) to be signed extended to
+(const_int -1). The mismatch caused an unrecognizable insn error.
+
+The patch converts (const_int 255) to (const_int -1) in the backend
+expander.
+
+gcc/ChangeLog:
+
+	PR target/107863
+	* config/i386/i386-expand.cc (ix86_expand_vec_set_builtin):
+	Convert op1 to target mode whenever mode mismatch.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr107863.c: New test.
+---
+ gcc/config/i386/i386-expand.cc           | 2 +-
+ gcc/testsuite/gcc.target/i386/pr107863.c | 8 ++++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr107863.c
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index 31780b6daf7..faa63a48bcd 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -12234,7 +12234,7 @@ ix86_expand_vec_set_builtin (tree exp)
+   op1 = expand_expr (arg1, NULL_RTX, mode1, EXPAND_NORMAL);
+   elt = get_element_number (TREE_TYPE (arg0), arg2);
+ 
+-  if (GET_MODE (op1) != mode1 && GET_MODE (op1) != VOIDmode)
++  if (GET_MODE (op1) != mode1)
+     op1 = convert_modes (mode1, GET_MODE (op1), op1, true);
+ 
+   op0 = force_reg (tmode, op0);
+diff --git a/gcc/testsuite/gcc.target/i386/pr107863.c b/gcc/testsuite/gcc.target/i386/pr107863.c
+new file mode 100644
+index 00000000000..99fd85d9765
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr107863.c
+@@ -0,0 +1,8 @@
++/* { dg-do compile } */
++/* { dg-options "-mavx2 -O" } */
++
++typedef char v16qi __attribute__((vector_size(16)));
++
++v16qi foo(v16qi a){
++  return __builtin_ia32_vec_set_v16qi (a, -1, 2);
++}
+-- 
+2.25.1
+

@@ -1,0 +1,51 @@
+From 8495d80f44488b2566afc84b3f5704dd7c999e21 Mon Sep 17 00:00:00 2001
+From: Martin Jambor <mjambor@suse.cz>
+Date: Wed, 1 Feb 2023 18:58:09 +0100
+Subject: [PATCH 398/547] ipa: Release body more carefully when removing nodes
+ (PR 107944)
+
+The code removing function bodies when the last call graph clone of a
+node is removed is too aggressive when there are nodes up the
+clone_of chain which still need them.  Fixed by expanding the check.
+
+gcc/ChangeLog:
+
+2023-01-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/107944
+	* cgraph.cc (cgraph_node::remove): Check whether nodes up the
+	lcone_of chain also do not need the body.
+
+(cherry picked from commit db959e250077ae6b4fc08f53fb322719582c5de6)
+---
+ gcc/cgraph.cc | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/cgraph.cc b/gcc/cgraph.cc
+index 4bb9e7ba6af..3734c85db63 100644
+--- a/gcc/cgraph.cc
++++ b/gcc/cgraph.cc
+@@ -1895,8 +1895,18 @@ cgraph_node::remove (void)
+   else if (clone_of)
+     {
+       clone_of->clones = next_sibling_clone;
+-      if (!clone_of->analyzed && !clone_of->clones && !clones)
+-	clone_of->release_body ();
++      if (!clones)
++	{
++	  bool need_body = false;
++	  for (cgraph_node *n = clone_of; n; n = n->clone_of)
++	    if (n->analyzed || n->clones)
++	      {
++		need_body = true;
++		break;
++	      }
++	  if (!need_body)
++	    clone_of->release_body ();
++	}
+     }
+   if (next_sibling_clone)
+     next_sibling_clone->prev_sibling_clone = prev_sibling_clone;
+-- 
+2.25.1
+

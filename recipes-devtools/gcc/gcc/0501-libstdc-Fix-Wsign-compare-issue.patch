@@ -1,0 +1,33 @@
+From b32665852ebcf661247ea3d96793da778bfc566f Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Tue, 21 Feb 2023 10:31:55 +0100
+Subject: [PATCH 501/547] libstdc++: Fix -Wsign-compare issue
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+
+libstdc++-v3/ChangeLog:
+
+	* include/experimental/bits/simd_builtin.h (_S_set): Compare as
+	int. The actual range of these indexes is very small.
+
+(cherry picked from commit ffa39f7120f6e83a567d7a83ff4437f6b41036ea)
+---
+ libstdc++-v3/include/experimental/bits/simd_builtin.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/experimental/bits/simd_builtin.h b/libstdc++-v3/include/experimental/bits/simd_builtin.h
+index 019b98e8c37..5901dee24b2 100644
+--- a/libstdc++-v3/include/experimental/bits/simd_builtin.h
++++ b/libstdc++-v3/include/experimental/bits/simd_builtin.h
+@@ -2846,7 +2846,7 @@ template <typename _Abi, typename>
+ 		__k = __generate_from_n_evaluations<_Np,
+ 						    __vector_type_t<_Tp, _Np>>(
+ 		  [&](auto __j) {
+-		    if (__i == __j)
++		    if (__i == static_cast<int>(__j))
+ 		      return _Tp(-__x);
+ 		    else
+ 		      return __k[+__j];
+-- 
+2.25.1
+

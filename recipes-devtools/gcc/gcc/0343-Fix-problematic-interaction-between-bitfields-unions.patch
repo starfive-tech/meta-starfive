@@ -1,0 +1,112 @@
+From eec3a65ed638a1c58fa08ddf508d2d60b64d311d Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 11 Jan 2023 15:58:47 +0100
+Subject: [PATCH 343/547] Fix problematic interaction between bitfields,
+ unions, SSO and SRA
+
+The handling of bitfields by the SRA pass is peculiar and this must be taken
+into account to support the scalar_storage_order attribute.
+
+gcc/
+	PR tree-optimization/108199
+	* tree-sra.cc (sra_modify_expr): Deal with reverse storage order
+	for bit-field references.
+
+gcc/testsuite/
+	* gcc.dg/sso-17.c: New test.
+---
+ gcc/testsuite/gcc.dg/sso-17.c | 52 +++++++++++++++++++++++++++++++++++
+ gcc/tree-sra.cc               | 18 +++++++++++-
+ 2 files changed, 69 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/sso-17.c
+
+diff --git a/gcc/testsuite/gcc.dg/sso-17.c b/gcc/testsuite/gcc.dg/sso-17.c
+new file mode 100644
+index 00000000000..67e2d3793fd
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/sso-17.c
+@@ -0,0 +1,52 @@
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define REV_ENDIANNESS __attribute__((scalar_storage_order("big-endian")))
++#else
++#define REV_ENDIANNESS __attribute__((scalar_storage_order("little-endian")))
++#endif
++
++typedef unsigned long long u64;
++
++union DST {
++  u64 val;
++
++  struct {
++    u64 x : 1;
++    u64 y : 1;
++    u64 r: 62;
++  } REV_ENDIANNESS;
++} REV_ENDIANNESS;
++
++
++struct SRC {
++  u64 a;
++} REV_ENDIANNESS;
++
++[[gnu::noipa]]
++void foo () {__builtin_abort();}
++
++[[gnu::noinline]]
++int bar(struct SRC *src)
++{
++  union DST dst;
++  
++  dst.val = src->a;
++
++  if (dst.y) {
++    foo();
++  }
++  return 0;
++}
++
++int main(void)
++{
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++  struct SRC t = {-1ull & (~(0x01ull<<62))};
++#else
++  struct SRC t = {-1ull & (~(0x01ull<<1))};
++#endif
++  bar(&t);
++  return 0;
++}
+diff --git a/gcc/tree-sra.cc b/gcc/tree-sra.cc
+index 95291e8df93..09dbd7be77f 100644
+--- a/gcc/tree-sra.cc
++++ b/gcc/tree-sra.cc
+@@ -3858,7 +3858,23 @@ sra_modify_expr (tree *expr, gimple_stmt_iterator *gsi, bool write)
+ 	    }
+ 	}
+       else
+-	*expr = repl;
++	{
++	  /* If we are going to replace a scalar field in a structure with
++	     reverse storage order by a stand-alone scalar, we are going to
++	     effectively byte-swap the scalar and we also need to byte-swap
++	     the portion of it represented by the bit-field.  */
++	  if (bfr && REF_REVERSE_STORAGE_ORDER (bfr))
++	    {
++	      REF_REVERSE_STORAGE_ORDER (bfr) = 0;
++	      TREE_OPERAND (bfr, 2)
++		= size_binop (MINUS_EXPR, TYPE_SIZE (TREE_TYPE (repl)),
++			      size_binop (PLUS_EXPR, TREE_OPERAND (bfr, 1),
++						     TREE_OPERAND (bfr, 2)));
++	    }
++
++	  *expr = repl;
++	}
++
+       sra_stats.exprs++;
+     }
+   else if (write && access->grp_to_be_debug_replaced)
+-- 
+2.25.1
+

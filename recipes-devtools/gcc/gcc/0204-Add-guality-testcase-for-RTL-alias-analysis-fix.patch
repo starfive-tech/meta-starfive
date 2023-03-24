@@ -1,0 +1,41 @@
+From 22f701165a9e967b7ce8a232b388910450feff25 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 9 Nov 2022 12:27:34 +0100
+Subject: [PATCH 204/547] Add guality testcase for RTL alias analysis fix
+
+gcc/testsuite/
+	* gcc.dg/guality/param-6.c: New test.
+---
+ gcc/testsuite/gcc.dg/guality/param-6.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/guality/param-6.c
+
+diff --git a/gcc/testsuite/gcc.dg/guality/param-6.c b/gcc/testsuite/gcc.dg/guality/param-6.c
+new file mode 100644
+index 00000000000..9c4ba5cb46a
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/guality/param-6.c
+@@ -0,0 +1,20 @@
++/* { dg-do run { target i?86-*-* x86_64-*-* } } */
++/* { dg-options "-g" } */
++
++void __attribute__((noipa)) bar (void *p)
++{}
++
++void __attribute__((noipa)) foo (int i)
++{
++  void *p = __builtin_alloca (i);
++
++  asm volatile ("" : : : "ebx");
++
++  bar (p); /* { dg-final { gdb-test . "i" "5" } } */
++}
++
++int main (void)
++{
++  foo (5);
++  return 0;
++}
+-- 
+2.25.1
+

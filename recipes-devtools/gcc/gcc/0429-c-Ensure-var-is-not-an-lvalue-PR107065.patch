@@ -1,0 +1,101 @@
+From bc1ee711eeab4b0d55463cd153747d30c69225c7 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 15 Dec 2022 19:17:45 +0100
+Subject: [PATCH 429/547] c++: Ensure !!var is not an lvalue [PR107065]
+
+The TRUTH_NOT_EXPR case in cp_build_unary_op is one of the spots where
+we somewhat fold immediately using invert_truthvalue_loc.
+I've tried using
+  return build1_loc (location, TRUTH_NOT_EXPR, boolean_type_node, arg);
+in there instead, but unfortunately that regressed
+Wlogical-not-parentheses-*.c pr49706.c pr62199.c pr65120.c sequence-pt-1.C
+tests, so at least for backporting that doesn't seem to be a way to go.
+
+So, this patch instead wraps it into NON_LVALUE_EXPR if needed (which also
+need a tweak for some tests in the pr47906.c test, but nothing major),
+with the intent to make it backportable, and later I'll try to do further
+steps to avoid folding here prematurely.  Most of the problems with
+build1 TRUTH_NOT_EXPR are that it doesn't even invert comparisons as most
+common case and lots of warning code isn't able to deal with ! around
+comparisons; so perhaps one way to do this would be fold by hand only
+invertable comparisons and for the rest create TRUTH_NOT_EXPR.
+
+2022-12-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/107065
+gcc/cp/
+	* typeck.cc (cp_build_unary_op) <case TRUTH_NOT_EXPR>: If
+	invert_truthvalue_loc returns obvalue_p, wrap it into NON_LVALUE_EXPR.
+	* parser.cc (cp_parser_binary_expression): Don't call
+	warn_logical_not_parentheses if current.lhs is a NON_LVALUE_EXPR
+	of a decl with boolean type.
+gcc/testsuite/
+	* g++.dg/cpp0x/pr107065.C: New test.
+
+(cherry picked from commit 8b775b4c48a3cc4ef5c50e56144aea02da2e9cc6)
+---
+ gcc/cp/parser.cc                      |  5 ++++-
+ gcc/cp/typeck.cc                      |  8 ++++++--
+ gcc/testsuite/g++.dg/cpp0x/pr107065.C | 14 ++++++++++++++
+ 3 files changed, 24 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/pr107065.C
+
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index 5de1a80288e..39f7eda4b56 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -10157,7 +10157,10 @@ cp_parser_binary_expression (cp_parser* parser, bool cast_p,
+ 		      || (TREE_CODE (TREE_TYPE (TREE_OPERAND (current.lhs, 0)))
+ 			  != BOOLEAN_TYPE))))
+ 	  /* Avoid warning for !!b == y where b is boolean.  */
+-	  && (!DECL_P (tree_strip_any_location_wrapper (current.lhs))
++	  && (!(DECL_P (tree_strip_any_location_wrapper (current.lhs))
++		|| (TREE_CODE (current.lhs) == NON_LVALUE_EXPR
++		    && DECL_P (tree_strip_any_location_wrapper
++					    (TREE_OPERAND (current.lhs, 0)))))
+ 	      || TREE_TYPE (current.lhs) == NULL_TREE
+ 	      || TREE_CODE (TREE_TYPE (current.lhs)) != BOOLEAN_TYPE))
+ 	warn_logical_not_parentheses (current.loc, current.tree_type,
+diff --git a/gcc/cp/typeck.cc b/gcc/cp/typeck.cc
+index c36508b8cc5..bf42fb0ba32 100644
+--- a/gcc/cp/typeck.cc
++++ b/gcc/cp/typeck.cc
+@@ -7087,9 +7087,13 @@ cp_build_unary_op (enum tree_code code, tree xarg, bool noconvert,
+ 				   build_zero_cst (TREE_TYPE (arg)), complain);
+       arg = perform_implicit_conversion (boolean_type_node, arg,
+ 					 complain);
+-      val = invert_truthvalue_loc (location, arg);
+       if (arg != error_mark_node)
+-	return val;
++	{
++	  val = invert_truthvalue_loc (location, arg);
++	  if (obvalue_p (val))
++	    val = non_lvalue_loc (location, val);
++	  return val;
++	}
+       errstring = _("in argument to unary !");
+       break;
+ 
+diff --git a/gcc/testsuite/g++.dg/cpp0x/pr107065.C b/gcc/testsuite/g++.dg/cpp0x/pr107065.C
+new file mode 100644
+index 00000000000..5e18bb91cff
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/pr107065.C
+@@ -0,0 +1,14 @@
++// PR c++/107065
++// { dg-do compile { target c++11 } }
++
++template<class, class> struct is_same { static constexpr bool value = false; };
++template<class T> struct is_same<T, T> { static constexpr bool value = true; };
++
++int
++main ()
++{
++  bool b = true;
++  static_assert (is_same<decltype (!(!b)), bool>::value, "");
++  auto bb = (!(!b));
++  static_assert (is_same<decltype (bb), bool>::value, "");
++}
+-- 
+2.25.1
+

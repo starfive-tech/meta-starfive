@@ -1,0 +1,50 @@
+From 193f7e62815b4089dfaed4c2bd34fd4f10209e27 Mon Sep 17 00:00:00 2001
+From: Sergei Trofimovich <siarheit@google.com>
+Date: Tue, 16 Aug 2022 12:35:07 +0100
+Subject: [PATCH 363/547] driver: fix environ corruption after putenv()
+ [PR106624]
+
+The bug appeared afte r13-2010-g1270ccda70ca09 "Factor out
+jobserver_active_p" slightly changed `putenv()` use from allocating
+to non-allocating:
+
+    -xputenv (concat ("MAKEFLAGS=", dup, NULL));
+    +xputenv (jinfo.skipped_makeflags.c_str ());
+
+`xputenv()` (and `putenv()`) don't copy strings and only store the
+pointer in the `environ` global table. As a result `environ` got
+corrupted as soon as `jinfo.skipped_makeflags` store got deallocated.
+
+This started causing bootstrap crashes in `execv()` calls:
+
+    xgcc: fatal error: cannot execute '/build/build/./prev-gcc/collect2': execv: Bad address
+
+The change restores memory allocation for `xputenv()` argument.
+
+gcc/
+
+	PR driver/106624
+	* gcc.cc (driver::detect_jobserver): Allocate storage xputenv()
+	argument using xstrdup().
+
+(cherry picked from commit 2b403297b111c990c331b5bbb6165b061ad2259b)
+---
+ gcc/gcc.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/gcc.cc b/gcc/gcc.cc
+index b4c8d659014..fbcc9d03314 100644
+--- a/gcc/gcc.cc
++++ b/gcc/gcc.cc
+@@ -9182,7 +9182,7 @@ driver::detect_jobserver () const
+ {
+   jobserver_info jinfo;
+   if (!jinfo.is_active && !jinfo.skipped_makeflags.empty ())
+-    xputenv (jinfo.skipped_makeflags.c_str ());
++    xputenv (xstrdup (jinfo.skipped_makeflags.c_str ()));
+ }
+ 
+ /* Determine what the exit code of the driver should be.  */
+-- 
+2.25.1
+

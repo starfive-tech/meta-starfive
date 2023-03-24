@@ -1,0 +1,62 @@
+From baa9be7e01e8d71b248a17fe704089af40f4961b Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 7 Feb 2023 00:21:30 +0000
+Subject: [PATCH 413/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 15 +++++++++++++++
+ gcc/testsuite/ChangeLog | 10 ++++++++++
+ 3 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 285087c482a..9e62c1c1935 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230206
++20230207
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 92634fec032..5b90f745691 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,18 @@
++2023-02-06  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-02-06  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107461
++	* cp-tree.h (call_expr_dependent_name): Declare.
++	* pt.cc (iterative_hash_template_arg) <case CALL_EXPR>: Use
++	call_expr_dependent_name instead of dependent_name.
++	* tree.cc (call_expr_dependent_name): Define.
++	(called_fns_equal): Adjust to take two CALL_EXPRs instead of
++	CALL_EXPR_FNs thereof.  Use call_expr_dependent_name instead
++	of dependent_name.
++	(cp_tree_equal) <case CALL_EXPR>: Adjust call to called_fns_equal.
++
+ 2023-02-03  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 60ccc0cc19c..4964eb8aad6 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,13 @@
++2023-02-06  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-02-06  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107461
++	* g++.dg/cpp0x/overload5.C: New test.
++	* g++.dg/cpp0x/overload5a.C: New test.
++	* g++.dg/cpp0x/overload6.C: New test.
++
+ 2023-02-05  Mikael Morin  <mikael@gcc.gnu.org>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

@@ -1,0 +1,50 @@
+From 825365bec9e9b91173aa98a1ef30472618e6baa0 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 14 Sep 2022 13:48:25 +0100
+Subject: [PATCH 235/547] libstdc++: Document LWG 1203 API change in manual
+
+libstdc++-v3/ChangeLog:
+
+	* doc/xml/manual/intro.xml: Document LWG 1203.
+	* doc/html/*: Regenerate.
+
+(cherry picked from commit 8b1bc3051bd68ce193a8612fa3b1a65c0353b5b0)
+---
+ libstdc++-v3/doc/html/manual/bugs.html | 3 +++
+ libstdc++-v3/doc/xml/manual/intro.xml  | 6 ++++++
+ 2 files changed, 9 insertions(+)
+
+diff --git a/libstdc++-v3/doc/html/manual/bugs.html b/libstdc++-v3/doc/html/manual/bugs.html
+index ef00beec1a8..8e0bc1f9801 100644
+--- a/libstdc++-v3/doc/html/manual/bugs.html
++++ b/libstdc++-v3/doc/html/manual/bugs.html
+@@ -357,6 +357,9 @@
+ 	<span class="emphasis"><em>More algorithms that throw away information</em></span>
+     </span></dt><dd><p>The traditional HP / SGI return type and value is blessed
+ 		    by the resolution of the DR.
++    </p></dd><dt><a id="manual.bugs.dr1203"></a><span class="term"><a class="link" href="http://www.open-std.org/jtc1/sc22/wg21/docs/lwg-defects.html#1203" target="_top">1203</a>:
++       <span class="emphasis"><em>More useful rvalue stream insertion</em></span>
++    </span></dt><dd><p>Return the stream as its original type, not the base class.
+     </p></dd><dt><a id="manual.bugs.dr1339"></a><span class="term"><a class="link" href="http://www.open-std.org/jtc1/sc22/wg21/docs/lwg-defects.html#1339" target="_top">1339</a>:
+        <span class="emphasis"><em>uninitialized_fill_n should return the end of its range</em></span>
+     </span></dt><dd><p>Return the end of the filled range.
+diff --git a/libstdc++-v3/doc/xml/manual/intro.xml b/libstdc++-v3/doc/xml/manual/intro.xml
+index 7b8abd98b0d..e3a03cf9d59 100644
+--- a/libstdc++-v3/doc/xml/manual/intro.xml
++++ b/libstdc++-v3/doc/xml/manual/intro.xml
+@@ -852,6 +852,12 @@ requirements of the license of GCC.
+ 		    by the resolution of the DR.
+     </para></listitem></varlistentry>
+ 
++    <varlistentry xml:id="manual.bugs.dr1203"><term><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&DR;#1203">1203</link>:
++       <emphasis>More useful rvalue stream insertion</emphasis>
++    </term>
++    <listitem><para>Return the stream as its original type, not the base class.
++    </para></listitem></varlistentry>
++
+     <varlistentry xml:id="manual.bugs.dr1339"><term><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&DR;#1339">1339</link>:
+        <emphasis>uninitialized_fill_n should return the end of its range</emphasis>
+     </term>
+-- 
+2.25.1
+

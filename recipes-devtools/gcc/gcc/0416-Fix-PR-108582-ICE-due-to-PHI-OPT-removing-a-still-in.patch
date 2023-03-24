@@ -1,0 +1,113 @@
+From 6f23c9077feebb29c2a28ffe89b287286df27d6d Mon Sep 17 00:00:00 2001
+From: Andrew Pinski <apinski@marvell.com>
+Date: Sat, 28 Jan 2023 18:27:08 +0000
+Subject: [PATCH 416/547] Fix PR 108582: ICE due to PHI-OPT removing a still in
+ use ssa_name.
+
+This patch adds a check in match_simplify_replacement to make sure the middlebb
+does not have any phi-nodes as we don't currently move those.
+This was just a thinko from before.
+
+Committed on the GCC 12 branch after a bootstrap/test on x86_64-linux-gnu.
+
+	PR tree-optimization/108582
+
+gcc/ChangeLog:
+
+	* tree-ssa-phiopt.cc (match_simplify_replacement): Add check
+	for middlebb to have no phi nodes.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/pr108582-1.c: New test.
+
+(cherry picked from commit 876b3e0514bc8cb2256c44db56255403bedfa52d)
+---
+ gcc/testsuite/gcc.dg/pr108582-1.c | 58 +++++++++++++++++++++++++++++++
+ gcc/tree-ssa-phiopt.cc            |  5 +++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108582-1.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr108582-1.c b/gcc/testsuite/gcc.dg/pr108582-1.c
+new file mode 100644
+index 00000000000..88c2de369ad
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108582-1.c
+@@ -0,0 +1,58 @@
++/* { dg-do compile } */
++/* { dg-options "-O3 -fno-tree-ccp -fno-tree-dce" } */
++
++/*
++  PHI-OPT via match_simplify_replacement used to transform:
++  if (_25 != 0)
++    goto <bb 8>; [25.00%]
++  else
++    goto <bb 9>; [75.00%]
++
++  <bb 8> [local count: 11649864]:
++  # iftmp.5_13 = PHI <2(7)>
++  k_22 = k_11 | iftmp.5_13;
++
++  <bb 9> [local count: 105655256]:
++  # g_9 = PHI <1(2), 0(8), g_8(7)>
++  # k_12 = PHI <k_20(D)(2), k_22(8), k_11(7)>
++
++into:
++
++  _15 = (int) _25;
++  _28 = -_15;
++  _4 = _13 & _28;
++  _6 = _4 | k_11;
++
++  <bb 8> [local count: 105655256]:
++  # g_9 = PHI <1(2), g_8(7)>
++  # k_12 = PHI <k_20(D)(2), _6(7)>
++
++Removing the phi-node/assignment of _13.
++
++ */
++
++int a, c, d, e, f;
++char b;
++int main() {
++  int g = 1;
++  char h[1] = {0};
++  while (a) {
++    if (f) {
++      b = 0;
++      if (d)
++        continue;
++    }
++    if (a < 1) {
++      g = 0;
++      goto L;
++    }
++  }
++  while (c) {
++    char *j = h;
++    int k;
++  L:
++    if (e && !g)
++      k |= 2 | (*j < 0);
++  }
++  return 0;
++}
+diff --git a/gcc/tree-ssa-phiopt.cc b/gcc/tree-ssa-phiopt.cc
+index 3eda825672c..b8e57bb470e 100644
+--- a/gcc/tree-ssa-phiopt.cc
++++ b/gcc/tree-ssa-phiopt.cc
+@@ -973,6 +973,11 @@ match_simplify_replacement (basic_block cond_bb, basic_block middle_bb,
+       if (!single_pred_p (middle_bb))
+ 	return false;
+ 
++      /* The middle bb cannot have phi nodes as we don't
++	 move those assignments yet. */
++      if (!gimple_seq_empty_p (phi_nodes (middle_bb)))
++	return false;
++
+       stmt_to_move = last_and_only_stmt (middle_bb);
+       if (!stmt_to_move)
+ 	return false;
+-- 
+2.25.1
+

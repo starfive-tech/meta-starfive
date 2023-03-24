@@ -1,0 +1,44 @@
+From c70a6414d74431a9370c6806ea04882185774fe9 Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Fri, 3 Feb 2023 17:47:05 +0100
+Subject: [PATCH 486/547] libstdc++: Fix incorrect function call in -ffast-math
+ optimization
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+
+libstdc++-v3/ChangeLog:
+
+	* include/experimental/bits/simd_math.h (__hypot): Bitcasting
+	between scalars requires the __bit_cast helper function instead
+	of simd_bit_cast.
+
+(cherry picked from commit a5de17d9120dde7e6598a05ea4d1556c2783c69b)
+---
+ libstdc++-v3/include/experimental/bits/simd_math.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/include/experimental/bits/simd_math.h b/libstdc++-v3/include/experimental/bits/simd_math.h
+index 5fe44adceb5..b008139c11c 100644
+--- a/libstdc++-v3/include/experimental/bits/simd_math.h
++++ b/libstdc++-v3/include/experimental/bits/simd_math.h
+@@ -1010,7 +1010,7 @@ template <typename _VV, typename = __detail::__odr_helper>
+ 	    using _IV = rebind_simd_t<_Ip, _V>;
+ 	    const auto __as_int = simd_bit_cast<_IV>(__hi_exp);
+ 	    const _V __scale
+-	      = simd_bit_cast<_V>(2 * simd_bit_cast<_Ip>(_Tp(1)) - __as_int);
++	      = simd_bit_cast<_V>(2 * __bit_cast<_Ip>(_Tp(1)) - __as_int);
+ #else
+ 	    const _V __scale = (__hi_exp ^ __inf) * _Tp(.5);
+ #endif
+@@ -1180,7 +1180,7 @@ _GLIBCXX_SIMD_CVTING2(hypot)
+ 		using _IV = rebind_simd_t<_Ip, _V>;
+ 		const auto __as_int = simd_bit_cast<_IV>(__hi_exp);
+ 		const _V __scale
+-		  = simd_bit_cast<_V>(2 * simd_bit_cast<_Ip>(_Tp(1)) - __as_int);
++		  = simd_bit_cast<_V>(2 * __bit_cast<_Ip>(_Tp(1)) - __as_int);
+ #else
+ 		const _V __scale = (__hi_exp ^ __inf) * _Tp(.5);
+ #endif
+-- 
+2.25.1
+

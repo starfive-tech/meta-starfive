@@ -1,0 +1,104 @@
+From 0a2597477e482df4d67db6696431286df1ff4428 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 2 Feb 2023 14:06:40 +0000
+Subject: [PATCH 495/547] libstdc++: Fix std::filesystem errors with
+ -fkeep-inline-functions [PR108636]
+
+With -fkeep-inline-functions there are linker errors when including
+<filesystem>. This happens because there are some filesystem::path
+constructors defined inline which call non-exported functions defined in
+the library. That's usually not a problem, because those constructors
+are only called by code that's also inside the library. But when the
+header is compiled with -fkeep-inline-functions those inline functions
+are emitted even though they aren't called. That then creates an
+undefined reference to the other library internsl. The fix is to just
+move the private constructors into the library where they are called.
+That way they are never even seen by users, and so not compiled even if
+-fkeep-inline-functions is used.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/108636
+	* include/bits/fs_path.h (path::path(string_view, _Type))
+	(path::_Cmpt::_Cmpt(string_view, _Type, size_t)): Move inline
+	definitions to ...
+	* src/c++17/fs_path.cc: ... here.
+	* testsuite/27_io/filesystem/path/108636.cc: New test.
+
+(cherry picked from commit db8d6fc572ec316ccfcf70b1dffe3be0b1b37212)
+---
+ libstdc++-v3/include/bits/fs_path.h                 | 10 ++--------
+ libstdc++-v3/src/c++17/fs_path.cc                   | 13 +++++++++++++
+ .../testsuite/27_io/filesystem/path/108636.cc       |  8 ++++++++
+ 3 files changed, 23 insertions(+), 8 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/27_io/filesystem/path/108636.cc
+
+diff --git a/libstdc++-v3/include/bits/fs_path.h b/libstdc++-v3/include/bits/fs_path.h
+index 7a3d0513134..1f87414c145 100644
+--- a/libstdc++-v3/include/bits/fs_path.h
++++ b/libstdc++-v3/include/bits/fs_path.h
+@@ -599,12 +599,7 @@ namespace __detail
+       _Multi = 0, _Root_name, _Root_dir, _Filename
+     };
+ 
+-    path(basic_string_view<value_type> __str, _Type __type)
+-    : _M_pathname(__str)
+-    {
+-      __glibcxx_assert(__type != _Type::_Multi);
+-      _M_cmpts.type(__type);
+-    }
++    path(basic_string_view<value_type> __str, _Type __type);
+ 
+     enum class _Split { _Stem, _Extension };
+ 
+@@ -859,8 +854,7 @@ namespace __detail
+ 
+   struct path::_Cmpt : path
+   {
+-    _Cmpt(basic_string_view<value_type> __s, _Type __t, size_t __pos)
+-      : path(__s, __t), _M_pos(__pos) { }
++    _Cmpt(basic_string_view<value_type> __s, _Type __t, size_t __pos);
+ 
+     _Cmpt() : _M_pos(-1) { }
+ 
+diff --git a/libstdc++-v3/src/c++17/fs_path.cc b/libstdc++-v3/src/c++17/fs_path.cc
+index 047082350ec..830df884915 100644
+--- a/libstdc++-v3/src/c++17/fs_path.cc
++++ b/libstdc++-v3/src/c++17/fs_path.cc
+@@ -187,6 +187,19 @@ struct path::_Parser
+   { return origin + c.str.data() - input.data(); }
+ };
+ 
++inline
++path::path(basic_string_view<value_type> __str, _Type __type)
++: _M_pathname(__str)
++{
++  __glibcxx_assert(__type != _Type::_Multi);
++  _M_cmpts.type(__type);
++}
++
++inline
++path::_Cmpt::_Cmpt(basic_string_view<value_type> __s, _Type __t, size_t __pos)
++: path(__s, __t), _M_pos(__pos)
++{ }
++
+ struct path::_List::_Impl
+ {
+   using value_type = _Cmpt;
+diff --git a/libstdc++-v3/testsuite/27_io/filesystem/path/108636.cc b/libstdc++-v3/testsuite/27_io/filesystem/path/108636.cc
+new file mode 100644
+index 00000000000..d58de461090
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/filesystem/path/108636.cc
+@@ -0,0 +1,8 @@
++// { dg-do link { target c++17 } }
++// { dg-options "-fkeep-inline-functions" }
++
++#include <filesystem>
++int main()
++{
++  // PR libstdc++/108636 - link failure with -fkeep-inline-functions
++}
+-- 
+2.25.1
+

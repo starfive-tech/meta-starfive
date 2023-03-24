@@ -1,0 +1,66 @@
+From bd4c310b06d747975853ac6dfef6da120c13f6ec Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Fri, 23 Dec 2022 15:27:32 +0100
+Subject: [PATCH 342/547] strlen: do not use cond_expr for boundaries
+
+	PR tree-optimization/108137
+
+gcc/ChangeLog:
+
+	* tree-ssa-strlen.cc (get_range_strlen_phi): Reject anything
+	different from INTEGER_CST.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/tree-ssa/pr108137.c: New test.
+
+(cherry picked from commit ee6f262b87fef590729e96e999f1c3b207c251c0)
+---
+ gcc/testsuite/gcc.dg/tree-ssa/pr108137.c |  8 ++++++++
+ gcc/tree-ssa-strlen.cc                   | 13 +++++++------
+ 2 files changed, 15 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/pr108137.c
+
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/pr108137.c b/gcc/testsuite/gcc.dg/tree-ssa/pr108137.c
+new file mode 100644
+index 00000000000..f0cb71b2267
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/pr108137.c
+@@ -0,0 +1,8 @@
++// PR tree-optimization/108137
++// { dg-do compile }
++// { dg-options "-Wformat-overflow" }
++
++void f(unsigned short x_port, unsigned int x_host)
++{
++    __builtin_printf("missing %s", x_port ? "host" : &"host:port"[x_host ? 5 : 0]);
++}
+diff --git a/gcc/tree-ssa-strlen.cc b/gcc/tree-ssa-strlen.cc
+index 9ae25d1dde2..2d7db6da5bc 100644
+--- a/gcc/tree-ssa-strlen.cc
++++ b/gcc/tree-ssa-strlen.cc
+@@ -1136,14 +1136,15 @@ get_range_strlen_phi (tree src, gphi *phi,
+ 
+       /* Adjust the minimum and maximum length determined so far and
+ 	 the upper bound on the array size.  */
+-      if (!pdata->minlen
+-	  || tree_int_cst_lt (argdata.minlen, pdata->minlen))
++      if (TREE_CODE (argdata.minlen) == INTEGER_CST
++	  && (!pdata->minlen
++	      || tree_int_cst_lt (argdata.minlen, pdata->minlen)))
+ 	pdata->minlen = argdata.minlen;
+ 
+-      if (!pdata->maxlen
+-	  || (argdata.maxlen
+-	      && TREE_CODE (argdata.maxlen) == INTEGER_CST
+-	      && tree_int_cst_lt (pdata->maxlen, argdata.maxlen)))
++      if (TREE_CODE (argdata.maxlen) == INTEGER_CST
++	  && (!pdata->maxlen
++	      || (argdata.maxlen
++		  && tree_int_cst_lt (pdata->maxlen, argdata.maxlen))))
+ 	pdata->maxlen = argdata.maxlen;
+ 
+       if (!pdata->maxbound
+-- 
+2.25.1
+

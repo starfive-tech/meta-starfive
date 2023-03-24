@@ -1,0 +1,92 @@
+From ff0a274e5c3026b105c7f51126fa51f8178fa42c Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 6 Oct 2022 11:20:16 +0200
+Subject: [PATCH 140/547] tree-optimization/107107 - tail-merging VN wrong-code
+
+The following fixes an unintended(?) side-effect of the special
+MODIFY_EXPR expression entries we add for tail-merging during VN.
+We shouldn't value-number the virtual operand differently here.
+
+	PR tree-optimization/107107
+	* tree-ssa-sccvn.cc (visit_reference_op_store): Do not
+	affect value-numbering when doing the tail merging
+	MODIFY_EXPR lookup.
+
+	* gcc.dg/pr107107.c: New testcase.
+
+(cherry picked from commit 85333b9265720fc4e49397301cb16324d2b89aa7)
+---
+ gcc/testsuite/gcc.dg/pr107107.c | 25 +++++++++++++++++++++++++
+ gcc/tree-ssa-sccvn.cc           | 17 +++--------------
+ 2 files changed, 28 insertions(+), 14 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr107107.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr107107.c b/gcc/testsuite/gcc.dg/pr107107.c
+new file mode 100644
+index 00000000000..5ad6a63159e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr107107.c
+@@ -0,0 +1,25 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -ftree-tail-merge" } */
++
++static inline void set_longish(int is_long_long, void *p, long x)
++{
++  if (is_long_long)
++    *(long long*)p = x;
++  else
++    *(long*)p = x;
++}
++static long test(long long *p, int index, int mode)
++{
++  *p = 1;
++  set_longish(mode, p+index, 2);
++  return *p;
++}
++long (*volatile vtest)(long long*, int, int) = test;
++int main(void)
++{
++  long long x;
++  long result = vtest(&x, 0, 1);
++  if (result != 2 || x != 2)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index 854c0c25bc7..a63f5c8c307 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -5490,19 +5490,6 @@ visit_reference_op_store (tree lhs, tree op, gimple *stmt)
+ 
+   if (!resultsame)
+     {
+-      /* Only perform the following when being called from PRE
+-	 which embeds tail merging.  */
+-      if (default_vn_walk_kind == VN_WALK)
+-	{
+-	  assign = build2 (MODIFY_EXPR, TREE_TYPE (lhs), lhs, op);
+-	  vn_reference_lookup (assign, vuse, VN_NOWALK, &vnresult, false);
+-	  if (vnresult)
+-	    {
+-	      VN_INFO (vdef)->visited = true;
+-	      return set_ssa_val_to (vdef, vnresult->result_vdef);
+-	    }
+-	}
+-
+       if (dump_file && (dump_flags & TDF_DETAILS))
+ 	{
+ 	  fprintf (dump_file, "No store match\n");
+@@ -5527,7 +5514,9 @@ visit_reference_op_store (tree lhs, tree op, gimple *stmt)
+       if (default_vn_walk_kind == VN_WALK)
+ 	{
+ 	  assign = build2 (MODIFY_EXPR, TREE_TYPE (lhs), lhs, op);
+-	  vn_reference_insert (assign, lhs, vuse, vdef);
++	  vn_reference_lookup (assign, vuse, VN_NOWALK, &vnresult, false);
++	  if (!vnresult)
++	    vn_reference_insert (assign, lhs, vuse, vdef);
+ 	}
+     }
+   else
+-- 
+2.25.1
+

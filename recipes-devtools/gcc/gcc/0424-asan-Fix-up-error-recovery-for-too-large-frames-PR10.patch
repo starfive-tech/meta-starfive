@@ -1,0 +1,75 @@
+From ff185dd96ac4576e722b39fc0f7026281de06eb2 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 24 Nov 2022 11:29:54 +0100
+Subject: [PATCH 424/547] asan: Fix up error recovery for too large frames
+ [PR107317]
+
+asan_emit_stack_protection and functions it calls have various asserts that
+verify sanity of the stack protection instrumentation.  But, that
+verification can easily fail if we've diagnosed a frame offset overflow.
+asan_emit_stack_protection just emits some extra code in the prologue,
+if we've reported errors, we aren't producing assembly, so it doesn't
+really matter if we don't include the protection code, compilation
+is going to fail anyway.
+
+2022-11-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/107317
+	* asan.cc: Include diagnostic-core.h.
+	(asan_emit_stack_protection): Return NULL early if seen_error ().
+
+	* gcc.dg/asan/pr107317.c: New test.
+
+(cherry picked from commit b6330a7685476fc30b8ae9bbf3fca1a9b0d4be95)
+---
+ gcc/asan.cc                          |  6 ++++++
+ gcc/testsuite/gcc.dg/asan/pr107317.c | 13 +++++++++++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/asan/pr107317.c
+
+diff --git a/gcc/asan.cc b/gcc/asan.cc
+index bacf890af18..f0dca99507d 100644
+--- a/gcc/asan.cc
++++ b/gcc/asan.cc
+@@ -64,6 +64,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "tree-inline.h"
+ #include "tree-ssa.h"
+ #include "tree-eh.h"
++#include "diagnostic-core.h"
+ 
+ /* AddressSanitizer finds out-of-bounds and use-after-free bugs
+    with <2x slowdown on average.
+@@ -1818,6 +1819,11 @@ asan_emit_stack_protection (rtx base, rtx pbase, unsigned int alignb,
+   tree str_cst, decl, id;
+   int use_after_return_class = -1;
+ 
++  /* Don't emit anything when doing error recovery, the assertions
++     might fail e.g. if a function had a frame offset overflow.  */
++  if (seen_error ())
++    return NULL;
++
+   if (shadow_ptr_types[0] == NULL_TREE)
+     asan_init_shadow_ptr_types ();
+ 
+diff --git a/gcc/testsuite/gcc.dg/asan/pr107317.c b/gcc/testsuite/gcc.dg/asan/pr107317.c
+new file mode 100644
+index 00000000000..dd7ad7d2449
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/asan/pr107317.c
+@@ -0,0 +1,13 @@
++/* PR middle-end/107317 */
++/* { dg-do compile { target ilp32 } } */
++/* { dg-options "-fsanitize=address -ffat-lto-objects" } */
++
++void bar (float *, float *);
++
++void
++foo (void)		/* { dg-error "exceeds maximum" } */
++{
++  float a[400000000];
++  float b[200000000];
++  bar (a, b);
++}
+-- 
+2.25.1
+

@@ -1,0 +1,162 @@
+From de1ba234311b935b1a38d512e57329d4b6e8354d Mon Sep 17 00:00:00 2001
+From: Richard Earnshaw <rearnsha@arm.com>
+Date: Wed, 11 May 2022 13:08:40 +0100
+Subject: [PATCH 039/547] arm: correctly handle misaligned MEMs on MVE
+ [PR105463]
+
+Vector operations in MVE must be aligned to the element size, so if we
+are asked for a misaligned move in a wider mode we must recast it to a
+form suitable for the known alignment (larger elements have better
+address offset ranges, so there is some advantage to using wider
+element sizes if possible).  Whilst fixing this, also rework the
+predicates used for validating operands - the Neon predicates are
+not right for MVE.
+
+gcc/ChangeLog:
+
+	PR target/105463
+	* config/arm/mve.md (*movmisalign<mode>_mve_store): Use
+	mve_memory_operand.
+	(*movmisalign<mode>_mve_load): Likewise.
+	* config/arm/vec-common.md (movmisalign<mode>): Convert to generator
+	form...
+	(@movmisalign<mode>): ... thus.  Use generic predicates and then
+	rework operands if they are not valid.  For MVE rework to a
+	narrower element size if the alignment is not high enough.
+
+(cherry picked from commit 6a116728e27c4da65d84483c0e75561a7479d4d5)
+---
+ gcc/config/arm/mve.md        |  4 +-
+ gcc/config/arm/vec-common.md | 90 ++++++++++++++++++++++++++++--------
+ 2 files changed, 73 insertions(+), 21 deletions(-)
+
+diff --git a/gcc/config/arm/mve.md b/gcc/config/arm/mve.md
+index 369d7a79f6c..f16991c0a34 100644
+--- a/gcc/config/arm/mve.md
++++ b/gcc/config/arm/mve.md
+@@ -10462,7 +10462,7 @@
+ )
+ 
+ (define_insn "*movmisalign<mode>_mve_store"
+-  [(set (match_operand:MVE_VLD_ST 0 "neon_permissive_struct_operand"	     "=Ux")
++  [(set (match_operand:MVE_VLD_ST 0 "mve_memory_operand"	     "=Ux")
+ 	(unspec:MVE_VLD_ST [(match_operand:MVE_VLD_ST 1 "s_register_operand" " w")]
+ 	 UNSPEC_MISALIGNED_ACCESS))]
+   "((TARGET_HAVE_MVE && VALID_MVE_SI_MODE (<MODE>mode))
+@@ -10475,7 +10475,7 @@
+ 
+ (define_insn "*movmisalign<mode>_mve_load"
+   [(set (match_operand:MVE_VLD_ST 0 "s_register_operand"				 "=w")
+-	(unspec:MVE_VLD_ST [(match_operand:MVE_VLD_ST 1 "neon_permissive_struct_operand" " Ux")]
++	(unspec:MVE_VLD_ST [(match_operand:MVE_VLD_ST 1 "mve_memory_operand" " Ux")]
+ 	 UNSPEC_MISALIGNED_ACCESS))]
+   "((TARGET_HAVE_MVE && VALID_MVE_SI_MODE (<MODE>mode))
+     || (TARGET_HAVE_MVE_FLOAT && VALID_MVE_SF_MODE (<MODE>mode)))
+diff --git a/gcc/config/arm/vec-common.md b/gcc/config/arm/vec-common.md
+index fd878cba22d..1fd68f3ac43 100644
+--- a/gcc/config/arm/vec-common.md
++++ b/gcc/config/arm/vec-common.md
+@@ -280,29 +280,81 @@
+   DONE;
+ })
+ 
+-(define_expand "movmisalign<mode>"
+- [(set (match_operand:VDQ 0 "neon_perm_struct_or_reg_operand")
+-	(unspec:VDQ [(match_operand:VDQ 1 "neon_perm_struct_or_reg_operand")]
++(define_expand "@movmisalign<mode>"
++ [(set (match_operand:VDQ 0 "nonimmediate_operand")
++	(unspec:VDQ [(match_operand:VDQ 1 "general_operand")]
+ 	 UNSPEC_MISALIGNED_ACCESS))]
+  "ARM_HAVE_<MODE>_LDST && !BYTES_BIG_ENDIAN
+   && unaligned_access && !TARGET_REALLY_IWMMXT"
+ {
+- rtx adjust_mem;
+- /* This pattern is not permitted to fail during expansion: if both arguments
+-    are non-registers (e.g. memory := constant, which can be created by the
+-    auto-vectorizer), force operand 1 into a register.  */
+- if (!s_register_operand (operands[0], <MODE>mode)
+-     && !s_register_operand (operands[1], <MODE>mode))
+-   operands[1] = force_reg (<MODE>mode, operands[1]);
+-
+- if (s_register_operand (operands[0], <MODE>mode))
+-   adjust_mem = operands[1];
+- else
+-   adjust_mem = operands[0];
+-
+- /* Legitimize address.  */
+- if (!neon_vector_mem_operand (adjust_mem, 2, true))
+-   XEXP (adjust_mem, 0) = force_reg (Pmode, XEXP (adjust_mem, 0));
++  rtx *memloc;
++  bool for_store = false;
++  /* This pattern is not permitted to fail during expansion: if both arguments
++     are non-registers (e.g. memory := constant, which can be created by the
++     auto-vectorizer), force operand 1 into a register.  */
++  if (!s_register_operand (operands[0], <MODE>mode)
++      && !s_register_operand (operands[1], <MODE>mode))
++    operands[1] = force_reg (<MODE>mode, operands[1]);
++
++  if (s_register_operand (operands[0], <MODE>mode))
++    memloc = &operands[1];
++  else
++    {
++      memloc = &operands[0];
++      for_store = true;
++    }
++
++  /* For MVE, vector loads/stores must be aligned to the element size.  If the
++     alignment is less than that convert the load/store to a suitable mode.  */
++  if (TARGET_HAVE_MVE
++      && (MEM_ALIGN (*memloc)
++	  < GET_MODE_ALIGNMENT (GET_MODE_INNER (<MODE>mode))))
++    {
++      scalar_mode new_smode;
++      switch (MEM_ALIGN (*memloc))
++	{
++	case 64:
++	case 32:
++	  new_smode = SImode;
++	  break;
++	case 16:
++	  new_smode = HImode;
++	  break;
++	default:
++	  new_smode = QImode;
++	  break;
++	}
++      machine_mode new_mode
++	= mode_for_vector (new_smode,
++			   GET_MODE_SIZE (<MODE>mode)
++			   / GET_MODE_SIZE (new_smode)).require ();
++      rtx new_mem = adjust_address (*memloc, new_mode, 0);
++
++      if (!for_store)
++	{
++	  rtx reg = gen_reg_rtx (new_mode);
++	  emit_insn (gen_movmisalign (new_mode, reg, new_mem));
++	  emit_move_insn (operands[0], gen_lowpart (<MODE>mode, reg));
++	  DONE;
++	}
++      emit_insn (gen_movmisalign (new_mode, new_mem,
++				  gen_lowpart (new_mode, operands[1])));
++      DONE;
++    }
++
++  /* Legitimize address.  */
++  if ((TARGET_HAVE_MVE
++       && !mve_vector_mem_operand (<MODE>mode, XEXP (*memloc, 0), false))
++      || (!TARGET_HAVE_MVE
++	  && !neon_vector_mem_operand (*memloc, 2, false)))
++    {
++      rtx new_mem
++	= replace_equiv_address (*memloc,
++				 force_reg (Pmode, XEXP (*memloc, 0)),
++				 false);
++      gcc_assert (MEM_ALIGN (new_mem) == MEM_ALIGN (*memloc));
++      *memloc = new_mem;
++    }
+ })
+ 
+ (define_insn "mve_vshlq_<supf><mode>"
+-- 
+2.25.1
+

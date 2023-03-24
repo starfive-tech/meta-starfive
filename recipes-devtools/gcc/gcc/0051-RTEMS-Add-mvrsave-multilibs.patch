@@ -1,0 +1,55 @@
+From 3a83d005e5d23ae97704d13e615a087765b81699 Mon Sep 17 00:00:00 2001
+From: Sebastian Huber <sebastian.huber@embedded-brains.de>
+Date: Thu, 1 Sep 2022 10:22:47 +0200
+Subject: [PATCH 051/547] RTEMS: Add -mvrsave multilibs
+
+gcc/ChangeLog:
+
+	* config/rs6000/rtems.h (CPP_OS_DEFAULT_SPEC): Define __PPC_VRSAVE__ if
+	-mvrsave is present.
+	* config/rs6000/t-rtems: Add -mvrsave multilib variants for
+	-mcpu=e6500.
+---
+ gcc/config/rs6000/rtems.h | 3 ++-
+ gcc/config/rs6000/t-rtems | 5 +++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/rs6000/rtems.h b/gcc/config/rs6000/rtems.h
+index d529e22f7de..84370150dc4 100644
+--- a/gcc/config/rs6000/rtems.h
++++ b/gcc/config/rs6000/rtems.h
+@@ -255,7 +255,8 @@
+ %{mcpu=821:  %{!Dppc*: %{!Dmpc*: -Dmpc821}  } } \
+ %{mcpu=860:  %{!Dppc*: %{!Dmpc*: -Dmpc860}  } } \
+ %{mcpu=8540: %{!Dppc*: %{!Dmpc*: -Dppc8540}  } } \
+-%{mcpu=e6500: -D__PPC_CPU_E6500__}"
++%{mcpu=e6500: -D__PPC_CPU_E6500__} \
++%{mvrsave: -D__PPC_VRSAVE__}"
+ 
+ #undef	ASM_SPEC
+ #define	ASM_SPEC "%{!m64:%(asm_spec32)}%{m64:%(asm_spec64)} %(asm_spec_common)"
+diff --git a/gcc/config/rs6000/t-rtems b/gcc/config/rs6000/t-rtems
+index 4f8c147be3e..9da2da6154b 100644
+--- a/gcc/config/rs6000/t-rtems
++++ b/gcc/config/rs6000/t-rtems
+@@ -36,6 +36,9 @@ MULTILIB_DIRNAMES += nof
+ MULTILIB_OPTIONS += mno-altivec
+ MULTILIB_DIRNAMES += noaltivec
+ 
++MULTILIB_OPTIONS += mvrsave
++MULTILIB_DIRNAMES += vrsave
++
+ MULTILIB_MATCHES  	+= ${MULTILIB_MATCHES_ENDIAN}
+ MULTILIB_MATCHES	+= ${MULTILIB_MATCHES_SYSV}
+ # Map 405 to 403
+@@ -70,5 +73,7 @@ MULTILIB_REQUIRED += mcpu=7400/msoft-float
+ MULTILIB_REQUIRED += mcpu=8540/msoft-float
+ MULTILIB_REQUIRED += mcpu=860
+ MULTILIB_REQUIRED += mcpu=e6500/m32
++MULTILIB_REQUIRED += mcpu=e6500/m32/mvrsave
+ MULTILIB_REQUIRED += mcpu=e6500/m32/msoft-float/mno-altivec
+ MULTILIB_REQUIRED += mcpu=e6500/m64
++MULTILIB_REQUIRED += mcpu=e6500/m64/mvrsave
+-- 
+2.25.1
+

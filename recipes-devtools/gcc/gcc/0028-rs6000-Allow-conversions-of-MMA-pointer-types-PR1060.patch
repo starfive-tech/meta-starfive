@@ -1,0 +1,89 @@
+From 22ff125247ff5328ad4544aef939d491618d714d Mon Sep 17 00:00:00 2001
+From: Peter Bergner <bergner@linux.ibm.com>
+Date: Sat, 27 Aug 2022 19:44:16 -0500
+Subject: [PATCH 028/547] rs6000: Allow conversions of MMA pointer types
+ [PR106017]
+
+GCC incorrectly disables conversions between MMA pointer types, which
+are allowed with clang.  The original intent was to disable conversions
+between MMA types and other other types, but pointer conversions should
+have been allowed.  The fix is to just remove the MMA pointer conversion
+handling code altogether.
+
+gcc/
+	PR target/106017
+	* config/rs6000/rs6000.cc (rs6000_invalid_conversion): Remove handling
+	of MMA pointer conversions.
+
+gcc/testsuite/
+	PR target/106017
+	* gcc.target/powerpc/pr106017.c: New test.
+
+(cherry picked from commit 1ae1325f24cea1698b56e4299d95446a1f7b90a2)
+---
+ gcc/config/rs6000/rs6000.cc                 | 22 ---------------------
+ gcc/testsuite/gcc.target/powerpc/pr106017.c | 19 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 22 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106017.c
+
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index 1aadd2b96b8..e382f5f1135 100644
+--- a/gcc/config/rs6000/rs6000.cc
++++ b/gcc/config/rs6000/rs6000.cc
+@@ -28287,28 +28287,6 @@ rs6000_invalid_conversion (const_tree fromtype, const_tree totype)
+       if (tomode == OOmode)
+ 	return N_("invalid conversion to type %<__vector_pair%>");
+     }
+-  else if (POINTER_TYPE_P (fromtype) && POINTER_TYPE_P (totype))
+-    {
+-      /* We really care about the modes of the base types.  */
+-      frommode = TYPE_MODE (TREE_TYPE (fromtype));
+-      tomode = TYPE_MODE (TREE_TYPE (totype));
+-
+-      /* Do not allow conversions to/from XOmode and OOmode pointer
+-	 types, except to/from void pointers.  */
+-      if (frommode != tomode
+-	  && frommode != VOIDmode
+-	  && tomode != VOIDmode)
+-	{
+-	  if (frommode == XOmode)
+-	    return N_("invalid conversion from type %<* __vector_quad%>");
+-	  if (tomode == XOmode)
+-	    return N_("invalid conversion to type %<* __vector_quad%>");
+-	  if (frommode == OOmode)
+-	    return N_("invalid conversion from type %<* __vector_pair%>");
+-	  if (tomode == OOmode)
+-	    return N_("invalid conversion to type %<* __vector_pair%>");
+-	}
+-    }
+ 
+   /* Conversion allowed.  */
+   return NULL;
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106017.c b/gcc/testsuite/gcc.target/powerpc/pr106017.c
+new file mode 100644
+index 00000000000..46d6c7a4a33
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106017.c
+@@ -0,0 +1,19 @@
++/* PR target/106017 */
++/* { dg-options "-O1 -mdejagnu-cpu=power10" } */
++/* { dg-require-effective-target power10_ok } */
++
++/* Make sure we do not flag any errors on the following test cases.  */
++
++void takeacc(__vector_quad *);
++void
++foo (void)
++{
++  __vector_quad arr[4];
++  takeacc (arr);
++}
++
++unsigned char *
++bar (__vector_quad *a)
++{
++  return (unsigned char *)a;
++}
+-- 
+2.25.1
+

@@ -1,0 +1,41 @@
+From 0bc43f9ae1384787b0efcf9a41f00c1eeaf8bb8b Mon Sep 17 00:00:00 2001
+From: Pat Haugen <pthaugen@linux.ibm.com>
+Date: Tue, 17 May 2022 15:53:24 -0500
+Subject: [PATCH 144/547] Fix register count when not splitting Complex IEEE
+ 128-bit args.
+
+For ABI_V4, we do not split complex args. This created a problem because
+even though an arg would be passed in two VSX regs, we were only advancing the
+function arg counter by one VSX register. Fixed with this patch.
+
+	PR target/99685
+
+gcc/
+	* config/rs6000/rs6000-call.cc (rs6000_function_arg_advance_1): Bump
+	register count when not splitting IEEE 128-bit Complex.
+
+(cherry picked from commit 2ee68beee709e48fce85b8892ff9985acc6a91a8)
+---
+ gcc/config/rs6000/rs6000-call.cc | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/gcc/config/rs6000/rs6000-call.cc b/gcc/config/rs6000/rs6000-call.cc
+index f06c69252b2..d27df7b25ac 100644
+--- a/gcc/config/rs6000/rs6000-call.cc
++++ b/gcc/config/rs6000/rs6000-call.cc
+@@ -1111,6 +1111,12 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
+ 	{
+ 	  cum->vregno += n_elts;
+ 
++	  /* If we are not splitting Complex IEEE128 args then account for the
++	     fact that they are passed in 2 VSX regs. */
++	  if (!targetm.calls.split_complex_arg && type
++	      && TREE_CODE (type) == COMPLEX_TYPE && elt_mode == KCmode)
++	    cum->vregno++;
++
+ 	  if (!TARGET_ALTIVEC)
+ 	    error ("cannot pass argument in vector register because"
+ 		   " altivec instructions are disabled, use %qs"
+-- 
+2.25.1
+

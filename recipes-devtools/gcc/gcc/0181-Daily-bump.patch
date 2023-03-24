@@ -1,0 +1,19 @@
+From faac1fccd75529c9eecd2bff8faea3b961c19c69 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 31 Oct 2022 00:21:38 +0000
+Subject: [PATCH 181/547] Daily bump.
+
+---
+ gcc/DATESTAMP | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 1440bc55c69..bed449ab430 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221030
++20221031
+-- 
+2.25.1
+

@@ -1,0 +1,66 @@
+From 7048e8c1073fcf2bf6be1a3d079393a78864ca61 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 4 Jan 2023 18:42:31 +0100
+Subject: [PATCH 439/547] c++: Error recovery in merge_default_template_args
+ [PR108206]
+
+We ICE on the following testcase during error recovery, both new_parm
+and old_parm are error_mark_node, the ICE is on
+          error ("redefinition of default argument for %q+#D", new_parm);
+          inform (DECL_SOURCE_LOCATION (old_parm),
+                  "original definition appeared here");
+where we don't print anything useful for new_parm and ICE trying to
+access DECL_SOURCE_LOCATION of old_parm.  I think we shouldn't diagnose
+anything when either of the parms is erroneous, GCC 11 before
+merge_default_template_args has been added was doing
+      if (TREE_VEC_ELT (tmpl_parms, i) == error_mark_node
+          || TREE_VEC_ELT (parms, i) == error_mark_node)
+        continue;
+
+      tmpl_parm = TREE_VALUE (TREE_VEC_ELT (tmpl_parms, i));
+      if (error_operand_p (tmpl_parm))
+        return false;
+in redeclare_class_template.
+
+2023-01-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108206
+	* decl.cc (merge_default_template_args): Return false if either
+	new_parm or old_parm are erroneous.
+
+	* g++.dg/template/pr108206.C: New test.
+
+(cherry picked from commit fc349931adcf1024ee95e0a0cd98cf4a41996093)
+---
+ gcc/cp/decl.cc                           | 2 ++
+ gcc/testsuite/g++.dg/template/pr108206.C | 5 +++++
+ 2 files changed, 7 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/template/pr108206.C
+
+diff --git a/gcc/cp/decl.cc b/gcc/cp/decl.cc
+index ed47d262078..64fba7fafac 100644
+--- a/gcc/cp/decl.cc
++++ b/gcc/cp/decl.cc
+@@ -1490,6 +1490,8 @@ merge_default_template_args (tree new_parms, tree old_parms, bool class_p)
+       tree old_parm = TREE_VALUE (TREE_VEC_ELT (old_parms, i));
+       tree& new_default = TREE_PURPOSE (TREE_VEC_ELT (new_parms, i));
+       tree& old_default = TREE_PURPOSE (TREE_VEC_ELT (old_parms, i));
++      if (error_operand_p (new_parm) || error_operand_p (old_parm))
++	return false;
+       if (new_default != NULL_TREE && old_default != NULL_TREE)
+ 	{
+ 	  auto_diagnostic_group d;
+diff --git a/gcc/testsuite/g++.dg/template/pr108206.C b/gcc/testsuite/g++.dg/template/pr108206.C
+new file mode 100644
+index 00000000000..9362d261bea
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/pr108206.C
+@@ -0,0 +1,5 @@
++// PR c++/108206
++// { dg-do compile { target c++11 } }
++
++template <X x, typename T1> void foo (T1);	// { dg-error "'X' has not been declared" }
++template <X x, typename T2> void foo (T2);	// { dg-error "'X' has not been declared" }
+-- 
+2.25.1
+

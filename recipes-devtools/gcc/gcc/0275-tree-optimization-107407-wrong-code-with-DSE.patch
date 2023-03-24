@@ -1,0 +1,113 @@
+From e0e37f97e67c99604129eeac2e73ccd3719ccb28 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 28 Oct 2022 15:03:49 +0200
+Subject: [PATCH 275/547] tree-optimization/107407 - wrong code with DSE
+
+So what happens is that we elide processing of this check with
+
+          /* In addition to kills we can remove defs whose only use
+             is another def in defs.  That can only ever be PHIs of which
+             we track two for simplicity reasons, the first and last in
+             {first,last}_phi_def (we fail for multiple PHIs anyways).
+             We can also ignore defs that feed only into
+             already visited PHIs.  */
+          else if (single_imm_use (vdef, &use_p, &use_stmt)
+                   && (use_stmt == first_phi_def
+                       || use_stmt == last_phi_def
+                       || (gimple_code (use_stmt) == GIMPLE_PHI
+                           && bitmap_bit_p (visited,
+                                            SSA_NAME_VERSION
+                                              (PHI_RESULT (use_stmt))))))
+
+where we have the last PHI being the outer loop virtual PHI and the first
+PHI being the loop exit PHI of the outer loop and we've already processed
+the single immediate use of the outer loop PHI, the inner loop PHI.  But
+we still have to perform the above check!
+
+It's easiest to perform the check when we visit the PHI node instead of
+delaying it to the actual processing loop.
+
+	PR tree-optimization/107407
+	* tree-ssa-dse.cc (dse_classify_store): Perform backedge
+	varying index check when collecting PHI uses rather than
+	after optimizing processing of the candidate defs.
+
+	* gcc.dg/torture/pr107407.c: New testcase.
+
+(cherry picked from commit 031a400e49d8db156c43f9ec0b21ab0c2aee8c6d)
+---
+ gcc/testsuite/gcc.dg/torture/pr107407.c | 26 +++++++++++++++++++++++++
+ gcc/tree-ssa-dse.cc                     | 17 ++++++++--------
+ 2 files changed, 35 insertions(+), 8 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr107407.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr107407.c b/gcc/testsuite/gcc.dg/torture/pr107407.c
+new file mode 100644
+index 00000000000..228fce1e699
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr107407.c
+@@ -0,0 +1,26 @@
++/* { dg-do run } */
++
++int *a;
++int c[4];
++int d;
++
++static int
++f(char k, int j)
++{
++  for (; k <= 3; k++)
++    {
++      a = &c[k];
++      for (; d <= 1; d++)
++        *a = 3;
++    }
++  *a = 0;
++}
++
++int main()
++{
++  int i;
++  f(0, 0);
++  if (c[0] != 3)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-ssa-dse.cc b/gcc/tree-ssa-dse.cc
+index 881a2d0f98d..e647f0e7368 100644
+--- a/gcc/tree-ssa-dse.cc
++++ b/gcc/tree-ssa-dse.cc
+@@ -930,14 +930,6 @@ dse_classify_store (ao_ref *ref, gimple *stmt,
+ 
+       if (gimple_code (temp) == GIMPLE_PHI)
+ 	{
+-	  /* If we visit this PHI by following a backedge then we have to
+-	     make sure ref->ref only refers to SSA names that are invariant
+-	     with respect to the loop represented by this PHI node.  */
+-	  if (dominated_by_p (CDI_DOMINATORS, gimple_bb (stmt),
+-			      gimple_bb (temp))
+-	      && !for_each_index (ref->ref ? &ref->ref : &ref->base,
+-				  check_name, gimple_bb (temp)))
+-	    return DSE_STORE_LIVE;
+ 	  defvar = PHI_RESULT (temp);
+ 	  bitmap_set_bit (visited, SSA_NAME_VERSION (defvar));
+ 	}
+@@ -971,6 +963,15 @@ dse_classify_store (ao_ref *ref, gimple *stmt,
+ 	      if (!bitmap_bit_p (visited,
+ 				 SSA_NAME_VERSION (PHI_RESULT (use_stmt))))
+ 		{
++		  /* If we visit this PHI by following a backedge then we have
++		     to make sure ref->ref only refers to SSA names that are
++		     invariant with respect to the loop represented by this
++		     PHI node.  */
++		  if (dominated_by_p (CDI_DOMINATORS, gimple_bb (stmt),
++				      gimple_bb (use_stmt))
++		      && !for_each_index (ref->ref ? &ref->ref : &ref->base,
++					  check_name, gimple_bb (use_stmt)))
++		    return DSE_STORE_LIVE;
+ 		  defs.safe_push (use_stmt);
+ 		  if (!first_phi_def)
+ 		    first_phi_def = use_stmt;
+-- 
+2.25.1
+

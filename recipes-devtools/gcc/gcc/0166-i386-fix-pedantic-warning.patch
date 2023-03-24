@@ -1,0 +1,33 @@
+From 2a2093a9d40b5bc97b970fca9c02ff64056f3ed0 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 25 Oct 2022 06:16:03 +0200
+Subject: [PATCH 166/547] i386: fix pedantic warning
+
+	PR target/107364
+
+gcc/ChangeLog:
+
+	* common/config/i386/i386-cpuinfo.h (enum processor_vendor):
+	Fix pedantic warning.
+
+(cherry picked from commit f3f000b7689ce9eb6364808072025672af1e4e1b)
+---
+ gcc/common/config/i386/i386-cpuinfo.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/common/config/i386/i386-cpuinfo.h b/gcc/common/config/i386/i386-cpuinfo.h
+index 0f12024141c..12830a610ca 100644
+--- a/gcc/common/config/i386/i386-cpuinfo.h
++++ b/gcc/common/config/i386/i386-cpuinfo.h
+@@ -36,7 +36,7 @@ enum processor_vendor
+ 
+   /* Maximum values must be at the end of this enum.  */
+   VENDOR_MAX,
+-  BUILTIN_VENDOR_MAX = VENDOR_OTHER,
++  BUILTIN_VENDOR_MAX = VENDOR_OTHER
+ };
+ 
+ /* Any new types or subtypes have to be inserted at the end. */
+-- 
+2.25.1
+

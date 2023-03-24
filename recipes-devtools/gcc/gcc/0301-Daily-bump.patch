@@ -1,0 +1,155 @@
+From 77788d02944108f32a22815abadd7267bc6b53af Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 20 Dec 2022 00:20:39 +0000
+Subject: [PATCH 301/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/c-family/ChangeLog  |  8 +++++++
+ gcc/cp/ChangeLog        | 51 +++++++++++++++++++++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 50 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 110 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 11fabd49cf9..142f05d4354 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221219
++20221220
+diff --git a/gcc/c-family/ChangeLog b/gcc/c-family/ChangeLog
+index 75ecf66d765..97fa7792343 100644
+--- a/gcc/c-family/ChangeLog
++++ b/gcc/c-family/ChangeLog
+@@ -1,3 +1,11 @@
++2022-12-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-12-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c/98487
++	* c-format.cc (check_function_format): Use get_attribute_name.
++
+ 2022-09-27  Marek Polacek  <polacek@redhat.com>
+ 
+ 	* c-format.cc (c_keywords): Drop nothrow.
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 4c71410c0fe..6c0f86e9459 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,54 @@
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-15  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/100295
++	PR c++/107579
++	* pt.cc (el_data::skip_unevaluated_operands): New data member.
++	(extract_locals_r): If skip_unevaluated_operands is true,
++	don't walk into unevaluated contexts.
++	(extract_local_specs): Walk the pattern twice, first with
++	skip_unevaluated_operands true followed by it set to false.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-15  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/108104
++	* pt.cc (unify) <default>: Relax assert to accept any
++	CONSTRUCTOR parm, not just COMPOUND_LITERAL_P one.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-04  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107417
++	* pt.cc (for_each_template_parm_r) <case REQUIRES_EXPR>: Move
++	walking of the TREE_TYPE of each parameter to ...
++	* tree.cc (cp_walk_subtrees) <case REQUIRES_EXPR>: ... here.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-03  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/103081
++	* pt.cc (tsubst_copy) <case CONST_DECL>: Generalize
++	early exit test for namespace-scope decls to check dependence of
++	the enclosing scope instead.  Remove dead early exit test.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-11-30  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107542
++	* typeck.cc (cp_build_binary_op): In the SPACESHIP_EXPR case,
++	handle an error_mark_node result type.
++
+ 2022-11-20  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index c63dd2bbb6f..bbc9f6fba38 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,53 @@
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-15  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/100295
++	PR c++/107579
++	* g++.dg/cpp1z/constexpr-if-lambda5.C: New test.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-15  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/108104
++	* g++.dg/template/ptrmem33.C: New test.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-04  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107417
++	* g++.dg/cpp2a/concepts-requires33.C: New test.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-12-03  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/103081
++	* g++.dg/cpp2a/using-enum-10.C: New test.
++	* g++.dg/cpp2a/using-enum-10a.C: New test.
++
++2022-12-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-11-30  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107542
++	* g++.dg/cpp2a/spaceship-sfinae2.C: New test.
++
++2022-12-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-12-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c/98487
++	* c-c++-common/Wsuggest-attribute-1.c: New test.
++
+ 2022-12-18  Paul Thomas  <pault@gcc.gnu.org>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

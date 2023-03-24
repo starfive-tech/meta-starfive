@@ -1,0 +1,38 @@
+From 4218d3abfde1aa3dadfdacb55893f08489e8a064 Mon Sep 17 00:00:00 2001
+From: Tobias Burnus <tobias@codesourcery.com>
+Date: Tue, 23 Aug 2022 11:35:01 +0200
+Subject: [PATCH 007/547] gcn/mkoffload: Cleanup temporary dbgobj file
+
+The file (suffix ".mkoffload.dbg.o") used to save the dbgobj data
+data has to be passed to maybe_unlink for cleanup or -v -save-temps stderr
+diagnostic. That was missed before.
+
+This is a partial backport of commit r13-2125, "mkoffload: Cleanup
+temporary omp_requires_file", only for GCN's mkoffload and its dbgobj
+file as 'omp requires' is not supported on GCC 12 and, hence,
+omp_requires_file does not exist on this branch.
+
+gcc/ChangeLog:
+
+	* config/gcn/mkoffload.cc (main): Add dbgobj to files_to_cleanup.
+
+(cherry picked from commit 713ec97e593bd4d9915a13bc4047f064fec0e24a)
+---
+ gcc/config/gcn/mkoffload.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/config/gcn/mkoffload.cc b/gcc/config/gcn/mkoffload.cc
+index 94ba7ffa5af..a8b1b6e05c2 100644
+--- a/gcc/config/gcn/mkoffload.cc
++++ b/gcc/config/gcn/mkoffload.cc
+@@ -1082,6 +1082,7 @@ main (int argc, char **argv)
+ 		    }
+ 		  else
+ 		    dbgobj = make_temp_file (".mkoffload.dbg.o");
++		  obstack_ptr_grow (&files_to_cleanup, dbgobj);
+ 
+ 		  /* If the copy fails then just ignore it.  */
+ 		  if (copy_early_debug_info (argv[ix], dbgobj))
+-- 
+2.25.1
+

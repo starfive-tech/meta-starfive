@@ -1,0 +1,55 @@
+From e95fa8c0b88b6e95b103077b6173c043d04228d0 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 17 Jan 2023 00:21:46 +0000
+Subject: [PATCH 351/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libcpp/po/ChangeLog    |  4 ++++
+ libstdc++-v3/ChangeLog | 14 ++++++++++++++
+ 3 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 748a3e00583..9081c2e74e5 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230116
++20230117
+diff --git a/libcpp/po/ChangeLog b/libcpp/po/ChangeLog
+index 4c0d40272e7..8d5e5ce9ff4 100644
+--- a/libcpp/po/ChangeLog
++++ b/libcpp/po/ChangeLog
+@@ -1,3 +1,7 @@
++2023-01-16  Joseph Myers  <joseph@codesourcery.com>
++
++	* ka.po: New.
++
+ 2023-01-09  Joseph Myers  <joseph@codesourcery.com>
+ 
+ 	* eo.po: Update.
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 02ec4a72b46..248b99d6041 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,17 @@
++2023-01-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-04  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/106183
++	* include/bits/atomic_wait.h (__waiter_pool_base::_M_notify):
++	Move increment of _M_ver here.
++	[!_GLIBCXX_HAVE_PLATFORM_WAIT]: Lock mutex around increment.
++	Use relaxed memory order and always notify all waiters.
++	(__waiter_base::_M_do_wait) [!_GLIBCXX_HAVE_PLATFORM_WAIT]:
++	Check value again after locking mutex.
++	(__waiter_base::_M_notify): Remove increment of _M_ver.
++
+ 2023-01-05  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

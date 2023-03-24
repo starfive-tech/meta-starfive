@@ -1,0 +1,65 @@
+From c3119f575a04845fbbebbf90b5cdea88d5d76156 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 14 Sep 2022 09:00:35 +0200
+Subject: [PATCH 123/547] tree-optimization/106934 - avoid BIT_FIELD_REF of
+ bitfields
+
+The following avoids creating BIT_FIELD_REF of bitfields in
+update-address-taken.  The patch doesn't implement punning to
+a full precision integer type but leaves a comment according to
+that.
+
+	PR tree-optimization/106934
+	* tree-ssa.cc (non_rewritable_mem_ref_base): Avoid BIT_FIELD_REFs
+	of bitfields.
+	(maybe_rewrite_mem_ref_base): Likewise.
+
+	* gfortran.dg/pr106934.f90: New testcase.
+
+(cherry picked from commit 05f5c42cb42c5088187d44cc45a5f671d19ad8c5)
+---
+ gcc/testsuite/gfortran.dg/pr106934.f90 | 7 +++++++
+ gcc/tree-ssa.cc                        | 6 ++++++
+ 2 files changed, 13 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr106934.f90
+
+diff --git a/gcc/testsuite/gfortran.dg/pr106934.f90 b/gcc/testsuite/gfortran.dg/pr106934.f90
+new file mode 100644
+index 00000000000..ac58a3e82e3
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr106934.f90
+@@ -0,0 +1,7 @@
++! { dg-do compile }
++! { dg-options "-O" }
++subroutine s
++   logical(1) :: a = .true.
++   logical(2) :: b
++   a = transfer(b, a)
++end
+diff --git a/gcc/tree-ssa.cc b/gcc/tree-ssa.cc
+index a362a0a9ea6..ab8b1c27ed4 100644
+--- a/gcc/tree-ssa.cc
++++ b/gcc/tree-ssa.cc
+@@ -1459,6 +1459,8 @@ maybe_rewrite_mem_ref_base (tree *tp, bitmap suitable_for_renaming)
+ 	       && (! INTEGRAL_TYPE_P (TREE_TYPE (*tp)) 
+ 		   || (wi::to_offset (TYPE_SIZE (TREE_TYPE (*tp)))
+ 		       == TYPE_PRECISION (TREE_TYPE (*tp))))
++	       && (! INTEGRAL_TYPE_P (TREE_TYPE (sym))
++		   || type_has_mode_precision_p (TREE_TYPE (sym)))
+ 	       && wi::umod_trunc (wi::to_offset (TYPE_SIZE (TREE_TYPE (*tp))),
+ 				  BITS_PER_UNIT) == 0)
+ 	{
+@@ -1531,6 +1533,10 @@ non_rewritable_mem_ref_base (tree ref)
+ 	  && (! INTEGRAL_TYPE_P (TREE_TYPE (base))
+ 	      || (wi::to_offset (TYPE_SIZE (TREE_TYPE (base)))
+ 		  == TYPE_PRECISION (TREE_TYPE (base))))
++	  /* ???  Likewise for extracts from bitfields, we'd have
++	     to pun the base object to a size precision mode first.  */
++	  && (! INTEGRAL_TYPE_P (TREE_TYPE (decl))
++	      || type_has_mode_precision_p (TREE_TYPE (decl)))
+ 	  && wi::umod_trunc (wi::to_offset (TYPE_SIZE (TREE_TYPE (base))),
+ 			     BITS_PER_UNIT) == 0)
+ 	return NULL_TREE;
+-- 
+2.25.1
+

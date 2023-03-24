@@ -1,0 +1,57 @@
+From 14c3bc31e4fc58c4673f12e72a73f4a4e58ef3da Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 7 Dec 2022 00:22:28 +0000
+Subject: [PATCH 264/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 11 +++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  9 +++++++++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index fb6fcef68a6..bb7d1574532 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,14 @@
++2022-12-06  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	Backported from master:
++	2022-11-30  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	* config/aarch64/aarch64.md (aarch64_cpymemdi): Specify clobber of CC reg.
++	(*aarch64_cpymemdi): Likewise.
++	(aarch64_movmemdi): Likewise.
++	(aarch64_setmemdi): Likewise.
++	(*aarch64_setmemdi): Likewise.
++
+ 2022-12-05  Andrew Pinski  <pinskia@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index b55757e1766..ec18fda0770 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221206
++20221207
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 3039da0da9f..22825be9b20 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,12 @@
++2022-12-06  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	Backported from master:
++	2022-11-30  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	* gcc.target/aarch64/mops_5.c: New test.
++	* gcc.target/aarch64/mops_6.c: Likewise.
++	* gcc.target/aarch64/mops_7.c: Likewise.
++
+ 2022-12-01  liuhongt  <hongtao.liu@intel.com>
+ 
+ 	* gcc.target/i386/pr107863.c: New test.
+-- 
+2.25.1
+

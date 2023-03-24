@@ -1,0 +1,172 @@
+From 912bdd5cfb92f6dd58accd755ad14f47c0df619e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 18 Oct 2022 00:21:01 +0000
+Subject: [PATCH 145/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 76 +++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 59 ++++++++++++++++++++++++++++++++
+ 3 files changed, 136 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 22d698f9f89..5a83f183018 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,79 @@
++2022-10-17  Pat Haugen  <pthaugen@linux.ibm.com>
++
++	Backported from master:
++	2022-05-17  Pat Haugen  <pthaugen@linux.ibm.com>
++
++	PR target/99685
++	* config/rs6000/rs6000-call.cc (rs6000_function_arg_advance_1): Bump
++	register count when not splitting IEEE 128-bit Complex.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107254
++	* tree-vect-slp.cc (vect_slp_analyze_node_operations_1):
++	For permutes also analyze live lanes.
++	(vect_schedule_slp_node): For permutes also code generate
++	live lane extracts.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107212
++	* tree-vect-loop.cc (vectorizable_reduction): Make sure to
++	set STMT_VINFO_REDUC_DEF for all live lanes in a SLP
++	reduction.
++	(vectorizable_live_operation): Do not pun to the SLP
++	node representative for reduction epilogue generation.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107160
++	* tree-vect-loop.cc (vect_create_epilog_for_reduction):
++	Do not register accumulator if we failed to reduce it
++	to a single vector.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-06  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107107
++	* tree-ssa-sccvn.cc (visit_reference_op_store): Do not
++	affect value-numbering when doing the tail merging
++	MODIFY_EXPR lookup.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-23  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* tree-ssa-sccvn.cc (vn_reference_lookup_3): Allow
++	an arbitrary number of same valued skipped stores.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-22  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* tree-ssa-sccvn.cc (vn_walk_cb_data::same_val): New member.
++	(vn_walk_cb_data::finish): Perform delayed verification of
++	a skipped may-alias.
++	(vn_reference_lookup_pieces): Likewise.
++	(vn_reference_lookup): Likewise.
++	(vn_reference_lookup_3): When skipping stores of the same
++	value also handle constant stores that are more than a
++	single VDEF away by delaying the verification.
++
+ 2022-10-14  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR target/107248
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 856b00bc5d5..e1b70eb75bf 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221017
++20221018
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 8452ecbe1a6..831106e291c 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,62 @@
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107254
++	* gfortran.dg/vect/pr107254.f90: New testcase.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-11  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107212
++	* gcc.dg/vect/pr107212-1.c: New testcase.
++	* gcc.dg/vect/pr107212-2.c: Likewise.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107160
++	* gcc.dg/vect/pr107160.c: New testcase.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-10-06  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/107107
++	* gcc.dg/pr107107.c: New testcase.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-23  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* g++.dg/torture/pr106922.C: New testcase.
++
++2022-10-17  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-23  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/106922
++	* g++.dg/tree-ssa/pr106922.C: Scan in cddce3 dump rather than
++	dce3.  Remove -fdump-tree-pre-details from dg-options.
++
++2022-10-17  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-09-22  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/106922
++	* gcc.dg/tree-ssa/ssa-fre-100.c: New testcase.
++	* g++.dg/tree-ssa/pr106922.C: Adjust.
++
+ 2022-10-13  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

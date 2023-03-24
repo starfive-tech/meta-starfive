@@ -1,0 +1,77 @@
+From dc4cf9fe202b9813cf2a68aeff7cc00cf882aa7d Mon Sep 17 00:00:00 2001
+From: Haochen Jiang <haochen.jiang@intel.com>
+Date: Thu, 16 Jun 2022 00:15:53 -0700
+Subject: [PATCH 083/547] i386: Add syscall to enable AMX for latest kernels
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/amx-check.h (request_perm_xtile_data):
+	New function to check if AMX is usable and enable AMX.
+	(main): Run test if AMX is usable.
+---
+ gcc/testsuite/gcc.target/i386/amx-check.h | 30 +++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/gcc/testsuite/gcc.target/i386/amx-check.h b/gcc/testsuite/gcc.target/i386/amx-check.h
+index 434b0e59703..6fff5ff4631 100644
+--- a/gcc/testsuite/gcc.target/i386/amx-check.h
++++ b/gcc/testsuite/gcc.target/i386/amx-check.h
+@@ -4,11 +4,24 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdint.h>
++#include <unistd.h>
++#ifdef __linux__
++#include <sys/syscall.h>
++#endif
+ #ifdef DEBUG
+ #include <stdio.h>
+ #endif
+ #include "cpuid.h"
+ 
++#define XFEATURE_XTILECFG	17
++#define XFEATURE_XTILEDATA	18
++#define XFEATURE_MASK_XTILECFG	(1 << XFEATURE_XTILECFG)
++#define XFEATURE_MASK_XTILEDATA	(1 << XFEATURE_XTILEDATA)
++#define XFEATURE_MASK_XTILE	(XFEATURE_MASK_XTILECFG | XFEATURE_MASK_XTILEDATA)
++
++#define ARCH_GET_XCOMP_PERM	0x1022
++#define ARCH_REQ_XCOMP_PERM	0x1023
++
+ /* TODO: The tmm emulation is temporary for current
+    AMX implementation with no tmm regclass, should
+    be changed in the future. */
+@@ -44,6 +57,20 @@ typedef struct __tile
+ /* Stride (colum width in byte) used for tileload/store */
+ #define _STRIDE 64
+ 
++#ifdef __linux__
++/* We need syscall to use amx functions */
++int request_perm_xtile_data()
++{
++  unsigned long bitmask;
++
++  if (syscall (SYS_arch_prctl, ARCH_REQ_XCOMP_PERM, XFEATURE_XTILEDATA) ||
++      syscall (SYS_arch_prctl, ARCH_GET_XCOMP_PERM, &bitmask))
++    return 0;
++
++  return (bitmask & XFEATURE_MASK_XTILE) != 0;
++}
++#endif
++
+ /* Initialize tile config by setting all tmm size to 16x64 */
+ void init_tile_config (__tilecfg_u *dst)
+ {
+@@ -185,6 +212,9 @@ main ()
+ #endif
+ #ifdef AMX_BF16
+       && __builtin_cpu_supports ("amx-bf16")
++#endif
++#ifdef __linux__
++      && request_perm_xtile_data ()
+ #endif
+       )
+     {
+-- 
+2.25.1
+

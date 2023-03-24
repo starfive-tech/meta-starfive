@@ -1,0 +1,74 @@
+From 2d4f60f206cf1100b7484d708f6c913762618676 Mon Sep 17 00:00:00 2001
+From: Peter Bergner <bergner@linux.ibm.com>
+Date: Wed, 31 Aug 2022 21:14:36 -0500
+Subject: [PATCH 042/547] rs6000: Don't ICE when we disassemble an MMA variable
+ [PR101322]
+
+When we expand an MMA disassemble built-in with C++ using a pointer that
+is cast to a valid MMA type, the type isn't passed down to the expand
+machinery and we end up using the base type of the pointer which leads to
+an ICE.  This patch enforces we always use the correct MMA type regardless
+of the pointer type being used.
+
+2022-08-31  Peter Bergner  <bergner@linux.ibm.com>
+
+gcc/
+	PR target/101322
+	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_mma_builtin):
+	Enforce the use of a valid MMA pointer type.
+
+gcc/testsuite/
+	PR target/101322
+	* g++.target/powerpc/pr101322.C: New test.
+
+(cherry picked from commit 2985049049f12b0aa3366ca244d387820385b9e8)
+---
+ gcc/config/rs6000/rs6000-builtin.cc         |  7 ++++++-
+ gcc/testsuite/g++.target/powerpc/pr101322.C | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.target/powerpc/pr101322.C
+
+diff --git a/gcc/config/rs6000/rs6000-builtin.cc b/gcc/config/rs6000/rs6000-builtin.cc
+index e925ba9fad9..15370e45e65 100644
+--- a/gcc/config/rs6000/rs6000-builtin.cc
++++ b/gcc/config/rs6000/rs6000-builtin.cc
+@@ -1121,7 +1121,12 @@ rs6000_gimple_fold_mma_builtin (gimple_stmt_iterator *gsi,
+       unsigned nvec = (fncode == RS6000_BIF_DISASSEMBLE_ACC) ? 4 : 2;
+       tree dst_ptr = gimple_call_arg (stmt, 0);
+       tree src_ptr = gimple_call_arg (stmt, 1);
+-      tree src_type = TREE_TYPE (src_ptr);
++      tree src_type = (fncode == RS6000_BIF_DISASSEMBLE_ACC)
++		      ? build_pointer_type (vector_quad_type_node)
++		      : build_pointer_type (vector_pair_type_node);
++      if (TREE_TYPE (src_ptr) != src_type)
++	src_ptr = build1 (NOP_EXPR, src_type, src_ptr);
++
+       tree src = create_tmp_reg_or_ssa_name (TREE_TYPE (src_type));
+       gimplify_assign (src, build_simple_mem_ref (src_ptr), &new_seq);
+ 
+diff --git a/gcc/testsuite/g++.target/powerpc/pr101322.C b/gcc/testsuite/g++.target/powerpc/pr101322.C
+new file mode 100644
+index 00000000000..43eaf3afcd4
+--- /dev/null
++++ b/gcc/testsuite/g++.target/powerpc/pr101322.C
+@@ -0,0 +1,17 @@
++/* PR target/101322 */
++/* { dg-require-effective-target power10_ok } */
++/* { dg-options "-O2 -mdejagnu-cpu=power10" } */
++
++/* Verify we don't ICE on the following test cases.  */
++
++void
++foo (char *resp, char *vpp)
++{
++  __builtin_vsx_disassemble_pair (resp, (__vector_pair *) vpp);
++}
++
++void
++bar (char *resp, char *vpp)
++{
++  __builtin_mma_disassemble_acc (resp, (__vector_quad *)vpp);
++}
+-- 
+2.25.1
+

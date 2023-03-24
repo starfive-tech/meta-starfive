@@ -1,0 +1,87 @@
+From 6ab4c8759754f34f5285924652238c829960cd4c Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 22 Feb 2023 15:17:03 -0500
+Subject: [PATCH 520/547] c-family: avoid compile-time-hog in c_genericize
+ [PR108880]
+
+This fixes a compile-time hog with UBSan.  This only happened in cc1 but
+not cc1plus.  The problem is ultimately that c_genericize_control_stmt/
+STATEMENT_LIST -> walk_tree_1 doesn't use a hash_set to remember visited
+nodes, so it kept on recursing for a long time.  We should be able to
+use the pset that c_genericize created.  We just need to use walk_tree
+instead of walk_tree_w_d so that the pset is explicit.
+
+	PR c/108880
+
+gcc/c-family/ChangeLog:
+
+	* c-gimplify.cc (c_genericize_control_stmt) <case STATEMENT_LIST>: Pass
+	pset to walk_tree_1.
+	(c_genericize): Call walk_tree with an explicit pset.
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/ubsan/pr108880.c: New test.
+
+(cherry picked from commit 1370014f2ea02ec185cf1199027575916f79fe63)
+---
+ gcc/c-family/c-gimplify.cc                  | 10 +++++++---
+ gcc/testsuite/c-c++-common/ubsan/pr108880.c | 13 +++++++++++++
+ 2 files changed, 20 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/ubsan/pr108880.c
+
+diff --git a/gcc/c-family/c-gimplify.cc b/gcc/c-family/c-gimplify.cc
+index 7e55fd73f81..5ec1dc5754f 100644
+--- a/gcc/c-family/c-gimplify.cc
++++ b/gcc/c-family/c-gimplify.cc
+@@ -510,12 +510,15 @@ c_genericize_control_stmt (tree *stmt_p, int *walk_subtrees, void *data,
+ 	     STATEMENT_LIST wouldn't be present at all the resulting
+ 	     expression wouldn't have TREE_SIDE_EFFECTS set, so make sure
+ 	     to clear it even on the STATEMENT_LIST in such cases.  */
++	  hash_set<tree> *pset = (c_dialect_cxx ()
++				  ? nullptr
++				  : static_cast<hash_set<tree> *>(data));
+ 	  for (i = tsi_start (stmt); !tsi_end_p (i); tsi_next (&i))
+ 	    {
+ 	      tree t = tsi_stmt (i);
+ 	      if (TREE_CODE (t) != DEBUG_BEGIN_STMT && nondebug_stmts < 2)
+ 		nondebug_stmts++;
+-	      walk_tree_1 (tsi_stmt_ptr (i), func, data, NULL, lh);
++	      walk_tree_1 (tsi_stmt_ptr (i), func, data, pset, lh);
+ 	      if (TREE_CODE (t) != DEBUG_BEGIN_STMT
+ 		  && (nondebug_stmts > 1 || TREE_SIDE_EFFECTS (tsi_stmt (i))))
+ 		clear_side_effects = false;
+@@ -570,8 +573,9 @@ c_genericize (tree fndecl)
+       bc_state_t save_state;
+       push_cfun (DECL_STRUCT_FUNCTION (fndecl));
+       save_bc_state (&save_state);
+-      walk_tree_without_duplicates (&DECL_SAVED_TREE (fndecl),
+-				    c_genericize_control_r, NULL);
++      hash_set<tree> pset;
++      walk_tree (&DECL_SAVED_TREE (fndecl), c_genericize_control_r, &pset,
++		 &pset);
+       restore_bc_state (&save_state);
+       pop_cfun ();
+     }
+diff --git a/gcc/testsuite/c-c++-common/ubsan/pr108880.c b/gcc/testsuite/c-c++-common/ubsan/pr108880.c
+new file mode 100644
+index 00000000000..7d589edcd12
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/ubsan/pr108880.c
+@@ -0,0 +1,13 @@
++/* PR c/108880 */
++/* { dg-do compile } */
++/* { dg-options "-fsanitize=undefined" } */
++
++long a;
++short b, e;
++char c;
++int d, f, g;
++void h() {
++  int i;
++  f &= i ^= (((g &= 0 / d / d % 8 << 0 << 2) % a >> e) / c >> b) / 1 % 8 << 3;
++}
++int main() {}
+-- 
+2.25.1
+

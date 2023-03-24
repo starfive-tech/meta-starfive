@@ -1,0 +1,51 @@
+From 8e171d840584a564993201101cd1f2e920e7aecb Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Sat, 14 Jan 2023 23:32:38 +0100
+Subject: [PATCH 502/547] libstdc++: Simplify three helper functions into one
+
+Broadcast is a very common function. This should reduce compile-time
+effort.
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/108030
+	* include/experimental/bits/simd.h (__vector_broadcast):
+	Implement via __vector_broadcast_impl instead of
+	__call_with_n_evaluations + 2 lambdas.
+	(__vector_broadcast_impl): New.
+
+(cherry picked from commit 2e29e2fbeb8936e5c85cefaf547cba42e17e137b)
+---
+ libstdc++-v3/include/experimental/bits/simd.h | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/libstdc++-v3/include/experimental/bits/simd.h b/libstdc++-v3/include/experimental/bits/simd.h
+index 7bdda6e6aae..7c5a32f6e95 100644
+--- a/libstdc++-v3/include/experimental/bits/simd.h
++++ b/libstdc++-v3/include/experimental/bits/simd.h
+@@ -1792,14 +1792,15 @@ template <typename _Tp, typename... _Args>
+ 
+ // }}}
+ // __vector_broadcast{{{
++template <size_t _Np, typename _Tp, size_t... _I>
++  _GLIBCXX_SIMD_INTRINSIC constexpr __vector_type_t<_Tp, _Np>
++  __vector_broadcast_impl(_Tp __x, index_sequence<_I...>)
++  { return __vector_type_t<_Tp, _Np>{((void)_I, __x)...}; }
++
+ template <size_t _Np, typename _Tp>
+   _GLIBCXX_SIMD_INTRINSIC constexpr __vector_type_t<_Tp, _Np>
+   __vector_broadcast(_Tp __x)
+-  {
+-    return __call_with_n_evaluations<_Np>(
+-      [](auto... __xx) { return __vector_type_t<_Tp, _Np>{__xx...}; },
+-      [&__x](int) { return __x; });
+-  }
++  { return __vector_broadcast_impl<_Np, _Tp>(__x, make_index_sequence<_Np>()); }
+ 
+ // }}}
+ // __generate_vector{{{
+-- 
+2.25.1
+

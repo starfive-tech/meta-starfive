@@ -1,0 +1,33 @@
+From 1fb5287dfcf3bef8adea98a4bded441c95e43914 Mon Sep 17 00:00:00 2001
+From: Max Filippov <jcmvbkbc@gmail.com>
+Date: Mon, 7 Nov 2022 13:58:49 -0800
+Subject: [PATCH 249/547] gcc: fix PR rtl-optimization/107482
+
+gcc/
+	PR rtl-optimization/107482
+	* ira-color.cc (assign_hard_reg): Only call
+	update_costs_from_copies when retry_p is false.
+
+(cherry picked from commit e581490f0cfa80c58d2b648d71a44a597fbe3008)
+---
+ gcc/ira-color.cc | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/ira-color.cc b/gcc/ira-color.cc
+index 4a1a325e8e3..ffe73b61c45 100644
+--- a/gcc/ira-color.cc
++++ b/gcc/ira-color.cc
+@@ -2209,8 +2209,8 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
+     restore_costs_from_copies (a);
+   ALLOCNO_HARD_REGNO (a) = best_hard_regno;
+   ALLOCNO_ASSIGNED_P (a) = true;
+-  if (best_hard_regno >= 0)
+-    update_costs_from_copies (a, true, ! retry_p);
++  if (best_hard_regno >= 0 && !retry_p)
++    update_costs_from_copies (a, true, true);
+   ira_assert (ALLOCNO_CLASS (a) == aclass);
+   /* We don't need updated costs anymore.  */
+   ira_free_allocno_updated_costs (a);
+-- 
+2.25.1
+

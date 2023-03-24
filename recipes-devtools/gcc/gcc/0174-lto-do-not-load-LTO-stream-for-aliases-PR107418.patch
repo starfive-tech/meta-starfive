@@ -1,0 +1,33 @@
+From ca0220d42e075194ca1341c98a0a9a9f3fd1c719 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Thu, 27 Oct 2022 10:29:17 +0200
+Subject: [PATCH 174/547] lto: do not load LTO stream for aliases [PR107418]
+
+	PR lto/107418
+
+gcc/lto/ChangeLog:
+
+	* lto-dump.cc (lto_main): Do not load LTO stream for aliases.
+
+(cherry picked from commit be6c75547385c69706370f4e792b04295f708a5a)
+---
+ gcc/lto/lto-dump.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/lto/lto-dump.cc b/gcc/lto/lto-dump.cc
+index 1fb3fb86fb5..7dd3ac7b96d 100644
+--- a/gcc/lto/lto-dump.cc
++++ b/gcc/lto/lto-dump.cc
+@@ -344,7 +344,8 @@ lto_main (void)
+       /* Dump gimple statement statistics.  */
+       cgraph_node *node;
+       FOR_EACH_DEFINED_FUNCTION (node)
+-	node->get_untransformed_body ();
++	if (!node->alias)
++	  node->get_untransformed_body ();
+       if (!GATHER_STATISTICS)
+ 	warning_at (input_location, 0,
+ 		    "Not configured with "
+-- 
+2.25.1
+

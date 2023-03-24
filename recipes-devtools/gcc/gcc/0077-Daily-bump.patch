@@ -1,0 +1,72 @@
+From f3ae8ce91a42ec8c519bb781a4ed5324e637f643 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 20 Sep 2022 00:22:15 +0000
+Subject: [PATCH 077/547] Daily bump.
+
+---
+ gcc/DATESTAMP                     | 2 +-
+ gcc/c/ChangeLog                   | 9 +++++++++
+ gcc/testsuite/ChangeLog           | 8 ++++++++
+ libgcc/config/avr/libf7/ChangeLog | 9 +++++++++
+ 4 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 98dc1b51fa6..54f97aaa2e6 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220919
++20220920
+diff --git a/gcc/c/ChangeLog b/gcc/c/ChangeLog
+index ed54905e78b..0254f4e087d 100644
+--- a/gcc/c/ChangeLog
++++ b/gcc/c/ChangeLog
+@@ -1,3 +1,12 @@
++2022-09-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-09-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c/106947
++	* c-typeck.cc (maybe_warn_for_null_address): Don't emit stray
++	notes.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index c5e53d5b842..b246d93bdb1 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-09-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2022-09-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c/106947
++	* c-c++-common/Waddress-7.c: New test.
++
+ 2022-09-16  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/libgcc/config/avr/libf7/ChangeLog b/libgcc/config/avr/libf7/ChangeLog
+index c9ad966f5e5..a56461b42e6 100644
+--- a/libgcc/config/avr/libf7/ChangeLog
++++ b/libgcc/config/avr/libf7/ChangeLog
+@@ -1,3 +1,12 @@
++2022-09-19  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2022-09-19  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR target/99184
++	* libf7-asm.sx (to_integer, to_unsigned): Don't round 16-bit
++	and 32-bit integers.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

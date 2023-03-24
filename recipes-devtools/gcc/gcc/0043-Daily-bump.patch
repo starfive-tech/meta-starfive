@@ -1,0 +1,54 @@
+From 29b456e0676e051720e030ab801be0479554658a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 4 Sep 2022 00:20:49 +0000
+Subject: [PATCH 043/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 9 +++++++++
+ gcc/DATESTAMP           | 2 +-
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 564a4c3847c..04366bbe256 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2022-09-03  Peter Bergner  <bergner@linux.ibm.com>
++
++	Backported from master:
++	2022-09-01  Peter Bergner  <bergner@linux.ibm.com>
++
++	PR target/101322
++	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_mma_builtin):
++	Enforce the use of a valid MMA pointer type.
++
+ 2022-09-02  Richard Earnshaw  <rearnsha@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e15744dd99e..999da9a9e8d 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220903
++20220904
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 356a9a19402..da17094268e 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-09-03  Peter Bergner  <bergner@linux.ibm.com>
++
++	Backported from master:
++	2022-09-01  Peter Bergner  <bergner@linux.ibm.com>
++
++	PR target/101322
++	* g++.target/powerpc/pr101322.C: New test.
++
+ 2022-08-30  Tobias Burnus  <tobias@codesourcery.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

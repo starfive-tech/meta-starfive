@@ -1,0 +1,101 @@
+From 9f78e7eb8e064556adf466444197aae8e52a1eb3 Mon Sep 17 00:00:00 2001
+From: liuhongt <hongtao.liu@intel.com>
+Date: Mon, 22 Aug 2022 10:41:16 +0800
+Subject: [PATCH 017/547] Don't gimple fold ymm-version
+ vblendvpd/vblendvps/vpblendvb w/o TARGET_AVX2
+
+Since 256-bit vector integer comparison is under TARGET_AVX2,
+and gimple folding for vblendvpd/vblendvps/vpblendvb relies on that.
+Restrict gimple fold condition to TARGET_AVX2.
+
+gcc/ChangeLog:
+
+	PR target/106704
+	* config/i386/i386-builtin.def (BDESC): Add
+	CODE_FOR_avx_blendvpd256/CODE_FOR_avx_blendvps256 to
+	corresponding builtins.
+	* config/i386/i386.cc (ix86_gimple_fold_builtin):
+	Don't fold IX86_BUILTIN_PBLENDVB256, IX86_BUILTIN_BLENDVPS256,
+	IX86_BUILTIN_BLENDVPD256 w/o TARGET_AVX2.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr106704.c: New test.
+---
+ gcc/config/i386/i386-builtin.def         |  4 ++--
+ gcc/config/i386/i386.cc                  | 12 +++++++++---
+ gcc/testsuite/gcc.target/i386/pr106704.c | 16 ++++++++++++++++
+ 3 files changed, 27 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr106704.c
+
+diff --git a/gcc/config/i386/i386-builtin.def b/gcc/config/i386/i386-builtin.def
+index b410102614d..bdd378ffda0 100644
+--- a/gcc/config/i386/i386-builtin.def
++++ b/gcc/config/i386/i386-builtin.def
+@@ -1036,8 +1036,8 @@ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_vpermilvarv8sf3, "__builtin_ia32_vpe
+ 
+ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_blendpd256, "__builtin_ia32_blendpd256", IX86_BUILTIN_BLENDPD256, UNKNOWN, (int) V4DF_FTYPE_V4DF_V4DF_INT)
+ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_blendps256, "__builtin_ia32_blendps256", IX86_BUILTIN_BLENDPS256, UNKNOWN, (int) V8SF_FTYPE_V8SF_V8SF_INT)
+-BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_nothing, "__builtin_ia32_blendvpd256", IX86_BUILTIN_BLENDVPD256, UNKNOWN, (int) V4DF_FTYPE_V4DF_V4DF_V4DF)
+-BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_nothing, "__builtin_ia32_blendvps256", IX86_BUILTIN_BLENDVPS256, UNKNOWN, (int) V8SF_FTYPE_V8SF_V8SF_V8SF)
++BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_blendvpd256, "__builtin_ia32_blendvpd256", IX86_BUILTIN_BLENDVPD256, UNKNOWN, (int) V4DF_FTYPE_V4DF_V4DF_V4DF)
++BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_blendvps256, "__builtin_ia32_blendvps256", IX86_BUILTIN_BLENDVPS256, UNKNOWN, (int) V8SF_FTYPE_V8SF_V8SF_V8SF)
+ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_dpps256, "__builtin_ia32_dpps256", IX86_BUILTIN_DPPS256, UNKNOWN, (int) V8SF_FTYPE_V8SF_V8SF_INT)
+ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_shufpd256, "__builtin_ia32_shufpd256", IX86_BUILTIN_SHUFPD256, UNKNOWN, (int) V4DF_FTYPE_V4DF_V4DF_INT)
+ BDESC (OPTION_MASK_ISA_AVX, 0, CODE_FOR_avx_shufps256, "__builtin_ia32_shufps256", IX86_BUILTIN_SHUFPS256, UNKNOWN, (int) V8SF_FTYPE_V8SF_V8SF_INT)
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 9dd9fa68722..a9ef291c514 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -18351,6 +18351,15 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
+ 	}
+       break;
+ 
++    case IX86_BUILTIN_PBLENDVB256:
++    case IX86_BUILTIN_BLENDVPS256:
++    case IX86_BUILTIN_BLENDVPD256:
++      /* pcmpeqb/d/q is under avx2, w/o avx2, it's veclower
++	 to scalar operations and not combined back.  */
++      if (!TARGET_AVX2)
++	break;
++
++      /* FALLTHRU.  */
+     case IX86_BUILTIN_BLENDVPD:
+       /* blendvpd is under sse4.1 but pcmpgtq is under sse4.2,
+ 	 w/o sse4.2, it's veclowered to scalar operations and
+@@ -18359,10 +18368,7 @@ ix86_gimple_fold_builtin (gimple_stmt_iterator *gsi)
+ 	break;
+       /* FALLTHRU.  */
+     case IX86_BUILTIN_PBLENDVB128:
+-    case IX86_BUILTIN_PBLENDVB256:
+     case IX86_BUILTIN_BLENDVPS:
+-    case IX86_BUILTIN_BLENDVPS256:
+-    case IX86_BUILTIN_BLENDVPD256:
+       gcc_assert (n_args == 3);
+       arg0 = gimple_call_arg (stmt, 0);
+       arg1 = gimple_call_arg (stmt, 1);
+diff --git a/gcc/testsuite/gcc.target/i386/pr106704.c b/gcc/testsuite/gcc.target/i386/pr106704.c
+new file mode 100644
+index 00000000000..44e052a4caa
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr106704.c
+@@ -0,0 +1,16 @@
++/* { dg-do compile } */
++/* { dg-options "-mavx -O2 -mno-avx2" } */
++/* { dg-final { scan-assembler-times {vblendvps[ \t]+%ymm[0-9]+} 1 } } */
++/* { dg-final { scan-assembler-times {vblendvpd[ \t]+%ymm[0-9]+} 1 } } */
++
++#include <immintrin.h>
++
++__m256 bend_stuff( __m256 a, __m256 b, __m256 mask)
++{
++  return _mm256_blendv_ps(a, b, mask);
++}
++
++__m256d bend_stuff1( __m256d a, __m256d b, __m256d mask)
++{
++  return _mm256_blendv_pd(a, b, mask);
++}
+-- 
+2.25.1
+

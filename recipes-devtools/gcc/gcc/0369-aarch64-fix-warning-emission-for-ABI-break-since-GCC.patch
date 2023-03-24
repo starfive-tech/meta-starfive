@@ -1,0 +1,1398 @@
+From f593bfa059fbd2c145d8dd2bae4860959e9e55fe Mon Sep 17 00:00:00 2001
+From: Christophe Lyon <christophe.lyon@arm.com>
+Date: Tue, 14 Jun 2022 21:08:33 +0000
+Subject: [PATCH 369/547] aarch64: fix warning emission for ABI break since GCC
+ 9.1
+
+While looking at PR 105549, which is about fixing the ABI break
+introduced in GCC 9.1 in parameter alignment with bit-fields, we
+noticed that the GCC 9.1 warning is not emitted in all the cases where
+it should be.  This patch fixes that and the next patch in the series
+fixes the GCC 9.1 break.
+
+We split this into two patches since patch #2 introduces a new ABI
+break starting with GCC 13.1.  This way, patch #1 can be back-ported
+to release branches if needed to fix the GCC 9.1 warning issue.
+
+The main idea is to add a new global boolean that indicates whether
+we're expanding the start of a function, so that aarch64_layout_arg
+can emit warnings for callees as well as callers.  This removes the
+need for aarch64_function_arg_boundary to warn (with its incomplete
+information).  However, in the first patch there are still cases where
+we emit warnings were we should not; this is fixed in patch #2 where
+we can distinguish between GCC 9.1 and GCC.13.1 ABI breaks properly.
+
+The fix in aarch64_function_arg_boundary (replacing & with &&) looks
+like an oversight of a previous commit in this area which changed
+'abi_break' from a boolean to an integer.
+
+We also take the opportunity to fix the comment above
+aarch64_function_arg_alignment since the value of the abi_break
+parameter was changed in a previous commit, no longer matching the
+description.
+
+2022-11-28  Christophe Lyon  <christophe.lyon@arm.com>
+	    Richard Sandiford  <richard.sandiford@arm.com>
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64.cc (aarch64_function_arg_alignment): Fix
+	comment.
+	(aarch64_layout_arg): Factorize warning conditions.
+	(aarch64_function_arg_boundary): Fix typo.
+	* function.cc (currently_expanding_function_start): New variable.
+	(expand_function_start): Handle
+	currently_expanding_function_start.
+	* function.h (currently_expanding_function_start): Declare.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/aarch64/bitfield-abi-warning-align16-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c: New
+	test.
+	* gcc.target/aarch64/bitfield-abi-warning-align32-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c: New
+	test.
+	* gcc.target/aarch64/bitfield-abi-warning-align8-O2.c: New test.
+	* gcc.target/aarch64/bitfield-abi-warning.h: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align16-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C: New
+	test.
+	* g++.target/aarch64/bitfield-abi-warning-align32-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C: New
+	test.
+	* g++.target/aarch64/bitfield-abi-warning-align8-O2.C: New test.
+	* g++.target/aarch64/bitfield-abi-warning.h: New test.
+
+(cherry picked from commit 3df1a115be22caeab3ffe7afb12e71adb54ff132)
+---
+ gcc/config/aarch64/aarch64.cc                 |  28 +++-
+ gcc/function.cc                               |   5 +
+ gcc/function.h                                |   2 +
+ .../bitfield-abi-warning-align16-O2-extra.C   |  86 ++++++++++++
+ .../aarch64/bitfield-abi-warning-align16-O2.C |  87 ++++++++++++
+ .../bitfield-abi-warning-align32-O2-extra.C   | 119 +++++++++++++++++
+ .../aarch64/bitfield-abi-warning-align32-O2.C | 119 +++++++++++++++++
+ .../aarch64/bitfield-abi-warning-align8-O2.C  |  16 +++
+ .../g++.target/aarch64/bitfield-abi-warning.h | 125 ++++++++++++++++++
+ .../bitfield-abi-warning-align16-O2-extra.c   |  86 ++++++++++++
+ .../aarch64/bitfield-abi-warning-align16-O2.c |  87 ++++++++++++
+ .../bitfield-abi-warning-align32-O2-extra.c   | 119 +++++++++++++++++
+ .../aarch64/bitfield-abi-warning-align32-O2.c | 119 +++++++++++++++++
+ .../aarch64/bitfield-abi-warning-align8-O2.c  |  16 +++
+ .../gcc.target/aarch64/bitfield-abi-warning.h | 125 ++++++++++++++++++
+ 15 files changed, 1132 insertions(+), 7 deletions(-)
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2.C
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2.C
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align8-O2.C
+ create mode 100644 gcc/testsuite/g++.target/aarch64/bitfield-abi-warning.h
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align8-O2.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning.h
+
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index 263bd138d27..e7eab1b938c 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -7301,9 +7301,9 @@ aarch64_vfp_is_call_candidate (cumulative_args_t pcum_v, machine_mode mode,
+ /* Given MODE and TYPE of a function argument, return the alignment in
+    bits.  The idea is to suppress any stronger alignment requested by
+    the user and opt for the natural alignment (specified in AAPCS64 \S
+-   4.1).  ABI_BREAK is set to true if the alignment was incorrectly
+-   calculated in versions of GCC prior to GCC-9.  This is a helper
+-   function for local use only.  */
++   4.1).  ABI_BREAK is set to the old alignment if the alignment was
++   incorrectly calculated in versions of GCC prior to GCC-9.  This is
++   a helper function for local use only.  */
+ 
+ static unsigned int
+ aarch64_function_arg_alignment (machine_mode mode, const_tree type,
+@@ -7379,11 +7379,24 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
+   if (pcum->aapcs_arg_processed)
+     return;
+ 
++  bool warn_pcs_change
++    = (warn_psabi
++       && !pcum->silent_p
++       && (currently_expanding_function_start
++	   || currently_expanding_gimple_stmt));
++
++  unsigned int alignment
++    = aarch64_function_arg_alignment (mode, type, &abi_break);
++  gcc_assert (!alignment || abi_break < alignment);
++
+   pcum->aapcs_arg_processed = true;
+ 
+   pure_scalable_type_info pst_info;
+   if (type && pst_info.analyze_registers (type))
+     {
++      /* aarch64_function_arg_alignment has never had an effect on
++	 this case.  */
++
+       /* The PCS says that it is invalid to pass an SVE value to an
+ 	 unprototyped function.  There is no ABI-defined location we
+ 	 can return in this case, so we have no real choice but to raise
+@@ -7454,6 +7467,8 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
+      and homogenous short-vector aggregates (HVA).  */
+   if (allocate_nvrn)
+     {
++      /* aarch64_function_arg_alignment has never had an effect on
++	 this case.  */
+       if (!pcum->silent_p && !TARGET_FLOAT)
+ 	aarch64_err_no_fpadvsimd (mode);
+ 
+@@ -7518,7 +7533,7 @@ aarch64_layout_arg (cumulative_args_t pcum_v, const function_arg_info &arg)
+ 	  && (aarch64_function_arg_alignment (mode, type, &abi_break)
+ 	      == 16 * BITS_PER_UNIT))
+ 	{
+-	  if (abi_break && warn_psabi && currently_expanding_gimple_stmt)
++	  if (warn_pcs_change && abi_break)
+ 	    inform (input_location, "parameter passing for argument of type "
+ 		    "%qT changed in GCC 9.1", type);
+ 	  ++ncrn;
+@@ -7581,7 +7596,7 @@ on_stack:
+       int new_size = ROUND_UP (pcum->aapcs_stack_size, 16 / UNITS_PER_WORD);
+       if (pcum->aapcs_stack_size != new_size)
+ 	{
+-	  if (abi_break && warn_psabi && currently_expanding_gimple_stmt)
++	  if (warn_pcs_change && abi_break)
+ 	    inform (input_location, "parameter passing for argument of type "
+ 		    "%qT changed in GCC 9.1", type);
+ 	  pcum->aapcs_stack_size = new_size;
+@@ -7701,14 +7716,13 @@ aarch64_function_arg_boundary (machine_mode mode, const_tree type)
+   unsigned int alignment = aarch64_function_arg_alignment (mode, type,
+ 							   &abi_break);
+   alignment = MIN (MAX (alignment, PARM_BOUNDARY), STACK_BOUNDARY);
+-  if (abi_break & warn_psabi)
++  if (abi_break && warn_psabi)
+     {
+       abi_break = MIN (MAX (abi_break, PARM_BOUNDARY), STACK_BOUNDARY);
+       if (alignment != abi_break)
+ 	inform (input_location, "parameter passing for argument of type "
+ 		"%qT changed in GCC 9.1", type);
+     }
+-
+   return alignment;
+ }
+ 
+diff --git a/gcc/function.cc b/gcc/function.cc
+index ad0096a43ef..3f83aff0bb7 100644
+--- a/gcc/function.cc
++++ b/gcc/function.cc
+@@ -5049,9 +5049,12 @@ stack_protect_epilogue (void)
+    PARMS_HAVE_CLEANUPS is nonzero if there are cleanups associated with
+    the function's parameters, which must be run at any return statement.  */
+ 
++bool currently_expanding_function_start;
+ void
+ expand_function_start (tree subr)
+ {
++  currently_expanding_function_start = true;
++
+   /* Make sure volatile mem refs aren't considered
+      valid operands of arithmetic insns.  */
+   init_recog_no_volatile ();
+@@ -5244,6 +5247,8 @@ expand_function_start (tree subr)
+   /* If we are doing generic stack checking, the probe should go here.  */
+   if (flag_stack_check == GENERIC_STACK_CHECK)
+     stack_check_probe_note = emit_note (NOTE_INSN_DELETED);
++
++  currently_expanding_function_start = false;
+ }
+ 
+ void
+diff --git a/gcc/function.h b/gcc/function.h
+index 098613766be..19abc5e7e6e 100644
+--- a/gcc/function.h
++++ b/gcc/function.h
+@@ -719,4 +719,6 @@ extern const char *current_function_name (void);
+ 
+ extern void used_types_insert (tree);
+ 
++extern bool currently_expanding_function_start;
++
+ #endif  /* GCC_FUNCTION_H */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C
+new file mode 100644
+index 00000000000..c45be832d5b
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2-extra.C
+@@ -0,0 +1,86 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps -Wno-narrowing" } */
++
++#define ALIGN 16
++//#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 12 { xfail *-*-* } } } */
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 47 } f1 */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 48 } f2 */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 49 } f4 */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 50 } f8 */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 53 }  fp */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Bitfield call argument in registers.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 60 } g1 */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 61 } g2 */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 62 } g4 */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 63 } g8 */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 66 }  gp */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 67 } g1p */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 68 } g2p */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 69 } g4p */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 70 } g8p */
++
++
++/* Bitfield parameter in stack.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 74 } f1_stack */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 75 } f2_stack */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 76 } f4_stack */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 77 } f8_stack */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 80 }  fp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* Bitfield call argument in stack.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 87 } g1_stack */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 88 } g2_stack */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 89 } g4_stack */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 90 } g8_stack */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 93 }  gp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* Bitfield parameter in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 101 } f1_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 102 } f2_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 103 } f4_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 104 } f8_stdarg */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 107 }  fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 111 } f8p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 114 } g1_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 115 } g2_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 116 } g4_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 117 } g8_stdarg */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 120 }  gp_stdarg */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 121 } g1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 122 } g2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 123 } g4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 124 } g8p_stdarg */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2.C b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2.C
+new file mode 100644
+index 00000000000..61d12ec22eb
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align16-O2.C
+@@ -0,0 +1,87 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps -Wno-narrowing" } */
++
++#define ALIGN 16
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 12 { xfail *-*-* } } } */
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 47 } f1 */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 48 } f2 */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 49 } f4 */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 50 } f8 */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) (because the argument fits in a single register).  Should not
++   warn, but aarch64_function_arg_boundary would need to take the argument size
++   into account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 53 }  fp */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Bitfield call argument in registers.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 60 } g1 */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 61 } g2 */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 62 } g4 */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 63 } g8 */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++
++/* Bitfield parameter in stack.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 74 } f1_stack */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 75 } f2_stack */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 76 } f4_stack */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 77 } f8_stack */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 80 }  fp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* Bitfield call argument in stack.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 87 } g1_stack */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 88 } g2_stack */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 89 } g4_stack */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 90 } g8_stack */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 93 }  gp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* Bitfield parameter in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} "" { target *-*-* } 101 } f1_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} "" { target *-*-* } 102 } f2_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} "" { target *-*-* } 103 } f4_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} "" { target *-*-* } 104 } f8_stdarg */
++
++/* Parameter passing for these should not have changed in GCC 9.1 (PR 105549).
++   Fortunately we warn. Note the discrepancy with lines 120-124 below: we warn
++   in the callee, but not in the caller.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1} "" { target *-*-* } 107 }  fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 111 } f8p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'S1' changed in GCC 9.1} ""  { target *-*-* } 114 } g1_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2' changed in GCC 9.1} ""  { target *-*-* } 115 } g2_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4' changed in GCC 9.1} ""  { target *-*-* } 116 } g4_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8' changed in GCC 9.1} ""  { target *-*-* } 117 } g8_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C
+new file mode 100644
+index 00000000000..04b183af697
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2-extra.C
+@@ -0,0 +1,119 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps -Wno-narrowing" } */
++
++#define ALIGN 32
++//#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++
++/* In f1, f2, f4, f8, f16 (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[x1\\\]" 10 } } */
++
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* In f16p (and stdarg version):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 2 { xfail *-*-* } } } */
++
++/* In f1_stack, f2_stack, f4_stack, f8_stack, f16_stack, f8p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx\[0-9\]+, \\\[sp, 8\\\]" 6 { xfail *-*-* } } } */
++
++/* In fp_stack, f1p_stack:  */
++/* { dg-final { scan-assembler-times "ldrb\tw0, \\\[sp, 8\\\]" 2 { xfail *-*-* } } } */
++
++/* In f2p_stack:  */
++/* { dg-final { scan-assembler-times "ldrh\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f4p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f16p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[sp, 16\\\]" 1 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 47-51 (f1, f2, f4, f8, f16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) because the argument fits in a single register.  Should not warn,
++   but aarch64_function_arg_boundary would need to take the argument size into
++   account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 53 } fp */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Changed in GCC 9.1, but we fail to emit a warning since GCC 11 (was OK with GCC 9).  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 58 } f16p */
++
++
++/* Bitfield call argument in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 60-64 (g1, g2, g4, g8, g16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 71 } g16p */
++
++
++/* Bitfield parameter in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 74-78 (f1_stack,
++   f2_stack, f4_stack, f8_stack, f16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* Changed in GCC 9.1.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 80 } fp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* No change in parameter passing in GCC 9.1 for line 85 (f16p_stack) because
++   the overall alignment is >= 16.  No warning expected.  */
++
++
++/* Bitfield call argument in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 87-91 (g1_stack,
++   g2_stack, g4_stack, g8_stack, g16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 93 } gp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* No change in parameter passing in GCC 9.1 for line 98 (g16p_stack).  No
++   warning expected.  */
++
++
++/* Bitfield parameter in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 101-105 (f1_stdarg,
++   f2_stdarg, f4_stdarg, f8_stdarg, f16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}   "" { target *-*-* } 107 } fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1}  "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1}  "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1}  "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1}  "" { target *-*-* } 111 } f8p_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for line 112 (f16p_stdarg).
++   Should not warn.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { target *-*-* } 112 } f16p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 114-118 (g1_stdarg,
++   g2_stdarg, g4_stdarg, g8_stdarg, g16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg,
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 125 } g16p_stdarg */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2.C b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2.C
+new file mode 100644
+index 00000000000..cdb5b4df774
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align32-O2.C
+@@ -0,0 +1,119 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps -Wno-narrowing" } */
++
++#define ALIGN 32
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16 (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[x1\\\]" 10 } } */
++
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* In f16p (and stdarg version):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 2 { xfail *-*-* } } } */
++
++/* In f1_stack, f2_stack, f4_stack, f8_stack, f16_stack, f8p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx\[0-9\]+, \\\[sp, 8\\\]" 6 { xfail *-*-* } } } */
++
++/* In fp_stack, f1p_stack:  */
++/* { dg-final { scan-assembler-times "ldrb\tw0, \\\[sp, 8\\\]" 2 { xfail *-*-* } } } */
++
++/* In f2p_stack:  */
++/* { dg-final { scan-assembler-times "ldrh\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f4p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f16p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[sp, 16\\\]" 1 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 47-51 (f1, f2, f4, f8, f16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) because the argument fits in a single register.  Should not warn,
++   but aarch64_function_arg_boundary would need to take the argument size into
++   account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 53 } fp */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Changed in GCC 9.1, but we fail to emit a warning since GCC 11 (was OK with GCC 9).  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 58 } f16p */
++
++
++/* Bitfield call argument in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 60-64 (g1, g2, g4, g8, g16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 71 } g16p */
++
++
++/* Bitfield parameter in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 74-78 (f1_stack,
++   f2_stack, f4_stack, f8_stack, f16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 80 } fp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* No change in parameter passing in GCC 9.1 for line 85 (f16p_stack) because
++   the overall alignment is >= 16.  No warning expected.  */
++
++/* Bitfield call argument in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 87-91 (g1_stack,
++   g2_stack, g4_stack, g8_stack, g16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}  "" { target *-*-* } 93 } gp_stack */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* No change in parameter passing in GCC 9.1 for line 98 (g16p_stack).  No
++   warning expected.  */
++
++
++/* Bitfield parameter in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 101-105 (f1_stdarg,
++   f2_stdarg, f4_stdarg, f8_stdarg, f16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* Parameter passing for these should not have changed in GCC 9.1 (PR 105549).
++   Fortunately we warn. Note the discrepancy with lines 120-124 below: we warn
++   in the callee, but not in the caller.  */
++/* { dg-note {parameter passing for argument of type 'Sp' changed in GCC 9.1}   "" { target *-*-* } 107 } fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'S1p' changed in GCC 9.1}  "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S2p' changed in GCC 9.1}  "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S4p' changed in GCC 9.1}  "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'S8p' changed in GCC 9.1}  "" { target *-*-* } 111 } f8p_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for line 112 (f16p_stdarg).
++   Should not warn.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { target *-*-* } 112 } f16p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 114-118 (g1_stdarg,
++   g2_stdarg, g4_stdarg, g8_stdarg, g16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg,
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'S16p' changed in GCC 9.1} "" { xfail *-*-* } 125 } g16p_stdarg */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align8-O2.C b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align8-O2.C
+new file mode 100644
+index 00000000000..b1764d97ea0
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning-align8-O2.C
+@@ -0,0 +1,16 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps -Wno-narrowing" } */
++
++#define ALIGN 8
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 18 } } */
++
++/* In f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 4 } } */
++
++/* In f1, f2, f4, f8, f16, fp, f1p, f2p, f4p, f8p, f16p stack versions:  */
++/* { dg-final { scan-assembler-times "and\tw0, w0, 1" 11 } } */
+diff --git a/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning.h b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning.h
+new file mode 100644
+index 00000000000..3940b714ef8
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/bitfield-abi-warning.h
+@@ -0,0 +1,125 @@
++#include <stdarg.h>
++
++typedef unsigned long long ull __attribute__((aligned(ALIGN)));
++
++#ifndef EXTRA
++#define EXTRA unsigned long long x;
++#endif
++
++struct S1  { __attribute__((aligned(1))) ull i : 1; EXTRA };
++struct S2  { __attribute__((aligned(2))) ull i : 1; EXTRA };
++struct S4  { __attribute__((aligned(4))) ull i : 1; EXTRA };
++struct S8  { __attribute__((aligned(8))) ull i : 1; EXTRA };
++struct S16 { __attribute__((aligned(16))) ull i : 1; EXTRA };
++
++struct Sp   { ull i : 1; EXTRA }__attribute__((packed));
++struct S1p  { __attribute__((packed, aligned(1))) ull i : 1; EXTRA };
++struct S2p  { __attribute__((packed, aligned(2))) ull i : 1; EXTRA };
++struct S4p  { __attribute__((packed, aligned(4))) ull i : 1; EXTRA };
++struct S8p  { __attribute__((packed, aligned(8))) ull i : 1; EXTRA };
++struct S16p { __attribute__((packed, aligned(16))) ull i : 1; EXTRA };
++
++/* Bitfield in registers.  */
++#define PARAMS(xx) int a0, struct S##xx s, ull a1
++/* Bitfield passed by the stack.  */
++#define PARAMS_STACK(xx) int a0, ull a1, ull a2, ull a3, ull a4, ull a5, ull a6, ull a7, ull a8, struct S##xx t
++/* Bitfield passed via stdarg.  */
++#define PARAMS_STDARG(xx) int a0, ...
++
++#define CODE(xx)				\
++  return s.i;
++
++#define CODE_STACK(xx)				\
++  return t.i;
++
++#define CODE_STDARG(xx)				\
++  va_list ap;					\
++  struct S##xx arg;				\
++  __builtin_va_start(ap,a0);			\
++  arg = __builtin_va_arg(ap, struct S##xx);	\
++  return arg.i;
++
++#define ARGS(xx) x, (struct S##xx) { x }, x
++#define ARGS_STACK(xx) x, x, x, x, x, x, x, x, x, (struct S##xx) { x }
++#define ARGS_STDARG(xx) x, (struct S##xx) { x }
++
++/* Bitfield in registers.  */
++int __attribute__ ((noipa)) f1 (PARAMS(1))  { CODE(1) }
++int __attribute__ ((noipa)) f2 (PARAMS(2))  { CODE(2) }
++int __attribute__ ((noipa)) f4 (PARAMS(4))  { CODE(4) }
++int __attribute__ ((noipa)) f8 (PARAMS(8))  { CODE(8) }
++int __attribute__ ((noipa)) f16(PARAMS(16)) { CODE(16) }
++
++int __attribute__ ((noipa)) fp  (PARAMS(p))   { CODE(p) }
++int __attribute__ ((noipa)) f1p (PARAMS(1p))  { CODE(1p) }
++int __attribute__ ((noipa)) f2p (PARAMS(2p))  { CODE(2p) }
++int __attribute__ ((noipa)) f4p (PARAMS(4p))  { CODE(4p) }
++int __attribute__ ((noipa)) f8p (PARAMS(8p))  { CODE(8p) }
++int __attribute__ ((noipa)) f16p(PARAMS(16p)) { CODE(16p) }
++
++int g1 (int x) { return f1 (ARGS(1)); }
++int g2 (int x) { return f2 (ARGS(2)); }
++int g4 (int x) { return f4 (ARGS(4)); }
++int g8 (int x) { return f8 (ARGS(8)); }
++int g16(int x) { return f16 (ARGS(16)); }
++
++int gp  (int x) { return fp   (ARGS(p)); }
++int g1p (int x) { return f1p  (ARGS(1p)); }
++int g2p (int x) { return f2p  (ARGS(2p)); }
++int g4p (int x) { return f4p  (ARGS(4p)); }
++int g8p (int x) { return f8p  (ARGS(8p)); }
++int g16p(int x) { return f16p (ARGS(16p)); }
++
++/* Bitfield in the stack.  */
++int __attribute__ ((noipa)) f1_stack (PARAMS_STACK(1))  { CODE_STACK(1) }
++int __attribute__ ((noipa)) f2_stack (PARAMS_STACK(2))  { CODE_STACK(2) }
++int __attribute__ ((noipa)) f4_stack (PARAMS_STACK(4))  { CODE_STACK(4) }
++int __attribute__ ((noipa)) f8_stack (PARAMS_STACK(8))  { CODE_STACK(8) }
++int __attribute__ ((noipa)) f16_stack(PARAMS_STACK(16)) { CODE_STACK(16) }
++
++int __attribute__ ((noipa)) fp_stack  (PARAMS_STACK(p))   { CODE_STACK(p) }
++int __attribute__ ((noipa)) f1p_stack (PARAMS_STACK(1p))  { CODE_STACK(1p) }
++int __attribute__ ((noipa)) f2p_stack (PARAMS_STACK(2p))  { CODE_STACK(2p) }
++int __attribute__ ((noipa)) f4p_stack (PARAMS_STACK(4p))  { CODE_STACK(4p) }
++int __attribute__ ((noipa)) f8p_stack (PARAMS_STACK(8p))  { CODE_STACK(8p) }
++int __attribute__ ((noipa)) f16p_stack(PARAMS_STACK(16p)) { CODE_STACK(16p) }
++
++int g1_stack (int x) { return f1_stack (ARGS_STACK(1)); }
++int g2_stack (int x) { return f2_stack (ARGS_STACK(2)); }
++int g4_stack (int x) { return f4_stack (ARGS_STACK(4)); }
++int g8_stack (int x) { return f8_stack (ARGS_STACK(8)); }
++int g16_stack(int x) { return f16_stack (ARGS_STACK(16)); }
++
++int gp_stack  (int x) { return fp_stack (ARGS_STACK(p)); }
++int g1p_stack (int x) { return f1p_stack (ARGS_STACK(1p)); }
++int g2p_stack (int x) { return f2p_stack (ARGS_STACK(2p)); }
++int g4p_stack (int x) { return f4p_stack (ARGS_STACK(4p)); }
++int g8p_stack (int x) { return f8p_stack (ARGS_STACK(8p)); }
++int g16p_stack(int x) { return f16p_stack (ARGS_STACK(16p)); }
++
++/* Bitfield  via stdarg.  */
++int __attribute__ ((noipa)) f1_stdarg (PARAMS_STDARG(1))  { CODE_STDARG(1) }
++int __attribute__ ((noipa)) f2_stdarg (PARAMS_STDARG(2))  { CODE_STDARG(2) }
++int __attribute__ ((noipa)) f4_stdarg (PARAMS_STDARG(4))  { CODE_STDARG(4) }
++int __attribute__ ((noipa)) f8_stdarg (PARAMS_STDARG(8))  { CODE_STDARG(8) }
++int __attribute__ ((noipa)) f16_stdarg(PARAMS_STDARG(16)) { CODE_STDARG(16) }
++
++int __attribute__ ((noipa)) fp_stdarg  (PARAMS_STDARG(p))   { CODE_STDARG(p) }
++int __attribute__ ((noipa)) f1p_stdarg (PARAMS_STDARG(1p))  { CODE_STDARG(1p) }
++int __attribute__ ((noipa)) f2p_stdarg (PARAMS_STDARG(2p))  { CODE_STDARG(2p) }
++int __attribute__ ((noipa)) f4p_stdarg (PARAMS_STDARG(4p))  { CODE_STDARG(4p) }
++int __attribute__ ((noipa)) f8p_stdarg (PARAMS_STDARG(8p))  { CODE_STDARG(8p) }
++int __attribute__ ((noipa)) f16p_stdarg(PARAMS_STDARG(16p)) { CODE_STDARG(16p) }
++
++int g1_stdarg (int x) { return f1_stdarg (ARGS_STDARG(1)); }
++int g2_stdarg (int x) { return f2_stdarg (ARGS_STDARG(2)); }
++int g4_stdarg (int x) { return f4_stdarg (ARGS_STDARG(4)); }
++int g8_stdarg (int x) { return f8_stdarg (ARGS_STDARG(8)); }
++int g16_stdarg(int x) { return f16_stdarg (ARGS_STDARG(16)); }
++
++int gp_stdarg  (int x) { return fp_stdarg (ARGS_STDARG(p)); }
++int g1p_stdarg (int x) { return f1p_stdarg (ARGS_STDARG(1p)); }
++int g2p_stdarg (int x) { return f2p_stdarg (ARGS_STDARG(2p)); }
++int g4p_stdarg (int x) { return f4p_stdarg (ARGS_STDARG(4p)); }
++int g8p_stdarg (int x) { return f8p_stdarg (ARGS_STDARG(8p)); }
++int g16p_stdarg(int x) { return f16p_stdarg (ARGS_STDARG(16p)); }
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c
+new file mode 100644
+index 00000000000..3e38cac149d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2-extra.c
+@@ -0,0 +1,86 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps" } */
++
++#define ALIGN 16
++//#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 12 { xfail *-*-* } } } */
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 47 } f1 */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 48 } f2 */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 49 } f4 */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 50 } f8 */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 53 }  fp */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Bitfield call argument in registers.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 60 } g1 */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 61 } g2 */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 62 } g4 */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 63 } g8 */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 66 }  gp */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 67 } g1p */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 68 } g2p */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 69 } g4p */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 70 } g8p */
++
++
++/* Bitfield parameter in stack.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 74 } f1_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 75 } f2_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 76 } f4_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 77 } f8_stack */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 80 }  fp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* Bitfield call argument in stack.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 87 } g1_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 88 } g2_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 89 } g4_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 90 } g8_stack */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 93 }  gp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* Bitfield parameter in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 101 } f1_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 102 } f2_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 103 } f4_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 104 } f8_stdarg */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 107 }  fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 111 } f8p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 114 } g1_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 115 } g2_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 116 } g4_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 117 } g8_stdarg */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 120 }  gp_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 121 } g1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 122 } g2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 123 } g4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 124 } g8p_stdarg */
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2.c b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2.c
+new file mode 100644
+index 00000000000..39c5f9228ee
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align16-O2.c
+@@ -0,0 +1,87 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps" } */
++
++#define ALIGN 16
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 12 { xfail *-*-* } } } */
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 47 } f1 */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 48 } f2 */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 49 } f4 */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 50 } f8 */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) (because the argument fits in a single register).  Should not
++   warn, but aarch64_function_arg_boundary would need to take the argument size
++   into account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 53 }  fp */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Bitfield call argument in registers.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 60 } g1 */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 61 } g2 */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 62 } g4 */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 63 } g8 */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++
++/* Bitfield parameter in stack.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 74 } f1_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 75 } f2_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 76 } f4_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 77 } f8_stack */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 80 }  fp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* Bitfield call argument in stack.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 87 } g1_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 88 } g2_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 89 } g4_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 90 } g8_stack */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 93 }  gp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* Bitfield parameter in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} "" { target *-*-* } 101 } f1_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} "" { target *-*-* } 102 } f2_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} "" { target *-*-* } 103 } f4_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} "" { target *-*-* } 104 } f8_stdarg */
++
++/* Parameter passing for these should not have changed in GCC 9.1 (PR 105549).
++   Fortunately we warn. Note the discrepancy with lines 120-124 below: we warn
++   in the callee, but not in the caller.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1} "" { target *-*-* } 107 }  fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 111 } f8p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* { dg-note {parameter passing for argument of type 'struct S1' changed in GCC 9.1} ""  { target *-*-* } 114 } g1_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2' changed in GCC 9.1} ""  { target *-*-* } 115 } g2_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4' changed in GCC 9.1} ""  { target *-*-* } 116 } g4_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8' changed in GCC 9.1} ""  { target *-*-* } 117 } g8_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c
+new file mode 100644
+index 00000000000..70671ceda09
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2-extra.c
+@@ -0,0 +1,119 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps" } */
++
++#define ALIGN 32
++//#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++
++/* In f1, f2, f4, f8, f16 (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[x1\\\]" 10 } } */
++
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* In f16p (and stdarg version):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 2 { xfail *-*-* } } } */
++
++/* In f1_stack, f2_stack, f4_stack, f8_stack, f16_stack, f8p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx\[0-9\]+, \\\[sp, 8\\\]" 6 { xfail *-*-* } } } */
++
++/* In fp_stack, f1p_stack:  */
++/* { dg-final { scan-assembler-times "ldrb\tw0, \\\[sp, 8\\\]" 2 { xfail *-*-* } } } */
++
++/* In f2p_stack:  */
++/* { dg-final { scan-assembler-times "ldrh\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f4p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f16p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[sp, 16\\\]" 1 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 47-51 (f1, f2, f4, f8, f16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) because the argument fits in a single register.  Should not warn,
++   but aarch64_function_arg_boundary would need to take the argument size into
++   account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 53 } fp */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Changed in GCC 9.1, but we fail to emit a warning since GCC 11 (was OK with GCC 9).  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 58 } f16p */
++
++
++/* Bitfield call argument in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 60-64 (g1, g2, g4, g8, g16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 71 } g16p */
++
++
++/* Bitfield parameter in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 74-78 (f1_stack,
++   f2_stack, f4_stack, f8_stack, f16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* Changed in GCC 9.1.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 80 } fp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* No change in parameter passing in GCC 9.1 for line 85 (f16p_stack) because
++   the overall alignment is >= 16.  No warning expected.  */
++
++
++/* Bitfield call argument in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 87-91 (g1_stack,
++   g2_stack, g4_stack, g8_stack, g16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 93 } gp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* No change in parameter passing in GCC 9.1 for line 98 (g16p_stack).  No
++   warning expected.  */
++
++
++/* Bitfield parameter in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 101-105 (f1_stdarg,
++   f2_stdarg, f4_stdarg, f8_stdarg, f16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}   "" { target *-*-* } 107 } fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1}  "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1}  "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1}  "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1}  "" { target *-*-* } 111 } f8p_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for line 112 (f16p_stdarg).
++   Should not warn.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { target *-*-* } 112 } f16p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 114-118 (g1_stdarg,
++   g2_stdarg, g4_stdarg, g8_stdarg, g16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg,
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 125 } g16p_stdarg */
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2.c b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2.c
+new file mode 100644
+index 00000000000..757a2f1543c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align32-O2.c
+@@ -0,0 +1,119 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps" } */
++
++#define ALIGN 32
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, f16 (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[x1\\\]" 10 } } */
++
++/* In fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 10 { xfail *-*-* } } } */
++
++/* In f16p (and stdarg version):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 2 { xfail *-*-* } } } */
++
++/* In f1_stack, f2_stack, f4_stack, f8_stack, f16_stack, f8p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx\[0-9\]+, \\\[sp, 8\\\]" 6 { xfail *-*-* } } } */
++
++/* In fp_stack, f1p_stack:  */
++/* { dg-final { scan-assembler-times "ldrb\tw0, \\\[sp, 8\\\]" 2 { xfail *-*-* } } } */
++
++/* In f2p_stack:  */
++/* { dg-final { scan-assembler-times "ldrh\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f4p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tw0, \\\[sp, 8\\\]" 1 { xfail *-*-* } } } */
++
++/* In f16p_stack:  */
++/* { dg-final { scan-assembler-times "ldr\tx0, \\\[sp, 16\\\]" 1 { xfail *-*-* } } } */
++
++/* Bitfield parameter in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 47-51 (f1, f2, f4, f8, f16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 53-57 (fp, f1p, f2p,
++   f4p, f8p) because the argument fits in a single register.  Should not warn,
++   but aarch64_function_arg_boundary would need to take the argument size into
++   account as well as whether it's passed via registers or the stack.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 53 } fp */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 54 } f1p */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 55 } f2p */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 56 } f4p */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 57 } f8p */
++
++/* Changed in GCC 9.1, but we fail to emit a warning since GCC 11 (was OK with GCC 9).  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 58 } f16p */
++
++
++/* Bitfield call argument in registers.  */
++/* No change in parameter passing in GCC 9.1 for lines 60-64 (g1, g2, g4, g8, g16)
++   because the overall alignment is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 66-70 (gp, g1p, g2p,
++   g4p, g8p), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 71 } g16p */
++
++
++/* Bitfield parameter in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 74-78 (f1_stack,
++   f2_stack, f4_stack, f8_stack, f16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 80 } fp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 81 } f1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 82 } f2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 83 } f4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 84 } f8p_stack */
++
++/* No change in parameter passing in GCC 9.1 for line 85 (f16p_stack) because
++   the overall alignment is >= 16.  No warning expected.  */
++
++/* Bitfield call argument in stack.  */
++/* No change in parameter passing in GCC 9.1 for lines 87-91 (g1_stack,
++   g2_stack, g4_stack, g8_stack, g16_stack) because the overall alignment is >
++   16.  No warning expected.  */
++
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}  "" { target *-*-* } 93 } gp_stack */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1} "" { target *-*-* } 94 } g1p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1} "" { target *-*-* } 95 } g2p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1} "" { target *-*-* } 96 } g4p_stack */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1} "" { target *-*-* } 97 } g8p_stack */
++
++
++/* No change in parameter passing in GCC 9.1 for line 98 (g16p_stack).  No
++   warning expected.  */
++
++
++/* Bitfield parameter in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 101-105 (f1_stdarg,
++   f2_stdarg, f4_stdarg, f8_stdarg, f16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* Parameter passing for these should not have changed in GCC 9.1 (PR 105549).
++   Fortunately we warn. Note the discrepancy with lines 120-124 below: we warn
++   in the callee, but not in the caller.  */
++/* { dg-note {parameter passing for argument of type 'struct Sp' changed in GCC 9.1}   "" { target *-*-* } 107 } fp_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S1p' changed in GCC 9.1}  "" { target *-*-* } 108 } f1p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S2p' changed in GCC 9.1}  "" { target *-*-* } 109 } f2p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S4p' changed in GCC 9.1}  "" { target *-*-* } 110 } f4p_stdarg */
++/* { dg-note {parameter passing for argument of type 'struct S8p' changed in GCC 9.1}  "" { target *-*-* } 111 } f8p_stdarg */
++
++/* No change in parameter passing in GCC 9.1 for line 112 (f16p_stdarg).
++   Should not warn.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { target *-*-* } 112 } f16p_stdarg */
++
++/* Bitfield call argument in stdarg.  */
++/* No change in parameter passing in GCC 9.1 for lines 114-118 (g1_stdarg,
++   g2_stdarg, g4_stdarg, g8_stdarg, g16_stdarg) because the overall alignment
++   is > 16.  No warning expected.  */
++
++/* No change in parameter passing in GCC 9.1 for lines 120-124 (gp_stdarg,
++   g1p_stdarg, g2p_stdarg, g4p_stdarg, g8p_stdarg), no warning expected.  */
++
++/* Changed in GCC 9.1, but we fail to emit a warning.  */
++/* { dg-note {parameter passing for argument of type 'struct S16p' changed in GCC 9.1} "" { xfail *-*-* } 125 } g16p_stdarg */
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align8-O2.c b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align8-O2.c
+new file mode 100644
+index 00000000000..cb2a945a819
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning-align8-O2.c
+@@ -0,0 +1,16 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -save-temps" } */
++
++#define ALIGN 8
++#define EXTRA
++
++#include "bitfield-abi-warning.h"
++
++/* In f1, f2, f4, f8, fp, f1p, f2p, f4p, f8p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w1, 1" 18 } } */
++
++/* In f16, f16p (and stdarg versions):  */
++/* { dg-final { scan-assembler-times "and\tw0, w2, 1" 4 } } */
++
++/* In f1, f2, f4, f8, f16, fp, f1p, f2p, f4p, f8p, f16p stack versions:  */
++/* { dg-final { scan-assembler-times "and\tw0, w0, 1" 11 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning.h b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning.h
+new file mode 100644
+index 00000000000..3940b714ef8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/bitfield-abi-warning.h
+@@ -0,0 +1,125 @@
++#include <stdarg.h>
++
++typedef unsigned long long ull __attribute__((aligned(ALIGN)));
++
++#ifndef EXTRA
++#define EXTRA unsigned long long x;
++#endif
++
++struct S1  { __attribute__((aligned(1))) ull i : 1; EXTRA };
++struct S2  { __attribute__((aligned(2))) ull i : 1; EXTRA };
++struct S4  { __attribute__((aligned(4))) ull i : 1; EXTRA };
++struct S8  { __attribute__((aligned(8))) ull i : 1; EXTRA };
++struct S16 { __attribute__((aligned(16))) ull i : 1; EXTRA };
++
++struct Sp   { ull i : 1; EXTRA }__attribute__((packed));
++struct S1p  { __attribute__((packed, aligned(1))) ull i : 1; EXTRA };
++struct S2p  { __attribute__((packed, aligned(2))) ull i : 1; EXTRA };
++struct S4p  { __attribute__((packed, aligned(4))) ull i : 1; EXTRA };
++struct S8p  { __attribute__((packed, aligned(8))) ull i : 1; EXTRA };
++struct S16p { __attribute__((packed, aligned(16))) ull i : 1; EXTRA };
++
++/* Bitfield in registers.  */
++#define PARAMS(xx) int a0, struct S##xx s, ull a1
++/* Bitfield passed by the stack.  */
++#define PARAMS_STACK(xx) int a0, ull a1, ull a2, ull a3, ull a4, ull a5, ull a6, ull a7, ull a8, struct S##xx t
++/* Bitfield passed via stdarg.  */
++#define PARAMS_STDARG(xx) int a0, ...
++
++#define CODE(xx)				\
++  return s.i;
++
++#define CODE_STACK(xx)				\
++  return t.i;
++
++#define CODE_STDARG(xx)				\
++  va_list ap;					\
++  struct S##xx arg;				\
++  __builtin_va_start(ap,a0);			\
++  arg = __builtin_va_arg(ap, struct S##xx);	\
++  return arg.i;
++
++#define ARGS(xx) x, (struct S##xx) { x }, x
++#define ARGS_STACK(xx) x, x, x, x, x, x, x, x, x, (struct S##xx) { x }
++#define ARGS_STDARG(xx) x, (struct S##xx) { x }
++
++/* Bitfield in registers.  */
++int __attribute__ ((noipa)) f1 (PARAMS(1))  { CODE(1) }
++int __attribute__ ((noipa)) f2 (PARAMS(2))  { CODE(2) }
++int __attribute__ ((noipa)) f4 (PARAMS(4))  { CODE(4) }
++int __attribute__ ((noipa)) f8 (PARAMS(8))  { CODE(8) }
++int __attribute__ ((noipa)) f16(PARAMS(16)) { CODE(16) }
++
++int __attribute__ ((noipa)) fp  (PARAMS(p))   { CODE(p) }
++int __attribute__ ((noipa)) f1p (PARAMS(1p))  { CODE(1p) }
++int __attribute__ ((noipa)) f2p (PARAMS(2p))  { CODE(2p) }
++int __attribute__ ((noipa)) f4p (PARAMS(4p))  { CODE(4p) }
++int __attribute__ ((noipa)) f8p (PARAMS(8p))  { CODE(8p) }
++int __attribute__ ((noipa)) f16p(PARAMS(16p)) { CODE(16p) }
++
++int g1 (int x) { return f1 (ARGS(1)); }
++int g2 (int x) { return f2 (ARGS(2)); }
++int g4 (int x) { return f4 (ARGS(4)); }
++int g8 (int x) { return f8 (ARGS(8)); }
++int g16(int x) { return f16 (ARGS(16)); }
++
++int gp  (int x) { return fp   (ARGS(p)); }
++int g1p (int x) { return f1p  (ARGS(1p)); }
++int g2p (int x) { return f2p  (ARGS(2p)); }
++int g4p (int x) { return f4p  (ARGS(4p)); }
++int g8p (int x) { return f8p  (ARGS(8p)); }
++int g16p(int x) { return f16p (ARGS(16p)); }
++
++/* Bitfield in the stack.  */
++int __attribute__ ((noipa)) f1_stack (PARAMS_STACK(1))  { CODE_STACK(1) }
++int __attribute__ ((noipa)) f2_stack (PARAMS_STACK(2))  { CODE_STACK(2) }
++int __attribute__ ((noipa)) f4_stack (PARAMS_STACK(4))  { CODE_STACK(4) }
++int __attribute__ ((noipa)) f8_stack (PARAMS_STACK(8))  { CODE_STACK(8) }
++int __attribute__ ((noipa)) f16_stack(PARAMS_STACK(16)) { CODE_STACK(16) }
++
++int __attribute__ ((noipa)) fp_stack  (PARAMS_STACK(p))   { CODE_STACK(p) }
++int __attribute__ ((noipa)) f1p_stack (PARAMS_STACK(1p))  { CODE_STACK(1p) }
++int __attribute__ ((noipa)) f2p_stack (PARAMS_STACK(2p))  { CODE_STACK(2p) }
++int __attribute__ ((noipa)) f4p_stack (PARAMS_STACK(4p))  { CODE_STACK(4p) }
++int __attribute__ ((noipa)) f8p_stack (PARAMS_STACK(8p))  { CODE_STACK(8p) }
++int __attribute__ ((noipa)) f16p_stack(PARAMS_STACK(16p)) { CODE_STACK(16p) }
++
++int g1_stack (int x) { return f1_stack (ARGS_STACK(1)); }
++int g2_stack (int x) { return f2_stack (ARGS_STACK(2)); }
++int g4_stack (int x) { return f4_stack (ARGS_STACK(4)); }
++int g8_stack (int x) { return f8_stack (ARGS_STACK(8)); }
++int g16_stack(int x) { return f16_stack (ARGS_STACK(16)); }
++
++int gp_stack  (int x) { return fp_stack (ARGS_STACK(p)); }
++int g1p_stack (int x) { return f1p_stack (ARGS_STACK(1p)); }
++int g2p_stack (int x) { return f2p_stack (ARGS_STACK(2p)); }
++int g4p_stack (int x) { return f4p_stack (ARGS_STACK(4p)); }
++int g8p_stack (int x) { return f8p_stack (ARGS_STACK(8p)); }
++int g16p_stack(int x) { return f16p_stack (ARGS_STACK(16p)); }
++
++/* Bitfield  via stdarg.  */
++int __attribute__ ((noipa)) f1_stdarg (PARAMS_STDARG(1))  { CODE_STDARG(1) }
++int __attribute__ ((noipa)) f2_stdarg (PARAMS_STDARG(2))  { CODE_STDARG(2) }
++int __attribute__ ((noipa)) f4_stdarg (PARAMS_STDARG(4))  { CODE_STDARG(4) }
++int __attribute__ ((noipa)) f8_stdarg (PARAMS_STDARG(8))  { CODE_STDARG(8) }
++int __attribute__ ((noipa)) f16_stdarg(PARAMS_STDARG(16)) { CODE_STDARG(16) }
++
++int __attribute__ ((noipa)) fp_stdarg  (PARAMS_STDARG(p))   { CODE_STDARG(p) }
++int __attribute__ ((noipa)) f1p_stdarg (PARAMS_STDARG(1p))  { CODE_STDARG(1p) }
++int __attribute__ ((noipa)) f2p_stdarg (PARAMS_STDARG(2p))  { CODE_STDARG(2p) }
++int __attribute__ ((noipa)) f4p_stdarg (PARAMS_STDARG(4p))  { CODE_STDARG(4p) }
++int __attribute__ ((noipa)) f8p_stdarg (PARAMS_STDARG(8p))  { CODE_STDARG(8p) }
++int __attribute__ ((noipa)) f16p_stdarg(PARAMS_STDARG(16p)) { CODE_STDARG(16p) }
++
++int g1_stdarg (int x) { return f1_stdarg (ARGS_STDARG(1)); }
++int g2_stdarg (int x) { return f2_stdarg (ARGS_STDARG(2)); }
++int g4_stdarg (int x) { return f4_stdarg (ARGS_STDARG(4)); }
++int g8_stdarg (int x) { return f8_stdarg (ARGS_STDARG(8)); }
++int g16_stdarg(int x) { return f16_stdarg (ARGS_STDARG(16)); }
++
++int gp_stdarg  (int x) { return fp_stdarg (ARGS_STDARG(p)); }
++int g1p_stdarg (int x) { return f1p_stdarg (ARGS_STDARG(1p)); }
++int g2p_stdarg (int x) { return f2p_stdarg (ARGS_STDARG(2p)); }
++int g4p_stdarg (int x) { return f4p_stdarg (ARGS_STDARG(4p)); }
++int g8p_stdarg (int x) { return f8p_stdarg (ARGS_STDARG(8p)); }
++int g16p_stdarg(int x) { return f16p_stdarg (ARGS_STDARG(16p)); }
+-- 
+2.25.1
+

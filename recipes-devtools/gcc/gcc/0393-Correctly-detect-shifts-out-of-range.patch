@@ -1,0 +1,84 @@
+From 9dccaeaa586a1634e1f6a0f4c51806f3c3aea63b Mon Sep 17 00:00:00 2001
+From: Andrew MacLeod <amacleod@redhat.com>
+Date: Mon, 30 Jan 2023 14:59:30 -0500
+Subject: [PATCH 393/547] Correctly detect shifts out of range
+
+get_shift_range was incorrectly communicating that it couldn't calculate
+a range when the shift values was always out fo range.  Fix this and
+alwasy return [0, 0] when the shift value is always out of range.
+
+	PR tree-optimization/108306
+	gcc/
+	* range-op.cc (operator_lshift::fold_range): Return [0, 0] not
+	varying for shifts that are always out of void range.
+	(operator_rshift::fold_range): Return [0, 0] not
+	varying for shifts that are always out of void range.
+
+	gcc/testsuite/
+	* gcc.dg/pr108306.c: New.
+---
+ gcc/range-op.cc                 |  4 ++--
+ gcc/testsuite/gcc.dg/pr108306.c | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108306.c
+
+diff --git a/gcc/range-op.cc b/gcc/range-op.cc
+index b5f4627fe2b..bf95f5fbaa1 100644
+--- a/gcc/range-op.cc
++++ b/gcc/range-op.cc
+@@ -1970,7 +1970,7 @@ operator_lshift::fold_range (irange &r, tree type,
+       if (op2.undefined_p ())
+ 	r.set_undefined ();
+       else
+-	r.set_varying (type);
++	r.set_zero (type);
+       return true;
+     }
+ 
+@@ -2240,7 +2240,7 @@ operator_rshift::fold_range (irange &r, tree type,
+       if (op2.undefined_p ())
+ 	r.set_undefined ();
+       else
+-	r.set_varying (type);
++	r.set_zero (type);
+       return true;
+     }
+ 
+diff --git a/gcc/testsuite/gcc.dg/pr108306.c b/gcc/testsuite/gcc.dg/pr108306.c
+new file mode 100644
+index 00000000000..1044c646de7
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108306.c
+@@ -0,0 +1,29 @@
++/* { dg-do compile } */
++/* { dg-options "-O2  -fno-strict-overflow -fsanitize=shift -Warray-bounds" } */
++
++enum psi_task_count {
++	NR_IOWAIT,
++	NR_PSI_TASK_COUNTS = 4,
++};
++
++unsigned int tasks[NR_PSI_TASK_COUNTS];
++
++static void psi_group_change(unsigned int set)
++{
++	unsigned int t;
++	unsigned int state_mask = 0;
++
++	for (t = 0; set; set &= ~(1 << t), t++)
++		if (set & (1 << t))
++			tasks[t]++;
++}
++
++void psi_task_switch(int sleep)
++{
++	int set = 0;
++
++	if (sleep)
++		set |= (1 << NR_IOWAIT);
++
++	psi_group_change(set);
++}
+-- 
+2.25.1
+

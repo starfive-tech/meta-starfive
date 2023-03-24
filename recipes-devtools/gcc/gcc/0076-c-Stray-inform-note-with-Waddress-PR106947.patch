@@ -1,0 +1,91 @@
+From 97803ee561c7a2692a6d7863a5d86797d79a18b1 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Mon, 19 Sep 2022 14:12:55 -0400
+Subject: [PATCH 076/547] c: Stray inform note with -Waddress [PR106947]
+
+A trivial fix for maybe_warn_for_null_address where we print an
+inform note without first checking the return value of a warning
+call.
+
+	PR c/106947
+
+gcc/c/ChangeLog:
+
+	* c-typeck.cc (maybe_warn_for_null_address): Don't emit stray
+	notes.
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/Waddress-7.c: New test.
+
+(cherry picked from commit 2d9429d5c0f86f588bdfd85bb9e236d2be367d3f)
+---
+ gcc/c/c-typeck.cc                       | 19 ++++++++++---------
+ gcc/testsuite/c-c++-common/Waddress-7.c | 22 ++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 9 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/Waddress-7.c
+
+diff --git a/gcc/c/c-typeck.cc b/gcc/c/c-typeck.cc
+index e130196a3a7..0e55fd1db4b 100644
+--- a/gcc/c/c-typeck.cc
++++ b/gcc/c/c-typeck.cc
+@@ -11681,18 +11681,19 @@ maybe_warn_for_null_address (location_t loc, tree op, tree_code code)
+       || from_macro_expansion_at (loc))
+     return;
+ 
++  bool w;
+   if (code == EQ_EXPR)
+-    warning_at (loc, OPT_Waddress,
+-		"the comparison will always evaluate as %<false%> "
+-		"for the address of %qE will never be NULL",
+-		op);
++    w = warning_at (loc, OPT_Waddress,
++		    "the comparison will always evaluate as %<false%> "
++		    "for the address of %qE will never be NULL",
++		    op);
+   else
+-    warning_at (loc, OPT_Waddress,
+-		"the comparison will always evaluate as %<true%> "
+-		"for the address of %qE will never be NULL",
+-		op);
++    w = warning_at (loc, OPT_Waddress,
++		    "the comparison will always evaluate as %<true%> "
++		    "for the address of %qE will never be NULL",
++		    op);
+ 
+-  if (DECL_P (op))
++  if (w && DECL_P (op))
+     inform (DECL_SOURCE_LOCATION (op), "%qD declared here", op);
+ }
+ 
+diff --git a/gcc/testsuite/c-c++-common/Waddress-7.c b/gcc/testsuite/c-c++-common/Waddress-7.c
+new file mode 100644
+index 00000000000..179948553c5
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/Waddress-7.c
+@@ -0,0 +1,22 @@
++/* PR c/106947 */
++/* { dg-do compile } */
++/* { dg-options "-Waddress" } */
++
++#ifndef __cplusplus
++# define bool _Bool
++#endif
++
++#pragma GCC diagnostic ignored "-Waddress"
++int s; /* { dg-bogus "declared" } */
++bool e = &s;
++int
++main ()
++{
++  int error = 0;
++  {
++    bool e1 = &s;
++    if (!e1)
++      error = 1;
++  }
++  return error;
++}
+-- 
+2.25.1
+

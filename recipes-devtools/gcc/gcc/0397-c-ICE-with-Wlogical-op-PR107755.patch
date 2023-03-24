@@ -1,0 +1,79 @@
+From fb2d50f72caf3b84b315bc760368670680999749 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 31 Jan 2023 14:36:30 -0500
+Subject: [PATCH 397/547] c++: ICE with -Wlogical-op [PR107755]
+
+Here we crash in the middle end because warn_logical_operator calls
+build_range_check which calls various fold_* functions and those
+don't work too well when we're still processing template trees.  For
+instance here we crash because we're converting a RECORD_TYPE to bool.
+At this point VIEW_CONVERT_EXPR<struct Foo>(b) hasn't yet been converted
+to Foo::operator bool (&b).
+
+I was excited to fix this with instantiation_dependent_expression_p
+which can now be called from c-family/ as well, but the problem isn't
+that the expression is dependent.  So, p_t_d it is.
+
+	PR c++/107755
+
+gcc/cp/ChangeLog:
+
+	* call.cc (build_new_op): Don't call warn_logical_operator when
+	processing a template.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/warn/Wlogical-op-4.C: New test.
+
+(cherry picked from commit 5ce8961b46f050a96e8c542b34b1cf024ba95f1b)
+---
+ gcc/cp/call.cc                            |  2 +-
+ gcc/testsuite/g++.dg/warn/Wlogical-op-4.C | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wlogical-op-4.C
+
+diff --git a/gcc/cp/call.cc b/gcc/cp/call.cc
+index 67c30f380f2..ae9a029ee56 100644
+--- a/gcc/cp/call.cc
++++ b/gcc/cp/call.cc
+@@ -6901,7 +6901,7 @@ build_new_op (const op_location_t &loc, enum tree_code code, int flags,
+     case TRUTH_ORIF_EXPR:
+     case TRUTH_AND_EXPR:
+     case TRUTH_OR_EXPR:
+-      if (complain & tf_warning)
++      if ((complain & tf_warning) && !processing_template_decl)
+ 	warn_logical_operator (loc, code, boolean_type_node,
+ 			       code_orig_arg1, arg1,
+ 			       code_orig_arg2, arg2);
+diff --git a/gcc/testsuite/g++.dg/warn/Wlogical-op-4.C b/gcc/testsuite/g++.dg/warn/Wlogical-op-4.C
+new file mode 100644
+index 00000000000..745c9117a3d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wlogical-op-4.C
+@@ -0,0 +1,23 @@
++// PR c++/107755
++// { dg-do compile }
++// { dg-options "-Wlogical-op" }
++
++struct Foo
++{
++  operator bool() const { return false; }
++};
++
++bool a;
++Foo b;
++
++template <typename ignored>
++static bool Bar()
++{
++  return (true && (false ? a : b));
++  return (false || (false ? a : b));
++}
++
++bool Baz()
++{
++  return Bar<void>();
++}
+-- 
+2.25.1
+

@@ -1,0 +1,60 @@
+From 1e60e9124543fd002f3e6dad8172cff8aa1b24b3 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Wed, 1 Feb 2023 21:01:32 +0100
+Subject: [PATCH 409/547] Fortran: error recovery on invalid array section
+ [PR108609]
+
+The testcase for PR108527 uncovered a latent issue with invalid array
+sections that resulted in different paths being taken on different
+architectures.  Detect the invalid array declaration for a clean recovery.
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108609
+	* expr.cc (find_array_section): Add check to prevent interpreting an
+	mpz non-integer constant as an integer.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108609
+	* gfortran.dg/pr108527.f90: Adjust test pattern.
+
+(cherry picked from commit 88a2a09dd4529107e7ef7a6e7ce43acf96457173)
+---
+ gcc/fortran/expr.cc                    | 6 +++++-
+ gcc/testsuite/gfortran.dg/pr108527.f90 | 2 +-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/fortran/expr.cc b/gcc/fortran/expr.cc
+index ab54d43bce2..15d41d023d3 100644
+--- a/gcc/fortran/expr.cc
++++ b/gcc/fortran/expr.cc
+@@ -1552,7 +1552,11 @@ find_array_section (gfc_expr *expr, gfc_ref *ref)
+       lower = ref->u.ar.as->lower[d];
+       upper = ref->u.ar.as->upper[d];
+ 
+-      if (!lower || !upper)
++      if (!lower || !upper
++	  || lower->expr_type != EXPR_CONSTANT
++	  || upper->expr_type != EXPR_CONSTANT
++	  || lower->ts.type != BT_INTEGER
++	  || upper->ts.type != BT_INTEGER)
+ 	{
+ 	  t = false;
+ 	  goto cleanup;
+diff --git a/gcc/testsuite/gfortran.dg/pr108527.f90 b/gcc/testsuite/gfortran.dg/pr108527.f90
+index c97ba3111cb..804514810ac 100644
+--- a/gcc/testsuite/gfortran.dg/pr108527.f90
++++ b/gcc/testsuite/gfortran.dg/pr108527.f90
+@@ -4,7 +4,7 @@
+ 
+ program p
+   integer, parameter :: a((2.)) = [4,8] ! { dg-error "must be of INTEGER type" }
+-  integer(a(1:1)) :: b                  ! { dg-error "out of bounds" }
++  integer(a(1:1)) :: b                  ! { dg-error "Unclassifiable statement" }
+ end
+ 
+ ! { dg-prune-output "Parameter array" }
+-- 
+2.25.1
+

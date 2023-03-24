@@ -1,0 +1,84 @@
+From 4b54eb8afe8fc9fc59b6a27a9dfb15f414325248 Mon Sep 17 00:00:00 2001
+From: Philipp Tomsich <philipp.tomsich@vrull.eu>
+Date: Mon, 3 Oct 2022 21:59:50 +0200
+Subject: [PATCH 170/547] aarch64: fix off-by-one in reading cpuinfo
+
+Fixes: 341573406b39
+
+Don't subtract one from the result of strnlen() when trying to point
+to the first character after the current string.  This issue would
+cause individual characters (where the 128 byte buffers are stitched
+together) to be lost.
+
+gcc/ChangeLog:
+
+	* config/aarch64/driver-aarch64.cc (readline): Fix off-by-one.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/aarch64/cpunative/info_18: New test.
+	* gcc.target/aarch64/cpunative/native_cpu_18.c: New test.
+
+(cherry picked from commit b1cfbccc41de6aec950c0f662e7e85ab34bfff8a)
+---
+ gcc/config/aarch64/driver-aarch64.cc              |  4 ++--
+ .../gcc.target/aarch64/cpunative/info_18          |  8 ++++++++
+ .../gcc.target/aarch64/cpunative/native_cpu_18.c  | 15 +++++++++++++++
+ 3 files changed, 25 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/cpunative/info_18
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_18.c
+
+diff --git a/gcc/config/aarch64/driver-aarch64.cc b/gcc/config/aarch64/driver-aarch64.cc
+index 8073a0786d9..d714a8bda43 100644
+--- a/gcc/config/aarch64/driver-aarch64.cc
++++ b/gcc/config/aarch64/driver-aarch64.cc
+@@ -202,9 +202,9 @@ readline (FILE *f)
+ 	return std::string ();
+       /* If we're not at the end of the line then override the
+ 	 \0 added by fgets.  */
+-      last = strnlen (buf, size) - 1;
++      last = strnlen (buf, size);
+     }
+-  while (!feof (f) && buf[last] != '\n');
++  while (!feof (f) && last > 0 && buf[last - 1] != '\n');
+ 
+   std::string result (buf);
+   free (buf);
+diff --git a/gcc/testsuite/gcc.target/aarch64/cpunative/info_18 b/gcc/testsuite/gcc.target/aarch64/cpunative/info_18
+new file mode 100644
+index 00000000000..25061a4abe8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/cpunative/info_18
+@@ -0,0 +1,8 @@
++processor	: 0
++BogoMIPS	: 2000.00
++Features	: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 asimddp sha512 asimdfhm dit uscat ilrcpc flagm ssbs sb dcpodp flagm2 frint i8mm bf16 rng ecv
++CPU implementer	: 0xc0
++CPU architecture: 8
++CPU variant	: 0x0
++CPU part	: 0xac3
++CPU revision	: 0
+diff --git a/gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_18.c b/gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_18.c
+new file mode 100644
+index 00000000000..b5f0a3005f5
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/cpunative/native_cpu_18.c
+@@ -0,0 +1,15 @@
++/* { dg-do compile { target { { aarch64*-*-linux*} && native } } } */
++/* { dg-set-compiler-env-var GCC_CPUINFO "$srcdir/gcc.target/aarch64/cpunative/info_18" } */
++/* { dg-additional-options "-mcpu=native" } */
++
++int main()
++{
++  return 0;
++}
++
++/* { dg-final { scan-assembler {\.arch armv8.6-a\+crc\+fp16\+aes\+sha3\+rng} } } */
++
++/* Test one where the boundary of buffer size would overwrite the last
++   character read when stitching the fgets-calls together.  With the
++   test data provided, this would truncate the 'sha512' into 'ha512'
++   (dropping the 'sha3' feature). */
+-- 
+2.25.1
+

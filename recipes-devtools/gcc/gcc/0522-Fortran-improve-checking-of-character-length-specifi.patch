@@ -1,0 +1,125 @@
+From abd1571d2340b5c86ba4d51ef9affc743e764ba8 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Mon, 20 Feb 2023 21:28:09 +0100
+Subject: [PATCH 522/547] Fortran: improve checking of character length
+ specification [PR96025]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/96025
+	* parse.cc (check_function_result_typed): Improve type check of
+	specification expression for character length and return status.
+	(parse_spec): Use status from above.
+	* resolve.cc (resolve_fntype): Prevent use of invalid specification
+	expression for character length.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/96025
+	* gfortran.dg/pr96025.f90: New test.
+
+(cherry picked from commit 6c1b825b3d6499dfeacf7c79dcf4b56a393ac204)
+---
+ gcc/fortran/parse.cc                  | 25 ++++++++++++++-----------
+ gcc/fortran/resolve.cc                |  4 +++-
+ gcc/testsuite/gfortran.dg/pr96025.f90 | 11 +++++++++++
+ 3 files changed, 28 insertions(+), 12 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr96025.f90
+
+diff --git a/gcc/fortran/parse.cc b/gcc/fortran/parse.cc
+index d1c72ef92e7..c220913e72c 100644
+--- a/gcc/fortran/parse.cc
++++ b/gcc/fortran/parse.cc
+@@ -3948,21 +3948,30 @@ match_deferred_characteristics (gfc_typespec * ts)
+    For return types specified in a FUNCTION prefix, the IMPLICIT rules of the
+    scope are not yet parsed so this has to be delayed up to parse_spec.  */
+ 
+-static void
++static bool
+ check_function_result_typed (void)
+ {
+   gfc_typespec ts;
+ 
+   gcc_assert (gfc_current_state () == COMP_FUNCTION);
+ 
+-  if (!gfc_current_ns->proc_name->result) return;
++  if (!gfc_current_ns->proc_name->result)
++    return true;
+ 
+   ts = gfc_current_ns->proc_name->result->ts;
+ 
+   /* Check type-parameters, at the moment only CHARACTER lengths possible.  */
+   /* TODO:  Extend when KIND type parameters are implemented.  */
+   if (ts.type == BT_CHARACTER && ts.u.cl && ts.u.cl->length)
+-    gfc_expr_check_typed (ts.u.cl->length, gfc_current_ns, true);
++    {
++      /* Reject invalid type of specification expression for length.  */
++      if (ts.u.cl->length->ts.type != BT_INTEGER)
++	  return false;
++
++      gfc_expr_check_typed (ts.u.cl->length, gfc_current_ns, true);
++    }
++
++  return true;
+ }
+ 
+ 
+@@ -4070,10 +4079,7 @@ loop:
+ 	}
+ 
+       if (verify_now)
+-	{
+-	  check_function_result_typed ();
+-	  function_result_typed = true;
+-	}
++	function_result_typed = check_function_result_typed ();
+     }
+ 
+   switch (st)
+@@ -4084,10 +4090,7 @@ loop:
+     case ST_IMPLICIT_NONE:
+     case ST_IMPLICIT:
+       if (!function_result_typed)
+-	{
+-	  check_function_result_typed ();
+-	  function_result_typed = true;
+-	}
++	function_result_typed = check_function_result_typed ();
+       goto declSt;
+ 
+     case ST_FORMAT:
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index 532ca05b69c..5c66bfb15d9 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -17350,7 +17350,9 @@ resolve_fntype (gfc_namespace *ns)
+ 	  }
+       }
+ 
+-  if (sym->ts.type == BT_CHARACTER)
++  if (sym->ts.type == BT_CHARACTER
++      && sym->ts.u.cl->length
++      && sym->ts.u.cl->length->ts.type == BT_INTEGER)
+     gfc_traverse_expr (sym->ts.u.cl->length, sym, flag_fn_result_spec, 0);
+ }
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr96025.f90 b/gcc/testsuite/gfortran.dg/pr96025.f90
+new file mode 100644
+index 00000000000..ce292bd9664
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr96025.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/96025 - ICE in expr_check_typed_help
++! Contributed by G.Steinmetz
++
++program p
++  print *, f()
++contains
++  character(char(1)) function f() ! { dg-error "must be of INTEGER type" }
++    f = 'f'
++  end
++end
+-- 
+2.25.1
+

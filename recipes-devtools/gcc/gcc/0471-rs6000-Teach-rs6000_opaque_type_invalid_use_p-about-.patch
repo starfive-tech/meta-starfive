@@ -1,0 +1,145 @@
+From 3c7bb6c0b0003f4e1fb52f814ad1a9a7f09573c6 Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Wed, 18 Jan 2023 02:34:19 -0600
+Subject: [PATCH 471/547] rs6000: Teach rs6000_opaque_type_invalid_use_p about
+ gcall [PR108348]
+
+PR108348 shows one special case that MMA opaque types are
+used in function arguments and treated as pass by reference,
+it results in one copying from argument to a temp variable,
+since this copying happens before rs6000_function_arg check,
+it can cause ICE without MMA support then.  This patch is to
+teach function rs6000_opaque_type_invalid_use_p to check if
+any function argument in a gcall stmt has the invalid use of
+MMA opaque types.
+
+btw, I checked the handling on return value, it doesn't have
+this kind of issue as its checking and error emission is quite
+early, so this doesn't handle function return value.
+
+	PR target/108348
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000.cc (rs6000_opaque_type_invalid_use_p): Add the
+	support for invalid uses of MMA opaque type in function arguments.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr108348-1.c: New test.
+	* gcc.target/powerpc/pr108348-2.c: New test.
+
+(cherry picked from commit 5d9529687deb9ed009361a16c02a7f6c3e2ebbf3)
+---
+ gcc/config/rs6000/rs6000.cc                   | 19 +++++++++++----
+ gcc/testsuite/gcc.target/powerpc/pr108348-1.c | 23 +++++++++++++++++++
+ gcc/testsuite/gcc.target/powerpc/pr108348-2.c | 23 +++++++++++++++++++
+ 3 files changed, 61 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108348-1.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108348-2.c
+
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index e8cc82c389a..78eace2d4df 100644
+--- a/gcc/config/rs6000/rs6000.cc
++++ b/gcc/config/rs6000/rs6000.cc
+@@ -28774,9 +28774,9 @@ constant_generates_xxspltidp (vec_const_128bit_type *vsx_const)
+    __vector_pair built-in types.  They are target specific and
+    only available when MMA is supported.  With MMA supported, it
+    simply returns true, otherwise it checks if the given gimple
+-   STMT is an assignment or asm stmt and uses either of these two
+-   opaque types unexpectedly, if yes, it would raise an error
+-   message and returns true, otherwise it returns false.  */
++   STMT is an assignment, asm or call stmt and uses either of
++   these two opaque types unexpectedly, if yes, it would raise
++   an error message and returns true, otherwise it returns false.  */
+ 
+ bool
+ rs6000_opaque_type_invalid_use_p (gimple *stmt)
+@@ -28805,7 +28805,7 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
+   if (stmt)
+     {
+       /* The usage of MMA opaque types is very limited for now,
+-	 to check with gassign and gasm is enough so far.  */
++	 to check with gassign, gasm and gcall is enough so far.  */
+       if (gassign *ga = dyn_cast<gassign *> (stmt))
+ 	{
+ 	  tree lhs = gimple_assign_lhs (ga);
+@@ -28834,6 +28834,17 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
+ 		return true;
+ 	    }
+ 	}
++      else if (gcall *gc = dyn_cast<gcall *> (stmt))
++	{
++	  unsigned nargs = gimple_call_num_args (gc);
++	  for (unsigned i = 0; i < nargs; i++)
++	    {
++	      tree arg = gimple_call_arg (gc, i);
++	      tree type = TREE_TYPE (arg);
++	      if (check_and_error_invalid_use (type))
++		return true;
++	    }
++	}
+     }
+ 
+   return false;
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108348-1.c b/gcc/testsuite/gcc.target/powerpc/pr108348-1.c
+new file mode 100644
+index 00000000000..29cbe7abffc
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108348-1.c
+@@ -0,0 +1,23 @@
++/* { dg-require-effective-target powerpc_altivec_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  This needs -mabi=no-altivec
++   to do the copying for pass-by-reference function argument on 32 bit
++   environment.  */
++/* { dg-options "-mdejagnu-cpu=power9 -mabi=no-altivec" } */
++
++/* Verify there is no ICE on 32 bit and don't check the error messages
++   on unsupported type since they could be fragile and are not test
++   points of this case.  */
++
++/* { dg-excess-errors "pr108348-1" } */
++
++extern void bar (__vector_quad v);
++
++void
++foo (void)
++{
++  __vector_quad v;
++  bar (v);
++}
++
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108348-2.c b/gcc/testsuite/gcc.target/powerpc/pr108348-2.c
+new file mode 100644
+index 00000000000..9aa8939e2f4
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108348-2.c
+@@ -0,0 +1,23 @@
++/* { dg-require-effective-target powerpc_altivec_ok } */
++/* If the default cpu type is power10 or later, type __vector_pair is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  This needs -mabi=no-altivec
++   to do the copying for pass-by-reference function argument on 32 bit
++   environment.  */
++/* { dg-options "-mdejagnu-cpu=power9 -mabi=no-altivec" } */
++
++/* Verify there is no ICE on 32 bit and don't check the error messages
++   on unsupported type since they could be fragile and are not test
++   points of this case.  */
++
++/* { dg-excess-errors "pr108348-2" } */
++
++extern void bar (__vector_pair v);
++
++void
++foo (void)
++{
++  __vector_pair v;
++  bar (v);
++}
++
+-- 
+2.25.1
+

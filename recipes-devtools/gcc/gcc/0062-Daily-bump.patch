@@ -1,0 +1,77 @@
+From 99c0c61618186c3cc4c3ada802dd18cf76558706 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 13 Sep 2022 00:22:42 +0000
+Subject: [PATCH 062/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 12 ++++++++++++
+ gcc/testsuite/ChangeLog | 11 +++++++++++
+ libstdc++-v3/ChangeLog  |  8 ++++++++
+ 4 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index eaf59824aca..3ab9ae22f92 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220912
++20220913
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index f97f1d6c890..3a5e7f4c3fe 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,15 @@
++2022-09-12  Jason Merrill  <jason@redhat.com>
++
++	PR c++/93259
++	* pt.cc (type_dependent_expression_p): Treat a compound
++	literal of array-of-unknown-bound type like a variable.
++
++2022-09-12  Jason Merrill  <jason@redhat.com>
++
++	PR c++/106893
++	PR c++/90451
++	* decl.cc (cp_finish_decl): Call mark_single_function.
++
+ 2022-08-30  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 2e519bcba48..56f8c384f8f 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,14 @@
++2022-09-12  Jason Merrill  <jason@redhat.com>
++
++	PR c++/93259
++	* g++.dg/cpp0x/initlist-array17.C: New test.
++
++2022-09-12  Jason Merrill  <jason@redhat.com>
++
++	PR c++/106893
++	PR c++/90451
++	* g++.dg/cpp1y/auto-fn65.C: New test.
++
+ 2022-09-09  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 7cfc53992dc..e30073a5eea 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,11 @@
++2022-09-12  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2022-09-12  Patrick Palka  <ppalka@redhat.com>
++
++	PR libstdc++/106320
++	* testsuite/std/ranges/adaptors/join.cc (test13): New test.
++
+ 2022-09-07  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

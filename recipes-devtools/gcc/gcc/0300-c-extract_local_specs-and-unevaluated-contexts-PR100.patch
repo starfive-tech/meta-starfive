@@ -1,0 +1,112 @@
+From cdc1a14be1182874ccf1ceb27ee5b67c5ce8c62d Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Thu, 15 Dec 2022 16:02:05 -0500
+Subject: [PATCH 300/547] c++: extract_local_specs and unevaluated contexts
+ [PR100295]
+
+Here during partial instantiation of the constexpr if, extra_local_specs
+walks the statement looking for local specializations within to capture.
+However, we're thwarted by the fact that 'ts' first appears inside an
+unevaluated context, and so the calls to process_outer_var_ref for its
+local specializations are a no-op.  And since we walk each tree exactly
+once, we end up not capturing the local specializations despite 'ts'
+later occurring in an evaluated context.
+
+This patch fixes this by making extract_local_specs walk evaluated
+contexts first before walking unevaluated contexts.  We could probably
+get away with not walking unevaluated contexts at all, but this approach
+seems more clearly safe.
+
+	PR c++/100295
+	PR c++/107579
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (el_data::skip_unevaluated_operands): New data member.
+	(extract_locals_r): If skip_unevaluated_operands is true,
+	don't walk into unevaluated contexts.
+	(extract_local_specs): Walk the pattern twice, first with
+	skip_unevaluated_operands true followed by it set to false.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1z/constexpr-if-lambda5.C: New test.
+
+(cherry picked from commit 18499b9f848707aee42d810e99ac0a4c9788433c)
+---
+ gcc/cp/pt.cc                                  | 19 ++++++++++++++++++-
+ .../g++.dg/cpp1z/constexpr-if-lambda5.C       | 15 +++++++++++++++
+ 2 files changed, 33 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1z/constexpr-if-lambda5.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index d4c32ce6025..735c106c7d6 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -12991,17 +12991,26 @@ public:
+   /* List of local_specializations used within the pattern.  */
+   tree extra;
+   tsubst_flags_t complain;
++  /* True iff we don't want to walk into unevaluated contexts.  */
++  bool skip_unevaluated_operands = false;
+ 
+   el_data (tsubst_flags_t c)
+     : extra (NULL_TREE), complain (c) {}
+ };
+ static tree
+-extract_locals_r (tree *tp, int */*walk_subtrees*/, void *data_)
++extract_locals_r (tree *tp, int *walk_subtrees, void *data_)
+ {
+   el_data &data = *reinterpret_cast<el_data*>(data_);
+   tree *extra = &data.extra;
+   tsubst_flags_t complain = data.complain;
+ 
++  if (data.skip_unevaluated_operands
++      && unevaluated_p (TREE_CODE (*tp)))
++    {
++      *walk_subtrees = 0;
++      return NULL_TREE;
++    }
++
+   if (TYPE_P (*tp) && typedef_variant_p (*tp))
+     /* Remember local typedefs (85214).  */
+     tp = &TYPE_NAME (*tp);
+@@ -13093,6 +13102,14 @@ static tree
+ extract_local_specs (tree pattern, tsubst_flags_t complain)
+ {
+   el_data data (complain);
++  /* Walk the pattern twice, ignoring unevaluated operands the first time
++     around, so that if a local specialization appears in both an evaluated
++     and unevaluated context we prefer to process it in the evaluated context
++     (since e.g. process_outer_var_ref is a no-op inside an unevaluated
++     context).  */
++  data.skip_unevaluated_operands = true;
++  cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
++  data.skip_unevaluated_operands = false;
+   cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
+   return data.extra;
+ }
+diff --git a/gcc/testsuite/g++.dg/cpp1z/constexpr-if-lambda5.C b/gcc/testsuite/g++.dg/cpp1z/constexpr-if-lambda5.C
+new file mode 100644
+index 00000000000..d2bf0221743
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/constexpr-if-lambda5.C
+@@ -0,0 +1,15 @@
++// PR c++/100295
++// { dg-do compile { target c++17 } }
++
++template<typename... Ts>
++void f(Ts... ts) {
++  auto lambda = [=](auto x) {
++    if constexpr (sizeof((ts+x) + ...) != 0)
++      (..., ts);
++  };
++  lambda(0);
++}
++
++int main() {
++  f(0, 'a');
++}
+-- 
+2.25.1
+

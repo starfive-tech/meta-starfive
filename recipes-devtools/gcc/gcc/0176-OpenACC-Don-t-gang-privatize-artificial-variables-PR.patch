@@ -1,0 +1,280 @@
+From 9b116c51a451995f1bae8fdac0748fcf3f06aafe Mon Sep 17 00:00:00 2001
+From: Julian Brown <julian@codesourcery.com>
+Date: Wed, 12 Oct 2022 20:44:57 +0000
+Subject: [PATCH 176/547] OpenACC: Don't gang-privatize artificial variables
+ [PR90115]
+
+This patch prevents compiler-generated artificial variables from being
+treated as privatization candidates for OpenACC.
+
+The rationale is that e.g. "gang-private" variables actually must be
+shared by each worker and vector spawned within a particular gang, but
+that sharing is not necessary for any compiler-generated variable (at
+least at present, but no such need is anticipated either).  Variables on
+the stack (and machine registers) are already private per-"thread"
+(gang, worker and/or vector), and that's fine for artificial variables.
+
+We're restricting this to blocks, as we still need to understand what it
+means for a 'DECL_ARTIFICIAL' to appear in a 'private' clause.
+
+Several tests need their scan output patterns adjusted to compensate.
+
+2022-10-14  Julian Brown  <julian@codesourcery.com>
+
+	PR middle-end/90115
+gcc/
+	* omp-low.cc (oacc_privatization_candidate_p): Artificial vars are not
+	privatization candidates.
+
+libgomp/
+	* testsuite/libgomp.oacc-fortran/declare-1.f90: Adjust scan output.
+	* testsuite/libgomp.oacc-fortran/host_data-5.F90: Likewise.
+	* testsuite/libgomp.oacc-fortran/if-1.f90: Likewise.
+	* testsuite/libgomp.oacc-fortran/print-1.f90: Likewise.
+	* testsuite/libgomp.oacc-fortran/privatized-ref-2.f90: Likewise.
+
+Co-authored-by: Thomas Schwinge <thomas@codesourcery.com>
+(cherry picked from commit 11e811d8e2f63667f60f73731bb934273f5882b8)
+---
+ gcc/omp-low.cc                                | 22 +++++++++++++++++
+ .../libgomp.oacc-fortran/declare-1.f90        |  2 +-
+ .../libgomp.oacc-fortran/host_data-5.F90      | 24 +++++++++----------
+ .../testsuite/libgomp.oacc-fortran/if-1.f90   | 12 +++++-----
+ .../libgomp.oacc-fortran/print-1.f90          | 13 +---------
+ .../libgomp.oacc-fortran/privatized-ref-2.f90 |  8 ++-----
+ 6 files changed, 44 insertions(+), 37 deletions(-)
+
+diff --git a/gcc/omp-low.cc b/gcc/omp-low.cc
+index e9482f2363b..a59996e2f13 100644
+--- a/gcc/omp-low.cc
++++ b/gcc/omp-low.cc
+@@ -10661,6 +10661,28 @@ oacc_privatization_candidate_p (const location_t loc, const tree c,
+ 	}
+     }
+ 
++  /* If an artificial variable has been added to a bind, e.g.
++     a compiler-generated temporary structure used by the Fortran front-end, do
++     not consider it as a privatization candidate.  Note that variables on
++     the stack are private per-thread by default: making them "gang-private"
++     for OpenACC actually means to share a single instance of a variable
++     amongst all workers and threads spawned within each gang.
++     At present, no compiler-generated artificial variables require such
++     sharing semantics, so this is safe.  */
++
++  if (res && block && DECL_ARTIFICIAL (decl))
++    {
++      res = false;
++
++      if (dump_enabled_p ())
++	{
++	  oacc_privatization_begin_diagnose_var (l_dump_flags, loc, c, decl);
++	  dump_printf (l_dump_flags,
++		       "isn%'t candidate for adjusting OpenACC privatization "
++		       "level: %s\n", "artificial");
++	}
++    }
++
+   if (res)
+     {
+       if (dump_enabled_p ())
+diff --git a/libgomp/testsuite/libgomp.oacc-fortran/declare-1.f90 b/libgomp/testsuite/libgomp.oacc-fortran/declare-1.f90
+index 51776a1d260..89bd4a2d094 100644
+--- a/libgomp/testsuite/libgomp.oacc-fortran/declare-1.f90
++++ b/libgomp/testsuite/libgomp.oacc-fortran/declare-1.f90
+@@ -215,7 +215,7 @@ program main
+   ! { dg-note {variable 'C\.[0-9]+' declared in block potentially has improper OpenACC privatization level: 'const_decl'} "TODO" { target *-*-* } .-1 }
+   ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-2 }
+   ! { dg-note {variable 'S\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-3 }
+-  ! { dg-note {variable 'desc\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-4 }
++  ! { dg-note {variable 'desc\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-4 }
+   use vars
+   use openacc
+   implicit none
+diff --git a/libgomp/testsuite/libgomp.oacc-fortran/host_data-5.F90 b/libgomp/testsuite/libgomp.oacc-fortran/host_data-5.F90
+index 93e9ee09818..c3453a579ae 100644
+--- a/libgomp/testsuite/libgomp.oacc-fortran/host_data-5.F90
++++ b/libgomp/testsuite/libgomp.oacc-fortran/host_data-5.F90
+@@ -43,7 +43,7 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+   ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target { ! openacc_host_selected } } .-2 }
+   ! { dg-note {variable 'p\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-3 }
+   ! { dg-note {variable 'parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-4 }
+-  ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target { ! openacc_host_selected } } .-5 }
++  ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-5 }
+ #if !ACC_MEM_SHARED
+     if (acc_is_present(p, c_sizeof(p))) stop 5
+     if (acc_is_present(parr, 1)) stop 6
+@@ -54,8 +54,8 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+     ! { dg-note {variable 'host_p\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-3 }
+     ! { dg-note {variable 'parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-4 }
+     ! { dg-note {variable 'host_parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-5 }
+-    ! { dg-note {variable 'D\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-6 }
+-    ! { dg-note {variable 'transfer\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-7 }
++    ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-6 }
++    ! { dg-note {variable 'transfer\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-7 }
+     ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-8 }
+       ! not mapped yet, so it will be equal to the host pointer.
+       if (transfer(c_loc(p), host_p) /= host_p) stop 7
+@@ -74,9 +74,9 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+     ! { dg-note {variable 'host_p\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-5 }
+     ! { dg-note {variable 'host_parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-6 }
+     ! { dg-note {variable 'C\.[0-9]+' declared in block potentially has improper OpenACC privatization level: 'const_decl'} "TODO" { target *-*-* } .-7 }
+-    ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-8 }
+-    ! { dg-note {variable 'D\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-9 }
+-    ! { dg-note {variable 'transfer\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-10 }
++    ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-8 }
++    ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-9 }
++    ! { dg-note {variable 'transfer\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-10 }
+     ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-11 }
+       if (.not. acc_is_present(p, c_sizeof(p))) stop 11
+       if (.not. acc_is_present(parr, 1)) stop 12
+@@ -90,8 +90,8 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+       ! { dg-note {variable 'host_p\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-3 }
+       ! { dg-note {variable 'parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-4 }
+       ! { dg-note {variable 'host_parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-5 }
+-      ! { dg-note {variable 'D\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-6 }
+-      ! { dg-note {variable 'transfer\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-7 }
++      ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-6 }
++      ! { dg-note {variable 'transfer\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-7 }
+       ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-8 }
+ #if ACC_MEM_SHARED
+         if (transfer(c_loc(p), host_p) /= host_p) stop 15
+@@ -110,8 +110,8 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+         ! { dg-note {variable 'parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-4 }
+         ! { dg-note {variable 'host_parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-5 }
+         ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-6 }
+-        ! { dg-note {variable 'D\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-7 }
+-        ! { dg-note {variable 'transfer\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-8 }
++        ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-7 }
++        ! { dg-note {variable 'transfer\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-8 }
+ #if ACC_MEM_SHARED
+         if (transfer(c_loc(p), host_p) /= host_p) stop 19
+         if (transfer(c_loc(parr), host_parr) /= host_parr) stop 20
+@@ -129,8 +129,8 @@ subroutine foo (p2, parr, host_p, host_parr, cond)
+         ! { dg-note {variable 'parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-4 }
+         ! { dg-note {variable 'host_parr\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-5 }
+         ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-6 }
+-        ! { dg-note {variable 'D\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-7 }
+-        ! { dg-note {variable 'transfer\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "TODO" { target *-*-* } .-8 }
++        ! { dg-note {variable 'D\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-7 }
++        ! { dg-note {variable 'transfer\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } .-8 }
+ #if ACC_MEM_SHARED
+         if (transfer(c_loc(p), host_p) /= host_p) stop 23
+         if (transfer(c_loc(parr), host_parr) /= host_parr) stop 24
+diff --git a/libgomp/testsuite/libgomp.oacc-fortran/if-1.f90 b/libgomp/testsuite/libgomp.oacc-fortran/if-1.f90
+index c6d67647d4a..e0cfd912d0f 100644
+--- a/libgomp/testsuite/libgomp.oacc-fortran/if-1.f90
++++ b/libgomp/testsuite/libgomp.oacc-fortran/if-1.f90
+@@ -382,7 +382,7 @@ program main
+   b(:) = 1.0
+ 
+   !$acc data copyin (a(1:N)) copyout (b(1:N)) if (0 == 1)
+-  ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-1 }
++  ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-1 }
+ 
+ #if !ACC_MEM_SHARED
+   if (acc_is_present (a) .eqv. .TRUE.) STOP 21
+@@ -396,7 +396,7 @@ program main
+ 
+   !$acc data copyin (a(1:N)) if (1 == 1)
+   ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-1 }
+-  ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-2 }
++  ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-2 }
+ 
+ #if !ACC_MEM_SHARED
+     if (acc_is_present (a) .eqv. .FALSE.) STOP 23
+@@ -404,7 +404,7 @@ program main
+ 
+     !$acc data copyout (b(1:N)) if (0 == 1)
+     ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-1 }
+-    ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-2 }
++    ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-2 }
+ #if !ACC_MEM_SHARED
+       if (acc_is_present (b) .eqv. .TRUE.) STOP 24
+ #endif
+@@ -877,7 +877,7 @@ program main
+   b(:) = 1.0
+ 
+   !$acc data copyin (a(1:N)) copyout (b(1:N)) if (0 == 1)
+-  ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-1 }
++  ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-1 }
+ 
+ #if !ACC_MEM_SHARED
+   if (acc_is_present (a) .eqv. .TRUE.) STOP 56
+@@ -891,7 +891,7 @@ program main
+ 
+   !$acc data copyin (a(1:N)) if (1 == 1)
+   ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-1 }
+-  ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-2 }
++  ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-2 }
+ 
+ #if !ACC_MEM_SHARED
+     if (acc_is_present (a) .eqv. .FALSE.) STOP 58
+@@ -899,7 +899,7 @@ program main
+ 
+     !$acc data copyout (b(1:N)) if (0 == 1)
+     ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: not addressable} "" { target *-*-* } .-1 }
+-    ! { dg-note {variable 'parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target { ! openacc_host_selected } } .-2 }
++    ! { dg-note {variable 'parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target { ! openacc_host_selected } } .-2 }
+ #if !ACC_MEM_SHARED
+       if (acc_is_present (b) .eqv. .TRUE.) STOP 59
+ #endif
+diff --git a/libgomp/testsuite/libgomp.oacc-fortran/print-1.f90 b/libgomp/testsuite/libgomp.oacc-fortran/print-1.f90
+index 42a8538e1fb..d2f89d915f8 100644
+--- a/libgomp/testsuite/libgomp.oacc-fortran/print-1.f90
++++ b/libgomp/testsuite/libgomp.oacc-fortran/print-1.f90
+@@ -6,15 +6,6 @@
+ ! Separate file 'print-1-nvptx.f90' for nvptx offloading.
+ ! { dg-skip-if "separate file" { offload_target_nvptx } }
+ 
+-! For GCN offloading compilation, when gang-privatizing 'dt_parm.N'
+-! (see below), we run into an 'gang-private data-share memory exhausted'
+-! error: the default '-mgang-private-size' is too small.  Per
+-! 'gcc/fortran/trans-io.cc'/'libgfortran/io/io.h', that one is
+-! 'struct st_parameter_dt', which indeed is rather big.  Instead of
+-! working out its exact size (which may vary per GCC configuration),
+-! raise '-mgang-private-size' to an arbitrary high value.
+-! { dg-additional-options "-foffload-options=amdgcn-amdhsa=-mgang-private-size=13579" { target openacc_radeon_accel_selected } }
+-
+ ! { dg-additional-options "-fopt-info-note-omp" }
+ ! { dg-additional-options "-foffload=-fopt-info-note-omp" }
+ 
+@@ -36,9 +27,7 @@ program main
+   integer :: var = 42
+ 
+ !$acc parallel ! { dg-line l_compute[incr c_compute] }
+-  ! { dg-note {variable 'dt_parm\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} {} { target *-*-* } l_compute$c_compute }
+-  !   { dg-note {variable 'dt_parm\.[0-9]+' ought to be adjusted for OpenACC privatization level: 'gang'} {} { target *-*-* } l_compute$c_compute }
+-  !   { dg-note {variable 'dt_parm\.[0-9]+' adjusted for OpenACC privatization level: 'gang'} {} { target { ! openacc_host_selected } } l_compute$c_compute }
++  ! { dg-note {variable 'dt_parm\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} {} { target *-*-* } l_compute$c_compute }
+   write (0, '("The answer is ", I2)') var
+ !$acc end parallel
+ 
+diff --git a/libgomp/testsuite/libgomp.oacc-fortran/privatized-ref-2.f90 b/libgomp/testsuite/libgomp.oacc-fortran/privatized-ref-2.f90
+index b31f4066152..498ef70b63a 100644
+--- a/libgomp/testsuite/libgomp.oacc-fortran/privatized-ref-2.f90
++++ b/libgomp/testsuite/libgomp.oacc-fortran/privatized-ref-2.f90
+@@ -122,9 +122,7 @@ contains
+     ! { dg-note {variable 'str' in 'private' clause is candidate for adjusting OpenACC privatization level} "" { target *-*-* } l_loop$c_loop }
+     ! { dg-note {variable 'str' ought to be adjusted for OpenACC privatization level: 'gang'} "" { target *-*-* } l_loop$c_loop }
+     ! { dg-note {variable 'str' adjusted for OpenACC privatization level: 'gang'} "" { target { ! { openacc_host_selected || { openacc_nvidia_accel_selected && __OPTIMIZE__ } } } } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target *-*-* } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' ought to be adjusted for OpenACC privatization level: 'gang'} "" { target *-*-* } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' adjusted for OpenACC privatization level: 'gang'} "" { target { ! { openacc_host_selected || { openacc_nvidia_accel_selected && __OPTIMIZE__ } } } } l_loop$c_loop }
++    ! { dg-note {variable 'char\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } l_loop$c_loop }
+     ! { dg-message {sorry, unimplemented: target cannot support alloca} PR65181 { target openacc_nvidia_accel_selected } l_loop$c_loop }
+     do i = 1, 10
+       str(i:i) = achar(ichar('A') + i)
+@@ -167,9 +165,7 @@ contains
+     ! { dg-note {variable 'scalar' in 'private' clause is candidate for adjusting OpenACC privatization level} "" { target *-*-* } l_loop$c_loop }
+     ! { dg-note {variable 'scalar' ought to be adjusted for OpenACC privatization level: 'gang'} "" { target *-*-* } l_loop$c_loop }
+     ! { dg-note {variable 'scalar' adjusted for OpenACC privatization level: 'gang'} "" { target { ! { openacc_host_selected || { openacc_nvidia_accel_selected && __OPTIMIZE__ } } } } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' declared in block is candidate for adjusting OpenACC privatization level} "" { target *-*-* } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' ought to be adjusted for OpenACC privatization level: 'gang'} "" { target *-*-* } l_loop$c_loop }
+-    ! { dg-note {variable 'char\.[0-9]+' adjusted for OpenACC privatization level: 'gang'} "" { target { ! { openacc_host_selected || { openacc_nvidia_accel_selected && __OPTIMIZE__ } } } } l_loop$c_loop }
++    ! { dg-note {variable 'char\.[0-9]+' declared in block isn't candidate for adjusting OpenACC privatization level: artificial} "" { target *-*-* } l_loop$c_loop }
+     do i = 1, 15
+       scalar(i:i) = achar(ichar('A') + i)
+     end do
+-- 
+2.25.1
+

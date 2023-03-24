@@ -1,0 +1,124 @@
+From 7790d4b2e5c6ed0d4957e3b7948e24023447fbfd Mon Sep 17 00:00:00 2001
+From: Jan Hubicka <jh@suse.cz>
+Date: Mon, 16 Jan 2023 15:40:45 +0100
+Subject: [PATCH 389/547] Disable gather/scatter for zen4
+
+this patch adds more tunes for zen4:
+ - new tunes for avx512 scater instructions.
+   In micro benchmarks these seems consistent loss compared to open-coded coe
+ - disable use of gather for zen4
+   While these are win for a micro benchmarks (based on TSVC), enabling gather
+   is a loss for parest. So for now it seems safe to keep it off.
+ - disable pass to avoid FMA chains for znver4 since fmadd was optimized and does not seem
+   to cause regressions.
+
+	* config/i386/i386.cc (ix86_vectorize_builtin_scatter): Guard scatter
+	by TARGET_USE_SCATTER.
+	* config/i386/i386.h (TARGET_USE_SCATTER_2PARTS,
+	TARGET_USE_SCATTER_4PARTS, TARGET_USE_SCATTER): New macros.
+	* config/i386/x86-tune.def (TARGET_USE_SCATTER_2PARTS,
+	TARGET_USE_SCATTER_4PARTS, TARGET_USE_SCATTER): New tunes.
+	(X86_TUNE_AVOID_256FMA_CHAINS, X86_TUNE_AVOID_512FMA_CHAINS): Disable
+	for znver4.  (X86_TUNE_USE_GATHER): Disable for zen4.
+
+(cherry picked from commit 967592488c64a86f37bef3dabebb56364f14acdd)
+---
+ gcc/config/i386/i386.cc      |  7 +++++++
+ gcc/config/i386/i386.h       |  6 ++++++
+ gcc/config/i386/x86-tune.def | 23 +++++++++++++++++++----
+ 3 files changed, 32 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index ad37f84fe06..962f8c82b48 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -18918,6 +18918,13 @@ ix86_vectorize_builtin_scatter (const_tree vectype,
+   if (!TARGET_AVX512F)
+     return NULL_TREE;
+ 
++  if (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 2u)
++      ? !TARGET_USE_SCATTER_2PARTS
++      : (known_eq (TYPE_VECTOR_SUBPARTS (vectype), 4u)
++	 ? !TARGET_USE_SCATTER_4PARTS
++	 : !TARGET_USE_SCATTER))
++    return NULL_TREE;
++
+   if ((TREE_CODE (index_type) != INTEGER_TYPE
+        && !POINTER_TYPE_P (index_type))
+       || (TYPE_MODE (index_type) != SImode
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index 7a079072e19..fce0b3564a8 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -392,10 +392,16 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
+ 	ix86_tune_features[X86_TUNE_AVOID_4BYTE_PREFIXES]
+ #define TARGET_USE_GATHER_2PARTS \
+ 	ix86_tune_features[X86_TUNE_USE_GATHER_2PARTS]
++#define TARGET_USE_SCATTER_2PARTS \
++	ix86_tune_features[X86_TUNE_USE_SCATTER_2PARTS]
+ #define TARGET_USE_GATHER_4PARTS \
+ 	ix86_tune_features[X86_TUNE_USE_GATHER_4PARTS]
++#define TARGET_USE_SCATTER_4PARTS \
++	ix86_tune_features[X86_TUNE_USE_SCATTER_4PARTS]
+ #define TARGET_USE_GATHER \
+ 	ix86_tune_features[X86_TUNE_USE_GATHER]
++#define TARGET_USE_SCATTER \
++	ix86_tune_features[X86_TUNE_USE_SCATTER]
+ #define TARGET_FUSE_CMP_AND_BRANCH_32 \
+ 	ix86_tune_features[X86_TUNE_FUSE_CMP_AND_BRANCH_32]
+ #define TARGET_FUSE_CMP_AND_BRANCH_64 \
+diff --git a/gcc/config/i386/x86-tune.def b/gcc/config/i386/x86-tune.def
+index eb3ab800264..8c3c1b41e79 100644
+--- a/gcc/config/i386/x86-tune.def
++++ b/gcc/config/i386/x86-tune.def
+@@ -469,28 +469,43 @@ DEF_TUNE (X86_TUNE_AVOID_4BYTE_PREFIXES, "avoid_4byte_prefixes",
+ DEF_TUNE (X86_TUNE_USE_GATHER_2PARTS, "use_gather_2parts",
+ 	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ZNVER4 | m_ALDERLAKE | m_GENERIC))
+ 
++/* X86_TUNE_USE_SCATTER_2PARTS: Use scater instructions for vectors with 2
++   elements.  */
++DEF_TUNE (X86_TUNE_USE_SCATTER_2PARTS, "use_scatter_2parts",
++	  ~(m_ZNVER4 | m_GENERIC))
++
+ /* X86_TUNE_USE_GATHER_4PARTS: Use gather instructions for vectors with 4
+    elements.  */
+ DEF_TUNE (X86_TUNE_USE_GATHER_4PARTS, "use_gather_4parts",
+ 	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ZNVER4 |  m_ALDERLAKE | m_GENERIC))
+ 
++/* X86_TUNE_USE_SCATTER_4PARTS: Use scater instructions for vectors with 4
++   elements.  */
++DEF_TUNE (X86_TUNE_USE_SCATTER_4PARTS, "use_scatter_4parts",
++	  ~(m_ZNVER4 | m_GENERIC))
++
+ /* X86_TUNE_USE_GATHER: Use gather instructions for vectors with 8 or more
+    elements.  */
+ DEF_TUNE (X86_TUNE_USE_GATHER, "use_gather",
+-	  ~(m_ZNVER1 | m_ZNVER2 | m_ALDERLAKE | m_GENERIC))
++	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER4 | m_ALDERLAKE | m_GENERIC))
++
++/* X86_TUNE_USE_SCATTER: Use scater instructions for vectors with 8 or more
++   elements.  */
++DEF_TUNE (X86_TUNE_USE_SCATTER, "use_scatter",
++	  ~(m_ZNVER4))
+ 
+ /* X86_TUNE_AVOID_128FMA_CHAINS: Avoid creating loops with tight 128bit or
+    smaller FMA chain.  */
+-DEF_TUNE (X86_TUNE_AVOID_128FMA_CHAINS, "avoid_fma_chains", m_ZNVER)
++DEF_TUNE (X86_TUNE_AVOID_128FMA_CHAINS, "avoid_fma_chains", m_ZNVER1 | m_ZNVER2 | m_ZNVER3)
+ 
+ /* X86_TUNE_AVOID_256FMA_CHAINS: Avoid creating loops with tight 256bit or
+    smaller FMA chain.  */
+-DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3 | m_ZNVER4
++DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3
+ 	  | m_ALDERLAKE | m_SAPPHIRERAPIDS)
+ 
+ /* X86_TUNE_AVOID_512FMA_CHAINS: Avoid creating loops with tight 512bit or
+    smaller FMA chain.  */
+-DEF_TUNE (X86_TUNE_AVOID_512FMA_CHAINS, "avoid_fma512_chains", m_ZNVER4)
++DEF_TUNE (X86_TUNE_AVOID_512FMA_CHAINS, "avoid_fma512_chains", m_NONE)
+ 
+ /* X86_TUNE_V2DF_REDUCTION_PREFER_PHADDPD: Prefer haddpd
+    for v2df vector reduction.  */
+-- 
+2.25.1
+

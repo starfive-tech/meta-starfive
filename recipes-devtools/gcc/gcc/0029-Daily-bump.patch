@@ -1,0 +1,182 @@
+From f86df0b551cefb799896fc5a6045fc4ee6d41166 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 30 Aug 2022 00:20:18 +0000
+Subject: [PATCH 029/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 41 +++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 11 +++++++++++
+ gcc/fortran/ChangeLog   | 27 +++++++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 26 ++++++++++++++++++++++++++
+ libgfortran/ChangeLog   | 13 +++++++++++++
+ 6 files changed, 119 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 0f444926f40..61465955127 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,44 @@
++2022-08-29  Peter Bergner  <bergner@linux.ibm.com>
++
++	Backported from master:
++	2022-08-28  Peter Bergner  <bergner@linux.ibm.com>
++
++	PR target/106017
++	* config/rs6000/rs6000.cc (rs6000_invalid_conversion): Remove handling
++	of MMA pointer conversions.
++
++2022-08-29  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2022-08-23  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/106714
++	* config/i386/amxtileintrin.h (_tile_loadd_internal): Cast to
++	__PTRDIFF_TYPE__.
++	(_tile_stream_loadd_internal): Likewise.
++	(_tile_stored_internal): Likewise.
++
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/106721
++	* config/i386/sse.md (i128vldq): Add V16HF entry.
++	(avx512er_vmrcp28<mode><mask_name><round_saeonly_name>): Fix typo,
++	mask_opernad3 -> mask_operand3.
++
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-15  Jakub Jelinek  <jakub@redhat.com>
++
++	PR rtl-optimization/106590
++	* ifcvt.cc (check_for_cc_cmp_clobbers): New function.
++	(noce_convert_multiple_sets_1): If SEQ sets or clobbers any regs
++	mentioned in cc_cmp or rev_cc_cmp, don't consider seq2 for any
++	further conditional moves.
++
+ 2022-08-26  liuhongt  <hongtao.liu@intel.com>
+ 
+ 	PR target/106704
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 85ed11f60d3..41f0d849079 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220829
++20220830
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index dc03a2518f3..631a53d61df 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,14 @@
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-16  Jakub Jelinek  <jakub@redhat.com>
++
++	* typeck.cc (cp_build_modify_expr): Implement
++	P2327R1 - De-deprecating volatile compound operations.  Don't warn
++	for |=, &= or ^= with volatile lhs.
++	* expr.cc (mark_use) <case MODIFY_EXPR>: Adjust warning wording,
++	leave out simple.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 0f53bf5f6b9..a7ec9c5310f 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,30 @@
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-26  Jakub Jelinek  <jakub@redhat.com>
++
++	PR fortran/106579
++	* trans-intrinsic.cc: Include realmpfr.h.
++	(conv_intrinsic_ieee_value): New function.
++	(gfc_conv_ieee_arithmetic_function): Handle ieee_value.
++
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-26  Jakub Jelinek  <jakub@redhat.com>
++
++	PR fortran/106579
++	* f95-lang.cc (gfc_init_builtin_functions): Initialize
++	BUILT_IN_FPCLASSIFY.
++	* libgfortran.h (IEEE_OTHER_VALUE, IEEE_SIGNALING_NAN,
++	IEEE_QUIET_NAN, IEEE_NEGATIVE_INF, IEEE_NEGATIVE_NORMAL,
++	IEEE_NEGATIVE_DENORMAL, IEEE_NEGATIVE_SUBNORMAL,
++	IEEE_NEGATIVE_ZERO, IEEE_POSITIVE_ZERO, IEEE_POSITIVE_DENORMAL,
++	IEEE_POSITIVE_SUBNORMAL, IEEE_POSITIVE_NORMAL, IEEE_POSITIVE_INF):
++	New enum.
++	* trans-intrinsic.cc (conv_intrinsic_ieee_class): New function.
++	(gfc_conv_ieee_arithmetic_function): Handle ieee_class.
++
+ 2022-08-26  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 0aa3c1c906e..26ebd115252 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,29 @@
++2022-08-29  Peter Bergner  <bergner@linux.ibm.com>
++
++	Backported from master:
++	2022-08-28  Peter Bergner  <bergner@linux.ibm.com>
++
++	PR target/106017
++	* gcc.target/powerpc/pr106017.c: New test.
++
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-16  Jakub Jelinek  <jakub@redhat.com>
++
++	* g++.dg/cpp2a/volatile1.C: Adjust for de-deprecation of volatile
++	compound |=, &= and ^= operations.
++	* g++.dg/cpp2a/volatile3.C: Likewise.
++	* g++.dg/cpp2a/volatile5.C: Likewise.
++
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-15  Jakub Jelinek  <jakub@redhat.com>
++
++	PR rtl-optimization/106590
++	* gcc.dg/torture/pr106590.c: New test.
++
+ 2022-08-26  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/libgfortran/ChangeLog b/libgfortran/ChangeLog
+index 5aed23549c1..e8bafe9e2aa 100644
+--- a/libgfortran/ChangeLog
++++ b/libgfortran/ChangeLog
+@@ -1,3 +1,16 @@
++2022-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-08-26  Jakub Jelinek  <jakub@redhat.com>
++
++	PR fortran/106579
++	* ieee/ieee_helper.c (IEEE_OTHER_VALUE, IEEE_SIGNALING_NAN,
++	IEEE_QUIET_NAN, IEEE_NEGATIVE_INF, IEEE_NEGATIVE_NORMAL,
++	IEEE_NEGATIVE_DENORMAL, IEEE_NEGATIVE_SUBNORMAL,
++	IEEE_NEGATIVE_ZERO, IEEE_POSITIVE_ZERO, IEEE_POSITIVE_DENORMAL,
++	IEEE_POSITIVE_SUBNORMAL, IEEE_POSITIVE_NORMAL, IEEE_POSITIVE_INF):
++	Move to gcc/fortran/libgfortran.h.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

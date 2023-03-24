@@ -1,0 +1,83 @@
+From 0e345504ec9349d9a3bf826c3e16b7e973739485 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Fri, 16 Dec 2022 12:28:43 -0500
+Subject: [PATCH 295/547] c-family: Fix ICE with -Wsuggest-attribute [PR98487]
+
+Here we crash because check_function_format was using TREE_PURPOSE
+directly rather than using get_attribute_name.
+
+	PR c/98487
+
+gcc/c-family/ChangeLog:
+
+	* c-format.cc (check_function_format): Use get_attribute_name.
+
+gcc/testsuite/ChangeLog:
+
+	* c-c++-common/Wsuggest-attribute-1.c: New test.
+
+(cherry picked from commit 68e51bd0a85794cd437d3e740357dfef84dc560d)
+---
+ gcc/c-family/c-format.cc                      |  2 +-
+ .../c-c++-common/Wsuggest-attribute-1.c       | 36 +++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/c-c++-common/Wsuggest-attribute-1.c
+
+diff --git a/gcc/c-family/c-format.cc b/gcc/c-family/c-format.cc
+index d05e5acd063..fe5ed48b86b 100644
+--- a/gcc/c-family/c-format.cc
++++ b/gcc/c-family/c-format.cc
+@@ -1205,7 +1205,7 @@ check_function_format (const_tree fntype, tree attrs, int nargs,
+ 	      for (c = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
+ 		   c;
+ 		   c = TREE_CHAIN (c))
+-		if (is_attribute_p ("format", TREE_PURPOSE (c))
++		if (is_attribute_p ("format", get_attribute_name (c))
+ 		    && (decode_format_type (IDENTIFIER_POINTER
+ 					    (TREE_VALUE (TREE_VALUE (c))))
+ 			== info.format_type))
+diff --git a/gcc/testsuite/c-c++-common/Wsuggest-attribute-1.c b/gcc/testsuite/c-c++-common/Wsuggest-attribute-1.c
+new file mode 100644
+index 00000000000..8b5b398fb78
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/Wsuggest-attribute-1.c
+@@ -0,0 +1,36 @@
++/* PR c/98487 */
++/* { dg-do compile { target { c || c++11 } } } */
++/* { dg-options "-Wsuggest-attribute=format" } */
++
++#include <stdarg.h>
++
++[[gnu::__format__(__printf__, 1, 2)]]
++void
++do_printf(const char * const a0, ...)
++{
++  va_list ap;
++  va_start(ap, a0);
++  __builtin_vprintf(a0, ap);
++  va_end(ap);
++}
++
++[[gnu::__format__(__scanf__, 1, 2)]]
++void
++do_scanf(const char * const a0, ...)
++{
++  va_list ap;
++  va_start(ap, a0);
++  __builtin_vscanf(a0, ap);
++  va_end(ap);
++}
++
++struct tm;
++
++[[gnu::__format__(__strftime__, 1, 0)]]
++void
++do_strftime(const char * const a0, struct tm * a1)
++{
++  char buff[256];
++  __builtin_strftime(buff, sizeof(buff), a0, a1);
++  __builtin_puts(buff);
++}
+-- 
+2.25.1
+

@@ -1,0 +1,48 @@
+From 4430147d3779d8f089d8eb765b4c7e0333279424 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 19 Dec 2022 13:49:52 +0100
+Subject: [PATCH 431/547] testsuite: Fix up pr64536.c for LLP64 targets
+ [PR108151]
+
+The test casts a pointer to long, which is ok for ilp32 and lp64
+targets but not for llp64 targets.  Nothing reads the values later,
+it is a link test, so all we care about is that it is the same
+cast on s390x-linux where it used to fail before the PR64536 fix,
+and that we don't warn about it.
+
+2022-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/108151
+	* gcc.dg/pr64536.c (bar): Use casts to __INTPTR_TYPE__ rather than
+	long when casting pointer to integral type.
+
+(cherry picked from commit ea37e96a37b50dad17b91d46edc518bbb9132d8e)
+---
+ gcc/testsuite/gcc.dg/pr64536.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/pr64536.c b/gcc/testsuite/gcc.dg/pr64536.c
+index f2728fbc938..bca2d4f0efe 100644
+--- a/gcc/testsuite/gcc.dg/pr64536.c
++++ b/gcc/testsuite/gcc.dg/pr64536.c
+@@ -41,7 +41,7 @@ bar (int x)
+ 	    }
+ 	  else
+ 	    i = (long *) (h->q = *f);
+-	  *c++ = (long) f;
++	  *c++ = (__INTPTR_TYPE__) f;
+ 	  e += 6;
+ 	}
+       else
+@@ -55,7 +55,7 @@ bar (int x)
+ 	    }
+ 	  else
+ 	    i = (long *) (h->q = *f);
+-	  *c++ = (long) f;
++	  *c++ = (__INTPTR_TYPE__) f;
+ 	  e += 6;
+ 	}
+     }
+-- 
+2.25.1
+

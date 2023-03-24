@@ -1,0 +1,122 @@
+From f1454a75c9a165c0ba30833f23f799044fd7a7fe Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Tue, 27 Sep 2022 16:19:11 -0700
+Subject: [PATCH 097/547] i386: Mark XMM4-XMM6 as clobbered by
+ encodekey128/encodekey256
+
+encodekey128 and encodekey256 operations clear XMM4-XMM6.  But it is
+documented that XMM4-XMM6 are reserved for future usages and software
+should not rely upon them being zeroed.  Change encodekey128 and
+encodekey256 to clobber XMM4-XMM6.
+
+gcc/
+
+	PR target/107061
+	* config/i386/predicates.md (encodekey128_operation): Check
+	XMM4-XMM6 as clobbered.
+	(encodekey256_operation): Likewise.
+	* config/i386/sse.md (encodekey128u32): Clobber XMM4-XMM6.
+	(encodekey256u32): Likewise.
+
+gcc/testsuite/
+
+	PR target/107061
+	* gcc.target/i386/keylocker-encodekey128.c: Don't check
+	XMM4-XMM6.
+	* gcc.target/i386/keylocker-encodekey256.c: Likewise.
+
+(cherry picked from commit db288230db55dc1ff626f46c708b555847013a41)
+---
+ gcc/config/i386/predicates.md                 | 20 +++++++++----------
+ gcc/config/i386/sse.md                        |  4 ++--
+ .../gcc.target/i386/keylocker-encodekey128.c  |  1 -
+ .../gcc.target/i386/keylocker-encodekey256.c  |  1 -
+ 4 files changed, 12 insertions(+), 14 deletions(-)
+
+diff --git a/gcc/config/i386/predicates.md b/gcc/config/i386/predicates.md
+index a8cc17a054d..ac02c61acb3 100644
+--- a/gcc/config/i386/predicates.md
++++ b/gcc/config/i386/predicates.md
+@@ -2019,11 +2019,11 @@
+   for(i = 4; i < 7; i++)
+     {
+       elt = XVECEXP (op, 0, i);
+-      if (GET_CODE (elt) != SET
+-	  || GET_CODE (SET_DEST (elt)) != REG
+-	  || GET_MODE (SET_DEST (elt)) != V2DImode
+-	  || REGNO (SET_DEST (elt)) != GET_SSE_REGNO (i)
+-	  || SET_SRC (elt) != CONST0_RTX (V2DImode))
++      if (GET_CODE (elt) != CLOBBER
++	  || GET_MODE (elt) != VOIDmode
++	  || GET_CODE (XEXP (elt, 0)) != REG
++	  || GET_MODE (XEXP (elt, 0)) != V2DImode
++	  || REGNO (XEXP (elt, 0)) != GET_SSE_REGNO (i))
+ 	return false;
+     }
+ 
+@@ -2069,11 +2069,11 @@
+   for(i = 4; i < 7; i++)
+     {
+       elt = XVECEXP (op, 0, i + 1);
+-      if (GET_CODE (elt) != SET
+-	  || GET_CODE (SET_DEST (elt)) != REG
+-	  || GET_MODE (SET_DEST (elt)) != V2DImode
+-	  || REGNO (SET_DEST (elt)) != GET_SSE_REGNO (i)
+-	  || SET_SRC (elt) != CONST0_RTX (V2DImode))
++      if (GET_CODE (elt) != CLOBBER
++	  || GET_MODE (elt) != VOIDmode
++	  || GET_CODE (XEXP (elt, 0)) != REG
++	  || GET_MODE (XEXP (elt, 0)) != V2DImode
++	  || REGNO (XEXP (elt, 0)) != GET_SSE_REGNO (i))
+ 	return false;
+     }
+ 
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index 407bcd8f837..eb767e56ca4 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -28404,7 +28404,7 @@
+ 
+   for (i = 4; i < 7; i++)
+     XVECEXP (operands[2], 0, i)
+-      = gen_rtx_SET (xmm_regs[i], CONST0_RTX (V2DImode));
++      = gen_rtx_CLOBBER (VOIDmode, xmm_regs[i]);
+ 
+   XVECEXP (operands[2], 0, 7)
+     = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (CCmode, FLAGS_REG));
+@@ -28461,7 +28461,7 @@
+ 
+   for (i = 4; i < 7; i++)
+     XVECEXP (operands[2], 0, i + 1)
+-      = gen_rtx_SET (xmm_regs[i], CONST0_RTX (V2DImode));
++      = gen_rtx_CLOBBER (VOIDmode, xmm_regs[i]);
+ 
+   XVECEXP (operands[2], 0, 8)
+     = gen_rtx_CLOBBER (VOIDmode, gen_rtx_REG (CCmode, FLAGS_REG));
+diff --git a/gcc/testsuite/gcc.target/i386/keylocker-encodekey128.c b/gcc/testsuite/gcc.target/i386/keylocker-encodekey128.c
+index 805e0628673..57fa9bdc831 100644
+--- a/gcc/testsuite/gcc.target/i386/keylocker-encodekey128.c
++++ b/gcc/testsuite/gcc.target/i386/keylocker-encodekey128.c
+@@ -6,7 +6,6 @@
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm0,\[^\\n\\r\]*" } } */
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm1,\[^\\n\\r\]*16\[^\\n\\r\]*" } } */
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm2,\[^\\n\\r\]*32\[^\\n\\r\]*" } } */
+-/* { dg-final { scan-assembler "(?:movdqa|movaps)\[ \\t\]+\[^\\n\]*%xmm\[4-6\],\[^\\n\\r\]*" } } */
+ 
+ #include <immintrin.h>
+ 
+diff --git a/gcc/testsuite/gcc.target/i386/keylocker-encodekey256.c b/gcc/testsuite/gcc.target/i386/keylocker-encodekey256.c
+index 26f04dcf014..a9398b4e7a2 100644
+--- a/gcc/testsuite/gcc.target/i386/keylocker-encodekey256.c
++++ b/gcc/testsuite/gcc.target/i386/keylocker-encodekey256.c
+@@ -8,7 +8,6 @@
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm1,\[^\\n\\r\]*16\[^\\n\\r\]*" } } */
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm2,\[^\\n\\r\]*32\[^\\n\\r\]*" } } */
+ /* { dg-final { scan-assembler "(?:movdqu|movups)\[ \\t\]+\[^\\n\]*%xmm3,\[^\\n\\r\]*48\[^\\n\\r\]*" } } */
+-/* { dg-final { scan-assembler "(?:movdqa|movaps)\[ \\t\]+\[^\\n\]*%xmm\[4-6\],\[^\\n\\r\]*" } } */
+ 
+ #include <immintrin.h>
+ 
+-- 
+2.25.1
+
