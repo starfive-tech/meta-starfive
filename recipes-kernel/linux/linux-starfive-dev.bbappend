@@ -1,23 +1,24 @@
 FORK = "starfive-tech"
-BRANCH = "starfive-5.15-dubhe"
-SRCREV = "2eba892dd9f73866999c19339a320f5e98068aeb"
+BRANCH = "starfive-6.1-dubhe"
+SRCREV = "0328291313ba8ad2cd6ac94df9039f2f4a365b6f"
 
-LINUX_VERSION = "5.15.0"
-LINUX_VERSION_EXTENSION:append = "-starlight"
+LINUX_VERSION = "6.1.20"
+LINUX_VERSION_EXTENSTION:append = "-starlight"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-SRC_URI = "git://github.com/starfive-tech/linux.git;protocol=https;branch=${BRANCH} \
-           file://defconfig \
+SRC_URI = "git://git@192.168.110.45/starfive-tech/linux.git;protocol=ssh;branch=${BRANCH} \
+	   file://cpio.cfg \
            "
 
-INITRAMFS_IMAGE_BUNDLE = "${@oe.utils.conditional('ENABLE_NFS','1','','1',d)}"
-INITRAMFS_IMAGE = "${@oe.utils.conditional('ENABLE_NFS','1','','dubhe-image-initramfs',d)}"
+INITRAMFS_IMAGE_BUNDLE = "${@oe.utils.conditional('ENABLE_INIT','1','1','',d)}"
+INITRAMFS_IMAGE = "${@oe.utils.conditional('ENABLE_INIT','1','dubhe-image-initramfs','',d)}"
 
 # Temporary remove the patch to update the kernel, will create new patches after that
-#SRC_URI:append = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','file://initramfs.patch',d)}"
+SRC_URI:append = "${@oe.utils.conditional('ENABLE_EXT4','1','file://ext4.patch','',d)}"
+SRC_URI:append = "${@oe.utils.conditional('ENABLE_UBI','1','file://ubi.patch','',d)}"
 
-#KBUILD_DEFCONFIG_starfive = "starfive_dubhe_defconfig"
+KBUILD_DEFCONFIG:starfive-dubhe = "starfive_dubhe_defconfig"
 
 COMPATIBLE_MACHINE = "(starfive-dubhe)"
 
