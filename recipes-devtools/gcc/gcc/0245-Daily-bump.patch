@@ -1,0 +1,54 @@
+From a1a79572fd8a6a79693e59c1121450ed40a23be9 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 26 Nov 2022 00:20:51 +0000
+Subject: [PATCH 245/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 9fb04058de4..ba378581096 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221125
++20221126
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index fd118323103..90cde4f78d8 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-25  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-11-18  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/107576
++	* interface.cc (gfc_procedure_use): Reject NULL as actual argument
++	when there is no explicit procedure interface.
++
+ 2022-10-29  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ac114f6083e..28ab320c3c2 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-11-25  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-11-18  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/107576
++	* gfortran.dg/null_actual_3.f90: New test.
++
+ 2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* gnat.dg/opt100.adb: New test.
+-- 
+2.25.1
+

@@ -1,0 +1,132 @@
+From c9c0684ad3092e5aa50453903c09959cb2e83fc7 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Mon, 22 Aug 2022 17:24:27 +0100
+Subject: [PATCH 009/547] libstdc++: Document linker option for C++23
+ <stacktrace> [PR105678]
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/105678
+	* doc/xml/manual/using.xml: Document -lstdc++_libbacktrace
+	requirement for using std::stacktrace. Also adjust -frtti and
+	-fexceptions to document non-default (i.e. negative) forms.
+	* doc/html/*: Regenerate.
+
+(cherry picked from commit cc4fa7a210b638d6a46f14dab17f2361389d18e1)
+---
+ libstdc++-v3/doc/html/bk02.html              |  2 +-
+ libstdc++-v3/doc/html/manual/extensions.html |  9 ++++++---
+ libstdc++-v3/doc/html/manual/using.html      | 12 +++++++++++-
+ libstdc++-v3/doc/xml/manual/using.xml        | 19 +++++++++++++++++--
+ 4 files changed, 35 insertions(+), 7 deletions(-)
+
+diff --git a/libstdc++-v3/doc/html/bk02.html b/libstdc++-v3/doc/html/bk02.html
+index 7c47759f223..182c94b59a6 100644
+--- a/libstdc++-v3/doc/html/bk02.html
++++ b/libstdc++-v3/doc/html/bk02.html
+@@ -1,2 +1,2 @@
+ <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title></title><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><meta name="keywords" content="ISO C++, runtime, library" /><link rel="home" href="index.html" title="The GNU C++ Library" /><link rel="up" href="index.html" title="The GNU C++ Library" /><link rel="prev" href="manual/backwards.html" title="Backwards Compatibility" /><link rel="next" href="api.html" title="The GNU C++ Library API Reference" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center"></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="manual/backwards.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="api.html">Next</a></td></tr></table><hr /></div><div class="book"><div class="titlepage"><hr /></div><div class="toc"><p><strong>Table of Contents</strong></p><dl class="toc"><dt><span class="article"><a href="api.html">The GNU C++ Library API Reference</a></span></dt></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="manual/backwards.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="api.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Backwards Compatibility </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> The GNU C++ Library API Reference</td></tr></table></div></body></html>
+\ No newline at end of file
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title></title><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><meta name="keywords" content="ISO C++, runtime, library" /><link rel="home" href="index.html" title="The GNU C++ Library" /><link rel="up" href="index.html" title="The GNU C++ Library" /><link rel="prev" href="manual/appendix_gfdl.html" title="Appendix E. GNU Free Documentation License" /><link rel="next" href="api.html" title="The GNU C++ Library API Reference" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center"></th></tr><tr><td width="20%" align="left"><a accesskey="p" href="manual/appendix_gfdl.html">Prev</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="api.html">Next</a></td></tr></table><hr /></div><div class="book"><div class="titlepage"><hr /></div><div class="toc"><p><strong>Table of Contents</strong></p><dl class="toc"><dt><span class="article"><a href="api.html">The GNU C++ Library API Reference</a></span></dt></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="manual/appendix_gfdl.html">Prev</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="api.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Appendix E. GNU Free Documentation License </td><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td><td width="40%" align="right" valign="top"> The GNU C++ Library API Reference</td></tr></table></div></body></html>
+\ No newline at end of file
+diff --git a/libstdc++-v3/doc/html/manual/extensions.html b/libstdc++-v3/doc/html/manual/extensions.html
+index 82bf42e54b0..1b13d711714 100644
+--- a/libstdc++-v3/doc/html/manual/extensions.html
++++ b/libstdc++-v3/doc/html/manual/extensions.html
+@@ -1,8 +1,8 @@
+ <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Part III.  Extensions</title><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><meta name="keywords" content="ISO C++, library" /><meta name="keywords" content="ISO C++, runtime, library" /><link rel="home" href="../index.html" title="The GNU C++ Library" /><link rel="up" href="index.html" title="The GNU C++ Library Manual" /><link rel="prev" href="io_and_c.html" title="Interacting with C" /><link rel="next" href="ext_preface.html" title="" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part III. 
++<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Part III.  Extensions</title><meta name="generator" content="DocBook XSL Stylesheets Vsnapshot" /><meta name="keywords" content="ISO C++, library" /><meta name="keywords" content="ISO C++, runtime, library" /><link rel="home" href="../index.html" title="The GNU C++ Library" /><link rel="up" href="index.html" title="The GNU C++ Library Manual" /><link rel="prev" href="concurrency.html" title="Chapter 15.  Concurrency" /><link rel="next" href="ext_preface.html" title="" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Part III. 
+   Extensions
+   
+-</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="io_and_c.html">Prev</a> </td><th width="60%" align="center">The GNU C++ Library Manual</th><td width="20%" align="right"> <a accesskey="n" href="ext_preface.html">Next</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="manual.ext"></a>Part III. 
++</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="concurrency.html">Prev</a> </td><th width="60%" align="center">The GNU C++ Library Manual</th><td width="20%" align="right"> <a accesskey="n" href="ext_preface.html">Next</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="manual.ext"></a>Part III. 
+   Extensions
+   <a id="id-1.3.5.1.1.1" class="indexterm"></a>
+ </h1></div></div></div><div class="toc"><p><strong>Table of Contents</strong></p><dl class="toc"><dt><span class="preface"><a href="ext_preface.html"></a></span></dt><dt><span class="chapter"><a href="ext_compile_checks.html">16. Compile Time Checks</a></span></dt><dt><span class="chapter"><a href="debug_mode.html">17. Debug Mode</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode.html#manual.ext.debug_mode.intro">Intro</a></span></dt><dt><span class="section"><a href="debug_mode_semantics.html">Semantics</a></span></dt><dt><span class="section"><a href="debug_mode_using.html">Using</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode_using.html#debug_mode.using.mode">Using the Debug Mode</a></span></dt><dt><span class="section"><a href="debug_mode_using.html#debug_mode.using.specific">Using a Specific Debug Container</a></span></dt></dl></dd><dt><span class="section"><a href="debug_mode_design.html">Design</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.goals">Goals</a></span></dt><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods">Methods</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods.wrappers">The Wrapper Model</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods.safe_iter">Safe Iterators</a></span></dt><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods.safe_seq">Safe Sequences (Containers)</a></span></dt></dl></dd><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods.precond">Precondition Checking</a></span></dt><dt><span class="section"><a href="debug_mode_design.html#debug_mode.design.methods.coexistence">Release- and debug-mode coexistence</a></span></dt><dd><dl><dt><span class="section"><a href="debug_mode_design.html#methods.coexistence.compile">Compile-time coexistence of release- and debug-mode components</a></span></dt><dt><span class="section"><a href="debug_mode_design.html#methods.coexistence.link">Link- and run-time coexistence of release- and
+@@ -68,4 +68,7 @@
+ 	  Text <code class="function">modify</code> Up
+ 	</a></span></dt><dt><span class="section"><a href="policy_based_data_structures_test.html#performance.priority_queue.text_modify_down">
+ 	  Text <code class="function">modify</code> Down
+-	</a></span></dt></dl></dd><dt><span class="section"><a href="policy_based_data_structures_test.html#pbds.test.performance.observations">Observations</a></span></dt><dd><dl><dt><span class="section"><a href="policy_based_data_structures_test.html#observations.associative">Associative</a></span></dt><dt><span class="section"><a href="policy_based_data_structures_test.html#observations.priority_queue">Priority_Queue</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="policy_data_structures_ack.html">Acknowledgments</a></span></dt><dt><span class="bibliography"><a href="policy_data_structures.html#pbds.biblio">Bibliography</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_containers.html">22. HP/SGI Extensions</a></span></dt><dd><dl><dt><span class="section"><a href="ext_containers.html#manual.ext.containers.sgi">Backwards Compatibility</a></span></dt><dt><span class="section"><a href="ext_sgi.html">Deprecated</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_utilities.html">23. Utilities</a></span></dt><dt><span class="chapter"><a href="ext_algorithms.html">24. Algorithms</a></span></dt><dt><span class="chapter"><a href="ext_numerics.html">25. Numerics</a></span></dt><dt><span class="chapter"><a href="ext_iterators.html">26. Iterators</a></span></dt><dt><span class="chapter"><a href="ext_io.html">27. Input and Output</a></span></dt><dd><dl><dt><span class="section"><a href="ext_io.html#manual.ext.io.filebuf_derived">Derived filebufs</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_demangling.html">28. Demangling</a></span></dt><dt><span class="chapter"><a href="ext_concurrency.html">29. Concurrency</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design">Design</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design.threads">Interface to Locks and Mutexes</a></span></dt><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design.atomics">Interface to Atomic Functions</a></span></dt></dl></dd><dt><span class="section"><a href="ext_concurrency_impl.html">Implementation</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency_impl.html#manual.ext.concurrency.impl.atomic_fallbacks">Using Built-in Atomic Functions</a></span></dt><dt><span class="section"><a href="ext_concurrency_impl.html#manual.ext.concurrency.impl.thread">Thread Abstraction</a></span></dt></dl></dd><dt><span class="section"><a href="ext_concurrency_use.html">Use</a></span></dt></dl></dd></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="io_and_c.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="index.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ext_preface.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Interacting with C </td><td width="20%" align="center"><a accesskey="h" href="../index.html">Home</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+\ No newline at end of file
++	</a></span></dt></dl></dd><dt><span class="section"><a href="policy_based_data_structures_test.html#pbds.test.performance.observations">Observations</a></span></dt><dd><dl><dt><span class="section"><a href="policy_based_data_structures_test.html#observations.associative">Associative</a></span></dt><dt><span class="section"><a href="policy_based_data_structures_test.html#observations.priority_queue">Priority_Queue</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="policy_data_structures_ack.html">Acknowledgments</a></span></dt><dt><span class="bibliography"><a href="policy_data_structures.html#pbds.biblio">Bibliography</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_containers.html">22. HP/SGI Extensions</a></span></dt><dd><dl><dt><span class="section"><a href="ext_containers.html#manual.ext.containers.sgi">Backwards Compatibility</a></span></dt><dt><span class="section"><a href="ext_sgi.html">Deprecated</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_utilities.html">23. Utilities</a></span></dt><dt><span class="chapter"><a href="ext_algorithms.html">24. Algorithms</a></span></dt><dt><span class="chapter"><a href="ext_numerics.html">25. Numerics</a></span></dt><dt><span class="chapter"><a href="ext_iterators.html">26. Iterators</a></span></dt><dt><span class="chapter"><a href="ext_io.html">27. Input and Output</a></span></dt><dd><dl><dt><span class="section"><a href="ext_io.html#manual.ext.io.filebuf_derived">Derived filebufs</a></span></dt></dl></dd><dt><span class="chapter"><a href="ext_demangling.html">28. Demangling</a></span></dt><dt><span class="chapter"><a href="ext_concurrency.html">29. Concurrency</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design">Design</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design.threads">Interface to Locks and Mutexes</a></span></dt><dt><span class="section"><a href="ext_concurrency.html#manual.ext.concurrency.design.atomics">Interface to Atomic Functions</a></span></dt></dl></dd><dt><span class="section"><a href="ext_concurrency_impl.html">Implementation</a></span></dt><dd><dl><dt><span class="section"><a href="ext_concurrency_impl.html#manual.ext.concurrency.impl.atomic_fallbacks">Using Built-in Atomic Functions</a></span></dt><dt><span class="section"><a href="ext_concurrency_impl.html#manual.ext.concurrency.impl.thread">Thread Abstraction</a></span></dt></dl></dd><dt><span class="section"><a href="ext_concurrency_use.html">Use</a></span></dt></dl></dd></dl></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="concurrency.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="index.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="ext_preface.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">Chapter 15. 
++  Concurrency
++  
++ </td><td width="20%" align="center"><a accesskey="h" href="../index.html">Home</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+\ No newline at end of file
+diff --git a/libstdc++-v3/doc/html/manual/using.html b/libstdc++-v3/doc/html/manual/using.html
+index 641a08c688b..08facffa445 100644
+--- a/libstdc++-v3/doc/html/manual/using.html
++++ b/libstdc++-v3/doc/html/manual/using.html
+@@ -16,7 +16,11 @@
+       <span class="command"><strong>g++ -std=gnu++98</strong></span> for older releases.
+     </p><div class="table"><a id="table.cmd_options"></a><p class="title"><strong>Table 3.1. C++ Command Options</strong></p><div class="table-contents"><table class="table" summary="C++ Command Options" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /></colgroup><thead><tr><th align="left">Option Flags</th><th align="left">Description</th></tr></thead><tbody><tr><td align="left"><code class="literal">-std=c++98</code> or <code class="literal">-std=c++03</code>
+       </td><td align="left">Use the 1998 ISO C++ standard plus amendments.</td></tr><tr><td align="left"><code class="literal">-std=gnu++98</code> or <code class="literal">-std=gnu++03</code>
+-      </td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left"><code class="literal">-std=c++11</code></td><td align="left">Use the 2011 ISO C++ standard.</td></tr><tr><td align="left"><code class="literal">-std=gnu++11</code></td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left"><code class="literal">-std=c++14</code></td><td align="left">Use the 2014 ISO C++ standard.</td></tr><tr><td align="left"><code class="literal">-std=gnu++14</code></td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left"><code class="literal">-fexceptions</code></td><td align="left">See <a class="link" href="using_exceptions.html#intro.using.exception.no" title="Doing without">exception-free dialect</a></td></tr><tr><td align="left"><code class="literal">-frtti</code></td><td align="left">As above, but RTTI-free dialect.</td></tr><tr><td align="left"><code class="literal">-pthread</code></td><td align="left">For ISO C++11
++      </td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left"><code class="literal">-std=c++11</code></td><td align="left">Use the 2011 ISO C++ standard.</td></tr><tr><td align="left"><code class="literal">-std=gnu++11</code></td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left"><code class="literal">-std=c++14</code></td><td align="left">Use the 2014 ISO C++ standard.</td></tr><tr><td align="left"><code class="literal">-std=gnu++14</code></td><td align="left">As directly above, with GNU extensions.</td></tr><tr><td align="left">
++	<code class="literal">-fno-exceptions</code>
++      </td><td align="left">See <a class="link" href="using_exceptions.html#intro.using.exception.no" title="Doing without">exception-free dialect</a></td></tr><tr><td align="left">
++	<code class="literal">-fno-rtti</code>
++      </td><td align="left">As above, but RTTI-free dialect.</td></tr><tr><td align="left"><code class="literal">-pthread</code></td><td align="left">For ISO C++11
+         <code class="filename">&lt;thread&gt;</code>,
+         <code class="filename">&lt;future&gt;</code>,
+         <code class="filename">&lt;mutex&gt;</code>,
+@@ -27,6 +31,12 @@
+       </td></tr><tr><td align="left"><code class="literal">-lstdc++fs</code></td><td align="left">Linking to <code class="filename">libstdc++fs</code>
+         is required for use of the Filesystem library extensions in
+         <code class="filename">&lt;experimental/filesystem&gt;</code>.
++      </td></tr><tr><td align="left"><code class="literal">-lstdc++_libbacktrace</code></td><td align="left">Until C++23 support is non-experimental, linking to
++	<code class="filename">libstdc++_libbacktrace.a</code>
++	is required for use of the C++23 type
++	<code class="classname">std::stacktrace</code>
++	and related types in
++	<code class="filename">&lt;stacktrace&gt;</code>.
+       </td></tr><tr><td align="left"><code class="literal">-fopenmp</code></td><td align="left">For <a class="link" href="parallel_mode.html" title="Chapter 18. Parallel Mode">parallel</a> mode.</td></tr><tr><td align="left"><code class="literal">-ltbb</code></td><td align="left">Linking to tbb (Thread Building Blocks) is required for use of the
+         Parallel Standard Algorithms and execution policies in
+         <code class="filename">&lt;execution&gt;</code>.
+diff --git a/libstdc++-v3/doc/xml/manual/using.xml b/libstdc++-v3/doc/xml/manual/using.xml
+index 36b86702d22..0b9a0c98518 100644
+--- a/libstdc++-v3/doc/xml/manual/using.xml
++++ b/libstdc++-v3/doc/xml/manual/using.xml
+@@ -69,12 +69,16 @@
+     </row>
+ 
+     <row>
+-      <entry><literal>-fexceptions</literal></entry>
++      <entry>
++	<literal>-fno-exceptions</literal>
++      </entry>
+       <entry>See <link linkend="intro.using.exception.no">exception-free dialect</link></entry>
+     </row>
+ 
+     <row>
+-      <entry><literal>-frtti</literal></entry>
++      <entry>
++	<literal>-fno-rtti</literal>
++      </entry>
+       <entry>As above, but RTTI-free dialect.</entry>
+     </row>
+ 
+@@ -104,6 +108,17 @@
+       </entry>
+     </row>
+ 
++    <row>
++      <entry><literal>-lstdc++_libbacktrace</literal></entry>
++      <entry>Until C++23 support is non-experimental, linking to
++	<filename class="libraryfile">libstdc++_libbacktrace.a</filename>
++	is required for use of the C++23 type
++	<classname>std::stacktrace</classname>
++	and related types in
++	<filename class="headerfile">&lt;stacktrace&gt;</filename>.
++      </entry>
++    </row>
++
+     <row>
+       <entry><literal>-fopenmp</literal></entry>
+       <entry>For <link linkend="manual.ext.parallel_mode">parallel</link> mode.</entry>
+-- 
+2.25.1
+

@@ -1,0 +1,134 @@
+From fd605b17db09f7ae6d2189d15e8119c52d548900 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 14 Mar 2023 23:28:38 -0700
+Subject: [PATCH 542/547] add some zba/zbb builtins
+
+---
+ gcc/config/riscv/bitmanip.md       | 38 ++++++++++++++++++++++++++++++
+ gcc/config/riscv/riscv-builtins.cc | 11 +++++++++
+ gcc/config/riscv/riscv-ftypes.def  |  3 +++
+ gcc/config/riscv/riscv.md          |  2 ++
+ 4 files changed, 54 insertions(+)
+
+diff --git a/gcc/config/riscv/bitmanip.md b/gcc/config/riscv/bitmanip.md
+index 0ab9ffe3c0b..10cc078f944 100644
+--- a/gcc/config/riscv/bitmanip.md
++++ b/gcc/config/riscv/bitmanip.md
+@@ -340,3 +340,41 @@
+   "TARGET_ZBS"
+   "bexti\t%0,%1,%2"
+   [(set_attr "type" "bitmanip")])
++
++(define_insn "riscv_orc_b"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_ZBB"
++  "orc.b\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "riscv_rev8"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (match_operand:SI 1 "register_operand" "r")))]
++  "TARGET_ZBB"
++  "rev8\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "riscv_clmul"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmul\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "riscv_clmulh"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmulh\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
++
++(define_insn "riscv_clmulr"
++  [(set (match_operand:SI 0 "register_operand" "=r")
++	(sign_extend:SI (rotate:SI (match_operand:SI 1 "register_operand" "r")
++				   (match_operand:SI 2 "register_operand" "r"))))]
++  "TARGET_ZBC"
++  "clmulr\t%0,%1,%2"
++  [(set_attr "type" "bitmanip")])
+diff --git a/gcc/config/riscv/riscv-builtins.cc b/gcc/config/riscv/riscv-builtins.cc
+index 0658f8d3047..8ce8a6e6282 100644
+--- a/gcc/config/riscv/riscv-builtins.cc
++++ b/gcc/config/riscv/riscv-builtins.cc
+@@ -40,6 +40,7 @@ along with GCC; see the file COPYING3.  If not see
+ /* Macros to create an enumeration identifier for a function prototype.  */
+ #define RISCV_FTYPE_NAME0(A) RISCV_##A##_FTYPE
+ #define RISCV_FTYPE_NAME1(A, B) RISCV_##A##_FTYPE_##B
++#define RISCV_FTYPE_NAME2(A, B, C) RISCV_##A##_FTYPE_##B##_##C
+ 
+ /* Classifies the prototype of a built-in function.  */
+ enum riscv_function_type {
+@@ -49,6 +50,7 @@ enum riscv_function_type {
+   RISCV_MAX_FTYPE_MAX
+ };
+ 
++
+ /* Specifies how a built-in function should be converted into rtl.  */
+ enum riscv_builtin_type {
+   /* The function corresponds directly to an .md pattern.  */
+@@ -86,6 +88,8 @@ struct riscv_builtin_description {
+ };
+ 
+ AVAIL (hard_float, TARGET_HARD_FLOAT)
++AVAIL (zbb, TARGET_ZBB)
++AVAIL (zbc, TARGET_ZBC)
+ 
+ /* Construct a riscv_builtin_description from the given arguments.
+ 
+@@ -119,6 +123,7 @@ AVAIL (hard_float, TARGET_HARD_FLOAT)
+ /* Argument types.  */
+ #define RISCV_ATYPE_VOID void_type_node
+ #define RISCV_ATYPE_USI unsigned_intSI_type_node
++#define RISCV_ATYPE_SI intSI_type_node
+ 
+ /* RISCV_FTYPE_ATYPESN takes N RISCV_FTYPES-like type codes and lists
+    their associated RISCV_ATYPEs.  */
+@@ -126,8 +131,14 @@ AVAIL (hard_float, TARGET_HARD_FLOAT)
+   RISCV_ATYPE_##A
+ #define RISCV_FTYPE_ATYPES1(A, B) \
+   RISCV_ATYPE_##A, RISCV_ATYPE_##B
++#define RISCV_FTYPE_ATYPES2(A, B, C) \
++  RISCV_ATYPE_##A, RISCV_ATYPE_##B, RISCV_ATYPE_##C
+ 
+ static const struct riscv_builtin_description riscv_builtins[] = {
++  DIRECT_BUILTIN (orc_b, RISCV_SI_FTYPE_SI, zbb),
++  DIRECT_BUILTIN (clmul, RISCV_SI_FTYPE_SI_SI, zbc),
++  DIRECT_BUILTIN (clmulh, RISCV_SI_FTYPE_SI_SI, zbc),
++  DIRECT_BUILTIN (clmulr, RISCV_SI_FTYPE_SI_SI, zbc),
+   DIRECT_BUILTIN (frflags, RISCV_USI_FTYPE, hard_float),
+   DIRECT_NO_TARGET_BUILTIN (fsflags, RISCV_VOID_FTYPE_USI, hard_float)
+ };
+diff --git a/gcc/config/riscv/riscv-ftypes.def b/gcc/config/riscv/riscv-ftypes.def
+index 2214c496f9b..2b5b35b94a0 100644
+--- a/gcc/config/riscv/riscv-ftypes.def
++++ b/gcc/config/riscv/riscv-ftypes.def
+@@ -28,3 +28,6 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ DEF_RISCV_FTYPE (0, (USI))
+ DEF_RISCV_FTYPE (1, (VOID, USI))
++DEF_RISCV_FTYPE (1, (SI, SI))
++DEF_RISCV_FTYPE (2, (SI, SI, SI))
++
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index c6399b1389e..fdb8c102560 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -2869,3 +2869,5 @@
+ (include "pic.md")
+ (include "generic.md")
+ (include "sifive-7.md")
++
++
+-- 
+2.25.1
+

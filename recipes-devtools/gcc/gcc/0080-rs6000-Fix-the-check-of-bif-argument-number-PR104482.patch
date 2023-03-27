@@ -1,0 +1,145 @@
+From 1a71881d05d3ec3e56492fff0197f88dcf4d9dbc Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Tue, 13 Sep 2022 04:14:23 -0500
+Subject: [PATCH 080/547] rs6000: Fix the check of bif argument number
+ [PR104482]
+
+As PR104482 shown, it's one regression about the handlings when
+the argument number is more than the one of built-in function
+prototype.  The new bif support only catches the case that the
+argument number is less than the one of function prototype, but
+it misses the case that the argument number is more than the one
+of function prototype.  Because it uses "n != expected_args",
+n is updated in
+
+   for (n = 0; !VOID_TYPE_P (TREE_VALUE (fnargs)) && n < nargs;
+        fnargs = TREE_CHAIN (fnargs), n++)
+
+, it's restricted to be less than or equal to expected_args with
+the guard !VOID_TYPE_P (TREE_VALUE (fnargs)), so it's wrong.
+
+The fix is to use nargs instead, also move the checking hunk's
+location ahead to avoid useless further scanning when the counts
+mismatch.
+
+	PR target/104482
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin): Fix
+	the equality check for argument number, and move this hunk ahead.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr104482.c: New test.
+
+(cherry picked from commit 38db48346cc045ed5656233c42d01d6d06bffc35)
+---
+ gcc/config/rs6000/rs6000-c.cc               | 60 ++++++++++-----------
+ gcc/testsuite/gcc.target/powerpc/pr104482.c | 16 ++++++
+ 2 files changed, 46 insertions(+), 30 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr104482.c
+
+diff --git a/gcc/config/rs6000/rs6000-c.cc b/gcc/config/rs6000/rs6000-c.cc
+index 84bb98f94fb..fa0c93e1841 100644
+--- a/gcc/config/rs6000/rs6000-c.cc
++++ b/gcc/config/rs6000/rs6000-c.cc
+@@ -1755,6 +1755,36 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
+   vec<tree, va_gc> *arglist = static_cast<vec<tree, va_gc> *> (passed_arglist);
+   unsigned int nargs = vec_safe_length (arglist);
+ 
++  /* If the number of arguments did not match the prototype, return NULL
++     and the generic code will issue the appropriate error message.  Skip
++     this test for functions where we don't fully describe all the possible
++     overload signatures in rs6000-overload.def (because they aren't relevant
++     to the expansion here).  If we don't, we get confusing error messages.  */
++  /* As an example, for vec_splats we have:
++
++; There are no actual builtins for vec_splats.  There is special handling for
++; this in altivec_resolve_overloaded_builtin in rs6000-c.cc, where the call
++; is replaced by a constructor.  The single overload here causes
++; __builtin_vec_splats to be registered with the front end so that can happen.
++[VEC_SPLATS, vec_splats, __builtin_vec_splats]
++  vsi __builtin_vec_splats (vsi);
++    ABS_V4SI SPLATS_FAKERY
++
++    So even though __builtin_vec_splats accepts all vector types, the
++    infrastructure cheats and just records one prototype.  We end up getting
++    an error message that refers to this specific prototype even when we
++    are handling a different argument type.  That is completely confusing
++    to the user, so it's best to let these cases be handled individually
++    in the resolve_vec_splats, etc., helper functions.  */
++
++  if (expected_args != nargs
++      && !(fcode == RS6000_OVLD_VEC_PROMOTE
++	   || fcode == RS6000_OVLD_VEC_SPLATS
++	   || fcode == RS6000_OVLD_VEC_EXTRACT
++	   || fcode == RS6000_OVLD_VEC_INSERT
++	   || fcode == RS6000_OVLD_VEC_STEP))
++    return NULL;
++
+   for (n = 0;
+        !VOID_TYPE_P (TREE_VALUE (fnargs)) && n < nargs;
+        fnargs = TREE_CHAIN (fnargs), n++)
+@@ -1815,36 +1845,6 @@ altivec_resolve_overloaded_builtin (location_t loc, tree fndecl,
+       types[n] = type;
+     }
+ 
+-  /* If the number of arguments did not match the prototype, return NULL
+-     and the generic code will issue the appropriate error message.  Skip
+-     this test for functions where we don't fully describe all the possible
+-     overload signatures in rs6000-overload.def (because they aren't relevant
+-     to the expansion here).  If we don't, we get confusing error messages.  */
+-  /* As an example, for vec_splats we have:
+-
+-; There are no actual builtins for vec_splats.  There is special handling for
+-; this in altivec_resolve_overloaded_builtin in rs6000-c.cc, where the call
+-; is replaced by a constructor.  The single overload here causes
+-; __builtin_vec_splats to be registered with the front end so that can happen.
+-[VEC_SPLATS, vec_splats, __builtin_vec_splats]
+-  vsi __builtin_vec_splats (vsi);
+-    ABS_V4SI SPLATS_FAKERY
+-
+-    So even though __builtin_vec_splats accepts all vector types, the
+-    infrastructure cheats and just records one prototype.  We end up getting
+-    an error message that refers to this specific prototype even when we
+-    are handling a different argument type.  That is completely confusing
+-    to the user, so it's best to let these cases be handled individually
+-    in the resolve_vec_splats, etc., helper functions.  */
+-
+-  if (n != expected_args
+-      && !(fcode == RS6000_OVLD_VEC_PROMOTE
+-	   || fcode == RS6000_OVLD_VEC_SPLATS
+-	   || fcode == RS6000_OVLD_VEC_EXTRACT
+-	   || fcode == RS6000_OVLD_VEC_INSERT
+-	   || fcode == RS6000_OVLD_VEC_STEP))
+-    return NULL;
+-
+   /* Some overloads require special handling.  */
+   tree returned_expr = NULL;
+   resolution res = unresolved;
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr104482.c b/gcc/testsuite/gcc.target/powerpc/pr104482.c
+new file mode 100644
+index 00000000000..92191265e4c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr104482.c
+@@ -0,0 +1,16 @@
++/* { dg-require-effective-target powerpc_vsx_ok } */
++/* { dg-options "-mvsx" } */
++
++/* It's to verify no ICE here, ignore error messages about
++   mismatch argument number since they are not test points
++   here.  */
++/* { dg-excess-errors "pr104482" } */
++
++__attribute__ ((altivec (vector__))) int vsi;
++
++double
++testXXPERMDI (void)
++{
++  return __builtin_vsx_xxpermdi (vsi, vsi, 2, 4);
++}
++
+-- 
+2.25.1
+

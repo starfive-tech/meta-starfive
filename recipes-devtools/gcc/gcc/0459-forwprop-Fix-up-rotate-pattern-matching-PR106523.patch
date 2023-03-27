@@ -1,0 +1,774 @@
+From a558a4d3d1b488783b96dff7141d12e02ded3ad3 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 17 Jan 2023 12:14:25 +0100
+Subject: [PATCH 459/547] forwprop: Fix up rotate pattern matching [PR106523]
+
+The comment above simplify_rotate roughly describes what patterns
+are matched into what:
+   We are looking for X with unsigned type T with bitsize B, OP being
+   +, | or ^, some type T2 wider than T.  For:
+   (X << CNT1) OP (X >> CNT2)                           iff CNT1 + CNT2 == B
+   ((T) ((T2) X << CNT1)) OP ((T) ((T2) X >> CNT2))     iff CNT1 + CNT2 == B
+
+   transform these into:
+   X r<< CNT1
+
+   Or for:
+   (X << Y) OP (X >> (B - Y))
+   (X << (int) Y) OP (X >> (int) (B - Y))
+   ((T) ((T2) X << Y)) OP ((T) ((T2) X >> (B - Y)))
+   ((T) ((T2) X << (int) Y)) OP ((T) ((T2) X >> (int) (B - Y)))
+   (X << Y) | (X >> ((-Y) & (B - 1)))
+   (X << (int) Y) | (X >> (int) ((-Y) & (B - 1)))
+   ((T) ((T2) X << Y)) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+   ((T) ((T2) X << (int) Y)) | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+
+   transform these into (last 2 only if ranger can prove Y < B):
+   X r<< Y
+
+   Or for:
+   (X << (Y & (B - 1))) | (X >> ((-Y) & (B - 1)))
+   (X << (int) (Y & (B - 1))) | (X >> (int) ((-Y) & (B - 1)))
+   ((T) ((T2) X << (Y & (B - 1)))) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+   ((T) ((T2) X << (int) (Y & (B - 1)))) \
+     | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+
+   transform these into:
+   X r<< (Y & (B - 1))
+
+The following testcase shows that 2 of these are problematic.
+If T2 is wider than T, then the 2 which yse (-Y) & (B - 1) on one
+of the shift counts but Y on the can do something different from
+rotate.  E.g.:
+__attribute__((noipa)) unsigned char
+f7 (unsigned char x, unsigned int y)
+{
+  unsigned int t = x;
+  return (t << y) | (t >> ((-y) & 7));
+}
+if y is [0, 7], then it is a normal rotate, and if y is in [32, ~0U]
+then it is UB, but for y in [9, 31] the left shift in this case
+will never leave any bits in the result, while in a rotate they are
+left there.  Say for y 5 and x 0xaa the expression gives
+0x55 which is the same thing as rotate, while for y 19 and x 0xaa
+0x5, which is different.
+Now, I believe the
+   ((T) ((T2) X << Y)) OP ((T) ((T2) X >> (B - Y)))
+   ((T) ((T2) X << (int) Y)) OP ((T) ((T2) X >> (int) (B - Y)))
+forms are ok, because B - Y still needs to be a valid shift count,
+and if Y > B then B - Y should be either negative or very large
+positive (for unsigned types).
+And similarly the last 2 cases above which use & (B - 1) on both
+shift operands are definitely ok.
+
+The following patch disables the
+   ((T) ((T2) X << Y)) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+   ((T) ((T2) X << (int) Y)) | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+unless ranger says Y is not in [B, B2 - 1] range.
+
+And, looking at it again this morning, actually the Y equal to B
+case is still fine, if Y is equal to 0, then it is
+(T) (((T2) X << 0) | ((T2) X >> 0))
+and so X, for Y == B it is
+(T) (((T2) X << B) | ((T2) X >> 0))
+which is the same as
+(T) (0 | ((T2) X >> 0))
+which is also X.  So instead of the [B, B2 - 1] range we could use
+[B + 1, B2 - 1].  And, if we wanted to go further, even multiplies
+of B are ok if they are smaller than B2, so we could construct a detailed
+int_range_max if we wanted.
+
+2023-01-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/106523
+	* tree-ssa-forwprop.cc (simplify_rotate): For the
+	patterns with (-Y) & (B - 1) in one operand's shift
+	count and Y in another, if T2 has wider precision than T,
+	punt if Y could have a value in [B, B2 - 1] range.
+
+	* c-c++-common/rotate-2.c (f5, f6, f7, f8, f13, f14, f15, f16,
+	f37, f38, f39, f40, f45, f46, f47, f48): Add assertions using
+	__builtin_unreachable about shift count.
+	* c-c++-common/rotate-2b.c: New test.
+	* c-c++-common/rotate-4.c (f5, f6, f7, f8, f13, f14, f15, f16,
+	f37, f38, f39, f40, f45, f46, f47, f48): Add assertions using
+	__builtin_unreachable about shift count.
+	* c-c++-common/rotate-4b.c: New test.
+	* gcc.c-torture/execute/pr106523.c: New test.
+
+(cherry picked from commit 001121e8921d5d1a439ce0e64ab04c5959b0bfd8)
+---
+ gcc/testsuite/c-c++-common/rotate-2.c         |  32 ++++++
+ gcc/testsuite/c-c++-common/rotate-2b.c        | 100 ++++++++++++++++++
+ gcc/testsuite/c-c++-common/rotate-4.c         |  32 ++++++
+ gcc/testsuite/c-c++-common/rotate-4b.c        | 100 ++++++++++++++++++
+ .../gcc.c-torture/execute/pr106523.c          |  22 ++++
+ gcc/tree-ssa-forwprop.cc                      |  53 +++++++++-
+ 6 files changed, 335 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/rotate-2b.c
+ create mode 100644 gcc/testsuite/c-c++-common/rotate-4b.c
+ create mode 100644 gcc/testsuite/gcc.c-torture/execute/pr106523.c
+
+diff --git a/gcc/testsuite/c-c++-common/rotate-2.c b/gcc/testsuite/c-c++-common/rotate-2.c
+index c8359cd2ae0..544a7ca298f 100644
+--- a/gcc/testsuite/c-c++-common/rotate-2.c
++++ b/gcc/testsuite/c-c++-common/rotate-2.c
+@@ -32,24 +32,32 @@ f4 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f5 (unsigned short int x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned short int
+ f6 (unsigned short int x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned char
+ f7 (unsigned char x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+ unsigned char
+ f8 (unsigned char x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+@@ -80,24 +88,32 @@ f12 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f13 (unsigned short int x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned short int
+ f14 (unsigned short int x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned char
+ f15 (unsigned char x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+ unsigned char
+ f16 (unsigned char x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+@@ -224,24 +240,32 @@ f36 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f37 (unsigned short int x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned short int
+ f38 (unsigned short int x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned char
+ f39 (unsigned char x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+ unsigned char
+ f40 (unsigned char x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+@@ -272,24 +296,32 @@ f44 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f45 (unsigned short int x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned short int
+ f46 (unsigned short int x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned char
+ f47 (unsigned char x, unsigned int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+ unsigned char
+ f48 (unsigned char x, unsigned long int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+diff --git a/gcc/testsuite/c-c++-common/rotate-2b.c b/gcc/testsuite/c-c++-common/rotate-2b.c
+new file mode 100644
+index 00000000000..2a6bf909ae6
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/rotate-2b.c
+@@ -0,0 +1,100 @@
++/* Check rotate pattern detection.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fno-ipa-icf -fdump-tree-optimized" } */
++/* { dg-final { scan-tree-dump-not "r\[<>]\[<>]" "optimized" } } */
++
++unsigned short int
++f5 (unsigned short int x, unsigned int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned short int
++f6 (unsigned short int x, unsigned long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned char
++f7 (unsigned char x, unsigned int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++f8 (unsigned char x, unsigned long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned short int
++f13 (unsigned short int x, unsigned int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned short int
++f14 (unsigned short int x, unsigned long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned char
++f15 (unsigned char x, unsigned int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned char
++f16 (unsigned char x, unsigned long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned short int
++f37 (unsigned short int x, unsigned int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned short int
++f38 (unsigned short int x, unsigned long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned char
++f39 (unsigned char x, unsigned int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++f40 (unsigned char x, unsigned long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned short int
++f45 (unsigned short int x, unsigned int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned short int
++f46 (unsigned short int x, unsigned long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned char
++f47 (unsigned char x, unsigned int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned char
++f48 (unsigned char x, unsigned long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
+diff --git a/gcc/testsuite/c-c++-common/rotate-4.c b/gcc/testsuite/c-c++-common/rotate-4.c
+index 44fd1d0bb83..f85236239d8 100644
+--- a/gcc/testsuite/c-c++-common/rotate-4.c
++++ b/gcc/testsuite/c-c++-common/rotate-4.c
+@@ -32,24 +32,32 @@ f4 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f5 (unsigned short int x, int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned short int
+ f6 (unsigned short int x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned char
+ f7 (unsigned char x, int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+ unsigned char
+ f8 (unsigned char x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+@@ -80,24 +88,32 @@ f12 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f13 (unsigned short int x, int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned short int
+ f14 (unsigned short int x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned char
+ f15 (unsigned char x, int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+ unsigned char
+ f16 (unsigned char x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+@@ -224,24 +240,32 @@ f36 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f37 (unsigned short int x, int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned short int
+ f38 (unsigned short int x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
+ }
+ 
+ unsigned char
+ f39 (unsigned char x, int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+ unsigned char
+ f40 (unsigned char x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
+ }
+ 
+@@ -272,24 +296,32 @@ f44 (unsigned int x, int y __attribute__((unused)))
+ unsigned short int
+ f45 (unsigned short int x, int y)
+ {
++  if (y >= __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned short int
+ f46 (unsigned short int x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__ * __SIZEOF_SHORT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
+ }
+ 
+ unsigned char
+ f47 (unsigned char x, int y)
+ {
++  if (y >= __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+ unsigned char
+ f48 (unsigned char x, long int y)
+ {
++  if (y >= 0UL + __CHAR_BIT__)
++    __builtin_unreachable ();
+   return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
+ }
+ 
+diff --git a/gcc/testsuite/c-c++-common/rotate-4b.c b/gcc/testsuite/c-c++-common/rotate-4b.c
+new file mode 100644
+index 00000000000..a3824754d63
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/rotate-4b.c
+@@ -0,0 +1,100 @@
++/* Check rotate pattern detection.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fno-ipa-icf -fdump-tree-optimized" } */
++/* { dg-final { scan-tree-dump-not "r\[<>]\[<>]" "optimized" } } */
++
++unsigned short int
++f5 (unsigned short int x, int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned short int
++f6 (unsigned short int x, long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned char
++f7 (unsigned char x, int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++f8 (unsigned char x, long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned short int
++f13 (unsigned short int x, int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned short int
++f14 (unsigned short int x, long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned char
++f15 (unsigned char x, int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned char
++f16 (unsigned char x, long int y)
++{
++  return (x << y) | (x >> ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned short int
++f37 (unsigned short int x, int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned short int
++f38 (unsigned short int x, long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * __SIZEOF_SHORT__ - 1)));
++}
++
++unsigned char
++f39 (unsigned char x, int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned char
++f40 (unsigned char x, long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ - 1)));
++}
++
++unsigned short int
++f45 (unsigned short int x, int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned short int
++f46 (unsigned short int x, long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned short) - 1)));
++}
++
++unsigned char
++f47 (unsigned char x, int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
++
++unsigned char
++f48 (unsigned char x, long int y)
++{
++  return (x >> y) | (x << ((-y) & (__CHAR_BIT__ * sizeof (unsigned char) - 1)));
++}
+diff --git a/gcc/testsuite/gcc.c-torture/execute/pr106523.c b/gcc/testsuite/gcc.c-torture/execute/pr106523.c
+new file mode 100644
+index 00000000000..abd78f59ce3
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/execute/pr106523.c
+@@ -0,0 +1,22 @@
++/* PR tree-optimization/106523 */
++
++__attribute__((noipa)) unsigned char
++f7 (unsigned char x, unsigned int y)
++{
++  unsigned int t = x;
++  return (t << y) | (t >> ((-y) & 7));
++}
++
++int
++main ()
++{
++  if (__CHAR_BIT__ != 8 || __SIZEOF_INT__ != 4)
++    return 0;
++
++  volatile unsigned char x = 152;
++  volatile unsigned int y = 19;
++  if (f7 (x, y) != 4)
++    __builtin_abort ();
++
++  return 0;
++}
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index 260d5dac83b..c8a867ae828 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -1831,7 +1831,7 @@ defcodefor_name (tree name, enum tree_code *code, tree *arg1, tree *arg2)
+    ((T) ((T2) X << Y)) | ((T) ((T2) X >> ((-Y) & (B - 1))))
+    ((T) ((T2) X << (int) Y)) | ((T) ((T2) X >> (int) ((-Y) & (B - 1))))
+ 
+-   transform these into:
++   transform these into (last 2 only if ranger can prove Y < B):
+    X r<< Y
+ 
+    Or for:
+@@ -1860,6 +1860,8 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+   int i;
+   bool swapped_p = false;
+   gimple *g;
++  gimple *def_arg_stmt[2] = { NULL, NULL };
++  int wider_prec = 0;
+ 
+   arg[0] = gimple_assign_rhs1 (stmt);
+   arg[1] = gimple_assign_rhs2 (stmt);
+@@ -1872,7 +1874,11 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+     return false;
+ 
+   for (i = 0; i < 2; i++)
+-    defcodefor_name (arg[i], &def_code[i], &def_arg1[i], &def_arg2[i]);
++    {
++      defcodefor_name (arg[i], &def_code[i], &def_arg1[i], &def_arg2[i]);
++      if (TREE_CODE (arg[i]) == SSA_NAME)
++	def_arg_stmt[i] = SSA_NAME_DEF_STMT (arg[i]);
++    }
+ 
+   /* Look through narrowing (or same precision) conversions.  */
+   if (CONVERT_EXPR_CODE_P (def_code[0])
+@@ -1885,10 +1891,13 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+       && has_single_use (arg[0])
+       && has_single_use (arg[1]))
+     {
++      wider_prec = TYPE_PRECISION (TREE_TYPE (def_arg1[0]));
+       for (i = 0; i < 2; i++)
+ 	{
+ 	  arg[i] = def_arg1[i];
+ 	  defcodefor_name (arg[i], &def_code[i], &def_arg1[i], &def_arg2[i]);
++	  if (TREE_CODE (arg[i]) == SSA_NAME)
++	    def_arg_stmt[i] = SSA_NAME_DEF_STMT (arg[i]);
+ 	}
+     }
+   else
+@@ -1904,6 +1913,8 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 	{
+ 	  arg[i] = def_arg1[i];
+ 	  defcodefor_name (arg[i], &def_code[i], &def_arg1[i], &def_arg2[i]);
++	  if (TREE_CODE (arg[i]) == SSA_NAME)
++	    def_arg_stmt[i] = SSA_NAME_DEF_STMT (arg[i]);
+ 	}
+     }
+ 
+@@ -1977,6 +1988,9 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+     {
+       tree cdef_arg1[2], cdef_arg2[2], def_arg2_alt[2];
+       enum tree_code cdef_code[2];
++      gimple *def_arg_alt_stmt[2] = { NULL, NULL };
++      bool check_range = false;
++      gimple *check_range_stmt = NULL;
+       /* Look through conversion of the shift count argument.
+ 	 The C/C++ FE cast any shift count argument to integer_type_node.
+ 	 The only problem might be if the shift count type maximum value
+@@ -1993,9 +2007,13 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 	      && type_has_mode_precision_p (TREE_TYPE (cdef_arg1[i])))
+ 	    {
+ 	      def_arg2_alt[i] = cdef_arg1[i];
++	      if (TREE_CODE (def_arg2[i]) == SSA_NAME)
++		def_arg_alt_stmt[i] = SSA_NAME_DEF_STMT (def_arg2[i]);
+ 	      defcodefor_name (def_arg2_alt[i], &cdef_code[i],
+ 			       &cdef_arg1[i], &cdef_arg2[i]);
+ 	    }
++	  else
++	    def_arg_alt_stmt[i] = def_arg_stmt[i];
+ 	}
+       for (i = 0; i < 2; i++)
+ 	/* Check for one shift count being Y and the other B - Y,
+@@ -2018,7 +2036,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 	    if (CONVERT_EXPR_CODE_P (code)
+ 		&& INTEGRAL_TYPE_P (TREE_TYPE (tem))
+ 		&& TYPE_PRECISION (TREE_TYPE (tem))
+-		 > floor_log2 (TYPE_PRECISION (rtype))
++		   > floor_log2 (TYPE_PRECISION (rtype))
+ 		&& type_has_mode_precision_p (TREE_TYPE (tem))
+ 		&& (tem == def_arg2[1 - i]
+ 		    || tem == def_arg2_alt[1 - i]))
+@@ -2047,7 +2065,7 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 	    if (CONVERT_EXPR_CODE_P (code)
+ 		&& INTEGRAL_TYPE_P (TREE_TYPE (tem))
+ 		&& TYPE_PRECISION (TREE_TYPE (tem))
+-		 > floor_log2 (TYPE_PRECISION (rtype))
++		   > floor_log2 (TYPE_PRECISION (rtype))
+ 		&& type_has_mode_precision_p (TREE_TYPE (tem)))
+ 	      defcodefor_name (tem, &code, &tem, NULL);
+ 
+@@ -2056,6 +2074,11 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 		if (tem == def_arg2[1 - i] || tem == def_arg2_alt[1 - i])
+ 		  {
+ 		    rotcnt = tem;
++		    check_range = true;
++		    if (tem == def_arg2[1 - i])
++		      check_range_stmt = def_arg_stmt[1 - i];
++		    else
++		      check_range_stmt = def_arg_alt_stmt[1 - i];
+ 		    break;
+ 		  }
+ 		tree tem2;
+@@ -2070,6 +2093,11 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 			|| tem2 == def_arg2_alt[1 - i])
+ 		      {
+ 			rotcnt = tem2;
++			check_range = true;
++			if (tem2 == def_arg2[1 - i])
++			  check_range_stmt = def_arg_stmt[1 - i];
++			else
++			  check_range_stmt = def_arg_alt_stmt[1 - i];
+ 			break;
+ 		      }
+ 		  }
+@@ -2105,6 +2133,23 @@ simplify_rotate (gimple_stmt_iterator *gsi)
+ 		  }
+ 	      }
+ 	  }
++      if (check_range && wider_prec > TYPE_PRECISION (rtype))
++	{
++	  if (TREE_CODE (rotcnt) != SSA_NAME)
++	    return false;
++	  int_range_max r;
++	  if (!get_global_range_query ()->range_of_expr (r, rotcnt,
++							 check_range_stmt))
++	    return false;
++	  int prec = TYPE_PRECISION (TREE_TYPE (rotcnt));
++	  signop sign = TYPE_SIGN (TREE_TYPE (rotcnt));
++	  wide_int min = wide_int::from (TYPE_PRECISION (rtype), prec, sign);
++	  wide_int max = wide_int::from (wider_prec - 1, prec, sign);
++	  int_range<2> r2 (TREE_TYPE (rotcnt), min, max);
++	  r.intersect (r2);
++	  if (!r.undefined_p ())
++	    return false;
++	}
+       if (rotcnt == NULL_TREE)
+ 	return false;
+       swapped_p = i != 1;
+-- 
+2.25.1
+

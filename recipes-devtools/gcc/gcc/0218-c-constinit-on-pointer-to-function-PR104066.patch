@@ -1,0 +1,70 @@
+From 14faa5f585f6025df1e04c8c8b34340ff5e4d494 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 17 Nov 2022 11:59:29 -0500
+Subject: [PATCH 218/547] c++: constinit on pointer to function [PR104066]
+
+[dcl.constinit]: "The constinit specifier shall be applied only to
+a declaration of a variable with static or thread storage duration."
+
+Thus, this ought to be OK:
+
+  constinit void (*p)() = nullptr;
+
+but the error message I introduced when implementing constinit was
+not looking at funcdecl_p, so the code above was rejected.
+
+Fixed thus.  I'm checking constinit_p first because I think that's
+far more likely to be false than funcdecl_p.
+
+	PR c++/104066
+
+gcc/cp/ChangeLog:
+
+	* decl.cc (grokdeclarator): Check funcdecl_p before complaining
+	about constinit.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/constinit18.C: New test.
+
+(cherry picked from commit 7b3b2f50953c5143d4b14b59d322d8a793f411dd)
+---
+ gcc/cp/decl.cc                           |  2 +-
+ gcc/testsuite/g++.dg/cpp2a/constinit18.C | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/constinit18.C
+
+diff --git a/gcc/cp/decl.cc b/gcc/cp/decl.cc
+index cd1522f9a9f..ed47d262078 100644
+--- a/gcc/cp/decl.cc
++++ b/gcc/cp/decl.cc
+@@ -12963,7 +12963,7 @@ grokdeclarator (const cp_declarator *declarator,
+ 			  "an array", name);
+ 		return error_mark_node;
+ 	      }
+-	    if (constinit_p)
++	    if (constinit_p && funcdecl_p)
+ 	      {
+ 		error_at (declspecs->locations[ds_constinit],
+ 			  "%<constinit%> on function return type is not "
+diff --git a/gcc/testsuite/g++.dg/cpp2a/constinit18.C b/gcc/testsuite/g++.dg/cpp2a/constinit18.C
+new file mode 100644
+index 00000000000..51b4f0273be
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/constinit18.C
+@@ -0,0 +1,12 @@
++// PR c++/104066
++// { dg-do compile { target c++20 } }
++
++constinit void (*p)() = nullptr;
++constinit void (*pp)() = nullptr;
++void fn();
++constinit void (&r)() = fn;
++
++extern constinit long (* const syscall_reexported) (long, ...);
++
++constinit void bad (); // { dg-error ".constinit. on function return type is not allowed" }
++constinit void bad () { } // { dg-error ".constinit. on function return type is not allowed" }
+-- 
+2.25.1
+

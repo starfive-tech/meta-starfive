@@ -1,0 +1,83 @@
+From 2b17f9c0e3a1bc36a4f249da5b8b86be20361a3f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 22 Sep 2022 00:23:47 +0000
+Subject: [PATCH 082/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 30 ++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 3 files changed, 47 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 35f74103528..dabbe18d29f 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,33 @@
++2022-09-21  Richard Sandiford  <richard.sandiford@arm.com>
++
++	Backported from master:
++	2022-09-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	PR target/106491
++	* config/aarch64/aarch64-sve-builtins.cc (scalar_types)
++	(acle_vector_types, acle_svpattern, acle_svprfop): Add GTY
++	markup to (new) extern declarations instead of to the main
++	definition.
++
++2022-09-21  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-13  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/104482
++	* config/rs6000/rs6000-c.cc (altivec_resolve_overloaded_builtin): Fix
++	the equality check for argument number, and move this hunk ahead.
++
++2022-09-21  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	Backported from master:
++	2022-09-13  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	PR target/105485
++	* config/rs6000/rs6000-builtin.cc (rs6000_gimple_fold_builtin): Add
++	the handling for unresolved overloaded builtin function.
++	(rs6000_expand_builtin): Likewise.
++
+ 2022-09-09  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 2407ee3feb4..6fbb09fe858 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220921
++20220922
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index b246d93bdb1..4d7c2724746 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2022-09-21  Kewen Lin  <linkw@linux.ibm.com>
++
++	Backported from master:
++	2022-09-13  Kewen Lin  <linkw@linux.ibm.com>
++
++	PR target/104482
++	* gcc.target/powerpc/pr104482.c: New test.
++
++2022-09-21  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	Backported from master:
++	2022-09-13  Kewen.Lin  <linkw@gcc.gnu.org>
++
++	PR target/105485
++	* g++.target/powerpc/pr105485.C: New test.
++
+ 2022-09-19  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

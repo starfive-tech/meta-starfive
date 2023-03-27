@@ -1,0 +1,50 @@
+From d1084be3151d447cffe2d36667e67939dcdf3e75 Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Fri, 13 Jan 2023 16:20:36 +0100
+Subject: [PATCH 482/547] libstdc++: Ensure __builtin_constant_p isn't lost on
+ the way
+
+The more expensive code path should only be taken if it can be optimized
+away.
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+
+libstdc++-v3/ChangeLog:
+
+	* include/experimental/bits/simd.h
+	(_SimdWrapper::_M_is_constprop_none_of)
+	(_SimdWrapper::_M_is_constprop_all_of): Return false unless the
+	computed result still satisfies __builtin_constant_p.
+
+(cherry picked from commit fea34ee491104f325682cc5fb75683b7d74a0a3b)
+---
+ libstdc++-v3/include/experimental/bits/simd.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/include/experimental/bits/simd.h b/libstdc++-v3/include/experimental/bits/simd.h
+index b0226fa4c53..2b1e5bcbe94 100644
+--- a/libstdc++-v3/include/experimental/bits/simd.h
++++ b/libstdc++-v3/include/experimental/bits/simd.h
+@@ -2673,7 +2673,8 @@ template <typename _Tp, size_t _Width>
+ 	  else
+ 	    __execute_n_times<_Width>(
+ 	      [&](auto __i) { __r &= _M_data[__i.value] == _Tp(); });
+-	  return __r;
++	  if (__builtin_constant_p(__r))
++	    return __r;
+ 	}
+       return false;
+     }
+@@ -2693,7 +2694,8 @@ template <typename _Tp, size_t _Width>
+ 	  else
+ 	    __execute_n_times<_Width>(
+ 	      [&](auto __i) { __r &= _M_data[__i.value] == ~_Tp(); });
+-	  return __r;
++	  if (__builtin_constant_p(__r))
++	    return __r;
+ 	}
+       return false;
+     }
+-- 
+2.25.1
+

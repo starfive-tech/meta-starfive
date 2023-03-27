@@ -1,0 +1,109 @@
+From 85a84ce2e502b820277dbb399c43d4ced291efca Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 28 Nov 2022 10:13:43 +0100
+Subject: [PATCH 425/547] i386: Fix up ix86_abi handling [PR106875]
+
+The following testcase fails since my changes to make also
+opts_set saved/restored upon function target/optimization changes
+(before it has been acting as "has this option be ever explicit
+anywhere?").
+
+The problem is that for ix86_abi we depend on the opts_set
+value for it in ix86_option_override_internal:
+  SET_OPTION_IF_UNSET (opts, opts_set, ix86_abi, DEFAULT_ABI);
+but as it is a TargetSave, the backend code is required to
+save/restore it manually (it does that) and since gcc 11 also
+to save/restore the opts_set bit for it (which isn't done).
+We don't do that for various other TargetSave which
+ix86_function_specific_{save,restore} saves/restores, but as long
+as we never test opts_set for it, it doesn't really matter.
+One possible fix would be to introduce some new TargetSave into
+which ix86_function_specific_{save,restore} would save/restore a bitmask
+of the opts_set bits.  The following patch uses an easier fix, by
+making it a TargetVariable instead the saving/restoring is handled
+by the generated code.
+The differences in options.h are just slight movements on where
+*ix86_abi stuff appears in it, ditto for options.cc, the real
+differences are just in options-save.cc, where cl_target_option_save
+gets:
++  ptr->x_ix86_abi = opts->x_ix86_abi;
+...
++  if (opts_set->x_ix86_abi) mask |= HOST_WIDE_INT_1U << 3;
+(plus adjustments of following TargetVariables mask related stuff),
+cl_target_option_restore gets:
++  opts->x_ix86_abi = ptr->x_ix86_abi;
+...
++  opts_set->x_ix86_abi = static_cast<enum calling_abi>((mask & 1) != 0);
++  mask >>= 1;
+plus the movements in other functions too.  So, by it being a
+TargetVariable, the only thing that changed is that we don't need to
+handle it manually in ix86_function_specific_{save,restore} because it
+is handled automatically including the opts_set stuff.
+
+2022-11-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/106875
+	* config/i386/i386.opt (x_ix86_abi): Remove TargetSave.
+	(ix86_abi): Replace it with TargetVariable.
+	* config/i386/i386-options.cc (ix86_function_specific_save,
+	ix86_function_specific_restore): Don't save and restore x_ix86_abi.
+
+	* g++.target/i386/pr106875.C: New test.
+
+(cherry picked from commit ee629d242d9f93a38e49bed904bb334bbe15dde1)
+---
+ gcc/config/i386/i386-options.cc          | 2 --
+ gcc/config/i386/i386.opt                 | 4 ++--
+ gcc/testsuite/g++.target/i386/pr106875.C | 5 +++++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/g++.target/i386/pr106875.C
+
+diff --git a/gcc/config/i386/i386-options.cc b/gcc/config/i386/i386-options.cc
+index b9bce613f25..099cec4b610 100644
+--- a/gcc/config/i386/i386-options.cc
++++ b/gcc/config/i386/i386-options.cc
+@@ -678,7 +678,6 @@ ix86_function_specific_save (struct cl_target_option *ptr,
+   ptr->x_recip_mask_explicit = opts->x_recip_mask_explicit;
+   ptr->x_ix86_arch_string = opts->x_ix86_arch_string;
+   ptr->x_ix86_tune_string = opts->x_ix86_tune_string;
+-  ptr->x_ix86_abi = opts->x_ix86_abi;
+   ptr->x_ix86_asm_dialect = opts->x_ix86_asm_dialect;
+   ptr->x_ix86_branch_cost = opts->x_ix86_branch_cost;
+   ptr->x_ix86_dump_tunes = opts->x_ix86_dump_tunes;
+@@ -810,7 +809,6 @@ ix86_function_specific_restore (struct gcc_options *opts,
+   opts->x_recip_mask_explicit = ptr->x_recip_mask_explicit;
+   opts->x_ix86_arch_string = ptr->x_ix86_arch_string;
+   opts->x_ix86_tune_string = ptr->x_ix86_tune_string;
+-  opts->x_ix86_abi = ptr->x_ix86_abi;
+   opts->x_ix86_asm_dialect = ptr->x_ix86_asm_dialect;
+   opts->x_ix86_branch_cost = ptr->x_ix86_branch_cost;
+   opts->x_ix86_dump_tunes = ptr->x_ix86_dump_tunes;
+diff --git a/gcc/config/i386/i386.opt b/gcc/config/i386/i386.opt
+index 851168911c3..a3675e515bc 100644
+--- a/gcc/config/i386/i386.opt
++++ b/gcc/config/i386/i386.opt
+@@ -109,8 +109,8 @@ TargetVariable
+ enum cmodel ix86_cmodel = CM_32
+ 
+ ;; -mabi=
+-TargetSave
+-enum calling_abi x_ix86_abi
++TargetVariable
++enum calling_abi ix86_abi = SYSV_ABI
+ 
+ ;; -masm=
+ TargetSave
+diff --git a/gcc/testsuite/g++.target/i386/pr106875.C b/gcc/testsuite/g++.target/i386/pr106875.C
+new file mode 100644
+index 00000000000..eeab510761c
+--- /dev/null
++++ b/gcc/testsuite/g++.target/i386/pr106875.C
+@@ -0,0 +1,5 @@
++// PR target/106875
++// { dg-do compile { target { c++11 && lp64 } } }
++// { dg-options "-O0 -mabi=ms -fabi-version=3 -mcall-ms2sysv-xlogues" }
++
++#include "pr101180.C"
+-- 
+2.25.1
+

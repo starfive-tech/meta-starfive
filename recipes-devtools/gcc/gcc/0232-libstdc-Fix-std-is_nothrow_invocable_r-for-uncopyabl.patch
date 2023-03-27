@@ -1,0 +1,181 @@
+From db206f15f7091382cb981ade3c75f4c3e3559ab8 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 23 Sep 2022 13:28:37 +0100
+Subject: [PATCH 232/547] libstdc++: Fix std::is_nothrow_invocable_r for
+ uncopyable prvalues [PR91456]
+
+This is the last missing piece of PR 91456.
+
+This also removes the only use of the C++11 version of
+std::is_nothrow_invocable.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/91456
+	* include/std/type_traits (__is_nothrow_invocable): Remove.
+	(__is_invocable_impl::__nothrow_type): New member type which
+	checks if the conversion can throw.
+	(__is_nt_invocable_impl): Replace class template with alias
+	template to __is_nt_invocable_impl::__nothrow_type.
+	* testsuite/20_util/is_nothrow_invocable/91456.cc: New test.
+	* testsuite/20_util/is_nothrow_convertible/value.cc: Remove
+	macro used by value_ext.cc test.
+	* testsuite/20_util/is_nothrow_convertible/value_ext.cc: Remove
+	test for non-standard __is_nothrow_invocable trait.
+
+(cherry picked from commit 71c828f84572d933979468baf2cf744180258ee4)
+---
+ libstdc++-v3/include/std/type_traits          | 45 ++++++++++---------
+ .../20_util/is_nothrow_convertible/value.cc   |  2 -
+ .../91456.cc}                                 | 19 +++++---
+ 3 files changed, 36 insertions(+), 30 deletions(-)
+ rename libstdc++-v3/testsuite/20_util/{is_nothrow_convertible/value_ext.cc => is_nothrow_invocable/91456.cc} (59%)
+
+diff --git a/libstdc++-v3/include/std/type_traits b/libstdc++-v3/include/std/type_traits
+index 2572d8edd69..d4e7200123c 100644
+--- a/libstdc++-v3/include/std/type_traits
++++ b/libstdc++-v3/include/std/type_traits
+@@ -1517,12 +1517,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     };
+ #pragma GCC diagnostic pop
+ 
+-  // is_nothrow_convertible for C++11
+-  template<typename _From, typename _To>
+-    struct __is_nothrow_convertible
+-    : public __is_nt_convertible_helper<_From, _To>::type
+-    { };
+-
+ #if __cplusplus > 201703L
+ #define __cpp_lib_is_nothrow_convertible 201806L
+   /// is_nothrow_convertible
+@@ -2906,7 +2900,11 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+   // The primary template is used for invalid INVOKE expressions.
+   template<typename _Result, typename _Ret,
+ 	   bool = is_void<_Ret>::value, typename = void>
+-    struct __is_invocable_impl : false_type { };
++    struct __is_invocable_impl
++    : false_type
++    {
++      using __nothrow_type = false_type; // For is_nothrow_invocable_r
++    };
+ 
+   // Used for valid INVOKE and INVOKE<void> expressions.
+   template<typename _Result, typename _Ret>
+@@ -2914,7 +2912,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 			       /* is_void<_Ret> = */ true,
+ 			       __void_t<typename _Result::type>>
+     : true_type
+-    { };
++    {
++      using __nothrow_type = true_type; // For is_nothrow_invocable_r
++    };
+ 
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wctor-dtor-privacy"
+@@ -2926,23 +2926,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     {
+     private:
+       // The type of the INVOKE expression.
+-      // Unlike declval, this doesn't add_rvalue_reference.
+-      static typename _Result::type _S_get();
++      // Unlike declval, this doesn't add_rvalue_reference, so it respects
++      // guaranteed copy elision.
++      static typename _Result::type _S_get() noexcept;
+ 
+       template<typename _Tp>
+-	static void _S_conv(_Tp);
++	static void _S_conv(_Tp) noexcept;
+ 
+       // This overload is viable if INVOKE(f, args...) can convert to _Tp.
+-      template<typename _Tp, typename = decltype(_S_conv<_Tp>(_S_get()))>
+-	static true_type
++      template<typename _Tp, bool _Check_Noex = false,
++	       typename = decltype(_S_conv<_Tp>(_S_get())),
++	       bool _Noex = noexcept(_S_conv<_Tp>(_S_get()))>
++	static __bool_constant<_Check_Noex ? _Noex : true>
+ 	_S_test(int);
+ 
+-      template<typename _Tp>
++      template<typename _Tp, bool = false>
+ 	static false_type
+ 	_S_test(...);
+ 
+     public:
++      // For is_invocable_r
+       using type = decltype(_S_test<_Ret>(1));
++
++      // For is_nothrow_invocable_r
++      using __nothrow_type = decltype(_S_test<_Ret, true>(1));
+     };
+ #pragma GCC diagnostic pop
+ 
+@@ -3073,15 +3080,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     };
+ 
+   /// @cond undocumented
+-  template<typename _Result, typename _Ret, typename = void>
+-    struct __is_nt_invocable_impl : false_type { };
+-
+   template<typename _Result, typename _Ret>
+-    struct __is_nt_invocable_impl<_Result, _Ret,
+-				  __void_t<typename _Result::type>>
+-    : __or_<is_void<_Ret>,
+-	    __is_nothrow_convertible<typename _Result::type, _Ret>>
+-    { };
++    using __is_nt_invocable_impl
++      = typename __is_invocable_impl<_Result, _Ret>::__nothrow_type;
+   /// @endcond
+ 
+   /// std::is_nothrow_invocable_r
+diff --git a/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value.cc b/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value.cc
+index e9aded73624..a2686285052 100644
+--- a/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value.cc
++++ b/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value.cc
+@@ -21,9 +21,7 @@
+ #include <type_traits>
+ #include <testsuite_tr1.h>
+ 
+-#ifndef IS_NT_CONVERTIBLE_DEFINED
+ using std::is_nothrow_convertible;
+-#endif
+ 
+ void test01()
+ {
+diff --git a/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value_ext.cc b/libstdc++-v3/testsuite/20_util/is_nothrow_invocable/91456.cc
+similarity index 59%
+rename from libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value_ext.cc
+rename to libstdc++-v3/testsuite/20_util/is_nothrow_invocable/91456.cc
+index 0f896428537..abbbd1aade4 100644
+--- a/libstdc++-v3/testsuite/20_util/is_nothrow_convertible/value_ext.cc
++++ b/libstdc++-v3/testsuite/20_util/is_nothrow_invocable/91456.cc
+@@ -15,14 +15,21 @@
+ // with this library; see the file COPYING3.  If not see
+ // <http://www.gnu.org/licenses/>.
+ 
+-// { dg-do compile { target c++11 } }
++// { dg-do compile { target c++17 } }
++
++// PR 91456
++// std::function and std::is_invocable_r do not understand guaranteed elision
+ 
+ #include <type_traits>
+ 
+-// Test the non-standard __is_nothrow_convertible trait
++#include <functional>
+ 
+-template<typename From, typename To>
+-  using is_nothrow_convertible = std::__is_nothrow_convertible<From, To>;
++struct Immovable {
++  Immovable() = default;
++  Immovable(const Immovable&) = delete;
++  Immovable& operator=(const Immovable&) = delete;
++};
+ 
+-#define IS_NT_CONVERTIBLE_DEFINED
+-#include "value.cc"
++static_assert(std::is_nothrow_invocable_r_v<Immovable, Immovable(*)() noexcept>);
++static_assert(std::is_nothrow_invocable_r_v<const Immovable, Immovable(*)() noexcept>);
++static_assert(std::is_nothrow_invocable_r_v<Immovable, const Immovable(*)() noexcept>);
+-- 
+2.25.1
+

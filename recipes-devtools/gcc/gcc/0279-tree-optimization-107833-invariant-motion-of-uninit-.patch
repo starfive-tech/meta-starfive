@@ -1,0 +1,434 @@
+From 812847a9d12c0b65695cbe1a23959b69a7e62355 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 2 Dec 2022 14:52:20 +0100
+Subject: [PATCH 279/547] tree-optimization/107833 - invariant motion of uninit
+ uses
+
+The following fixes a wrong-code bug caused by loop invariant motion
+hoisting an expression using an uninitialized value outside of its
+controlling condition causing IVOPTs to use that to rewrite a defined
+value.  PR107839 is a similar case involving a bogus uninit diagnostic.
+
+	PR tree-optimization/107833
+	PR tree-optimization/107839
+	* cfghooks.cc: Include tree.h.
+	* tree-ssa-loop-im.cc (movement_possibility): Wrap and
+	make stmts using any ssa_name_maybe_undef_p operand
+	to preserve execution.
+	(loop_invariant_motion_in_fun): Call mark_ssa_maybe_undefs
+	to init maybe-undefined status.
+	* tree-ssa-loop-ivopts.cc (ssa_name_maybe_undef_p,
+	ssa_name_set_maybe_undef, ssa_name_any_use_dominates_bb_p,
+	mark_ssa_maybe_undefs): Move ...
+	* tree-ssa.cc: ... here.
+	* tree-ssa.h (ssa_name_any_use_dominates_bb_p,
+	mark_ssa_maybe_undefs): Declare.
+	(ssa_name_maybe_undef_p, ssa_name_set_maybe_undef): Define.
+
+	* gcc.dg/torture/pr107833.c: New testcase.
+	* gcc.dg/uninit-pr107839.c: Likewise.
+
+(cherry picked from commit 44c8402d35160515b3c09fd2bc239587e0c32a2b)
+---
+ gcc/cfghooks.cc                         |   1 +
+ gcc/testsuite/gcc.dg/torture/pr107833.c |  33 +++++++
+ gcc/testsuite/gcc.dg/uninit-pr107839.c  |  13 +++
+ gcc/tree-ssa-loop-im.cc                 |  24 ++++-
+ gcc/tree-ssa-loop-ivopts.cc             | 111 ------------------------
+ gcc/tree-ssa.cc                         |  93 ++++++++++++++++++++
+ gcc/tree-ssa.h                          |  25 ++++++
+ 7 files changed, 187 insertions(+), 113 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr107833.c
+ create mode 100644 gcc/testsuite/gcc.dg/uninit-pr107839.c
+
+diff --git a/gcc/cfghooks.cc b/gcc/cfghooks.cc
+index e435891fac6..c0b7bdcd9b2 100644
+--- a/gcc/cfghooks.cc
++++ b/gcc/cfghooks.cc
+@@ -29,6 +29,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "diagnostic-core.h"
+ #include "dumpfile.h"
+ #include "cfganal.h"
++#include "tree.h"
+ #include "tree-ssa.h"
+ #include "cfgloop.h"
+ #include "sreal.h"
+diff --git a/gcc/testsuite/gcc.dg/torture/pr107833.c b/gcc/testsuite/gcc.dg/torture/pr107833.c
+new file mode 100644
+index 00000000000..0edf7c328ba
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr107833.c
+@@ -0,0 +1,33 @@
++/* { dg-do run } */
++
++int a, b[1] = { 0 }, c, *d = b, e, *f, g;
++
++__attribute__((noipa)) int
++foo (const char *x)
++{
++  (void) x;
++  return 0;
++}
++
++int
++main ()
++{
++  for (int h = 0; a < 2; a++)
++    {
++      int i;
++      for (g = 0; g < 2; g++)
++	if (a < h)
++	  {
++	    e = i % 2;
++	    c = *f;
++	  }
++      for (h = 0; h < 3; h++)
++	{
++	  if (d)
++	    break;
++	  i--;
++	  foo ("0");
++	}
++    }
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/uninit-pr107839.c b/gcc/testsuite/gcc.dg/uninit-pr107839.c
+new file mode 100644
+index 00000000000..c2edcfaee22
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/uninit-pr107839.c
+@@ -0,0 +1,13 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -Wuninitialized" } */
++
++int f (int);
++void g (int c)
++{
++  int v;
++  if (c)
++    v = f(0);
++  while (1)
++    if (c)
++      f(v + v); /* { dg-bogus "uninitialized" } */ 
++}
+diff --git a/gcc/tree-ssa-loop-im.cc b/gcc/tree-ssa-loop-im.cc
+index 6d9316eed1f..3926e5c14a4 100644
+--- a/gcc/tree-ssa-loop-im.cc
++++ b/gcc/tree-ssa-loop-im.cc
+@@ -46,6 +46,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "alias.h"
+ #include "builtins.h"
+ #include "tree-dfa.h"
++#include "tree-ssa.h"
+ #include "dbgcnt.h"
+ 
+ /* TODO:  Support for predicated code motion.  I.e.
+@@ -331,8 +332,8 @@ enum move_pos
+    because it may trap), return MOVE_PRESERVE_EXECUTION.
+    Otherwise return MOVE_IMPOSSIBLE.  */
+ 
+-enum move_pos
+-movement_possibility (gimple *stmt)
++static enum move_pos
++movement_possibility_1 (gimple *stmt)
+ {
+   tree lhs;
+   enum move_pos ret = MOVE_POSSIBLE;
+@@ -422,6 +423,23 @@ movement_possibility (gimple *stmt)
+   return ret;
+ }
+ 
++static enum move_pos
++movement_possibility (gimple *stmt)
++{
++  enum move_pos pos = movement_possibility_1 (stmt);
++  if (pos == MOVE_POSSIBLE)
++    {
++      use_operand_p use_p;
++      ssa_op_iter ssa_iter;
++      FOR_EACH_PHI_OR_STMT_USE (use_p, stmt, ssa_iter, SSA_OP_USE)
++	if (TREE_CODE (USE_FROM_PTR (use_p)) == SSA_NAME
++	    && ssa_name_maybe_undef_p (USE_FROM_PTR (use_p)))
++	  return MOVE_PRESERVE_EXECUTION;
++    }
++  return pos;
++}
++
++
+ /* Compare the profile count inequality of bb and loop's preheader, it is
+    three-state as stated in profile-count.h, FALSE is returned if inequality
+    cannot be decided.  */
+@@ -3524,6 +3542,8 @@ loop_invariant_motion_in_fun (function *fun, bool store_motion)
+ 
+   tree_ssa_lim_initialize (store_motion);
+ 
++  mark_ssa_maybe_undefs ();
++
+   /* Gathers information about memory accesses in the loops.  */
+   analyze_memory_references (store_motion);
+ 
+diff --git a/gcc/tree-ssa-loop-ivopts.cc b/gcc/tree-ssa-loop-ivopts.cc
+index 549168aebd6..a67f5d549e6 100644
+--- a/gcc/tree-ssa-loop-ivopts.cc
++++ b/gcc/tree-ssa-loop-ivopts.cc
+@@ -3071,117 +3071,6 @@ get_loop_invariant_expr (struct ivopts_data *data, tree inv_expr)
+   return *slot;
+ }
+ 
+-/* Return TRUE iff VAR is marked as maybe-undefined.  See
+-   mark_ssa_maybe_undefs.  */
+-
+-static inline bool
+-ssa_name_maybe_undef_p (tree var)
+-{
+-  gcc_checking_assert (TREE_CODE (var) == SSA_NAME);
+-  return TREE_VISITED (var);
+-}
+-
+-/* Set (or clear, depending on VALUE) VAR's maybe-undefined mark.  */
+-
+-static inline void
+-ssa_name_set_maybe_undef (tree var, bool value = true)
+-{
+-  gcc_checking_assert (TREE_CODE (var) == SSA_NAME);
+-  TREE_VISITED (var) = value;
+-}
+-
+-/* Return TRUE iff there are any non-PHI uses of VAR that dominate the
+-   end of BB.  If we return TRUE and BB is a loop header, then VAR we
+-   be assumed to be defined within the loop, even if it is marked as
+-   maybe-undefined.  */
+-
+-static inline bool
+-ssa_name_any_use_dominates_bb_p (tree var, basic_block bb)
+-{
+-  imm_use_iterator iter;
+-  use_operand_p use_p;
+-  FOR_EACH_IMM_USE_FAST (use_p, iter, var)
+-    {
+-      if (is_a <gphi *> (USE_STMT (use_p))
+-	  || is_gimple_debug (USE_STMT (use_p)))
+-	continue;
+-      basic_block dombb = gimple_bb (USE_STMT (use_p));
+-      if (dominated_by_p (CDI_DOMINATORS, bb, dombb))
+-	return true;
+-    }
+-
+-  return false;
+-}
+-
+-/* Mark as maybe_undef any SSA_NAMEs that are unsuitable as ivopts
+-   candidates for potentially involving undefined behavior.  */
+-
+-static void
+-mark_ssa_maybe_undefs (void)
+-{
+-  auto_vec<tree> queue;
+-
+-  /* Scan all SSA_NAMEs, marking the definitely-undefined ones as
+-     maybe-undefined and queuing them for propagation, while clearing
+-     the mark on others.  */
+-  unsigned int i;
+-  tree var;
+-  FOR_EACH_SSA_NAME (i, var, cfun)
+-    {
+-      if (SSA_NAME_IS_VIRTUAL_OPERAND (var)
+-	  || !ssa_undefined_value_p (var, false))
+-	ssa_name_set_maybe_undef (var, false);
+-      else
+-	{
+-	  ssa_name_set_maybe_undef (var);
+-	  queue.safe_push (var);
+-	  if (dump_file && (dump_flags & TDF_DETAILS))
+-	    fprintf (dump_file, "marking _%i as maybe-undef\n",
+-		     SSA_NAME_VERSION (var));
+-	}
+-    }
+-
+-  /* Now propagate maybe-undefined from a DEF to any other PHI that
+-     uses it, as long as there isn't any intervening use of DEF.  */
+-  while (!queue.is_empty ())
+-    {
+-      var = queue.pop ();
+-      imm_use_iterator iter;
+-      use_operand_p use_p;
+-      FOR_EACH_IMM_USE_FAST (use_p, iter, var)
+-	{
+-	  /* Any uses of VAR that aren't PHI args imply VAR must be
+-	     defined, otherwise undefined behavior would have been
+-	     definitely invoked.  Only PHI args may hold
+-	     maybe-undefined values without invoking undefined
+-	     behavior for that reason alone.  */
+-	  if (!is_a <gphi *> (USE_STMT (use_p)))
+-	    continue;
+-	  gphi *phi = as_a <gphi *> (USE_STMT (use_p));
+-
+-	  tree def = gimple_phi_result (phi);
+-	  if (ssa_name_maybe_undef_p (def))
+-	    continue;
+-
+-	  /* Look for any uses of the maybe-unused SSA_NAME that
+-	     dominates the block that reaches the incoming block
+-	     corresponding to the PHI arg in which it is mentioned.
+-	     That means we can assume the SSA_NAME is defined in that
+-	     path, so we only mark a PHI result as maybe-undef if we
+-	     find an unused reaching SSA_NAME.  */
+-	  int idx = phi_arg_index_from_use (use_p);
+-	  basic_block bb = gimple_phi_arg_edge (phi, idx)->src;
+-	  if (ssa_name_any_use_dominates_bb_p (var, bb))
+-	    continue;
+-
+-	  ssa_name_set_maybe_undef (def);
+-	  queue.safe_push (def);
+-	  if (dump_file && (dump_flags & TDF_DETAILS))
+-	    fprintf (dump_file, "marking _%i as maybe-undef because of _%i\n",
+-		     SSA_NAME_VERSION (def), SSA_NAME_VERSION (var));
+-	}
+-    }
+-}
+ 
+ /* Return *TP if it is an SSA_NAME marked with TREE_VISITED, i.e., as
+    unsuitable as ivopts candidates for potentially involving undefined
+diff --git a/gcc/tree-ssa.cc b/gcc/tree-ssa.cc
+index ab8b1c27ed4..d36d2273f9d 100644
+--- a/gcc/tree-ssa.cc
++++ b/gcc/tree-ssa.cc
+@@ -1400,6 +1400,99 @@ gimple_uses_undefined_value_p (gimple *stmt)
+ }
+ 
+ 
++/* Return TRUE iff there are any non-PHI uses of VAR that dominate the
++   end of BB.  If we return TRUE and BB is a loop header, then VAR we
++   be assumed to be defined within the loop, even if it is marked as
++   maybe-undefined.  */
++
++bool
++ssa_name_any_use_dominates_bb_p (tree var, basic_block bb)
++{
++  imm_use_iterator iter;
++  use_operand_p use_p;
++  FOR_EACH_IMM_USE_FAST (use_p, iter, var)
++    {
++      if (is_a <gphi *> (USE_STMT (use_p))
++	  || is_gimple_debug (USE_STMT (use_p)))
++	continue;
++      basic_block dombb = gimple_bb (USE_STMT (use_p));
++      if (dominated_by_p (CDI_DOMINATORS, bb, dombb))
++	return true;
++    }
++
++  return false;
++}
++
++/* Mark as maybe_undef any SSA_NAMEs that are unsuitable as ivopts
++   candidates for potentially involving undefined behavior.  */
++
++void
++mark_ssa_maybe_undefs (void)
++{
++  auto_vec<tree> queue;
++
++  /* Scan all SSA_NAMEs, marking the definitely-undefined ones as
++     maybe-undefined and queuing them for propagation, while clearing
++     the mark on others.  */
++  unsigned int i;
++  tree var;
++  FOR_EACH_SSA_NAME (i, var, cfun)
++    {
++      if (SSA_NAME_IS_VIRTUAL_OPERAND (var)
++	  || !ssa_undefined_value_p (var, false))
++	ssa_name_set_maybe_undef (var, false);
++      else
++	{
++	  ssa_name_set_maybe_undef (var);
++	  queue.safe_push (var);
++	  if (dump_file && (dump_flags & TDF_DETAILS))
++	    fprintf (dump_file, "marking _%i as maybe-undef\n",
++		     SSA_NAME_VERSION (var));
++	}
++    }
++
++  /* Now propagate maybe-undefined from a DEF to any other PHI that
++     uses it, as long as there isn't any intervening use of DEF.  */
++  while (!queue.is_empty ())
++    {
++      var = queue.pop ();
++      imm_use_iterator iter;
++      use_operand_p use_p;
++      FOR_EACH_IMM_USE_FAST (use_p, iter, var)
++	{
++	  /* Any uses of VAR that aren't PHI args imply VAR must be
++	     defined, otherwise undefined behavior would have been
++	     definitely invoked.  Only PHI args may hold
++	     maybe-undefined values without invoking undefined
++	     behavior for that reason alone.  */
++	  if (!is_a <gphi *> (USE_STMT (use_p)))
++	    continue;
++	  gphi *phi = as_a <gphi *> (USE_STMT (use_p));
++
++	  tree def = gimple_phi_result (phi);
++	  if (ssa_name_maybe_undef_p (def))
++	    continue;
++
++	  /* Look for any uses of the maybe-unused SSA_NAME that
++	     dominates the block that reaches the incoming block
++	     corresponding to the PHI arg in which it is mentioned.
++	     That means we can assume the SSA_NAME is defined in that
++	     path, so we only mark a PHI result as maybe-undef if we
++	     find an unused reaching SSA_NAME.  */
++	  int idx = phi_arg_index_from_use (use_p);
++	  basic_block bb = gimple_phi_arg_edge (phi, idx)->src;
++	  if (ssa_name_any_use_dominates_bb_p (var, bb))
++	    continue;
++
++	  ssa_name_set_maybe_undef (def);
++	  queue.safe_push (def);
++	  if (dump_file && (dump_flags & TDF_DETAILS))
++	    fprintf (dump_file, "marking _%i as maybe-undef because of _%i\n",
++		     SSA_NAME_VERSION (def), SSA_NAME_VERSION (var));
++	}
++    }
++}
++
+ 
+ /* If necessary, rewrite the base of the reference tree *TP from
+    a MEM_REF to a plain or converted symbol.  */
+diff --git a/gcc/tree-ssa.h b/gcc/tree-ssa.h
+index 008535454a8..19c1eedc9f9 100644
+--- a/gcc/tree-ssa.h
++++ b/gcc/tree-ssa.h
+@@ -55,6 +55,31 @@ extern tree find_released_ssa_name (tree *, int *, void *);
+ extern bool ssa_defined_default_def_p (tree t);
+ extern bool ssa_undefined_value_p (tree, bool = true);
+ extern bool gimple_uses_undefined_value_p (gimple *);
++
++
++bool ssa_name_any_use_dominates_bb_p (tree var, basic_block bb);
++extern void mark_ssa_maybe_undefs (void);
++
++/* Return TRUE iff VAR is marked as maybe-undefined.  See
++   mark_ssa_maybe_undefs.  */
++
++static inline bool
++ssa_name_maybe_undef_p (tree var)
++{
++  gcc_checking_assert (TREE_CODE (var) == SSA_NAME);
++  return TREE_VISITED (var);
++}
++
++/* Set (or clear, depending on VALUE) VAR's maybe-undefined mark.  */
++
++static inline void
++ssa_name_set_maybe_undef (tree var, bool value = true)
++{
++  gcc_checking_assert (TREE_CODE (var) == SSA_NAME);
++  TREE_VISITED (var) = value;
++}
++
++
+ extern void execute_update_addresses_taken (void);
+ 
+ /* Given an edge_var_map V, return the PHI arg definition.  */
+-- 
+2.25.1
+

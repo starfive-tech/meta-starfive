@@ -1,0 +1,38 @@
+From 6e3b2c0d5e676e1cba1c27b95dd850e5cc33f9e1 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 28 Oct 2022 15:28:09 +0100
+Subject: [PATCH 236/547] libstdc++: Fix dangling reference in
+ filesystem::path::filename()
+
+The new -Wdangling-reference warning noticed this.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/fs_path.h (path::filename()): Fix dangling
+	reference.
+
+(cherry picked from commit 49237fe6ef677a81eae701f937546210c90b5914)
+---
+ libstdc++-v3/include/bits/fs_path.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/fs_path.h b/libstdc++-v3/include/bits/fs_path.h
+index 1b4a1b69f37..7a3d0513134 100644
+--- a/libstdc++-v3/include/bits/fs_path.h
++++ b/libstdc++-v3/include/bits/fs_path.h
+@@ -1288,9 +1288,9 @@ namespace __detail
+       {
+ 	if (_M_pathname.back() == preferred_separator)
+ 	  return {};
+-	auto& __last = *--end();
+-	if (__last._M_type() == _Type::_Filename)
+-	  return __last;
++	auto __last = --end();
++	if (__last->_M_type() == _Type::_Filename)
++	  return *__last;
+       }
+     return {};
+   }
+-- 
+2.25.1
+

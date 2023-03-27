@@ -1,0 +1,44 @@
+From cc0394346ac49659d446b2ef35c40ba1ef3cd117 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 31 Jan 2023 22:28:16 +0000
+Subject: [PATCH 402/547] libstdc++: Fix std::random_device for avr
+
+This fixes a build failure that affects avr, but could affect other
+targets in theory. The _M_fini function should not try to use ::open or
+::fopen if _GLIBCXX_USE_DEV_RANDOM is not defined, because no file can
+ever have been opened.
+
+libstdc++-v3/ChangeLog:
+
+	* src/c++11/random.cc (random_device::_M_fini): Do not try to
+	close the file handle if the target doesn't support the
+	/dev/random and /dev/urandom files.
+
+(cherry picked from commit 277dd6ea416718ba5493023b5a4660ecdbaf936c)
+---
+ libstdc++-v3/src/c++11/random.cc | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/libstdc++-v3/src/c++11/random.cc b/libstdc++-v3/src/c++11/random.cc
+index 8b5175a4ebf..38e2153ec17 100644
+--- a/libstdc++-v3/src/c++11/random.cc
++++ b/libstdc++-v3/src/c++11/random.cc
+@@ -548,6 +548,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
+       }
+ #endif
+ 
++#ifdef _GLIBCXX_USE_DEV_RANDOM
+ #ifdef USE_POSIX_FILE_IO
+     ::close(_M_fd);
+     _M_fd = -1;
+@@ -555,6 +556,7 @@ namespace std _GLIBCXX_VISIBILITY(default)
+     std::fclose(static_cast<FILE*>(_M_file));
+ #endif
+     _M_file = nullptr;
++#endif
+   }
+ 
+   random_device::result_type
+-- 
+2.25.1
+

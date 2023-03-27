@@ -1,0 +1,65 @@
+From 6db4ba9750ffd65c80995425db0d5f1020a04b28 Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Sun, 25 Sep 2022 22:01:50 -0500
+Subject: [PATCH 147/547] rs6000: Fix condition of define_expand vec_shr_<mode>
+ [PR100645]
+
+PR100645 exposes one latent bug in define_expand vec_shr_<mode>
+that the current condition TARGET_ALTIVEC is too loose.  The
+mode iterator VEC_L contains a few modes, they are not always
+supported as vector mode, VECTOR_UNIT_ALTIVEC_OR_VSX_P should
+be used like some other VEC_L usages.
+
+	PR target/100645
+
+gcc/ChangeLog:
+
+	* config/rs6000/vector.md (vec_shr_<mode>): Replace condition
+	TARGET_ALTIVEC with VECTOR_UNIT_ALTIVEC_OR_VSX_P.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr100645.c: New test.
+
+(cherry picked from commit bfad7069b74c97000b698191c1945f07a6192db5)
+---
+ gcc/config/rs6000/vector.md                 |  2 +-
+ gcc/testsuite/gcc.target/powerpc/pr100645.c | 13 +++++++++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr100645.c
+
+diff --git a/gcc/config/rs6000/vector.md b/gcc/config/rs6000/vector.md
+index 4d0797c48f8..9436f002f08 100644
+--- a/gcc/config/rs6000/vector.md
++++ b/gcc/config/rs6000/vector.md
+@@ -1535,7 +1535,7 @@
+   [(match_operand:VEC_L 0 "vlogical_operand")
+    (match_operand:VEC_L 1 "vlogical_operand")
+    (match_operand:QI 2 "reg_or_short_operand")]
+-  "TARGET_ALTIVEC"
++  "VECTOR_UNIT_ALTIVEC_OR_VSX_P (<MODE>mode)"
+ {
+   rtx bitshift = operands[2];
+   rtx shift;
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr100645.c b/gcc/testsuite/gcc.target/powerpc/pr100645.c
+new file mode 100644
+index 00000000000..c4e92cc8052
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr100645.c
+@@ -0,0 +1,13 @@
++/* { dg-require-effective-target powerpc_altivec_ok } */
++/* { dg-options "-mdejagnu-cpu=power6 -maltivec" } */
++
++/* This used to ICE.  */
++
++typedef long long v2di __attribute__ ((vector_size (16)));
++
++v2di
++foo_v2di_l (v2di x)
++{
++  return __builtin_shuffle ((v2di){0, 0}, x, (v2di){3, 0});
++}
++
+-- 
+2.25.1
+

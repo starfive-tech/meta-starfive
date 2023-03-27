@@ -1,0 +1,315 @@
+From c38ef2e5f9e957df5d01fe8afb0c6ace1178c322 Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Mon, 27 Feb 2023 13:49:17 +0800
+Subject: [PATCH 5/6] Upgrade CLINT implementation to ACLINT and Misc
+
+---
+ hw/riscv/Kconfig      |   4 +-
+ hw/riscv/starfive_u.c | 105 ++++++++++++++++++------------------------
+ 2 files changed, 46 insertions(+), 63 deletions(-)
+
+diff --git a/hw/riscv/Kconfig b/hw/riscv/Kconfig
+index 369495f2fe..5e95cf4875 100644
+--- a/hw/riscv/Kconfig
++++ b/hw/riscv/Kconfig
+@@ -90,7 +90,7 @@ config STARFIVE_U
+     bool
+     select CADENCE
+     select MSI_NONBROKEN
+-    select SIFIVE_CLINT
++    select RISCV_ACLINT
+     select SIFIVE_GPIO
+     select SIFIVE_PDMA
+     select SIFIVE_PLIC
+@@ -100,4 +100,4 @@ config STARFIVE_U
+     select SIFIVE_U_PRCI
+     select SSI_M25P80
+     select SSI_SD
+-    select UNIMP
+\ No newline at end of file
++    select UNIMP
+diff --git a/hw/riscv/starfive_u.c b/hw/riscv/starfive_u.c
+index c8e27ab805..0a143a59cf 100644
+--- a/hw/riscv/starfive_u.c
++++ b/hw/riscv/starfive_u.c
+@@ -35,7 +35,6 @@
+  */
+ 
+ #include "qemu/osdep.h"
+-#include "qemu/log.h"
+ #include "qemu/error-report.h"
+ #include "qapi/error.h"
+ #include "qapi/visitor.h"
+@@ -52,18 +51,19 @@
+ #include "hw/riscv/starfive_u.h"
+ #include "hw/riscv/boot.h"
+ #include "hw/char/sifive_uart.h"
+-#include "hw/intc/sifive_clint.h"
++#include "hw/intc/riscv_aclint.h"
+ #include "hw/intc/sifive_plic.h"
+ #include "hw/misc/sifive_test.h"
+ #include "chardev/char.h"
+ #include "net/eth.h"
+-#include "sysemu/arch_init.h"
+ #include "sysemu/device_tree.h"
+ #include "sysemu/runstate.h"
+ #include "sysemu/sysemu.h"
+ 
+ #include <libfdt.h>
+ 
++/* CLINT timebase frequency */
++#define CLINT_TIMEBASE_FREQ 1000000
+ static const MemMapEntry starfive_u_memmap[] = {
+     [STARFIVE_U_DEV_DEBUG] =    {        0x0,      0x100 },
+     [STARFIVE_U_DEV_MROM] =     {     0x1000,     0xf000 },
+@@ -98,9 +98,15 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+     int cpu;
+     uint32_t *cells;
+     char *nodename;
+-    char ethclk_names[] = "pclk\0hclk";
+     uint32_t plic_phandle, prci_phandle, gpio_phandle, phandle = 1;
+     uint32_t hfclk_phandle, rtcclk_phandle, phy_phandle;
++    static const char * const ethclk_names[2] = { "pclk", "hclk" };
++    static const char * const clint_compat[2] = {
++        "sifive,clint0", "riscv,clint0"
++    };
++    static const char * const plic_compat[2] = {
++        "sifive,plic-1.0.0", "riscv,plic0"
++    };
+ 
+     if (ms->dtb) {
+         fdt = s->fdt = load_device_tree(ms->dtb, &s->fdt_size);
+@@ -162,7 +168,7 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+ 
+     qemu_fdt_add_subnode(fdt, "/cpus");
+     qemu_fdt_setprop_cell(fdt, "/cpus", "timebase-frequency",
+-        SIFIVE_CLINT_TIMEBASE_FREQ);
++        CLINT_TIMEBASE_FREQ);
+     qemu_fdt_setprop_cell(fdt, "/cpus", "#size-cells", 0x0);
+     qemu_fdt_setprop_cell(fdt, "/cpus", "#address-cells", 0x1);
+ 
+@@ -212,7 +218,8 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+     nodename = g_strdup_printf("/soc/clint@%lx",
+         (long)memmap[STARFIVE_U_DEV_CLINT].base);
+     qemu_fdt_add_subnode(fdt, nodename);
+-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,clint0");
++    qemu_fdt_setprop_string_array(fdt, nodename, "compatible",
++        (char **)&clint_compat, ARRAY_SIZE(clint_compat));
+     qemu_fdt_setprop_cells(fdt, nodename, "reg",
+         0x0, memmap[STARFIVE_U_DEV_CLINT].base,
+         0x0, memmap[STARFIVE_U_DEV_CLINT].size);
+@@ -269,7 +276,8 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+         (long)memmap[STARFIVE_U_DEV_PLIC].base);
+     qemu_fdt_add_subnode(fdt, nodename);
+     qemu_fdt_setprop_cell(fdt, nodename, "#interrupt-cells", 1);
+-    qemu_fdt_setprop_string(fdt, nodename, "compatible", "riscv,plic0");
++    qemu_fdt_setprop_string_array(fdt, nodename, "compatible",
++        (char **)&plic_compat, ARRAY_SIZE(plic_compat));
+     qemu_fdt_setprop(fdt, nodename, "interrupt-controller", NULL, 0);
+     qemu_fdt_setprop(fdt, nodename, "interrupts-extended",
+         cells, (ms->smp.cpus * 4 - 2) * sizeof(uint32_t));
+@@ -415,8 +423,8 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+     qemu_fdt_setprop_cell(fdt, nodename, "interrupts", STARFIVE_U_GEM_IRQ);
+     qemu_fdt_setprop_cells(fdt, nodename, "clocks",
+         prci_phandle, PRCI_CLK_GEMGXLPLL, prci_phandle, PRCI_CLK_GEMGXLPLL);
+-    qemu_fdt_setprop(fdt, nodename, "clock-names", ethclk_names,
+-        sizeof(ethclk_names));
++    qemu_fdt_setprop_string_array(fdt, nodename, "clock-names",
++        (char **)&ethclk_names, ARRAY_SIZE(ethclk_names));
+     qemu_fdt_setprop(fdt, nodename, "local-mac-address",
+         s->soc.gem.conf.macaddr.a, ETH_ALEN);
+     qemu_fdt_setprop_cell(fdt, nodename, "#address-cells", 1);
+@@ -468,7 +476,7 @@ static void create_fdt(StarFiveUState *s, const MemMapEntry *memmap,
+     g_free(nodename);
+ 
+ update_bootargs:
+-    if (cmdline) {
++    if (cmdline && *cmdline) {
+         qemu_fdt_setprop_string(fdt, "/chosen", "bootargs", cmdline);
+     }
+ }
+@@ -486,7 +494,6 @@ static void starfive_u_machine_init(MachineState *machine)
+     const MemMapEntry *memmap = starfive_u_memmap;
+     StarFiveUState *s = RISCV_U_MACHINE(machine);
+     MemoryRegion *system_memory = get_system_memory();
+-    MemoryRegion *main_mem = g_new(MemoryRegion, 1);
+     MemoryRegion *flash0 = g_new(MemoryRegion, 1);
+     target_ulong start_addr = memmap[STARFIVE_U_DEV_DRAM].base;
+     target_ulong firmware_end_addr, kernel_start_addr;
+@@ -504,13 +511,11 @@ static void starfive_u_machine_init(MachineState *machine)
+                              &error_abort);
+     object_property_set_str(OBJECT(&s->soc), "cpu-type", machine->cpu_type,
+                              &error_abort);
+-    qdev_realize(DEVICE(&s->soc), NULL, &error_abort);
++    qdev_realize(DEVICE(&s->soc), NULL, &error_fatal);
+ 
+     /* register RAM */
+-    memory_region_init_ram(main_mem, NULL, "riscv.starfive.u.ram",
+-                           machine->ram_size, &error_fatal);
+     memory_region_add_subregion(system_memory, memmap[STARFIVE_U_DEV_DRAM].base,
+-                                main_mem);
++                                machine->ram);
+ 
+     /* register QSPI0 Flash */
+     memory_region_init_ram(flash0, NULL, "riscv.starfive.u.flash0",
+@@ -555,12 +560,10 @@ static void starfive_u_machine_init(MachineState *machine)
+ 
+     if (riscv_is_32bit(&s->soc.u_cpus)) {
+         firmware_end_addr = riscv_find_and_load_firmware(machine,
+-                                    "opensbi-riscv32-generic-fw_dynamic.bin",
+-                                    start_addr, NULL);
++                                    RISCV32_BIOS_BIN, start_addr, NULL);
+     } else {
+         firmware_end_addr = riscv_find_and_load_firmware(machine,
+-                                    "opensbi-riscv64-generic-fw_dynamic.bin",
+-                                    start_addr, NULL);
++                                    RISCV64_BIOS_BIN, start_addr, NULL);
+     }
+ 
+     if (machine->kernel_filename) {
+@@ -595,11 +598,14 @@ static void starfive_u_machine_init(MachineState *machine)
+         start_addr_hi32 = (uint64_t)start_addr >> 32;
+     }
+ 
++    /* Set machine->fdt for 'dumpdtb' QMP/HMP command */
++    machine->fdt = s->fdt;
++
+     /* reset vector */
+-    uint32_t reset_vec[11] = {
++    uint32_t reset_vec[12] = {
+         s->msel,                       /* MSEL pin state */
+         0x00000297,                    /* 1:  auipc  t0, %pcrel_hi(fw_dyn) */
+-        0x02828613,                    /*     addi   a2, t0, %pcrel_lo(1b) */
++        0x02c28613,                    /*     addi   a2, t0, %pcrel_lo(1b) */
+         0xf1402573,                    /*     csrr   a0, mhartid  */
+         0,
+         0,
+@@ -607,6 +613,7 @@ static void starfive_u_machine_init(MachineState *machine)
+         start_addr,                    /* start: .dword */
+         start_addr_hi32,
+         fdt_load_addr,                 /* fdt_laddr: .dword */
++        0x00000000,
+         0x00000000,
+                                        /* fw_dyn: */
+     };
+@@ -632,7 +639,7 @@ static void starfive_u_machine_init(MachineState *machine)
+ 
+     /* Connect an SPI flash to SPI0 */
+     flash_dev = qdev_new("is25wp256");
+-    dinfo = drive_get_next(IF_MTD);
++    dinfo = drive_get(IF_MTD, 0, 0);
+     if (dinfo) {
+         qdev_prop_set_drive_err(flash_dev, "drive",
+                                 blk_by_legacy_dinfo(dinfo),
+@@ -664,36 +671,20 @@ static void starfive_u_machine_set_start_in_flash(Object *obj, bool value, Error
+     s->start_in_flash = value;
+ }
+ 
+-static void starfive_u_machine_get_uint32_prop(Object *obj, Visitor *v,
+-                                             const char *name, void *opaque,
+-                                             Error **errp)
+-{
+-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
+-}
+-
+-static void starfive_u_machine_set_uint32_prop(Object *obj, Visitor *v,
+-                                             const char *name, void *opaque,
+-                                             Error **errp)
+-{
+-    visit_type_uint32(v, name, (uint32_t *)opaque, errp);
+-}
+-
+ static void starfive_u_machine_instance_init(Object *obj)
+ {
+     StarFiveUState *s = RISCV_U_MACHINE(obj);
+ 
+     s->start_in_flash = false;
+     s->msel = 0;
+-    object_property_add(obj, "msel", "uint32",
+-                        starfive_u_machine_get_uint32_prop,
+-                        starfive_u_machine_set_uint32_prop, NULL, &s->msel);
++    object_property_add_uint32_ptr(obj, "msel", &s->msel,
++                                   OBJ_PROP_FLAG_READWRITE);
+     object_property_set_description(obj, "msel",
+                                     "Mode Select (MSEL[3:0]) pin state");
+ 
+     s->serial = OTP_SERIAL;
+-    object_property_add(obj, "serial", "uint32",
+-                        starfive_u_machine_get_uint32_prop,
+-                        starfive_u_machine_set_uint32_prop, NULL, &s->serial);
++    object_property_add_uint32_ptr(obj, "serial", &s->serial,
++                                   OBJ_PROP_FLAG_READWRITE);
+     object_property_set_description(obj, "serial", "Board serial number");
+ }
+ 
+@@ -707,6 +698,7 @@ static void starfive_u_machine_class_init(ObjectClass *oc, void *data)
+     mc->min_cpus = STARFIVE_U_MANAGEMENT_CPU_COUNT;
+     mc->default_cpu_type = SIFIVE_U_CPU;
+     mc->default_cpus = mc->min_cpus;
++    mc->default_ram_id = "riscv.sifive.u.ram";
+ 
+     object_class_property_add_bool(oc, "start-in-flash",
+                                    starfive_u_machine_get_start_in_flash,
+@@ -759,7 +751,6 @@ static void starfive_u_soc_realize(DeviceState *dev, Error **errp)
+     MemoryRegion *mask_rom = g_new(MemoryRegion, 1);
+     MemoryRegion *l2lim_mem = g_new(MemoryRegion, 1);
+     char *plic_hart_config;
+-    size_t plic_hart_config_len;
+     int i;
+     NICInfo *nd = &nd_table[0];
+ 
+@@ -768,7 +759,7 @@ static void starfive_u_soc_realize(DeviceState *dev, Error **errp)
+     qdev_prop_set_string(DEVICE(&s->u_cpus), "cpu-type", s->cpu_type);
+     qdev_prop_set_uint64(DEVICE(&s->u_cpus), "resetvec", 0x1004);
+ 
+-    sysbus_realize(SYS_BUS_DEVICE(&s->u_cpus), &error_abort);
++    sysbus_realize(SYS_BUS_DEVICE(&s->u_cpus), &error_fatal);
+     /*
+      * The cluster must be realized after the RISC-V hart array container,
+      * as the container's CPU object is only created on realize, and the
+@@ -798,22 +789,11 @@ static void starfive_u_soc_realize(DeviceState *dev, Error **errp)
+                                 l2lim_mem);
+ 
+     /* create PLIC hart topology configuration string */
+-    plic_hart_config_len = (strlen(STARFIVE_U_PLIC_HART_CONFIG) + 1) *
+-                           ms->smp.cpus;
+-    plic_hart_config = g_malloc0(plic_hart_config_len);
+-    for (i = 0; i < ms->smp.cpus; i++) {
+-        if (i != 0) {
+-            strncat(plic_hart_config, "," STARFIVE_U_PLIC_HART_CONFIG,
+-                    plic_hart_config_len);
+-        } else {
+-            strncat(plic_hart_config, "M", plic_hart_config_len);
+-        }
+-        plic_hart_config_len -= (strlen(STARFIVE_U_PLIC_HART_CONFIG) + 1);
+-    }
++    plic_hart_config = riscv_plic_hart_config_string(ms->smp.cpus);
+ 
+     /* MMIO */
+     s->plic = sifive_plic_create(memmap[STARFIVE_U_DEV_PLIC].base,
+-        plic_hart_config, 0,
++        plic_hart_config, ms->smp.cpus, 0,
+         STARFIVE_U_PLIC_NUM_SOURCES,
+         STARFIVE_U_PLIC_NUM_PRIORITIES,
+         STARFIVE_U_PLIC_PRIORITY_BASE,
+@@ -828,10 +808,13 @@ static void starfive_u_soc_realize(DeviceState *dev, Error **errp)
+         serial_hd(0), qdev_get_gpio_in(DEVICE(s->plic), STARFIVE_U_UART0_IRQ));
+     sifive_uart_create(system_memory, memmap[STARFIVE_U_DEV_UART1].base,
+         serial_hd(1), qdev_get_gpio_in(DEVICE(s->plic), STARFIVE_U_UART1_IRQ));
+-    sifive_clint_create(memmap[STARFIVE_U_DEV_CLINT].base,
+-        memmap[STARFIVE_U_DEV_CLINT].size, 0, ms->smp.cpus,
+-        SIFIVE_SIP_BASE, SIFIVE_TIMECMP_BASE, SIFIVE_TIME_BASE,
+-        SIFIVE_CLINT_TIMEBASE_FREQ, false);
++    riscv_aclint_swi_create(memmap[STARFIVE_U_DEV_CLINT].base, 0,
++        ms->smp.cpus, false);
++    riscv_aclint_mtimer_create(memmap[STARFIVE_U_DEV_CLINT].base +
++            RISCV_ACLINT_SWI_SIZE,
++        RISCV_ACLINT_DEFAULT_MTIMER_SIZE, 0, ms->smp.cpus,
++        RISCV_ACLINT_DEFAULT_MTIMECMP, RISCV_ACLINT_DEFAULT_MTIME,
++        CLINT_TIMEBASE_FREQ, false);
+     sifive_test_create(memmap[STARFIVE_U_DEV_TEST].base);
+ 
+     if (!sysbus_realize(SYS_BUS_DEVICE(&s->prci), errp)) {
+-- 
+2.25.1
+

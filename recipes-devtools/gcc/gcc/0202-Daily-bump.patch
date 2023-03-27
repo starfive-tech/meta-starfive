@@ -1,0 +1,72 @@
+From 253a85be59cba7fd9243b0b3e14b1ed5001acc81 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 9 Nov 2022 00:23:44 +0000
+Subject: [PATCH 202/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 9 +++++++++
+ gcc/DATESTAMP           | 2 +-
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ libstdc++-v3/ChangeLog  | 9 +++++++++
+ 4 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index aad5bc1784b..d9026205824 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-08  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2022-10-25  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/107304
++	* expr.cc (get_inner_reference): Always use TYPE_MODE for vector
++	field with vector raw mode.
++
+ 2022-11-07  Cui,Lili  <lili.cui@intel.com>
+ 
+ 	* config/i386/driver-i386.cc (host_detect_local_cpu):
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f47121e1a89..c240fbb06eb 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221108
++20221109
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f40f824c3c6..132be7e6e82 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-11-08  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2022-10-25  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/107304
++	* gcc.target/i386/pr107304.c: New test.
++
+ 2022-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* gnat.dg/opt99.adb: New test.
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 7c1f69516dc..f4cb4c04090 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-08  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-08  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/xml/authors.xml: Remove empty author element.
++	* doc/xml/manual/spine.xml: Likewise.
++	* doc/html/manual/index.html: Regenerate.
++
+ 2022-10-19  Alexandre Oliva  <oliva@adacore.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

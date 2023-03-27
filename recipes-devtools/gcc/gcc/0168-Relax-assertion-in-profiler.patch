@@ -1,0 +1,92 @@
+From da1f6e5260dbcce59372cb522e1af763f25eed6b Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 25 Oct 2022 12:20:33 +0200
+Subject: [PATCH 168/547] Relax assertion in profiler
+
+This assertion in branch_prob:
+
+  if (bb == ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb)
+    {
+      location_t loc = DECL_SOURCE_LOCATION (current_function_decl);
+      gcc_checking_assert (!RESERVED_LOCATION_P (loc));
+
+had been correct until the fix for PR debug/101598 was installed.
+
+gcc/
+	* profile.cc (branch_prob): Be prepared for ignored functions with
+	DECL_SOURCE_LOCATION set to UNKNOWN_LOCATION.
+
+gcc/testsuite:
+	* gnat.dg/specs/coverage1.ads: New test.
+	* gnat.dg/specs/variant_part.ads: Minor tweak.
+	* gnat.dg/specs/weak1.ads: Add dg directive.
+---
+ gcc/profile.cc                               | 12 +++++++-----
+ gcc/testsuite/gnat.dg/specs/coverage1.ads    | 10 ++++++++++
+ gcc/testsuite/gnat.dg/specs/variant_part.ads |  1 +
+ gcc/testsuite/gnat.dg/specs/weak1.ads        |  2 ++
+ 4 files changed, 20 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gnat.dg/specs/coverage1.ads
+
+diff --git a/gcc/profile.cc b/gcc/profile.cc
+index a67cce5b199..40e105258fa 100644
+--- a/gcc/profile.cc
++++ b/gcc/profile.cc
+@@ -1457,11 +1457,13 @@ branch_prob (bool thunk)
+ 	  if (bb == ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb)
+ 	    {
+ 	      location_t loc = DECL_SOURCE_LOCATION (current_function_decl);
+-	      gcc_checking_assert (!RESERVED_LOCATION_P (loc));
+-	      seen_locations.add (loc);
+-	      expanded_location curr_location = expand_location (loc);
+-	      output_location (&streamed_locations, curr_location.file,
+-			       MAX (1, curr_location.line), &offset, bb);
++	      if (!RESERVED_LOCATION_P (loc))
++		{
++		  seen_locations.add (loc);
++		  expanded_location curr_location = expand_location (loc);
++		  output_location (&streamed_locations, curr_location.file,
++				   MAX (1, curr_location.line), &offset, bb);
++		}
+ 	    }
+ 
+ 	  for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+diff --git a/gcc/testsuite/gnat.dg/specs/coverage1.ads b/gcc/testsuite/gnat.dg/specs/coverage1.ads
+new file mode 100644
+index 00000000000..af7b61ce4e6
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/coverage1.ads
+@@ -0,0 +1,10 @@
++-- { dg-do compile }
++-- { dg-options "-ftest-coverage" }
++
++package Coverage1 is
++
++  type Rec is record
++    I : Integer := 0;
++  end record;
++
++end Coverage1;
+diff --git a/gcc/testsuite/gnat.dg/specs/variant_part.ads b/gcc/testsuite/gnat.dg/specs/variant_part.ads
+index afc92cde5d7..72da4108588 100644
+--- a/gcc/testsuite/gnat.dg/specs/variant_part.ads
++++ b/gcc/testsuite/gnat.dg/specs/variant_part.ads
+@@ -1,4 +1,5 @@
+ -- { dg-do compile }
++
+ package Variant_Part is
+    type T1(b: boolean) is record
+      case (b) is    -- { dg-error "discriminant name may not be parenthesized" }
+diff --git a/gcc/testsuite/gnat.dg/specs/weak1.ads b/gcc/testsuite/gnat.dg/specs/weak1.ads
+index 82cddc09ac2..ece05ea68a7 100644
+--- a/gcc/testsuite/gnat.dg/specs/weak1.ads
++++ b/gcc/testsuite/gnat.dg/specs/weak1.ads
+@@ -1,3 +1,5 @@
++-- { dg-do compile }
++
+ package Weak1 is
+ 
+    Myconst : constant Integer := 1234;
+-- 
+2.25.1
+

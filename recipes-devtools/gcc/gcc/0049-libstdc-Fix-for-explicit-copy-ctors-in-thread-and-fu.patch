@@ -1,0 +1,147 @@
+From 47f0bd269403762ddb71b8c6165b30ace4f70a8b Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Mon, 22 Aug 2022 15:42:17 +0100
+Subject: [PATCH 049/547] libstdc++: Fix for explicit copy ctors in <thread>
+ and <future> [PR106695]
+
+When I changed std::thread and std::async to avoid unnecessary move
+construction of temporaries, I introduced a regression where types with
+an explicit copy constructor could not be passed to std::thread or
+std::async. The fix is to add a constructor instead of using aggregate
+initialization of an unnamed temporary.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/106695
+	* include/bits/std_thread.h (thread::_State_impl): Forward
+	individual arguments to _Invoker constructor.
+	(thread::_Invoker): Add constructor. Delete copies.
+	* include/std/future (__future_base::_Deferred_state): Forward
+	individual arguments to _Invoker constructor.
+	(__future_base::_Async_state_impl): Likewise.
+	* testsuite/30_threads/async/106695.cc: New test.
+	* testsuite/30_threads/thread/106695.cc: New test.
+
+(cherry picked from commit 5abe0657553580bd1b7488dd84d55138a8d9f23c)
+---
+ libstdc++-v3/include/bits/std_thread.h        |  8 ++++-
+ libstdc++-v3/include/std/future               |  4 +--
+ .../testsuite/30_threads/async/106695.cc      | 29 +++++++++++++++++++
+ .../testsuite/30_threads/thread/106695.cc     | 21 ++++++++++++++
+ 4 files changed, 59 insertions(+), 3 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/30_threads/async/106695.cc
+ create mode 100644 libstdc++-v3/testsuite/30_threads/thread/106695.cc
+
+diff --git a/libstdc++-v3/include/bits/std_thread.h b/libstdc++-v3/include/bits/std_thread.h
+index dd625de3bc3..6adf5e6b467 100644
+--- a/libstdc++-v3/include/bits/std_thread.h
++++ b/libstdc++-v3/include/bits/std_thread.h
+@@ -203,7 +203,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+ 	template<typename... _Args>
+ 	  _State_impl(_Args&&... __args)
+-	  : _M_func{{std::forward<_Args>(__args)...}}
++	  : _M_func(std::forward<_Args>(__args)...)
+ 	  { }
+ 
+ 	void
+@@ -237,6 +237,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     template<typename _Tuple>
+       struct _Invoker
+       {
++	template<typename... _Args>
++	  explicit
++	  _Invoker(_Args&&... __args)
++	  : _M_t(std::forward<_Args>(__args)...)
++	  { }
++
+ 	_Tuple _M_t;
+ 
+ 	template<typename>
+diff --git a/libstdc++-v3/include/std/future b/libstdc++-v3/include/std/future
+index 3bdbc636f69..6cda28c84cf 100644
+--- a/libstdc++-v3/include/std/future
++++ b/libstdc++-v3/include/std/future
+@@ -1659,7 +1659,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	explicit
+ 	_Deferred_state(_Args&&... __args)
+ 	: _M_result(new _Result<_Res>()),
+-	  _M_fn{{std::forward<_Args>(__args)...}}
++	  _M_fn(std::forward<_Args>(__args)...)
+ 	{ }
+ 
+     private:
+@@ -1726,7 +1726,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	explicit
+ 	_Async_state_impl(_Args&&... __args)
+ 	: _M_result(new _Result<_Res>()),
+-	  _M_fn{{std::forward<_Args>(__args)...}}
++	  _M_fn(std::forward<_Args>(__args)...)
+ 	{
+ 	  _M_thread = std::thread{&_Async_state_impl::_M_run, this};
+ 	}
+diff --git a/libstdc++-v3/testsuite/30_threads/async/106695.cc b/libstdc++-v3/testsuite/30_threads/async/106695.cc
+new file mode 100644
+index 00000000000..74996342dc7
+--- /dev/null
++++ b/libstdc++-v3/testsuite/30_threads/async/106695.cc
+@@ -0,0 +1,29 @@
++// { dg-do compile { target c++11 } }
++// { dg-require-gthreads "" }
++
++// PR libstdc++/106695
++// Explicit copy constructor does not work for a parameter passed via std::async
++
++#include <future>
++
++struct A {
++  A() = default;
++  explicit A(const A&) = default;
++};
++
++void func(const A&) { }
++
++void
++test_async()
++{
++  (void) std::async(std::launch::async, func, A{});
++  (void) std::async(std::launch::deferred, func, A{});
++  (void) std::async(func, A{});
++}
++
++void
++test_task()
++{
++  std::packaged_task<void(const A&)> task(func);
++  task(A{});
++}
+diff --git a/libstdc++-v3/testsuite/30_threads/thread/106695.cc b/libstdc++-v3/testsuite/30_threads/thread/106695.cc
+new file mode 100644
+index 00000000000..97e9e922d8e
+--- /dev/null
++++ b/libstdc++-v3/testsuite/30_threads/thread/106695.cc
+@@ -0,0 +1,21 @@
++// { dg-do compile { target c++11 } }
++// { dg-require-gthreads "" }
++
++// PR libstdc++/106695
++// Explicit copy constructor does not work for a parameter passed via std::async
++
++#include <thread>
++
++struct A {
++  A() = default;
++  explicit A(const A&) = default;
++};
++
++void func(const A&) { }
++
++void
++test_thread()
++{
++  std::thread t(func, A{});
++  t.join();
++}
+-- 
+2.25.1
+

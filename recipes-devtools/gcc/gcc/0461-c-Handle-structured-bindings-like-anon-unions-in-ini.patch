@@ -1,0 +1,142 @@
+From c153fb6a5bda225fcfb34e17994a31b65616a6db Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 24 Jan 2023 11:28:00 +0100
+Subject: [PATCH 461/547] c++: Handle structured bindings like anon unions in
+ initializers [PR108474]
+
+As reported by Andrew Pinski, structured bindings (with the exception
+of the ones using std::tuple_{size,element} and get which are really
+standalone variables in addition to the binding one) also use
+DECL_VALUE_EXPR and needs the same treatment in static initializers.
+
+On Sun, Jan 22, 2023 at 07:19:07PM -0500, Jason Merrill wrote:
+> Though, actually, why not instead fix expand_expr_real_1 (and staticp) to
+> look through DECL_VALUE_EXPR?
+
+Doing it when emitting the initializers seems to be too late to me,
+we in various spots try to put parts of the static var DECL_INITIAL expressions
+into the IL, or e.g. for varpool purposes remember which vars are referenced
+there.
+
+This patch moves it to record_reference, which is called from varpool_node::analyze
+and so about the same time as gimplification of the bodies which also
+replaces DECL_VALUE_EXPRs.
+
+2023-01-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108474
+	* cp-gimplify.cc (cp_fold_r): Handle structured bindings
+	vars like anon union artificial vars.
+
+	* g++.dg/cpp1z/decomp57.C: New test.
+	* g++.dg/cpp1z/decomp58.C: New test.
+
+(cherry picked from commit b84e21115700523b4d0ac44275443f7b9c670344)
+---
+ gcc/cp/cp-gimplify.cc                 |  8 ++++--
+ gcc/testsuite/g++.dg/cpp1z/decomp57.C | 27 +++++++++++++++++++
+ gcc/testsuite/g++.dg/cpp1z/decomp58.C | 39 +++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1z/decomp57.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp1z/decomp58.C
+
+diff --git a/gcc/cp/cp-gimplify.cc b/gcc/cp/cp-gimplify.cc
+index 426b373689e..c0a79e20749 100644
+--- a/gcc/cp/cp-gimplify.cc
++++ b/gcc/cp/cp-gimplify.cc
+@@ -1006,8 +1006,12 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
+ 
+     case VAR_DECL:
+       /* In initializers replace anon union artificial VAR_DECLs
+-	 with their DECL_VALUE_EXPRs, as nothing will do it later.  */
+-      if (DECL_ANON_UNION_VAR_P (stmt) && !data->genericize)
++	 with their DECL_VALUE_EXPRs, as nothing will do it later.
++	 Ditto for structured bindings.  */
++      if (!data->genericize
++	  && DECL_HAS_VALUE_EXPR_P (stmt)
++	  && (DECL_ANON_UNION_VAR_P (stmt)
++	      || (DECL_DECOMPOSITION_P (stmt) && DECL_DECOMP_BASE (stmt))))
+ 	{
+ 	  *stmt_p = stmt = unshare_expr (DECL_VALUE_EXPR (stmt));
+ 	  break;
+diff --git a/gcc/testsuite/g++.dg/cpp1z/decomp57.C b/gcc/testsuite/g++.dg/cpp1z/decomp57.C
+new file mode 100644
+index 00000000000..923862e78d1
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/decomp57.C
+@@ -0,0 +1,27 @@
++// PR c++/108474
++// { dg-do link { target c++17 } }
++
++struct T { int i, j; };
++T h;
++auto [i, j] = h;
++int &r = i;
++int s = i;
++int *t = &i;
++
++void
++foo (int **p, int *q)
++{
++  static int &u = i;
++  static int v = i;
++  static int *w = &i;
++  int &x = i;
++  int y = i;
++  int *z = &i;
++  *p = &i;
++  *q = i;
++}
++
++int
++main ()
++{
++}
+diff --git a/gcc/testsuite/g++.dg/cpp1z/decomp58.C b/gcc/testsuite/g++.dg/cpp1z/decomp58.C
+new file mode 100644
+index 00000000000..b2604373bde
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/decomp58.C
+@@ -0,0 +1,39 @@
++// PR c++/108474
++// { dg-do link { target c++17 } }
++
++namespace std {
++  template <typename T> struct tuple_size;
++  template <int, typename> struct tuple_element;
++}
++
++struct A {
++  int i;
++  template <int I> int& get() { return i; }
++};
++
++template <> struct std::tuple_size <A> { static const int value = 2; };
++template <int I> struct std::tuple_element <I, A> { using type = int; };
++
++struct A a;
++auto [i, j] = a;
++int &r = i;
++int s = i;
++int *t = &i;
++
++void
++foo (int **p, int *q)
++{
++  static int &u = i;
++  static int v = i;
++  static int *w = &i;
++  int &x = i;
++  int y = i;
++  int *z = &i;
++  *p = &i;
++  *q = i;
++}
++
++int
++main ()
++{
++}
+-- 
+2.25.1
+

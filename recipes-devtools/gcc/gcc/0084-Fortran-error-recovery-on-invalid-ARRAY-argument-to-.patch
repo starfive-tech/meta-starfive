@@ -1,0 +1,53 @@
+From 84a34d76a76f27feabd4523e388068c90c2bb2e4 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 20 Sep 2022 22:41:48 +0200
+Subject: [PATCH 084/547] Fortran: error recovery on invalid ARRAY argument to
+ FINDLOC [PR106986]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/106986
+	* simplify.cc (gfc_simplify_findloc): Do not try to simplify
+	intrinsic FINDLOC when the ARRAY argument has a NULL shape.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/106986
+	* gfortran.dg/pr106986.f90: New test.
+
+(cherry picked from commit 5976fbf9d5dd9542fcb82eebb2185886fd52d000)
+---
+ gcc/fortran/simplify.cc                | 1 +
+ gcc/testsuite/gfortran.dg/pr106986.f90 | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr106986.f90
+
+diff --git a/gcc/fortran/simplify.cc b/gcc/fortran/simplify.cc
+index 0eff5a546cc..a6a3e94fbd9 100644
+--- a/gcc/fortran/simplify.cc
++++ b/gcc/fortran/simplify.cc
+@@ -5857,6 +5857,7 @@ gfc_simplify_findloc (gfc_expr *array, gfc_expr *value, gfc_expr *dim,
+   bool back_val = false;
+ 
+   if (!is_constant_array_expr (array)
++      || array->shape == NULL
+       || !gfc_is_constant_expr (dim))
+     return NULL;
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr106986.f90 b/gcc/testsuite/gfortran.dg/pr106986.f90
+new file mode 100644
+index 00000000000..a309b25d181
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr106986.f90
+@@ -0,0 +1,8 @@
++! { dg-do compile }
++! PR fortran/106986 - ICE in simplify_findloc_nodim
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a(:) = [1] ! { dg-error "deferred shape" }
++  print *, findloc (a, 1)
++end
+-- 
+2.25.1
+

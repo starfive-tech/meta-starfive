@@ -1,0 +1,177 @@
+From 45b346664c0af57053e77276cd030015eb21f851 Mon Sep 17 00:00:00 2001
+From: Siddhesh Poyarekar <siddhesh@gotplt.org>
+Date: Thu, 26 Jan 2023 07:07:03 -0500
+Subject: [PATCH 415/547] tree-optimization/108522 Use
+ component_ref_field_offset
+
+Instead of using TREE_OPERAND (expr, 2) directly, use
+component_ref_field_offset instead, which does scaling for us.  The
+function also substitutes PLACEHOLDER_EXPRs but it is not relevant for
+tree-object-size.
+
+gcc/ChangeLog:
+
+	PR tree-optimization/108522
+	* tree-object-size.cc (compute_object_offset): Make EXPR
+	argument non-const.  Call component_ref_field_offset.
+
+gcc/testsuite/ChangeLog:
+
+	PR tree-optimization/108522
+	* gcc.dg/builtin-dynamic-object-size-0.c (DEFSTRUCT): New
+	macro.
+	(test_dynarray_struct_member_b, test_dynarray_struct_member_c,
+	test_dynarray_struct_member_d,
+	test_dynarray_struct_member_subobj_b,
+	test_dynarray_struct_member_subobj_c,
+	test_dynarray_struct_member_subobj_d): New tests.
+	(main): Call them.
+
+Signed-off-by: Siddhesh Poyarekar <siddhesh@gotplt.org>
+(cherry picked from commit 0573a0778af88e805f7630ac8640ecd67d692665)
+---
+ .../gcc.dg/builtin-dynamic-object-size-0.c    | 81 +++++++++++++++++--
+ gcc/tree-object-size.cc                       |  7 +-
+ 2 files changed, 77 insertions(+), 11 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/builtin-dynamic-object-size-0.c b/gcc/testsuite/gcc.dg/builtin-dynamic-object-size-0.c
+index 2dd81c8d2fa..d6942c4b38c 100644
+--- a/gcc/testsuite/gcc.dg/builtin-dynamic-object-size-0.c
++++ b/gcc/testsuite/gcc.dg/builtin-dynamic-object-size-0.c
+@@ -315,19 +315,70 @@ test_dynarray_struct_subobj2 (size_t sz, size_t off, size_t *objsz)
+ }
+ 
+ /* See pr #108522.  */
++
++#define DEFSTRUCT(_s, _n) \
++  struct DS								      \
++    {									      \
++      char a[_n];							      \
++      unsigned long long b;						      \
++      int c;								      \
++      char d[2 * _n];							      \
++    } _s
++
+ size_t
+ __attribute__ ((noinline))
+-test_dynarray_struct_member (size_t sz)
++test_dynarray_struct_member_b (size_t sz)
+ {
+-  struct
+-    {
+-      char a[sz];
+-      char b;
+-    } s;
++  DEFSTRUCT (s, sz);
+ 
+   return __builtin_dynamic_object_size (&s.b, 0);
+ }
+ 
++size_t
++__attribute__ ((noinline))
++test_dynarray_struct_member_c (size_t sz)
++{
++  DEFSTRUCT (s, sz);
++
++  return __builtin_dynamic_object_size (&s.c, 0);
++}
++
++size_t
++__attribute__ ((noinline))
++test_dynarray_struct_member_d (size_t sz, size_t offset)
++{
++  DEFSTRUCT (s, sz);
++
++  return __builtin_dynamic_object_size (&s.d[offset], 0);
++}
++
++size_t
++__attribute__ ((noinline))
++test_dynarray_struct_member_subobj_b (size_t sz)
++{
++  DEFSTRUCT (s, sz);
++
++  return __builtin_dynamic_object_size (&s.b, 1);
++}
++
++size_t
++__attribute__ ((noinline))
++test_dynarray_struct_member_subobj_c (size_t sz)
++{
++  DEFSTRUCT (s, sz);
++
++  return __builtin_dynamic_object_size (&s.c, 1);
++}
++
++size_t
++__attribute__ ((noinline))
++test_dynarray_struct_member_subobj_d (size_t sz, size_t offset)
++{
++  DEFSTRUCT (s, sz);
++
++  return __builtin_dynamic_object_size (&s.d[offset], 1);
++}
++
+ size_t
+ __attribute__ ((noinline))
+ test_substring (size_t sz, size_t off)
+@@ -587,7 +638,23 @@ main (int argc, char **argv)
+   if (test_dynarray_struct_subobj2 (42, 4, &objsz)
+     != objsz - 4 - sizeof (long) - sizeof (int))
+     FAIL ();
+-  if (test_dynarray_struct_member (42) != sizeof (char))
++  DEFSTRUCT(ds, 64);
++  const size_t n = sizeof (ds.a);
++  if (test_dynarray_struct_member_b (n)
++      != sizeof (ds) - __builtin_offsetof (struct DS, b))
++    FAIL ();
++  if (test_dynarray_struct_member_c (n)
++      != sizeof (ds) - __builtin_offsetof (struct DS, c))
++    FAIL ();
++  if (test_dynarray_struct_member_d (n, 0)
++      != sizeof (ds) - __builtin_offsetof (struct DS, d))
++    FAIL ();
++  if (test_dynarray_struct_member_subobj_b (n) != sizeof (ds.b))
++    FAIL ();
++  if (test_dynarray_struct_member_subobj_c (n) != sizeof (ds.c))
++    FAIL ();
++  if (test_dynarray_struct_member_subobj_d (n, n - 2)
++      != sizeof (ds) - __builtin_offsetof (struct DS, d) - n + 2)
+     FAIL ();
+   if (test_substring_ptrplus (128, 4) != (128 - 4) * sizeof (int))
+     FAIL ();
+diff --git a/gcc/tree-object-size.cc b/gcc/tree-object-size.cc
+index b83d5b1c93e..91db1238f50 100644
+--- a/gcc/tree-object-size.cc
++++ b/gcc/tree-object-size.cc
+@@ -56,7 +56,7 @@ struct GTY(()) object_size
+   tree wholesize;
+ };
+ 
+-static tree compute_object_offset (const_tree, const_tree);
++static tree compute_object_offset (tree, const_tree);
+ static bool addr_object_size (struct object_size_info *,
+ 			      const_tree, int, tree *, tree *t = NULL);
+ static tree alloc_object_size (const gcall *, int);
+@@ -392,7 +392,7 @@ size_for_offset (tree sz, tree offset, tree wholesize = NULL_TREE)
+    if unknown.  */
+ 
+ static tree
+-compute_object_offset (const_tree expr, const_tree var)
++compute_object_offset (tree expr, const_tree var)
+ {
+   enum tree_code code = PLUS_EXPR;
+   tree base, off, t;
+@@ -409,8 +409,7 @@ compute_object_offset (const_tree expr, const_tree var)
+ 
+       t = TREE_OPERAND (expr, 1);
+       off = size_binop (PLUS_EXPR,
+-			(TREE_OPERAND (expr, 2) ? TREE_OPERAND (expr, 2)
+-			 : DECL_FIELD_OFFSET (t)),
++			component_ref_field_offset (expr),
+ 			size_int (tree_to_uhwi (DECL_FIELD_BIT_OFFSET (t))
+ 				  / BITS_PER_UNIT));
+       break;
+-- 
+2.25.1
+

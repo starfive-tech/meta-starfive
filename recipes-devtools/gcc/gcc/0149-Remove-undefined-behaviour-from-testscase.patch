@@ -1,0 +1,31 @@
+From e8bd12887e5f242bc45c9df14384db052e885d80 Mon Sep 17 00:00:00 2001
+From: Andrew MacLeod <amacleod@redhat.com>
+Date: Tue, 27 Sep 2022 18:42:33 -0400
+Subject: [PATCH 149/547] Remove undefined behaviour from testscase.
+
+There was a patch posted to remove the undefined behaviour from this
+testcase, but it appear to never have been applied.
+
+	gcc/teststuite/
+	PR tree-optimization/102892
+	* gcc.dg/pr102892-1.c: Remove undefined behaviour.
+---
+ gcc/testsuite/gcc.dg/pr102892-1.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.dg/pr102892-1.c b/gcc/testsuite/gcc.dg/pr102892-1.c
+index a9302b536df..051d09016f6 100644
+--- a/gcc/testsuite/gcc.dg/pr102892-1.c
++++ b/gcc/testsuite/gcc.dg/pr102892-1.c
+@@ -11,7 +11,7 @@ int
+ main ()
+ {
+   long c = 0;
+-  for (long a; a < 1; ++a)
++  for (long a = 0; a < 1; ++a)
+     for (; c <= 1; c++) {
+       bar();
+       if (1 == b[c][0])
+-- 
+2.25.1
+

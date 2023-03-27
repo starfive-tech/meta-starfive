@@ -1,0 +1,56 @@
+From ca8b8191983d1a211a718b39ca07e35b8c626416 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 11 Nov 2022 14:28:52 +0100
+Subject: [PATCH 364/547] tree-optimization/107554 - fix ICE in stlen
+ optimization
+
+The following fixes a wrongly typed variable causing an ICE.
+
+	PR tree-optimization/107554
+	* tree-ssa-strlen.cc (strlen_pass::count_nonzero_bytes):
+	Use unsigned HOST_WIDE_INT type for the strlen.
+
+	* gcc.dg/pr107554.c: New testcase.
+
+Co-Authored-By: Nikita Voronov <nik_1357@mail.ru>
+(cherry picked from commit 81de4037454275f8ed6d858fbc129e832c6147ef)
+---
+ gcc/testsuite/gcc.dg/pr107554.c | 12 ++++++++++++
+ gcc/tree-ssa-strlen.cc          |  2 +-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr107554.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr107554.c b/gcc/testsuite/gcc.dg/pr107554.c
+new file mode 100644
+index 00000000000..8bbe6b07ae9
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr107554.c
+@@ -0,0 +1,12 @@
++/* { dg-do compile } */
++/* { dg-options "-O -foptimize-strlen" } */
++
++#define ELEMS 0x40000000
++
++int a[ELEMS];
++int b[ELEMS];
++
++int main()
++{
++  __builtin_memcpy(a, b, ELEMS*sizeof(int));
++}
+diff --git a/gcc/tree-ssa-strlen.cc b/gcc/tree-ssa-strlen.cc
+index 2d7db6da5bc..cb7ccb41d73 100644
+--- a/gcc/tree-ssa-strlen.cc
++++ b/gcc/tree-ssa-strlen.cc
+@@ -4700,7 +4700,7 @@ strlen_pass::count_nonzero_bytes (tree exp, gimple *stmt,
+ 
+   /* Compute the number of leading nonzero bytes in the representation
+      and update the minimum and maximum.  */
+-  unsigned n = prep ? strnlen (prep, nbytes) : nbytes;
++  unsigned HOST_WIDE_INT n = prep ? strnlen (prep, nbytes) : nbytes;
+ 
+   if (n < lenrange[0])
+     lenrange[0] = n;
+-- 
+2.25.1
+

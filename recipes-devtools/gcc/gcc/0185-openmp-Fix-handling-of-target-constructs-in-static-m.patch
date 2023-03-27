@@ -1,0 +1,82 @@
+From f755e367117ca43c96235ef47d4915c3746a3483 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 7 Sep 2022 08:54:13 +0200
+Subject: [PATCH 185/547] openmp: Fix handling of target constructs in static
+ member functions [PR106829]
+
+Just calling current_nonlambda_class_type in static member functions returns
+non-NULL, but something that isn't *this and if unlucky can match part of the
+IL and can be added to target clauses.
+      if (DECL_NONSTATIC_MEMBER_P (decl)
+          && current_class_ptr)
+is a guard used elsewhere (in check_accessibility_of_qualified_id).
+
+2022-09-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/106829
+	* semantics.cc (finish_omp_target_clauses): If current_function_decl
+	isn't a nonstatic member function, don't set data.current_object to
+	non-NULL.
+
+	* g++.dg/gomp/pr106829.C: New test.
+
+(cherry picked from commit e90af965e5c858ba02c0cdfbac35d0a19da1c2f6)
+---
+ gcc/cp/semantics.cc                  | 17 ++++++++---------
+ gcc/testsuite/g++.dg/gomp/pr106829.C | 15 +++++++++++++++
+ 2 files changed, 23 insertions(+), 9 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/gomp/pr106829.C
+
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index 972a1966f69..a158d626ac1 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -9482,16 +9482,15 @@ finish_omp_target_clauses (location_t loc, tree body, tree *clauses_ptr)
+ {
+   omp_target_walk_data data;
+   data.this_expr_accessed = false;
++  data.current_object = NULL_TREE;
+ 
+-  tree ct = current_nonlambda_class_type ();
+-  if (ct)
+-    {
+-      tree object = maybe_dummy_object (ct, NULL);
+-      object = maybe_resolve_dummy (object, true);
+-      data.current_object = object;
+-    }
+-  else
+-    data.current_object = NULL_TREE;
++  if (DECL_NONSTATIC_MEMBER_P (current_function_decl) && current_class_ptr)
++    if (tree ct = current_nonlambda_class_type ())
++      {
++	tree object = maybe_dummy_object (ct, NULL);
++	object = maybe_resolve_dummy (object, true);
++	data.current_object = object;
++      }
+ 
+   if (DECL_LAMBDA_FUNCTION_P (current_function_decl))
+     {
+diff --git a/gcc/testsuite/g++.dg/gomp/pr106829.C b/gcc/testsuite/g++.dg/gomp/pr106829.C
+new file mode 100644
+index 00000000000..0295efb88ee
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/gomp/pr106829.C
+@@ -0,0 +1,15 @@
++// PR c++/106829
++
++namespace std
++{
++  template <typename> class complex;
++  template <> struct complex<double> { complex (double); _Complex double d; };
++}
++struct S { void static foo (); };
++
++void
++S::foo ()
++{
++#pragma omp target
++  std::complex<double> c = 0.0;
++}
+-- 
+2.25.1
+

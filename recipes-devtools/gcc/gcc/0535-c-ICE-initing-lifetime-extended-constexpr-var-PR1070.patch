@@ -1,0 +1,86 @@
+From fb82334341e21ad0254f63e942be276f62d111cf Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 8 Feb 2023 14:02:48 -0500
+Subject: [PATCH 535/547] c++: ICE initing lifetime-extended constexpr var
+ [PR107079]
+
+We ICE on the simple:
+
+  struct X { const X* x = this; };
+  constexpr const X& x = X{};
+
+where store_init_value initializes 'x' with
+
+  &TARGET_EXPR <D.2768, {.x=(const struct X *) &<PLACEHOLDER_EXPR struct X>}>
+
+but we must lifetime-extend via extend_ref_init_temps and we get
+
+  _ZGR1x_.x = (const struct X *) &<PLACEHOLDER_EXPR struct X> >>>;, (const struct X &) &_ZGR1x_;
+
+Since 'x' was declared constexpr, we do cxx_constant_init and we hit
+the preeval code added in r269003 while evaluating the INIT_EXPR:
+
+  _ZGR1x_.x = (const struct X *) &<PLACEHOLDER_EXPR struct X> >>>
+
+but we have no ctx.ctor or ctx.object here so lookup_placeholder won't
+find anything that could replace X and we ICE on
+ 7861       /* A placeholder without a referent.  We can get here when
+ 7862          checking whether NSDMIs are noexcept, or in massage_init_elt;
+ 7863          just say it's non-constant for now.  */
+ 7864       gcc_assert (ctx->quiet);
+because cxx_constant_init means !ctx->quiet.  It's not correct that
+there isn't a referent.  I think the following patch is a pretty
+straightforward fix: pass the _ZGR var down to maybe_constant_init so
+that it can replace the PLACEHOLDER_EXPR with _ZGR1x_.
+
+The commented assert in the test doesn't pass: we complain that _ZGR1x_
+isn't a constexpr variable because we don't implement DR2126 (PR101588).
+
+	PR c++/107079
+
+gcc/cp/ChangeLog:
+
+	* call.cc (set_up_extended_ref_temp): Pass var to maybe_constant_init.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/constexpr-nsdmi2.C: New test.
+
+(cherry picked from commit 67b82bc1b29b82e4577df9491793624f3a8eb12f)
+---
+ gcc/cp/call.cc                                | 2 +-
+ gcc/testsuite/g++.dg/cpp0x/constexpr-nsdmi2.C | 9 +++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/constexpr-nsdmi2.C
+
+diff --git a/gcc/cp/call.cc b/gcc/cp/call.cc
+index 64677315e02..4f4cee5b95c 100644
+--- a/gcc/cp/call.cc
++++ b/gcc/cp/call.cc
+@@ -12951,7 +12951,7 @@ set_up_extended_ref_temp (tree decl, tree expr, vec<tree, va_gc> **cleanups,
+ 
+   /* If the initializer is constant, put it in DECL_INITIAL so we get
+      static initialization and use in constant expressions.  */
+-  init = maybe_constant_init (expr);
++  init = maybe_constant_init (expr, var, /*manifestly_const_eval=*/true);
+   /* As in store_init_value.  */
+   init = cp_fully_fold (init);
+   if (TREE_CONSTANT (init))
+diff --git a/gcc/testsuite/g++.dg/cpp0x/constexpr-nsdmi2.C b/gcc/testsuite/g++.dg/cpp0x/constexpr-nsdmi2.C
+new file mode 100644
+index 00000000000..d711b8051c0
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/constexpr-nsdmi2.C
+@@ -0,0 +1,9 @@
++// PR c++/107079
++// { dg-do compile { target c++11 } }
++
++struct X {
++  const X* x = this;
++};
++constexpr const X& x = X{};
++// TODO: The assert should pass once we implement DR2126 (c++/101588).
++//static_assert(x.x == &x);
+-- 
+2.25.1
+

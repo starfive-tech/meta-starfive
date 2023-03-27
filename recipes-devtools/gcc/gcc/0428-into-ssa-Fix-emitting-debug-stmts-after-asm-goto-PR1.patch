@@ -1,0 +1,168 @@
+From 7e54e5a2bba69dc7fcbc88fe8cb20c91aaafabd2 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 15 Dec 2022 09:26:44 +0100
+Subject: [PATCH 428/547] into-ssa: Fix emitting debug stmts after asm goto
+ [PR108095]
+
+The following testcase ICEs, because ccp1 replaced
+  s.0_1 = &s;
+  __asm__ goto("" : "=r" MEM[(T *)s.0_1] :  :  : "lab" lab);
+with
+  __asm__ goto("" : "=r" s :  :  : "lab" lab);
+and because s is no longer addressable, we are rewriting it into
+ssa and want
+  __asm__ goto("" : "=r" s_7 :  :  : "lab" lab);
+plus debug stmt
+  # DEBUG s => s_7
+The code assumes that there is at most one non-EH edge in that
+case, but with the addition of outputs to asm goto that is no longer the
+case, we can have many outgoing edges.
+
+The patch keeps the checking assertion that there is at most one such
+edge for everything but asm goto, but moves the addition of the debug
+stmt into the loop, so that it can be added on all edges where it is
+possible, not just one of them.
+
+Furthermore, looking at gsi_insert_on_edge_immediate
+-> gimple_find_edge_insert_loc, the conditions to insert stmt there
+to the destination block are
+  if (single_pred_p (dest)
+      && gimple_seq_empty_p (phi_nodes (dest))
+      && dest != EXIT_BLOCK_PTR_FOR_FN (cfun))
+(plus there is code to insert it in the previous block but that is
+never true when the pred is known to be stmt_ends_bb_p), while
+mayube_register_def was just checking
+                 if (ef && single_pred_p (ef->dest)
+                     && ef->dest != EXIT_BLOCK_PTR_FOR_FN (cfun))
+so if for whatever reason ef->dest had any PHIs, we'd split the
+edge for -g and not for -g0, something we must avoid for -fcompare-debug
+stability.  So, I've added the no phi_nodes check too.
+
+2022-12-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108095
+	* tree-into-ssa.cc (maybe_register_def): Insert debug stmt
+	on all non-EH edges from asm goto if they have a single
+	predecessor rather than asserting there is at most one such edge.
+	Test whether there are no PHI nodes next to the single predecessor
+	test.
+
+	* gcc.dg/pr108095.c: New test.
+
+(cherry picked from commit bf3ce6f84a7a994a0fc87419b383b9ce4efed442)
+---
+ gcc/testsuite/gcc.dg/pr108095.c | 15 ++++++++
+ gcc/tree-into-ssa.cc            | 64 +++++++++++++++++++--------------
+ 2 files changed, 53 insertions(+), 26 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108095.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr108095.c b/gcc/testsuite/gcc.dg/pr108095.c
+new file mode 100644
+index 00000000000..fb76caae72e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108095.c
+@@ -0,0 +1,15 @@
++/* PR tree-optimization/108095 */
++/* { dg-do compile } */
++/* { dg-options "-Os -g" } */
++
++int v;
++typedef unsigned T;
++
++void
++foo (void)
++{
++  unsigned s;
++  asm goto ("" : "=r" (*(T *) &s) : : : lab);
++  v = 0;
++lab:
++}
+diff --git a/gcc/tree-into-ssa.cc b/gcc/tree-into-ssa.cc
+index 22c2e5b7982..dd41b1b77b7 100644
+--- a/gcc/tree-into-ssa.cc
++++ b/gcc/tree-into-ssa.cc
+@@ -1919,9 +1919,8 @@ maybe_register_def (def_operand_p def_p, gimple *stmt,
+ 	  tree tracked_var = target_for_debug_bind (sym);
+ 	  if (tracked_var)
+ 	    {
+-	      gimple *note = gimple_build_debug_bind (tracked_var, def, stmt);
+-	      /* If stmt ends the bb, insert the debug stmt on the single
+-		 non-EH edge from the stmt.  */
++	      /* If stmt ends the bb, insert the debug stmt on the non-EH
++		 edge(s) from the stmt.  */
+ 	      if (gsi_one_before_end_p (gsi) && stmt_ends_bb_p (stmt))
+ 		{
+ 		  basic_block bb = gsi_bb (gsi);
+@@ -1930,33 +1929,46 @@ maybe_register_def (def_operand_p def_p, gimple *stmt,
+ 		  FOR_EACH_EDGE (e, ei, bb->succs)
+ 		    if (!(e->flags & EDGE_EH))
+ 		      {
+-			gcc_checking_assert (!ef);
++			/* asm goto can have multiple non-EH edges from the
++			   stmt.  Insert on all of them where it is
++			   possible.  */
++			gcc_checking_assert (!ef || (gimple_code (stmt)
++						     == GIMPLE_ASM));
+ 			ef = e;
++			/* If there are other predecessors to ef->dest, then
++			   there must be PHI nodes for the modified
++			   variable, and therefore there will be debug bind
++			   stmts after the PHI nodes.  The debug bind notes
++			   we'd insert would force the creation of a new
++			   block (diverging codegen) and be redundant with
++			   the post-PHI bind stmts, so don't add them.
++
++			   As for the exit edge, there wouldn't be redundant
++			   bind stmts, but there wouldn't be a PC to bind
++			   them to either, so avoid diverging the CFG.  */
++			if (e
++			    && single_pred_p (e->dest)
++			    && gimple_seq_empty_p (phi_nodes (e->dest))
++			    && e->dest != EXIT_BLOCK_PTR_FOR_FN (cfun))
++			  {
++			    /* If there were PHI nodes in the node, we'd
++			       have to make sure the value we're binding
++			       doesn't need rewriting.  But there shouldn't
++			       be PHI nodes in a single-predecessor block,
++			       so we just add the note.  */
++			    gimple *note
++			      = gimple_build_debug_bind (tracked_var, def,
++							 stmt);
++			    gsi_insert_on_edge_immediate (ef, note);
++			  }
+ 		      }
+-		  /* If there are other predecessors to ef->dest, then
+-		     there must be PHI nodes for the modified
+-		     variable, and therefore there will be debug bind
+-		     stmts after the PHI nodes.  The debug bind notes
+-		     we'd insert would force the creation of a new
+-		     block (diverging codegen) and be redundant with
+-		     the post-PHI bind stmts, so don't add them.
+-
+-		     As for the exit edge, there wouldn't be redundant
+-		     bind stmts, but there wouldn't be a PC to bind
+-		     them to either, so avoid diverging the CFG.  */
+-		  if (ef && single_pred_p (ef->dest)
+-		      && ef->dest != EXIT_BLOCK_PTR_FOR_FN (cfun))
+-		    {
+-		      /* If there were PHI nodes in the node, we'd
+-			 have to make sure the value we're binding
+-			 doesn't need rewriting.  But there shouldn't
+-			 be PHI nodes in a single-predecessor block,
+-			 so we just add the note.  */
+-		      gsi_insert_on_edge_immediate (ef, note);
+-		    }
+ 		}
+ 	      else
+-		gsi_insert_after (&gsi, note, GSI_SAME_STMT);
++		{
++		  gimple *note
++		    = gimple_build_debug_bind (tracked_var, def, stmt);
++		  gsi_insert_after (&gsi, note, GSI_SAME_STMT);
++		}
+ 	    }
+ 	}
+ 
+-- 
+2.25.1
+

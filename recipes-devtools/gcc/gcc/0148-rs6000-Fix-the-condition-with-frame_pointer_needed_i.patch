@@ -1,0 +1,69 @@
+From c7f17493cc26a4395d549547075603a15f4c94a7 Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Mon, 26 Sep 2022 00:33:18 -0500
+Subject: [PATCH 148/547] rs6000: Fix the condition with
+ frame_pointer_needed_indeed [PR96072]
+
+As PR96072 shows, the code adding REG_CFA_DEF_CFA reg note
+makes one assumption that we have emitted one insn which
+restores the frame pointer previously.  That part of code
+was guarded with flag frame_pointer_needed before, it was
+consistent, but it was replaced with flag
+frame_pointer_needed_indeed since commit r10-7981.  It
+caused ICE due to unexpected NULL insn.
+
+	PR target/96072
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000-logue.cc (rs6000_emit_epilogue): Update the
+	condition for adding REG_CFA_DEF_CFA reg note with
+	frame_pointer_needed_indeed.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr96072.c: New test.
+
+(cherry picked from commit 5be0950d22209f5ba69d244387228e12389a8470)
+---
+ gcc/config/rs6000/rs6000-logue.cc          |  2 +-
+ gcc/testsuite/gcc.target/powerpc/pr96072.c | 14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr96072.c
+
+diff --git a/gcc/config/rs6000/rs6000-logue.cc b/gcc/config/rs6000/rs6000-logue.cc
+index 59fe1c8cb8b..a868ede24fb 100644
+--- a/gcc/config/rs6000/rs6000-logue.cc
++++ b/gcc/config/rs6000/rs6000-logue.cc
+@@ -4924,7 +4924,7 @@ rs6000_emit_epilogue (enum epilogue_type epilogue_type)
+ 	 a REG_CFA_DEF_CFA note, but that's OK;  A duplicate is
+ 	 discarded by dwarf2cfi.cc/dwarf2out.cc, and in any case would
+ 	 be harmless if emitted.  */
+-      if (frame_pointer_needed)
++      if (frame_pointer_needed_indeed)
+ 	{
+ 	  insn = get_last_insn ();
+ 	  add_reg_note (insn, REG_CFA_DEF_CFA,
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr96072.c b/gcc/testsuite/gcc.target/powerpc/pr96072.c
+new file mode 100644
+index 00000000000..10341c91d2f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr96072.c
+@@ -0,0 +1,14 @@
++/* { dg-options "-O2" } */
++
++/* This used to ICE with the SYSV ABI (PR96072).  */
++
++void
++he (int jn)
++{
++  {
++    int bh[jn];
++    if (jn != 0)
++      goto wa;
++  }
++wa:;
++}
+-- 
+2.25.1
+

@@ -1,0 +1,71 @@
+From 61537f7d8611934d9497547aec57e783f0b1f86c Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 17 Nov 2022 00:20:14 +0000
+Subject: [PATCH 217/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 26 ++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ 3 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index c4c1b70bd6c..2434de84f7d 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,29 @@
++2022-11-16  Philipp Tomsich  <philipp.tomsich@vrull.eu>
++
++	Backported from master:
++	2022-11-14  Philipp Tomsich  <philipp.tomsich@vrull.eu>
++
++	* config/aarch64/aarch64-cores.def (AARCH64_CORE): Add ampere1a.
++	* config/aarch64/aarch64-cost-tables.h: Add ampere1a_extra_costs.
++	* config/aarch64/aarch64-fusion-pairs.def (AARCH64_FUSION_PAIR):
++	Define a new fusion pair for A+B+1/A-B-1 (i.e., add/subtract two
++	registers and then +1/-1).
++	* config/aarch64/aarch64-tune.md: Regenerate.
++	* config/aarch64/aarch64.cc (aarch_macro_fusion_pair_p): Implement
++	idiom-matcher for the new fusion pair.
++	* doc/invoke.texi: Add ampere1a.
++
++2022-11-16  Martin Jambor  <mjambor@suse.cz>
++
++	Backported from master:
++	2022-10-19  Martin Jambor  <mjambor@suse.cz>
++
++	PR tree-optimization/107206
++	* tree-sra.cc (struct access): New field grp_result_of_prop_from_lhs.
++	(analyze_access_subtree): Do not create replacements for accesses with
++	this flag when not toally scalarizing.
++	(propagate_subaccesses_from_lhs): Set the new flag.
++
+ 2022-11-09  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* alias.cc (init_alias_analysis): Do not record sets to the hard
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index c559bd9ee8e..3204c3c9c61 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221116
++20221117
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 2f77b936c7b..6d01b9964f3 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-11-16  Martin Jambor  <mjambor@suse.cz>
++
++	Backported from master:
++	2022-10-19  Martin Jambor  <mjambor@suse.cz>
++
++	PR tree-optimization/107206
++	* g++.dg/tree-ssa/pr107206.C: New test.
++
+ 2022-11-09  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* gcc.dg/guality/param-6.c: New test.
+-- 
+2.25.1
+

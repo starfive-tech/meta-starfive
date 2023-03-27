@@ -1,0 +1,1020 @@
+From 17d46f069ceb55faa0db80a47c31710c7e6bcb11 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Tue, 16 Aug 2022 16:18:02 +0200
+Subject: [PATCH 252/547] d: Fix #error You must define
+ PREFERRED_DEBUGGING_TYPE if DWARF is not supported
+
+This moves all D front-end specific target definitions out of the main
+target headers, and into its own header that is included by tm_d.h
+instead of pulling in the same headers as tm_p.h.
+
+This fixes the build on target configurations that pull in the default D
+language target hooks, and subsequently trigger an error because the
+definition of PREFERRED_DEBUGGING_TYPE is behind tm.h, the one header
+that is avoided from being included in default-d.cc.
+
+	PR d/105659
+
+gcc/ChangeLog:
+
+	* config.gcc: Set tm_d_file to ${cpu_type}/${cpu_type}-d.h.
+	* config/aarch64/aarch64-d.cc: Include tm_d.h.
+	* config/aarch64/aarch64-protos.h (aarch64_d_target_versions): Move to
+	config/aarch64/aarch64-d.h.
+	(aarch64_d_register_target_info): Likewise.
+	* config/aarch64/aarch64.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/arm/arm-d.cc: Include tm_d.h and arm-protos.h instead of
+	tm_p.h.
+	* config/arm/arm-protos.h (arm_d_target_versions): Move to
+	config/arm/arm-d.h.
+	(arm_d_register_target_info): Likewise.
+	* config/arm/arm.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/default-d.cc: Remove memmodel.h include.
+	* config/freebsd-d.cc: Include tm_d.h instead of tm_p.h.
+	* config/glibc-d.cc: Likewise.
+	* config/i386/i386-d.cc: Include tm_d.h.
+	* config/i386/i386-protos.h (ix86_d_target_versions): Move to
+	config/i386/i386-d.h.
+	(ix86_d_register_target_info): Likewise.
+	(ix86_d_has_stdcall_convention): Likewise.
+	* config/i386/i386.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	(TARGET_D_HAS_STDCALL_CONVENTION): Likewise.
+	* config/i386/winnt-d.cc: Include tm_d.h instead of tm_p.h.
+	* config/mips/mips-d.cc: Include tm_d.h.
+	* config/mips/mips-protos.h (mips_d_target_versions): Move to
+	config/mips/mips-d.h.
+	(mips_d_register_target_info): Likewise.
+	* config/mips/mips.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/netbsd-d.cc: Include tm_d.h instead of tm.h and memmodel.h.
+	* config/openbsd-d.cc: Likewise.
+	* config/pa/pa-d.cc: Include tm_d.h.
+	* config/pa/pa-protos.h (pa_d_target_versions): Move to
+	config/pa/pa-d.h.
+	(pa_d_register_target_info): Likewise.
+	* config/pa/pa.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/riscv/riscv-d.cc: Include tm_d.h.
+	* config/riscv/riscv-protos.h (riscv_d_target_versions): Move to
+	config/riscv/riscv-d.h.
+	(riscv_d_register_target_info): Likewise.
+	* config/riscv/riscv.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/rs6000/rs6000-d.cc: Include tm_d.h.
+	* config/rs6000/rs6000-protos.h (rs6000_d_target_versions): Move to
+	config/rs6000/rs6000-d.h.
+	(rs6000_d_register_target_info): Likewise.
+	* config/rs6000/rs6000.h (TARGET_D_CPU_VERSIONS) Likewise.:
+	(TARGET_D_REGISTER_CPU_TARGET_INFO) Likewise.:
+	* config/s390/s390-d.cc: Include tm_d.h.
+	* config/s390/s390-protos.h (s390_d_target_versions): Move to
+	config/s390/s390-d.h.
+	(s390_d_register_target_info): Likewise.
+	* config/s390/s390.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* config/sol2-d.cc: Include tm_d.h instead of tm.h and memmodel.h.
+	* config/sparc/sparc-d.cc: Include tm_d.h.
+	* config/sparc/sparc-protos.h (sparc_d_target_versions): Move to
+	config/sparc/sparc-d.h.
+	(sparc_d_register_target_info): Likewise.
+	* config/sparc/sparc.h (TARGET_D_CPU_VERSIONS): Likewise.
+	(TARGET_D_REGISTER_CPU_TARGET_INFO): Likewise.
+	* configure: Regenerate.
+	* configure.ac (tm_d_file): Remove defaults.h.
+	(tm_d_include_list): Remove options.h and insn-constants.h.
+	* config/aarch64/aarch64-d.h: New file.
+	* config/arm/arm-d.h: New file.
+	* config/i386/i386-d.h: New file.
+	* config/mips/mips-d.h: New file.
+	* config/pa/pa-d.h: New file.
+	* config/riscv/riscv-d.h: New file.
+	* config/rs6000/rs6000-d.h: New file.
+	* config/s390/s390-d.h: New file.
+	* config/sparc/sparc-d.h: New file.
+
+(cherry picked from commit d5ad6f8415171798adaff5787400505ce9882144)
+---
+ gcc/config.gcc                      | 10 ++++++----
+ gcc/config/aarch64/aarch64-d.cc     |  1 +
+ gcc/config/aarch64/aarch64-d.h      | 24 ++++++++++++++++++++++++
+ gcc/config/aarch64/aarch64-protos.h |  4 ----
+ gcc/config/aarch64/aarch64.h        |  4 ----
+ gcc/config/arm/arm-d.cc             |  3 ++-
+ gcc/config/arm/arm-d.h              | 24 ++++++++++++++++++++++++
+ gcc/config/arm/arm-protos.h         |  4 ----
+ gcc/config/arm/arm.h                |  4 ----
+ gcc/config/default-d.cc             |  4 +++-
+ gcc/config/freebsd-d.cc             |  2 +-
+ gcc/config/glibc-d.cc               |  2 +-
+ gcc/config/i386/i386-d.cc           |  1 +
+ gcc/config/i386/i386-d.h            | 26 ++++++++++++++++++++++++++
+ gcc/config/i386/i386-protos.h       |  5 -----
+ gcc/config/i386/i386.h              |  5 -----
+ gcc/config/i386/winnt-d.cc          |  2 +-
+ gcc/config/mips/mips-d.cc           |  1 +
+ gcc/config/mips/mips-d.h            | 24 ++++++++++++++++++++++++
+ gcc/config/mips/mips-protos.h       |  4 ----
+ gcc/config/mips/mips.h              |  4 ----
+ gcc/config/netbsd-d.cc              |  4 +---
+ gcc/config/openbsd-d.cc             |  4 +---
+ gcc/config/pa/pa-d.cc               |  1 +
+ gcc/config/pa/pa-d.h                | 24 ++++++++++++++++++++++++
+ gcc/config/pa/pa-protos.h           |  4 ----
+ gcc/config/pa/pa.h                  |  4 ----
+ gcc/config/riscv/riscv-d.cc         |  1 +
+ gcc/config/riscv/riscv-d.h          | 24 ++++++++++++++++++++++++
+ gcc/config/riscv/riscv-protos.h     |  4 ----
+ gcc/config/riscv/riscv.h            |  4 ----
+ gcc/config/rs6000/rs6000-d.cc       |  1 +
+ gcc/config/rs6000/rs6000-d.h        | 24 ++++++++++++++++++++++++
+ gcc/config/rs6000/rs6000-protos.h   |  4 ----
+ gcc/config/rs6000/rs6000.h          |  4 ----
+ gcc/config/s390/s390-d.cc           |  1 +
+ gcc/config/s390/s390-d.h            | 24 ++++++++++++++++++++++++
+ gcc/config/s390/s390-protos.h       |  4 ----
+ gcc/config/s390/s390.h              |  4 ----
+ gcc/config/sol2-d.cc                |  4 +---
+ gcc/config/sparc/sparc-d.cc         |  1 +
+ gcc/config/sparc/sparc-d.h          | 24 ++++++++++++++++++++++++
+ gcc/config/sparc/sparc-protos.h     |  4 ----
+ gcc/config/sparc/sparc.h            |  4 ----
+ gcc/configure                       | 11 +++--------
+ gcc/configure.ac                    |  7 +------
+ 46 files changed, 247 insertions(+), 106 deletions(-)
+ create mode 100644 gcc/config/aarch64/aarch64-d.h
+ create mode 100644 gcc/config/arm/arm-d.h
+ create mode 100644 gcc/config/i386/i386-d.h
+ create mode 100644 gcc/config/mips/mips-d.h
+ create mode 100644 gcc/config/pa/pa-d.h
+ create mode 100644 gcc/config/riscv/riscv-d.h
+ create mode 100644 gcc/config/rs6000/rs6000-d.h
+ create mode 100644 gcc/config/s390/s390-d.h
+ create mode 100644 gcc/config/sparc/sparc-d.h
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index c5064dd3766..58136821afc 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -566,11 +566,15 @@ tilepro*-*-*)
+ esac
+ 
+ tm_file=${cpu_type}/${cpu_type}.h
+-tm_d_file=${cpu_type}/${cpu_type}.h
+ if test -f ${srcdir}/config/${cpu_type}/${cpu_type}-protos.h
+ then
+ 	tm_p_file=${cpu_type}/${cpu_type}-protos.h
+-	tm_d_file="${tm_d_file} ${cpu_type}/${cpu_type}-protos.h"
++fi
++
++tm_d_file=
++if test -f ${srcdir}/config/${cpu_type}/${cpu_type}-d.h
++then
++	tm_d_file="${tm_d_file} ${cpu_type}/${cpu_type}-d.h"
+ fi
+ 
+ extra_modes=
+@@ -676,7 +680,6 @@ case ${target} in
+ *-*-darwin*)
+   tmake_file="t-darwin "
+   tm_file="${tm_file} darwin.h"
+-  tm_d_file="${tm_d_file} tm-dwarf2.h"
+   darwin_os=`echo ${target} | sed 's/.*darwin\([0-9.]*\).*$/\1/'`
+   darwin_maj=`expr "$darwin_os" : '\([0-9]*\).*'`
+   macos_min=`expr "$darwin_os" : '[0-9]*\.\([0-9]*\).*'`
+@@ -3552,7 +3555,6 @@ xstormy16-*-elf)
+ 	# For historical reasons, the target files omit the 'x'.
+ 	tm_file="dbxelf.h elfos.h newlib-stdint.h stormy16/stormy16.h"
+ 	tm_p_file=stormy16/stormy16-protos.h
+-	tm_d_file="elfos.h stormy16/stormy16.h"
+ 	md_file=stormy16/stormy16.md
+ 	out_file=stormy16/stormy16.cc
+ 	extra_options=stormy16/stormy16.opt
+diff --git a/gcc/config/aarch64/aarch64-d.cc b/gcc/config/aarch64/aarch64-d.cc
+index d3fcc0b881e..e0e0401631e 100644
+--- a/gcc/config/aarch64/aarch64-d.cc
++++ b/gcc/config/aarch64/aarch64-d.cc
+@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/aarch64/aarch64-d.h b/gcc/config/aarch64/aarch64-d.h
+new file mode 100644
+index 00000000000..c605a68ef9f
+--- /dev/null
++++ b/gcc/config/aarch64/aarch64-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the AArch64 architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Defined in aarch64-d.cc  */
++extern void aarch64_d_target_versions (void);
++extern void aarch64_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS aarch64_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO aarch64_d_register_target_info
+diff --git a/gcc/config/aarch64/aarch64-protos.h b/gcc/config/aarch64/aarch64-protos.h
+index df311812e8d..031c6d74775 100644
+--- a/gcc/config/aarch64/aarch64-protos.h
++++ b/gcc/config/aarch64/aarch64-protos.h
+@@ -1049,10 +1049,6 @@ enum aarch64_parse_opt_result aarch64_parse_extension (const char *,
+ void aarch64_get_all_extension_candidates (auto_vec<const char *> *candidates);
+ std::string aarch64_get_extension_string_for_isa_flags (uint64_t, uint64_t);
+ 
+-/* Defined in aarch64-d.cc  */
+-extern void aarch64_d_target_versions (void);
+-extern void aarch64_d_register_target_info (void);
+-
+ rtl_opt_pass *make_pass_fma_steering (gcc::context *);
+ rtl_opt_pass *make_pass_track_speculation (gcc::context *);
+ rtl_opt_pass *make_pass_tag_collision_avoidance (gcc::context *);
+diff --git a/gcc/config/aarch64/aarch64.h b/gcc/config/aarch64/aarch64.h
+index 3e308ad6239..3bde24674dc 100644
+--- a/gcc/config/aarch64/aarch64.h
++++ b/gcc/config/aarch64/aarch64.h
+@@ -26,10 +26,6 @@
+ #define TARGET_CPU_CPP_BUILTINS()	\
+   aarch64_cpu_cpp_builtins (pfile)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS aarch64_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO aarch64_d_register_target_info
+-
+ 
+ 
+ #define REGISTER_TARGET_PRAGMAS() aarch64_register_pragmas ()
+diff --git a/gcc/config/arm/arm-d.cc b/gcc/config/arm/arm-d.cc
+index d65b7524934..5c89f1b1079 100644
+--- a/gcc/config/arm/arm-d.cc
++++ b/gcc/config/arm/arm-d.cc
+@@ -21,9 +21,10 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
++#include "arm-protos.h"
+ 
+ /* Implement TARGET_D_CPU_VERSIONS for ARM targets.  */
+ 
+diff --git a/gcc/config/arm/arm-d.h b/gcc/config/arm/arm-d.h
+new file mode 100644
+index 00000000000..479a89bb120
+--- /dev/null
++++ b/gcc/config/arm/arm-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the ARM architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Defined in arm-d.cc  */
++extern void arm_d_target_versions (void);
++extern void arm_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS arm_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO arm_d_register_target_info
+diff --git a/gcc/config/arm/arm-protos.h b/gcc/config/arm/arm-protos.h
+index 9d142096cb6..adcde586e2f 100644
+--- a/gcc/config/arm/arm-protos.h
++++ b/gcc/config/arm/arm-protos.h
+@@ -403,10 +403,6 @@ extern void arm_lang_object_attributes_init (void);
+ extern void arm_register_target_pragmas (void);
+ extern void arm_cpu_cpp_builtins (struct cpp_reader *);
+ 
+-/* Defined in arm-d.cc  */
+-extern void arm_d_target_versions (void);
+-extern void arm_d_register_target_info (void);
+-
+ extern bool arm_is_constant_pool_ref (rtx);
+ 
+ /* The bits in this mask specify which instruction scheduling options should
+diff --git a/gcc/config/arm/arm.h b/gcc/config/arm/arm.h
+index f479540812a..e15722b0be3 100644
+--- a/gcc/config/arm/arm.h
++++ b/gcc/config/arm/arm.h
+@@ -47,10 +47,6 @@ extern char arm_arch_name[];
+ /* Target CPU builtins.  */
+ #define TARGET_CPU_CPP_BUILTINS() arm_cpu_cpp_builtins (pfile)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS arm_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO arm_d_register_target_info
+-
+ #include "config/arm/arm-opts.h"
+ 
+ /* The processor for which instructions should be scheduled.  */
+diff --git a/gcc/config/default-d.cc b/gcc/config/default-d.cc
+index 2d7abfcba96..30c359ed226 100644
+--- a/gcc/config/default-d.cc
++++ b/gcc/config/default-d.cc
+@@ -18,9 +18,11 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+-#include "memmodel.h"
+ #include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
++/* Do not include tm.h or tm_p.h here; definitions needed by the target
++   architecture to initialize targetdm should instead be added to tm_d.h.  */
++
+ struct gcc_targetdm targetdm = TARGETDM_INITIALIZER;
+diff --git a/gcc/config/freebsd-d.cc b/gcc/config/freebsd-d.cc
+index 9f0f5e7b6ee..189e4a69e78 100644
+--- a/gcc/config/freebsd-d.cc
++++ b/gcc/config/freebsd-d.cc
+@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "coretypes.h"
+ #include "memmodel.h"
+ #include "tm.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/glibc-d.cc b/gcc/config/glibc-d.cc
+index f30af104db8..80ef27d19c6 100644
+--- a/gcc/config/glibc-d.cc
++++ b/gcc/config/glibc-d.cc
+@@ -20,7 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "coretypes.h"
+ #include "tm.h"
+ #include "memmodel.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/i386/i386-d.cc b/gcc/config/i386/i386-d.cc
+index a62339cae30..27e2b75fc25 100644
+--- a/gcc/config/i386/i386-d.cc
++++ b/gcc/config/i386/i386-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/i386/i386-d.h b/gcc/config/i386/i386-d.h
+new file mode 100644
+index 00000000000..b9806889df9
+--- /dev/null
++++ b/gcc/config/i386/i386-d.h
+@@ -0,0 +1,26 @@
++/* Definitions for the D front end on the x86 architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* In i386-d.cc  */
++extern void ix86_d_target_versions (void);
++extern void ix86_d_register_target_info (void);
++extern bool ix86_d_has_stdcall_convention (unsigned int *, unsigned int *);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS ix86_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO ix86_d_register_target_info
++#define TARGET_D_HAS_STDCALL_CONVENTION ix86_d_has_stdcall_convention
+diff --git a/gcc/config/i386/i386-protos.h b/gcc/config/i386/i386-protos.h
+index 3596ce81ecf..5b09924c929 100644
+--- a/gcc/config/i386/i386-protos.h
++++ b/gcc/config/i386/i386-protos.h
+@@ -274,11 +274,6 @@ extern bool ix86_extract_perm_from_pool_constant (int*, rtx);
+ extern void ix86_target_macros (void);
+ extern void ix86_register_pragmas (void);
+ 
+-/* In i386-d.cc  */
+-extern void ix86_d_target_versions (void);
+-extern void ix86_d_register_target_info (void);
+-extern bool ix86_d_has_stdcall_convention (unsigned int *, unsigned int *);
+-
+ /* In winnt.cc  */
+ extern void i386_pe_unique_section (tree, int);
+ extern void i386_pe_declare_function_type (FILE *, const char *, int);
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index a61c32b8957..c7ef7471d60 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -608,11 +608,6 @@ extern const char *host_detect_local_cpu (int argc, const char **argv);
+ /* Target Pragmas.  */
+ #define REGISTER_TARGET_PRAGMAS() ix86_register_pragmas ()
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS ix86_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO ix86_d_register_target_info
+-#define TARGET_D_HAS_STDCALL_CONVENTION ix86_d_has_stdcall_convention
+-
+ #ifndef CC1_SPEC
+ #define CC1_SPEC "%(cc1_cpu) "
+ #endif
+diff --git a/gcc/config/i386/winnt-d.cc b/gcc/config/i386/winnt-d.cc
+index 3d990a12331..00c28c3964a 100644
+--- a/gcc/config/i386/winnt-d.cc
++++ b/gcc/config/i386/winnt-d.cc
+@@ -21,9 +21,9 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "target.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+-#include "tm_p.h"
+ 
+ /* Implement TARGET_D_OS_VERSIONS for Windows targets.  */
+ 
+diff --git a/gcc/config/mips/mips-d.cc b/gcc/config/mips/mips-d.cc
+index 41a278a08fd..8b6ccd10604 100644
+--- a/gcc/config/mips/mips-d.cc
++++ b/gcc/config/mips/mips-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/mips/mips-d.h b/gcc/config/mips/mips-d.h
+new file mode 100644
+index 00000000000..7cb3ed9716e
+--- /dev/null
++++ b/gcc/config/mips/mips-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the MIPS architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Routines implemented in mips-d.cc  */
++extern void mips_d_target_versions (void);
++extern void mips_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS mips_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO mips_d_register_target_info
+diff --git a/gcc/config/mips/mips-protos.h b/gcc/config/mips/mips-protos.h
+index 9d0f4d90fd9..86350523c1b 100644
+--- a/gcc/config/mips/mips-protos.h
++++ b/gcc/config/mips/mips-protos.h
+@@ -388,8 +388,4 @@ extern void mips_register_frame_header_opt (void);
+ extern void mips_expand_vec_cond_expr (machine_mode, machine_mode, rtx *);
+ extern void mips_expand_vec_cmp_expr (rtx *);
+ 
+-/* Routines implemented in mips-d.cc  */
+-extern void mips_d_target_versions (void);
+-extern void mips_d_register_target_info (void);
+-
+ #endif /* ! GCC_MIPS_PROTOS_H */
+diff --git a/gcc/config/mips/mips.h b/gcc/config/mips/mips.h
+index 858bbba3a36..02562d3b644 100644
+--- a/gcc/config/mips/mips.h
++++ b/gcc/config/mips/mips.h
+@@ -680,10 +680,6 @@ struct mips_cpu_info {
+     }									\
+   while (0)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS mips_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO mips_d_register_target_info
+-
+ /* Default target_flags if no switches are specified  */
+ 
+ #ifndef TARGET_DEFAULT
+diff --git a/gcc/config/netbsd-d.cc b/gcc/config/netbsd-d.cc
+index 286f010939f..cd0c95568a1 100644
+--- a/gcc/config/netbsd-d.cc
++++ b/gcc/config/netbsd-d.cc
+@@ -20,9 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+-#include "tm.h"
+-#include "memmodel.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/openbsd-d.cc b/gcc/config/openbsd-d.cc
+index c1a2a89807a..33c7e41ab62 100644
+--- a/gcc/config/openbsd-d.cc
++++ b/gcc/config/openbsd-d.cc
+@@ -20,9 +20,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+-#include "memmodel.h"
+-#include "tm.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/pa/pa-d.cc b/gcc/config/pa/pa-d.cc
+index 122ad480447..077aeb5d634 100644
+--- a/gcc/config/pa/pa-d.cc
++++ b/gcc/config/pa/pa-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "target.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/pa/pa-d.h b/gcc/config/pa/pa-d.h
+new file mode 100644
+index 00000000000..9a9df108f61
+--- /dev/null
++++ b/gcc/config/pa/pa-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the HPPA architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Routines implemented in pa-d.cc  */
++extern void pa_d_target_versions (void);
++extern void pa_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS pa_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO pa_d_register_target_info
+diff --git a/gcc/config/pa/pa-protos.h b/gcc/config/pa/pa-protos.h
+index d474d9efc91..fe8b7a5091e 100644
+--- a/gcc/config/pa/pa-protos.h
++++ b/gcc/config/pa/pa-protos.h
+@@ -111,7 +111,3 @@ extern void pa_output_function_label (FILE *);
+ extern void hppa_profile_hook (int);
+ 
+ extern const int pa_magic_milli[];
+-
+-/* Routines implemented in pa-d.cc  */
+-extern void pa_d_target_versions (void);
+-extern void pa_d_register_target_info (void);
+diff --git a/gcc/config/pa/pa.h b/gcc/config/pa/pa.h
+index 92d3d1841a9..1ce6635ae9b 100644
+--- a/gcc/config/pa/pa.h
++++ b/gcc/config/pa/pa.h
+@@ -1310,9 +1310,5 @@ do {									     \
+ 
+ #define NEED_INDICATE_EXEC_STACK 0
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS pa_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO pa_d_register_target_info
+-
+ /* Output default function prologue for hpux.  */
+ #define TARGET_ASM_FUNCTION_PROLOGUE pa_output_function_prologue
+diff --git a/gcc/config/riscv/riscv-d.cc b/gcc/config/riscv/riscv-d.cc
+index 729de96d398..a762a35778d 100644
+--- a/gcc/config/riscv/riscv-d.cc
++++ b/gcc/config/riscv/riscv-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "target.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/riscv/riscv-d.h b/gcc/config/riscv/riscv-d.h
+new file mode 100644
+index 00000000000..21a989edd8c
+--- /dev/null
++++ b/gcc/config/riscv/riscv-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the RISC-V architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Routines implemented in riscv-d.cc  */
++extern void riscv_d_target_versions (void);
++extern void riscv_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS riscv_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO riscv_d_register_target_info
+diff --git a/gcc/config/riscv/riscv-protos.h b/gcc/config/riscv/riscv-protos.h
+index 20c2381c21a..65bb85f5587 100644
+--- a/gcc/config/riscv/riscv-protos.h
++++ b/gcc/config/riscv/riscv-protos.h
+@@ -78,10 +78,6 @@ extern bool riscv_gpr_save_operation_p (rtx);
+ /* Routines implemented in riscv-c.cc.  */
+ void riscv_cpu_cpp_builtins (cpp_reader *);
+ 
+-/* Routines implemented in riscv-d.cc  */
+-extern void riscv_d_target_versions (void);
+-extern void riscv_d_register_target_info (void);
+-
+ /* Routines implemented in riscv-builtins.cc.  */
+ extern void riscv_atomic_assign_expand_fenv (tree *, tree *, tree *);
+ extern rtx riscv_expand_builtin (tree, rtx, rtx, machine_mode, int);
+diff --git a/gcc/config/riscv/riscv.h b/gcc/config/riscv/riscv.h
+index b3eb6abc2aa..b30b4576c09 100644
+--- a/gcc/config/riscv/riscv.h
++++ b/gcc/config/riscv/riscv.h
+@@ -27,10 +27,6 @@ along with GCC; see the file COPYING3.  If not see
+ /* Target CPU builtins.  */
+ #define TARGET_CPU_CPP_BUILTINS() riscv_cpu_cpp_builtins (pfile)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS riscv_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO riscv_d_register_target_info
+-
+ #ifdef TARGET_BIG_ENDIAN_DEFAULT
+ #define DEFAULT_ENDIAN_SPEC    "b"
+ #else
+diff --git a/gcc/config/rs6000/rs6000-d.cc b/gcc/config/rs6000/rs6000-d.cc
+index 74e78cf9e4d..7b9ca5a855e 100644
+--- a/gcc/config/rs6000/rs6000-d.cc
++++ b/gcc/config/rs6000/rs6000-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/rs6000/rs6000-d.h b/gcc/config/rs6000/rs6000-d.h
+new file mode 100644
+index 00000000000..c805b304245
+--- /dev/null
++++ b/gcc/config/rs6000/rs6000-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the PowerPC architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Declare functions in rs6000-d.cc  */
++extern void rs6000_d_target_versions (void);
++extern void rs6000_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS rs6000_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO rs6000_d_register_target_info
+diff --git a/gcc/config/rs6000/rs6000-protos.h b/gcc/config/rs6000/rs6000-protos.h
+index 3ea01023609..5d203d96346 100644
+--- a/gcc/config/rs6000/rs6000-protos.h
++++ b/gcc/config/rs6000/rs6000-protos.h
+@@ -324,10 +324,6 @@ extern void rs6000_target_modify_macros (bool, HOST_WIDE_INT, HOST_WIDE_INT);
+ extern void (*rs6000_target_modify_macros_ptr) (bool, HOST_WIDE_INT,
+ 						HOST_WIDE_INT);
+ 
+-/* Declare functions in rs6000-d.cc  */
+-extern void rs6000_d_target_versions (void);
+-extern void rs6000_d_register_target_info (void);
+-
+ #ifdef NO_DOLLAR_IN_LABEL
+ const char * rs6000_xcoff_strip_dollar (const char *);
+ #endif
+diff --git a/gcc/config/rs6000/rs6000.h b/gcc/config/rs6000/rs6000.h
+index bc48f450210..5c886d909aa 100644
+--- a/gcc/config/rs6000/rs6000.h
++++ b/gcc/config/rs6000/rs6000.h
+@@ -649,10 +649,6 @@ extern unsigned char rs6000_recip_bits[];
+ #define TARGET_CPU_CPP_BUILTINS() \
+   rs6000_cpu_cpp_builtins (pfile)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS rs6000_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO rs6000_d_register_target_info
+-
+ /* This is used by rs6000_cpu_cpp_builtins to indicate the byte order
+    we're compiling for.  Some configurations may need to override it.  */
+ #define RS6000_CPU_CPP_ENDIAN_BUILTINS()	\
+diff --git a/gcc/config/s390/s390-d.cc b/gcc/config/s390/s390-d.cc
+index 8e631859e67..0dd4b5c999b 100644
+--- a/gcc/config/s390/s390-d.cc
++++ b/gcc/config/s390/s390-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/s390/s390-d.h b/gcc/config/s390/s390-d.h
+new file mode 100644
+index 00000000000..703031b3c81
+--- /dev/null
++++ b/gcc/config/s390/s390-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the IBM S/390 and zSeries architectures.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* s390-d.cc routines */
++extern void s390_d_target_versions (void);
++extern void s390_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS s390_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO s390_d_register_target_info
+diff --git a/gcc/config/s390/s390-protos.h b/gcc/config/s390/s390-protos.h
+index fd4acaae44a..7ce4c52abe9 100644
+--- a/gcc/config/s390/s390-protos.h
++++ b/gcc/config/s390/s390-protos.h
+@@ -174,10 +174,6 @@ extern void s390_register_target_pragmas (void);
+ /* Routines for s390-c.cc */
+ extern bool s390_const_operand_ok (tree, int, int, tree);
+ 
+-/* s390-d.cc routines */
+-extern void s390_d_target_versions (void);
+-extern void s390_d_register_target_info (void);
+-
+ /* Pass management.  */
+ namespace gcc { class context; }
+ class rtl_opt_pass;
+diff --git a/gcc/config/s390/s390.h b/gcc/config/s390/s390.h
+index 2e1bc71e73a..1114222cd4a 100644
+--- a/gcc/config/s390/s390.h
++++ b/gcc/config/s390/s390.h
+@@ -247,10 +247,6 @@ enum processor_flags
+ /* Target CPU builtins.  */
+ #define TARGET_CPU_CPP_BUILTINS() s390_cpu_cpp_builtins (pfile)
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS s390_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO s390_d_register_target_info
+-
+ #ifdef DEFAULT_TARGET_64BIT
+ #define TARGET_DEFAULT     (MASK_64BIT | MASK_ZARCH | MASK_HARD_DFP	\
+ 			    | MASK_OPT_HTM | MASK_OPT_VX)
+diff --git a/gcc/config/sol2-d.cc b/gcc/config/sol2-d.cc
+index 9caa82e8490..0ace79d5aae 100644
+--- a/gcc/config/sol2-d.cc
++++ b/gcc/config/sol2-d.cc
+@@ -18,9 +18,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "config.h"
+ #include "system.h"
+ #include "coretypes.h"
+-#include "tm.h"
+-#include "memmodel.h"
+-#include "tm_p.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/sparc/sparc-d.cc b/gcc/config/sparc/sparc-d.cc
+index 1f3a9666b97..f8a3cf30f25 100644
+--- a/gcc/config/sparc/sparc-d.cc
++++ b/gcc/config/sparc/sparc-d.cc
+@@ -21,6 +21,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "system.h"
+ #include "coretypes.h"
+ #include "tm.h"
++#include "tm_d.h"
+ #include "d/d-target.h"
+ #include "d/d-target-def.h"
+ 
+diff --git a/gcc/config/sparc/sparc-d.h b/gcc/config/sparc/sparc-d.h
+new file mode 100644
+index 00000000000..b9d8ccf15ab
+--- /dev/null
++++ b/gcc/config/sparc/sparc-d.h
+@@ -0,0 +1,24 @@
++/* Definitions for the D front end on the SPARC architecture.
++   Copyright (C) 2022 Free Software Foundation, Inc.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 3, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING3.  If not see
++<http://www.gnu.org/licenses/>.  */
++
++/* Routines implemented in sparc-d.cc  */
++extern void sparc_d_target_versions (void);
++extern void sparc_d_register_target_info (void);
++
++/* Target hooks for D language.  */
++#define TARGET_D_CPU_VERSIONS sparc_d_target_versions
++#define TARGET_D_REGISTER_CPU_TARGET_INFO sparc_d_register_target_info
+diff --git a/gcc/config/sparc/sparc-protos.h b/gcc/config/sparc/sparc-protos.h
+index f9e1c74554d..4ddd00c81e1 100644
+--- a/gcc/config/sparc/sparc-protos.h
++++ b/gcc/config/sparc/sparc-protos.h
+@@ -112,8 +112,4 @@ unsigned int sparc_regmode_natural_size (machine_mode);
+ 
+ extern rtl_opt_pass *make_pass_work_around_errata (gcc::context *);
+ 
+-/* Routines implemented in sparc-d.cc  */
+-extern void sparc_d_target_versions (void);
+-extern void sparc_d_register_target_info (void);
+-
+ #endif /* __SPARC_PROTOS_H__ */
+diff --git a/gcc/config/sparc/sparc.h b/gcc/config/sparc/sparc.h
+index 2e17fca197a..91917c3eaad 100644
+--- a/gcc/config/sparc/sparc.h
++++ b/gcc/config/sparc/sparc.h
+@@ -27,10 +27,6 @@ along with GCC; see the file COPYING3.  If not see
+ 
+ #define TARGET_CPU_CPP_BUILTINS() sparc_target_macros ()
+ 
+-/* Target hooks for D language.  */
+-#define TARGET_D_CPU_VERSIONS sparc_d_target_versions
+-#define TARGET_D_REGISTER_CPU_TARGET_INFO sparc_d_register_target_info
+-
+ /* Specify this in a cover file to provide bi-architecture (32/64) support.  */
+ /* #define SPARC_BI_ARCH */
+ 
+diff --git a/gcc/configure b/gcc/configure
+index 5ce0557719a..c749ace011d 100755
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -13008,7 +13008,6 @@ fi
+ 
+ tm_file="${tm_file} defaults.h"
+ tm_p_file="${tm_p_file} tm-preds.h"
+-tm_d_file="${tm_d_file} defaults.h"
+ host_xm_file="auto-host.h ansidecl.h ${host_xm_file}"
+ build_xm_file="${build_auto} ansidecl.h ${build_xm_file}"
+ # We don't want ansidecl.h in target files, write code there in ISO/GNU C.
+@@ -13403,13 +13402,9 @@ for f in $tm_p_file; do
+ done
+ 
+ tm_d_file_list=
+-tm_d_include_list="options.h insn-constants.h"
++tm_d_include_list=
+ for f in $tm_d_file; do
+   case $f in
+-    defaults.h )
+-       tm_d_file_list="${tm_d_file_list} \$(srcdir)/$f"
+-       tm_d_include_list="${tm_d_include_list} $f"
+-       ;;
+     * )
+        tm_d_file_list="${tm_d_file_list} \$(srcdir)/config/$f"
+        tm_d_include_list="${tm_d_include_list} config/$f"
+@@ -19673,7 +19668,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 19676 "configure"
++#line 19671 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+@@ -19779,7 +19774,7 @@ else
+   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
+   lt_status=$lt_dlunknown
+   cat > conftest.$ac_ext <<_LT_EOF
+-#line 19782 "configure"
++#line 19777 "configure"
+ #include "confdefs.h"
+ 
+ #if HAVE_DLFCN_H
+diff --git a/gcc/configure.ac b/gcc/configure.ac
+index 23bee7010a3..992a50e7b20 100644
+--- a/gcc/configure.ac
++++ b/gcc/configure.ac
+@@ -2113,7 +2113,6 @@ AC_SUBST(HAVE_AUTO_BUILD)
+ 
+ tm_file="${tm_file} defaults.h"
+ tm_p_file="${tm_p_file} tm-preds.h"
+-tm_d_file="${tm_d_file} defaults.h"
+ host_xm_file="auto-host.h ansidecl.h ${host_xm_file}"
+ build_xm_file="${build_auto} ansidecl.h ${build_xm_file}"
+ # We don't want ansidecl.h in target files, write code there in ISO/GNU C.
+@@ -2357,13 +2356,9 @@ for f in $tm_p_file; do
+ done
+ 
+ tm_d_file_list=
+-tm_d_include_list="options.h insn-constants.h"
++tm_d_include_list=
+ for f in $tm_d_file; do
+   case $f in
+-    defaults.h )
+-       tm_d_file_list="${tm_d_file_list} \$(srcdir)/$f"
+-       tm_d_include_list="${tm_d_include_list} $f"
+-       ;;
+     * )
+        tm_d_file_list="${tm_d_file_list} \$(srcdir)/config/$f"
+        tm_d_include_list="${tm_d_include_list} config/$f"
+-- 
+2.25.1
+

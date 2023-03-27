@@ -1,0 +1,82 @@
+From 5d645a9dbda0174a25358bf5090640acedec1159 Mon Sep 17 00:00:00 2001
+From: Mikael Morin <mikael@gcc.gnu.org>
+Date: Mon, 29 Aug 2022 11:19:29 +0200
+Subject: [PATCH 127/547] fortran: Fix invalid function decl clobber ICE
+ [PR105012]
+
+The fortran frontend, as result symbol for a function without
+declared result symbol, uses the function symbol itself.  This caused
+an invalid clobber of a function decl to be emitted, leading to an
+ICE, whereas the intended behaviour was to clobber the function result
+variable.  This change fixes the problem by getting the decl from the
+just-retrieved variable reference after the call to
+gfc_conv_expr_reference, instead of copying it from the frontend symbol.
+
+	PR fortran/105012
+
+gcc/fortran/ChangeLog:
+
+	* trans-expr.cc (gfc_conv_procedure_call): Retrieve variable
+	from the just calculated variable reference.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/intent_out_15.f90: New test.
+
+(cherry picked from commit edaf1e005c90b311c39b46d85cea17befbece112)
+---
+ gcc/fortran/trans-expr.cc                   |  3 ++-
+ gcc/testsuite/gfortran.dg/intent_out_15.f90 | 27 +++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/intent_out_15.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index 3cfde439cc0..fe979ce852d 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -6534,7 +6534,8 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 			  tree var;
+ 			  /* FIXME: This fails if var is passed by reference, see PR
+ 			     41453.  */
+-			  var = e->symtree->n.sym->backend_decl;
++			  var = build_fold_indirect_ref_loc (input_location,
++							     parmse.expr);
+ 			  tree clobber = build_clobber (TREE_TYPE (var));
+ 			  gfc_add_modify (&se->pre, var, clobber);
+ 			}
+diff --git a/gcc/testsuite/gfortran.dg/intent_out_15.f90 b/gcc/testsuite/gfortran.dg/intent_out_15.f90
+new file mode 100644
+index 00000000000..64334e6f038
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/intent_out_15.f90
+@@ -0,0 +1,27 @@
++! { dg-do compile }
++! { dg-additional-options "-fdump-tree-original" }
++!
++! PR fortran/105012
++! The following case was triggering an ICE because of a clobber
++! on the DERFC function decl instead of its result.
++
++module error_function
++integer, parameter :: r8 = selected_real_kind(12) ! 8 byte real
++contains
++SUBROUTINE CALERF_r8(ARG, RESULT, JINT)
++   integer, parameter :: rk = r8
++   real(rk), intent(in)  :: arg
++   real(rk), intent(out) :: result
++   IF (Y .LE. THRESH) THEN
++   END IF
++end SUBROUTINE CALERF_r8
++FUNCTION DERFC(X)
++   integer, parameter :: rk = r8 ! 8 byte real
++   real(rk), intent(in) :: X
++   real(rk) :: DERFC
++   CALL CALERF_r8(X, DERFC, JINT)
++END FUNCTION DERFC
++end module error_function
++
++! { dg-final { scan-tree-dump-times "CLOBBER" 1 "original" } }
++! { dg-final { scan-tree-dump "__result_derfc = {CLOBBER};" "original" } }
+-- 
+2.25.1
+

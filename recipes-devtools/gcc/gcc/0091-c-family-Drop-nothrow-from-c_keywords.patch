@@ -1,0 +1,30 @@
+From 36c23b302c9487b34fa89daaf1a1a11514ce9bd2 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 27 Sep 2022 10:40:09 -0400
+Subject: [PATCH 091/547] c-family: Drop nothrow from c_keywords
+
+As discussed in
+<https://gcc.gnu.org/pipermail/gcc-patches/2022-September/602337.html>.
+
+gcc/c-family/ChangeLog:
+
+	* c-format.cc (c_keywords): Drop nothrow.
+---
+ gcc/c-family/c-format.cc | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/gcc/c-family/c-format.cc b/gcc/c-family/c-format.cc
+index ebdac57f943..d05e5acd063 100644
+--- a/gcc/c-family/c-format.cc
++++ b/gcc/c-family/c-format.cc
+@@ -2933,7 +2933,6 @@ static const token_t c_keywords[] =
+    NAME ("noinline", NULL),
+    NAME ("nonnull", NULL),
+    NAME ("noreturn", NULL),
+-   NAME ("nothrow", NULL),
+    NAME ("offsetof", NULL),
+    NAME ("readonly", "read-only"),
+    NAME ("readwrite", "read-write"),
+-- 
+2.25.1
+

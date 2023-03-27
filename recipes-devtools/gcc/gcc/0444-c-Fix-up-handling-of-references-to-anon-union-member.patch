@@ -1,0 +1,92 @@
+From d4eca31c521f54a3066f9940fbf09e28b53eff8c Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 19 Jan 2023 23:27:34 +0100
+Subject: [PATCH 444/547] c++: Fix up handling of references to anon union
+ members in initializers [PR53932]
+
+For anonymous union members we create artificial VAR_DECLs which
+have DECL_VALUE_EXPR for the actual COMPONENT_REF.  That works
+just fine inside of functions (including global dynamic constructors),
+because during gimplification such VAR_DECLs are gimplified as
+their DECL_VALUE_EXPR.  This is also done during regimplification.
+
+But references to these artificial vars in DECL_INITIAL expressions
+aren't ever replaced by the DECL_VALUE_EXPRs, so we end up either
+with link failures like on the testcase below, or worse ICEs with
+LTO.
+
+The following patch fixes those during cp_fully_fold_init where we
+already walk all the trees (!data->genericize means that
+function rather than cp_fold_function).
+
+2023-01-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/53932
+	* cp-gimplify.cc (cp_fold_r): During cp_fully_fold_init replace
+	DECL_ANON_UNION_VAR_P VAR_DECLs with their corresponding
+	DECL_VALUE_EXPR.
+
+	* g++.dg/init/pr53932.C: New test.
+
+(cherry picked from commit 9b9a989adc042b304572fd6d4ade46b47be6ccb8)
+---
+ gcc/cp/cp-gimplify.cc               | 10 ++++++++++
+ gcc/testsuite/g++.dg/init/pr53932.C | 25 +++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/init/pr53932.C
+
+diff --git a/gcc/cp/cp-gimplify.cc b/gcc/cp/cp-gimplify.cc
+index e4c2644af15..426b373689e 100644
+--- a/gcc/cp/cp-gimplify.cc
++++ b/gcc/cp/cp-gimplify.cc
+@@ -1004,6 +1004,16 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
+ 	  *stmt_p = stmt = cxx_constant_value (stmt);
+       break;
+ 
++    case VAR_DECL:
++      /* In initializers replace anon union artificial VAR_DECLs
++	 with their DECL_VALUE_EXPRs, as nothing will do it later.  */
++      if (DECL_ANON_UNION_VAR_P (stmt) && !data->genericize)
++	{
++	  *stmt_p = stmt = unshare_expr (DECL_VALUE_EXPR (stmt));
++	  break;
++	}
++      break;
++
+     default:
+       break;
+     }
+diff --git a/gcc/testsuite/g++.dg/init/pr53932.C b/gcc/testsuite/g++.dg/init/pr53932.C
+new file mode 100644
+index 00000000000..3b129e7d68a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/init/pr53932.C
+@@ -0,0 +1,25 @@
++// PR c++/53932
++// { dg-do link }
++
++static union { int i; };
++int &r = i;
++int s = i;
++int *t = &i;
++
++void
++foo (int **p, int *q)
++{
++  static int &u = i;
++  static int v = i;
++  static int *w = &i;
++  int &x = i;
++  int y = i;
++  int *z = &i;
++  *p = &i;
++  *q = i;
++}
++
++int
++main ()
++{
++}
+-- 
+2.25.1
+

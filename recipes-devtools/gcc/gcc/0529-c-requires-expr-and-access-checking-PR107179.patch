@@ -1,0 +1,69 @@
+From 668098c2e55c33f97e331c3160174bf12c3d88f7 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Thu, 3 Nov 2022 15:35:18 -0400
+Subject: [PATCH 529/547] c++: requires-expr and access checking [PR107179]
+
+Like during satisfaction, we also need to avoid deferring access checks
+during substitution of a requires-expr because the outcome of an access
+check can determine the value of the requires-expr.  Otherwise (in
+deferred access checking contexts such as within a base-clause), the
+requires-expr may evaluate to the wrong result, and along the way a
+failed access check may leak out from it into a non-SFINAE context and
+cause a hard error (as in the below testcase).
+
+	PR c++/107179
+
+gcc/cp/ChangeLog:
+
+	* constraint.cc (tsubst_requires_expr): Make sure we're not
+	deferring access checks.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/concepts-requires31.C: New test.
+
+(cherry picked from commit 40c34beef620ed13c4113c893ed4335ccc1b8f92)
+---
+ gcc/cp/constraint.cc                             |  3 +++
+ gcc/testsuite/g++.dg/cpp2a/concepts-requires31.C | 15 +++++++++++++++
+ 2 files changed, 18 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/concepts-requires31.C
+
+diff --git a/gcc/cp/constraint.cc b/gcc/cp/constraint.cc
+index ab238dbb4cb..4e074f8fdaf 100644
+--- a/gcc/cp/constraint.cc
++++ b/gcc/cp/constraint.cc
+@@ -2252,6 +2252,9 @@ tsubst_requires_expr (tree t, tree args, sat_info info)
+ {
+   local_specialization_stack stack (lss_copy);
+ 
++  /* We need to check access during the substitution.  */
++  deferring_access_check_sentinel acs (dk_no_deferred);
++
+   /* A requires-expression is an unevaluated context.  */
+   cp_unevaluated u;
+ 
+diff --git a/gcc/testsuite/g++.dg/cpp2a/concepts-requires31.C b/gcc/testsuite/g++.dg/cpp2a/concepts-requires31.C
+new file mode 100644
+index 00000000000..cd26b9ca077
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/concepts-requires31.C
+@@ -0,0 +1,15 @@
++// PR c++/107179
++// { dg-do compile { target c++20 } }
++
++template<bool B> struct bool_constant { static constexpr bool value = B; };
++
++template<typename T>
++  struct is_implicitly_default_constructible
++  : bool_constant<requires { T(); }>
++  { };
++
++struct X { private: X(); };
++struct Y { };
++
++static_assert( !is_implicitly_default_constructible<X>::value );
++static_assert(  is_implicitly_default_constructible<Y>::value );
+-- 
+2.25.1
+

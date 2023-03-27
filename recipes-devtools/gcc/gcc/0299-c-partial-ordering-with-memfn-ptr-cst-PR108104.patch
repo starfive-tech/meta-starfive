@@ -1,0 +1,80 @@
+From 6e09ca0cba625b8bb2ef50f9df726eb455ebb813 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Thu, 15 Dec 2022 15:38:47 -0500
+Subject: [PATCH 299/547] c++: partial ordering with memfn ptr cst [PR108104]
+
+Here we're triggering an overzealous assert in unify during partial
+ordering since the member function pointer constants are represented as
+ordinary CONSTRUCTORs (with TYPE_PTRMEMFUNC_P TREE_TYPE) but the assert
+expects COMPOUND_LITERAL_P constructors.
+
+	PR c++/108104
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (unify) <default>: Relax assert to accept any
+	CONSTRUCTOR parm, not just COMPOUND_LITERAL_P one.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/template/ptrmem33.C: New test.
+
+(cherry picked from commit 38304846d18d6bb14b0fd6c627c5c6d43a814d01)
+---
+ gcc/cp/pt.cc                             |  2 +-
+ gcc/testsuite/g++.dg/template/ptrmem33.C | 30 ++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/template/ptrmem33.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index a5f14ef98e8..d4c32ce6025 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -24810,7 +24810,7 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
+       if (is_overloaded_fn (parm) || type_unknown_p (parm))
+ 	return unify_success (explain_p);
+       gcc_assert (EXPR_P (parm)
+-		  || COMPOUND_LITERAL_P (parm)
++		  || TREE_CODE (parm) == CONSTRUCTOR
+ 		  || TREE_CODE (parm) == TRAIT_EXPR);
+     expr:
+       /* We must be looking at an expression.  This can happen with
+diff --git a/gcc/testsuite/g++.dg/template/ptrmem33.C b/gcc/testsuite/g++.dg/template/ptrmem33.C
+new file mode 100644
+index 00000000000..dca741ae5e2
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/ptrmem33.C
+@@ -0,0 +1,30 @@
++// PR c++/108104
++// { dg-do compile { target c++11 } }
++
++struct A {
++  void x();
++  void y();
++};
++
++enum State { On };
++
++template<State state, void (A::*)()>
++struct B {
++  static void f();
++};
++
++template<State state>
++struct B<state, nullptr> {
++  static void g();
++};
++
++template<State state>
++struct B<state, &A::y> {
++  static void h();
++};
++
++int main() {
++  B<State::On, &A::x>::f();
++  B<State::On, nullptr>::g();
++  B<State::On, &A::y>::h();
++}
+-- 
+2.25.1
+

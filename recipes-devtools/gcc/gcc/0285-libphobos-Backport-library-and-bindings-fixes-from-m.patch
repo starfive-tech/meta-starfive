@@ -1,0 +1,255 @@
+From f141f0f374465759a78e58bf4fd76bc21330eac9 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Tue, 13 Dec 2022 22:34:57 +0100
+Subject: [PATCH 285/547] libphobos: Backport library and bindings fixes from
+ mainline
+
+D Runtime changes:
+
+	- Fix MIPS64 bindings for CRuntime_UClibc.
+
+Phobos changes:
+
+	- Fix std.path.expandTilde erroneously raising onOutOfMemory
+	  after failed call to getpwnam_r().
+	- Fix std.random unittest failures on ILP32 targets.
+	- Use GENERIC_IO on CRuntime_UClibc port of std.stdio.
+
+libphobos/ChangeLog:
+
+	* libdruntime/core/stdc/fenv.d: Compile in MIPS uClibc bindings on
+	MIPS_Any targets.
+	* libdruntime/core/stdc/math.d: Likewise.
+	* libdruntime/core/sys/posix/dlfcn.d: Likewise.
+	* libdruntime/core/sys/posix/setjmp.d: Add MIPS64 definitions for
+	CRuntime_UClibc.
+	* libdruntime/core/sys/posix/sys/types.d: Likewise.
+	* src/std/path.d (expandTilde): Handle more errno codes that could be
+	left set by getpwnam_r.
+	* src/std/random.d: Use D_LP64 in unittests.
+	* src/std/stdio.d: Set CRuntime_UClibc as GENERIC_IO target.
+---
+ libphobos/libdruntime/core/stdc/fenv.d        |  2 +-
+ libphobos/libdruntime/core/stdc/math.d        |  2 +-
+ libphobos/libdruntime/core/sys/posix/dlfcn.d  |  2 +-
+ libphobos/libdruntime/core/sys/posix/setjmp.d | 16 +++++++++++++
+ .../libdruntime/core/sys/posix/sys/types.d    | 12 ++++++++++
+ libphobos/src/std/path.d                      | 23 +++++++++++++++----
+ libphobos/src/std/random.d                    | 14 +++++------
+ libphobos/src/std/stdio.d                     |  3 +--
+ 8 files changed, 57 insertions(+), 17 deletions(-)
+
+diff --git a/libphobos/libdruntime/core/stdc/fenv.d b/libphobos/libdruntime/core/stdc/fenv.d
+index 88123fb16a6..5242ba9d4e2 100644
+--- a/libphobos/libdruntime/core/stdc/fenv.d
++++ b/libphobos/libdruntime/core/stdc/fenv.d
+@@ -483,7 +483,7 @@ else version (CRuntime_UClibc)
+ 
+         alias fexcept_t = ushort;
+     }
+-    else version (MIPS32)
++    else version (MIPS_Any)
+     {
+         struct fenv_t
+         {
+diff --git a/libphobos/libdruntime/core/stdc/math.d b/libphobos/libdruntime/core/stdc/math.d
+index 0393ea52c07..51fd68f9fc3 100644
+--- a/libphobos/libdruntime/core/stdc/math.d
++++ b/libphobos/libdruntime/core/stdc/math.d
+@@ -120,7 +120,7 @@ else version (CRuntime_UClibc)
+         ///
+         enum int FP_ILOGBNAN      = int.min;
+     }
+-    else version (MIPS32)
++    else version (MIPS_Any)
+     {
+         ///
+         enum int FP_ILOGB0        = -int.max;
+diff --git a/libphobos/libdruntime/core/sys/posix/dlfcn.d b/libphobos/libdruntime/core/sys/posix/dlfcn.d
+index a9519ca234a..24fa3787ec4 100644
+--- a/libphobos/libdruntime/core/sys/posix/dlfcn.d
++++ b/libphobos/libdruntime/core/sys/posix/dlfcn.d
+@@ -387,7 +387,7 @@ else version (CRuntime_UClibc)
+         enum RTLD_LOCAL             = 0;
+         enum RTLD_NODELETE          = 0x01000;
+     }
+-    else version (MIPS32)
++    else version (MIPS_Any)
+     {
+         enum RTLD_LAZY              = 0x0001;
+         enum RTLD_NOW               = 0x0002;
+diff --git a/libphobos/libdruntime/core/sys/posix/setjmp.d b/libphobos/libdruntime/core/sys/posix/setjmp.d
+index 91e3a19d081..5a15d82d2ee 100644
+--- a/libphobos/libdruntime/core/sys/posix/setjmp.d
++++ b/libphobos/libdruntime/core/sys/posix/setjmp.d
+@@ -370,6 +370,22 @@ else version (CRuntime_UClibc)
+                 double[6] __fpregs;
+         }
+     }
++    else version (MIPS64)
++    {
++        struct __jmp_buf
++        {
++            long __pc;
++            long __sp;
++            long[8] __regs;
++            long __fp;
++            long __gp;
++            int __fpc_csr;
++            version (MIPS_N64)
++                double[8] __fpregs;
++            else
++                double[6] __fpregs;
++        }
++    }
+     else
+         static assert(0, "unimplemented");
+ 
+diff --git a/libphobos/libdruntime/core/sys/posix/sys/types.d b/libphobos/libdruntime/core/sys/posix/sys/types.d
+index ec229dd3b2b..3e515c4c68e 100644
+--- a/libphobos/libdruntime/core/sys/posix/sys/types.d
++++ b/libphobos/libdruntime/core/sys/posix/sys/types.d
+@@ -1140,6 +1140,18 @@ else version (CRuntime_UClibc)
+         enum __SIZEOF_PTHREAD_BARRIER_T     = 20;
+         enum __SIZEOF_PTHREAD_BARRIERATTR_T = 4;
+      }
++     else version (MIPS64)
++     {
++        enum __SIZEOF_PTHREAD_ATTR_T        = 56;
++        enum __SIZEOF_PTHREAD_MUTEX_T       = 40;
++        enum __SIZEOF_PTHREAD_MUTEXATTR_T   = 4;
++        enum __SIZEOF_PTHREAD_COND_T        = 48;
++        enum __SIZEOF_PTHREAD_CONDATTR_T    = 4;
++        enum __SIZEOF_PTHREAD_RWLOCK_T      = 56;
++        enum __SIZEOF_PTHREAD_RWLOCKATTR_T  = 8;
++        enum __SIZEOF_PTHREAD_BARRIER_T     = 32;
++        enum __SIZEOF_PTHREAD_BARRIERATTR_T = 4;
++     }
+      else version (ARM)
+      {
+         enum __SIZEOF_PTHREAD_ATTR_T = 36;
+diff --git a/libphobos/src/std/path.d b/libphobos/src/std/path.d
+index de180fcc548..777d8b924dd 100644
+--- a/libphobos/src/std/path.d
++++ b/libphobos/src/std/path.d
+@@ -3959,7 +3959,7 @@ string expandTilde(string inputPath) @safe nothrow
+     version (Posix)
+     {
+         import core.exception : onOutOfMemoryError;
+-        import core.stdc.errno : errno, ERANGE;
++        import core.stdc.errno : errno, EBADF, ENOENT, EPERM, ERANGE, ESRCH;
+         import core.stdc.stdlib : malloc, free, realloc;
+ 
+         /*  Joins a path from a C string to the remainder of path.
+@@ -4065,7 +4065,7 @@ string expandTilde(string inputPath) @safe nothrow
+                 char[] extra_memory;
+ 
+                 passwd result;
+-                while (1)
++                loop: while (1)
+                 {
+                     extra_memory.length += extra_memory_size;
+ 
+@@ -4088,10 +4088,23 @@ string expandTilde(string inputPath) @safe nothrow
+                         break;
+                     }
+ 
+-                    if (errno != ERANGE &&
++                    switch (errno)
++                    {
++                        case ERANGE:
+                         // On BSD and OSX, errno can be left at 0 instead of set to ERANGE
+-                        errno != 0)
+-                        onOutOfMemoryError();
++                        case 0:
++                            break;
++
++                        case ENOENT:
++                        case ESRCH:
++                        case EBADF:
++                        case EPERM:
++                            // The given name or uid was not found.
++                            break loop;
++
++                        default:
++                            onOutOfMemoryError();
++                    }
+ 
+                     // extra_memory isn't large enough
+                     import core.checkedint : mulu;
+diff --git a/libphobos/src/std/random.d b/libphobos/src/std/random.d
+index 106e51ceedb..c23eac9843e 100644
+--- a/libphobos/src/std/random.d
++++ b/libphobos/src/std/random.d
+@@ -2516,7 +2516,7 @@ if (!is(T == enum) && (isIntegral!T || isSomeChar!T))
+     assert(rnd.uniform!ulong == 4838462006927449017);
+ 
+     enum Fruit { apple, mango, pear }
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(rnd.uniform!Fruit == Fruit.mango);
+ }
+ 
+@@ -2783,7 +2783,7 @@ auto ref choice(Range)(auto ref Range range)
+     auto rnd = MinstdRand0(42);
+ 
+     auto elem  = [1, 2, 3, 4, 5].choice(rnd);
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(elem == 3);
+ }
+ 
+@@ -2865,7 +2865,7 @@ if (isRandomAccessRange!Range)
+     auto rnd = MinstdRand0(42);
+ 
+     auto arr = [1, 2, 3, 4, 5].randomShuffle(rnd);
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(arr == [3, 5, 2, 4, 1]);
+ }
+ 
+@@ -2955,15 +2955,15 @@ if (isRandomAccessRange!Range)
+     auto arr = [1, 2, 3, 4, 5, 6];
+     arr = arr.dup.partialShuffle(1, rnd);
+ 
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(arr == [2, 1, 3, 4, 5, 6]); // 1<->2
+ 
+     arr = arr.dup.partialShuffle(2, rnd);
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(arr == [1, 4, 3, 2, 5, 6]); // 1<->2, 2<->4
+ 
+     arr = arr.dup.partialShuffle(3, rnd);
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(arr == [5, 4, 6, 2, 1, 3]); // 1<->5, 2<->4, 3<->6
+ }
+ 
+@@ -3369,7 +3369,7 @@ if (isRandomAccessRange!Range)
+     import std.range : iota;
+     auto rnd = MinstdRand0(42);
+ 
+-    version (X86_64) // https://issues.dlang.org/show_bug.cgi?id=15147
++    version (D_LP64) // https://issues.dlang.org/show_bug.cgi?id=15147
+     assert(10.iota.randomCover(rnd).equal([7, 4, 2, 0, 1, 6, 8, 3, 9, 5]));
+ }
+ 
+diff --git a/libphobos/src/std/stdio.d b/libphobos/src/std/stdio.d
+index 1bde73d628d..ca6f48c7c13 100644
+--- a/libphobos/src/std/stdio.d
++++ b/libphobos/src/std/stdio.d
+@@ -85,8 +85,7 @@ else version (CRuntime_Musl)
+ }
+ else version (CRuntime_UClibc)
+ {
+-    // uClibc supports GCC IO
+-    version = GCC_IO;
++    version = GENERIC_IO;
+ }
+ else version (OSX)
+ {
+-- 
+2.25.1
+

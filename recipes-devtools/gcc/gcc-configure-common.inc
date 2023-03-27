@@ -7,7 +7,7 @@ require gcc-shared-source.inc
 
 # gcc 3.x expects 'f77', 4.0 expects 'f95', 4.1 and 4.2 expect 'fortran'
 FORTRAN ?= ",f77"
-LANGUAGES ?= "c,c++,${FORTRAN}"
+LANGUAGES ?= "c,c++${FORTRAN}"
 
 EXTRA_OECONF_BASE ?= ""
 EXTRA_OECONF_PATHS ?= ""
@@ -21,34 +21,26 @@ SYMVERS_CONF ?= "--enable-symvers=gnu"
 
 EXTRA_OECONF = "\
     ${@['--enable-clocale=generic', ''][d.getVar('USE_NLS') != 'no']} \
+    --with-gnu-ld \
     --enable-shared \
     --enable-languages=${LANGUAGES} \
     --enable-threads=${GCCTHREADS} \
     ${GCCMULTILIB} \
     ${GCCPIE} \
+    --enable-c99 \
+    --enable-long-long \
     ${SYMVERS_CONF} \
+    --enable-libstdcxx-pch \
     --program-prefix=${TARGET_PREFIX} \
     --without-local-prefix \
-    --enable-lto \
+    --disable-install-libiberty \
     ${EXTRA_OECONF_BASE} \
     ${EXTRA_OECONF_GCC_FLOAT} \
     ${EXTRA_OECONF_PATHS} \
     ${@get_gcc_mips_plt_setting(bb, d)} \
     ${@get_gcc_ppc_plt_settings(bb, d)} \
     ${@get_gcc_multiarch_setting(bb, d)} \
-    --enable-standard-branch-protection \
-    --disable-libmudflap \
-    --disable-libgomp \
-    --disable-libssp \
-    --disable-libquadmath \
-    --disable-libquadmath-support \
-    --disable-libmpx \
-    --enable-target-optspace \
-    --with-gmp \
-    --with-mpfr \
-    --with-mpc \
-    --enable-tls \
-    --with-isl \
+	--enable-standard-branch-protection \
 "
 
 # glibc version is a minimum controlling whether features are enabled. 
@@ -57,7 +49,7 @@ EXTRA_OECONF:append:libc-glibc = " --with-glibc-version=2.28 "
 
 # Set this here since GCC configure won't auto-detect and enable
 # initfini-arry when cross compiling.
-#EXTRA_OECONF:append = " --enable-initfini-array"
+EXTRA_OECONF:append = " --enable-initfini-array"
 
 export gcc_cv_collect2_libs = 'none required'
 # We need to set gcc_cv_collect2_libs else there is cross-compilation badness

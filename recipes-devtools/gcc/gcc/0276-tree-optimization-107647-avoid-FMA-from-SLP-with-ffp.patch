@@ -1,0 +1,84 @@
+From a9fafa2f533e25c57528c0294e19a154197848dd Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 17 Nov 2022 09:43:31 +0100
+Subject: [PATCH 276/547] tree-optimization/107647 - avoid FMA from SLP with
+ -ffp-contract=off
+
+Only with -ffp-contract=fast we can synthesize FMA operations like
+vfmaddsub231ps, so properly guard the transform in SLP pattern
+detection.
+
+	PR tree-optimization/107647
+	* tree-vect-slp-patterns.cc (addsub_pattern::recognize): Only
+	allow FMA generation with -ffp-contract=fast for FP types.
+	(complex_mul_pattern::matches): Likewise.
+
+	* gcc.target/i386/pr107647.c: New testcase.
+
+(cherry picked from commit c5df8392c5848c0462558f41cdf6eab31db301cf)
+---
+ gcc/testsuite/gcc.target/i386/pr107647.c | 17 +++++++++++++++++
+ gcc/tree-vect-slp-patterns.cc            | 15 +++++++++++----
+ 2 files changed, 28 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr107647.c
+
+diff --git a/gcc/testsuite/gcc.target/i386/pr107647.c b/gcc/testsuite/gcc.target/i386/pr107647.c
+new file mode 100644
+index 00000000000..45fcb55d698
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr107647.c
+@@ -0,0 +1,17 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -ffp-contract=off -mavx2 -mfma" } */
++
++void cscal(int n, float da_r, float *x)
++{
++  for (int i = 0; i < n; i += 4)
++    {
++      float temp0  =  da_r * x[i]   - x[i+1];
++      float temp1  =  da_r * x[i+2] - x[i+3];
++      x[i+1]       =  da_r * x[i+1] + x[i];
++      x[i+3]       =  da_r * x[i+3] + x[i+2];
++      x[i]         =  temp0;
++      x[i+2]       =  temp1;
++    }
++}
++
++/* { dg-final { scan-assembler-not "fma" } } */
+diff --git a/gcc/tree-vect-slp-patterns.cc b/gcc/tree-vect-slp-patterns.cc
+index 4b6384d7e25..5c6ce8729bd 100644
+--- a/gcc/tree-vect-slp-patterns.cc
++++ b/gcc/tree-vect-slp-patterns.cc
+@@ -1035,8 +1035,11 @@ complex_mul_pattern::matches (complex_operation_t op,
+   auto_vec<slp_tree> left_op, right_op;
+   slp_tree add0 = NULL;
+ 
+-  /* Check if we may be a multiply add.  */
++  /* Check if we may be a multiply add.  It's only valid to form FMAs
++     with -ffp-contract=fast.  */
+   if (!mul0
++      && (flag_fp_contract_mode == FP_CONTRACT_FAST
++	  || !FLOAT_TYPE_P (SLP_TREE_VECTYPE (l0node[0])))
+       && vect_match_expression_p (l0node[0], PLUS_EXPR))
+     {
+       auto vals = SLP_TREE_CHILDREN (l0node[0]);
+@@ -1501,9 +1504,13 @@ addsub_pattern::recognize (slp_tree_to_load_perm_map_t *,
+     }
+ 
+   /* Now we have either { -, +, -, + ... } (!l0add_p) or { +, -, +, - ... }
+-     (l0add_p), see whether we have FMA variants.  */
+-  if (!l0add_p
+-      && vect_match_expression_p (SLP_TREE_CHILDREN (l0node)[0], MULT_EXPR))
++     (l0add_p), see whether we have FMA variants.  We can only form FMAs
++     if allowed via -ffp-contract=fast.  */
++  if (flag_fp_contract_mode != FP_CONTRACT_FAST
++      && FLOAT_TYPE_P (SLP_TREE_VECTYPE (l0node)))
++    ;
++  else if (!l0add_p
++	   && vect_match_expression_p (SLP_TREE_CHILDREN (l0node)[0], MULT_EXPR))
+     {
+       /* (c * d) -+ a */
+       if (vect_pattern_validate_optab (IFN_VEC_FMADDSUB, node))
+-- 
+2.25.1
+

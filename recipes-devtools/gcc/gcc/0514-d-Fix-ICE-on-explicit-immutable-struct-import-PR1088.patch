@@ -1,0 +1,92 @@
+From 2583365912c8700abe1f4a23ed611acb80fac09d Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Mon, 27 Feb 2023 20:46:18 +0100
+Subject: [PATCH 514/547] d: Fix ICE on explicit immutable struct import
+ [PR108877]
+
+Const and immutable types are built as variants of the type they are
+derived from, and TYPE_STUB_DECL is not set for these variants.
+
+	PR d/108877
+
+gcc/d/ChangeLog:
+
+	* imports.cc (ImportVisitor::visit (EnumDeclaration *)): Call
+	make_import on TYPE_MAIN_VARIANT.
+	(ImportVisitor::visit (AggregateDeclaration *)): Likewise.
+	(ImportVisitor::visit (ClassDeclaration *)): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gdc.dg/imports/pr108877a.d: New test.
+	* gdc.dg/pr108877.d: New test.
+
+(cherry picked from commit ce1cea3e22f58bbddde017f8a92e59bae8892339)
+---
+ gcc/d/imports.cc                         | 7 ++++++-
+ gcc/testsuite/gdc.dg/imports/pr108877a.d | 6 ++++++
+ gcc/testsuite/gdc.dg/pr108877.d          | 9 +++++++++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gdc.dg/imports/pr108877a.d
+ create mode 100644 gcc/testsuite/gdc.dg/pr108877.d
+
+diff --git a/gcc/d/imports.cc b/gcc/d/imports.cc
+index dfda2401ee8..6a59ef61b9c 100644
+--- a/gcc/d/imports.cc
++++ b/gcc/d/imports.cc
+@@ -106,12 +106,16 @@ public:
+     tree type = build_ctype (d->type);
+     /* Not all kinds of D enums create a TYPE_DECL.  */
+     if (TREE_CODE (type) == ENUMERAL_TYPE)
+-      this->result_ = this->make_import (TYPE_STUB_DECL (type));
++      {
++	type = TYPE_MAIN_VARIANT (type);
++	this->result_ = this->make_import (TYPE_STUB_DECL (type));
++      }
+   }
+ 
+   void visit (AggregateDeclaration *d)
+   {
+     tree type = build_ctype (d->type);
++    type = TYPE_MAIN_VARIANT (type);
+     this->result_ = this->make_import (TYPE_STUB_DECL (type));
+   }
+ 
+@@ -119,6 +123,7 @@ public:
+   {
+     /* Want the RECORD_TYPE, not POINTER_TYPE.  */
+     tree type = TREE_TYPE (build_ctype (d->type));
++    type = TYPE_MAIN_VARIANT (type);
+     this->result_ = this->make_import (TYPE_STUB_DECL (type));
+   }
+ 
+diff --git a/gcc/testsuite/gdc.dg/imports/pr108877a.d b/gcc/testsuite/gdc.dg/imports/pr108877a.d
+new file mode 100644
+index 00000000000..a23c78ddf84
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/imports/pr108877a.d
+@@ -0,0 +1,6 @@
++immutable struct ImmutableS { }
++const struct ConstS { }
++immutable class ImmutableC { }
++const class ConstC { }
++immutable enum ImmutableE { _ }
++const enum ConstE { _ }
+diff --git a/gcc/testsuite/gdc.dg/pr108877.d b/gcc/testsuite/gdc.dg/pr108877.d
+new file mode 100644
+index 00000000000..710551f3f9a
+--- /dev/null
++++ b/gcc/testsuite/gdc.dg/pr108877.d
+@@ -0,0 +1,9 @@
++// { dg-options "-I $srcdir/gdc.dg" }
++// { dg-do compile }
++import imports.pr108877a :
++    ImmutableS,
++    ConstS,
++    ImmutableC,
++    ConstC,
++    ImmutableE,
++    ConstE;
+-- 
+2.25.1
+

@@ -1,0 +1,54 @@
+From 2e81790f45c9b7ced4d8c70c3122404854aa5be5 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 20 Sep 2022 22:23:43 +0200
+Subject: [PATCH 098/547] Fortran: NULL pointer dereference in invalid
+ simplification [PR106985]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/106985
+	* expr.cc (gfc_simplify_expr): Avoid NULL pointer dereference.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/106985
+	* gfortran.dg/pr106985.f90: New test.
+
+(cherry picked from commit 8dbb15bc2d019488240c1e69d93121b0347ac092)
+---
+ gcc/fortran/expr.cc                    | 3 ++-
+ gcc/testsuite/gfortran.dg/pr106985.f90 | 8 ++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr106985.f90
+
+diff --git a/gcc/fortran/expr.cc b/gcc/fortran/expr.cc
+index be94c18c836..290ddf360c8 100644
+--- a/gcc/fortran/expr.cc
++++ b/gcc/fortran/expr.cc
+@@ -2287,7 +2287,8 @@ gfc_simplify_expr (gfc_expr *p, int type)
+ 	 initialization expression, or we want a subsection.  */
+       if (p->symtree->n.sym->attr.flavor == FL_PARAMETER
+ 	  && (gfc_init_expr_flag || p->ref
+-	      || p->symtree->n.sym->value->expr_type != EXPR_ARRAY))
++	      || (p->symtree->n.sym->value
++		  && p->symtree->n.sym->value->expr_type != EXPR_ARRAY)))
+ 	{
+ 	  if (!simplify_parameter_variable (p, type))
+ 	    return false;
+diff --git a/gcc/testsuite/gfortran.dg/pr106985.f90 b/gcc/testsuite/gfortran.dg/pr106985.f90
+new file mode 100644
+index 00000000000..f4ed92577a3
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr106985.f90
+@@ -0,0 +1,8 @@
++! { dg-do compile }
++! PR fortran/106985 - ICE in gfc_simplify_expr
++! Contributed by G.Steinmetz
++
++program p
++  integer, parameter :: a(2) = 1
++  integer, parameter :: b = a(2) + b ! { dg-error "before its definition is complete" }
++end
+-- 
+2.25.1
+

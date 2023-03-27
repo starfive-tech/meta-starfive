@@ -1,0 +1,63 @@
+From 86def97756915ecd417110b9d88fbca41484222f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 12 Dec 2022 00:27:09 +0000
+Subject: [PATCH 273/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/d/ChangeLog         | 15 +++++++++++++++
+ gcc/testsuite/ChangeLog | 11 +++++++++++
+ 3 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 0706710bce8..a8efd513898 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221211
++20221212
+diff --git a/gcc/d/ChangeLog b/gcc/d/ChangeLog
+index a9d88d03ba9..7b53012d9a5 100644
+--- a/gcc/d/ChangeLog
++++ b/gcc/d/ChangeLog
+@@ -1,3 +1,18 @@
++2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
++
++	* imports.cc (ImportVisitor::visit (OverloadSet *)): Remove "final"
++	and "override" from visitor method.
++
++2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
++
++	Backported from master:
++	2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
++
++	PR d/108050
++	* decl.cc (DeclVisitor::visit (Import *)): Handle build_import_decl
++	returning a TREE_LIST.
++	* imports.cc (ImportVisitor::visit (OverloadSet *)): New override.
++
+ 2022-11-30  Iain Buclaw  <ibuclaw@gdcproject.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 3d10280ffb5..96870fb1a42 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,14 @@
++2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
++
++	Backported from master:
++	2022-12-11  Iain Buclaw  <ibuclaw@gdcproject.org>
++
++	PR d/108050
++	* gdc.dg/imports/pr108050/mod1.d: New.
++	* gdc.dg/imports/pr108050/mod2.d: New.
++	* gdc.dg/imports/pr108050/package.d: New.
++	* gdc.dg/pr108050.d: New test.
++
+ 2022-12-09  Martin Liska  <mliska@suse.cz>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

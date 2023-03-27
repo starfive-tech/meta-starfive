@@ -1,0 +1,77 @@
+From 14e25006c8d2c1245414a6145188161a6bf7064d Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 11 Jan 2023 00:22:09 +0000
+Subject: [PATCH 341/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 24 ++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 3 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index b768fb23c1c..d1d7b49a7cc 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,27 @@
++2023-01-10  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
++
++	Backported from master:
++	2022-12-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
++
++	PR target/107714
++	* config/arm/arm-protos.h (mve_struct_mem_operand): New protoype.
++	* config/arm/arm.cc (mve_struct_mem_operand): New function.
++	* config/arm/constraints.md (Ug): New constraint.
++	* config/arm/mve.md (mve_vst4q<mode>): Change constraint.
++	(mve_vst2q<mode>): Likewise.
++	(mve_vld4q<mode>): Likewise.
++	(mve_vld2q<mode>): Likewise.
++	* config/arm/predicates.md (mve_struct_operand): New predicate.
++
++2023-01-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	Backported from master:
++	2022-12-19  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	PR target/108140
++	* config/aarch64/aarch64-builtins.cc
++	(aarch64_expand_builtin_data_intrinsic): Handle NULL target.
++
+ 2023-01-05  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	PR target/106736
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 3437f90b0b3..35defd81c7a 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230110
++20230111
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 304fbe0a88b..b6511e3a967 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2023-01-10  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
++
++	Backported from master:
++	2022-12-30  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
++
++	PR target/107714
++	* gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c: New test.
++
++2023-01-10  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	Backported from master:
++	2022-12-19  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	PR target/108140
++	* gcc.target/aarch64/acle/pr108140.c: New test.
++
+ 2023-01-05  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	PR target/106736
+-- 
+2.25.1
+

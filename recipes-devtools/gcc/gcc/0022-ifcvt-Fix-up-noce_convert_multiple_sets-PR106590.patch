@@ -1,0 +1,221 @@
+From 030063c43f30a2335d3c03182df0beb82d003816 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 15 Aug 2022 13:56:57 +0200
+Subject: [PATCH 022/547] ifcvt: Fix up noce_convert_multiple_sets [PR106590]
+
+The following testcase is miscompiled on x86_64-linux.
+The problem is in the noce_convert_multiple_sets optimization.
+We essentially have:
+if (g == 1)
+  {
+    g = 1;
+    f = 23;
+  }
+else
+  {
+    g = 2;
+    f = 20;
+  }
+and for each insn try to create a conditional move sequence.
+There is code to detect overlap with the regs used in the condition
+and the destinations, so we actually try to construct:
+tmp_g = g == 1 ? 1 : 2;
+f = g == 1 ? 23 : 20;
+g = tmp_g;
+which is fine.  But, we actually try to create two different
+conditional move sequences in each case, seq1 with the whole
+(eq (reg/v:HI 82 [ g ]) (const_int 1 [0x1]))
+condition and seq2 with cc_cmp
+(eq (reg:CCZ 17 flags) (const_int 0 [0]))
+to rely on the earlier present comparison.  In each case, we
+compare the rtx costs and choose the cheaper sequence (seq1 if both
+have the same cost).
+The problem is that with the skylake tuning,
+tmp_g = g == 1 ? 1 : 2;
+is actually expanded as
+tmp_g = (g == 1) + 1;
+in seq1 (which clobbers (reg 17 flags)) and as a cmov in seq2
+(which doesn't).  The tuning says both have the same cost, so we
+pick seq1.  Next we check sequences for
+f = g == 1 ? 23 : 20; and here the seq2 cmov is cheaper, but it
+uses (reg 17 flags) which has been clobbered earlier.
+
+The following patch fixes that by detecting if we in the chosen
+sequence clobber some register mentioned in cc_cmp or rev_cc_cmp,
+and if yes, arranges for only seq1 (i.e. sequences that emit the
+comparison itself) to be used after that.
+
+2022-08-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR rtl-optimization/106590
+	* ifcvt.cc (check_for_cc_cmp_clobbers): New function.
+	(noce_convert_multiple_sets_1): If SEQ sets or clobbers any regs
+	mentioned in cc_cmp or rev_cc_cmp, don't consider seq2 for any
+	further conditional moves.
+
+	* gcc.dg/torture/pr106590.c: New test.
+
+(cherry picked from commit 3a74a7bf62f47ed0d19866576378724be932ee17)
+---
+ gcc/ifcvt.cc                            | 41 ++++++++++++--
+ gcc/testsuite/gcc.dg/torture/pr106590.c | 75 +++++++++++++++++++++++++
+ 2 files changed, 112 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr106590.c
+
+diff --git a/gcc/ifcvt.cc b/gcc/ifcvt.cc
+index e007b17b793..2c1eba312de 100644
+--- a/gcc/ifcvt.cc
++++ b/gcc/ifcvt.cc
+@@ -3368,6 +3368,20 @@ noce_convert_multiple_sets (struct noce_if_info *if_info)
+   return TRUE;
+ }
+ 
++/* Helper function for noce_convert_multiple_sets_1.  If store to
++   DEST can affect P[0] or P[1], clear P[0].  Called via note_stores.  */
++
++static void
++check_for_cc_cmp_clobbers (rtx dest, const_rtx, void *p0)
++{
++  rtx *p = (rtx *) p0;
++  if (p[0] == NULL_RTX)
++    return;
++  if (reg_overlap_mentioned_p (dest, p[0])
++      || (p[1] && reg_overlap_mentioned_p (dest, p[1])))
++    p[0] = NULL_RTX;
++}
++
+ /* This goes through all relevant insns of IF_INFO->then_bb and tries to
+    create conditional moves.  In case a simple move sufficis the insn
+    should be listed in NEED_NO_CMOV.  The rewired-src cases should be
+@@ -3518,7 +3532,7 @@ noce_convert_multiple_sets_1 (struct noce_if_info *if_info,
+ 
+ 	 as min/max and emit an insn, accordingly.  */
+       unsigned cost1 = 0, cost2 = 0;
+-      rtx_insn *seq, *seq1, *seq2;
++      rtx_insn *seq, *seq1, *seq2 = NULL;
+       rtx temp_dest = NULL_RTX, temp_dest1 = NULL_RTX, temp_dest2 = NULL_RTX;
+       bool read_comparison = false;
+ 
+@@ -3530,9 +3544,10 @@ noce_convert_multiple_sets_1 (struct noce_if_info *if_info,
+ 	 as well.  This allows the backend to emit a cmov directly without
+ 	 creating an additional compare for each.  If successful, costing
+ 	 is easier and this sequence is usually preferred.  */
+-      seq2 = try_emit_cmove_seq (if_info, temp, cond,
+-				 new_val, old_val, need_cmov,
+-				 &cost2, &temp_dest2, cc_cmp, rev_cc_cmp);
++      if (cc_cmp)
++	seq2 = try_emit_cmove_seq (if_info, temp, cond,
++				   new_val, old_val, need_cmov,
++				   &cost2, &temp_dest2, cc_cmp, rev_cc_cmp);
+ 
+       /* The backend might have created a sequence that uses the
+ 	 condition.  Check this.  */
+@@ -3587,6 +3602,24 @@ noce_convert_multiple_sets_1 (struct noce_if_info *if_info,
+ 	  return FALSE;
+ 	}
+ 
++      if (cc_cmp)
++	{
++	  /* Check if SEQ can clobber registers mentioned in
++	     cc_cmp and/or rev_cc_cmp.  If yes, we need to use
++	     only seq1 from that point on.  */
++	  rtx cc_cmp_pair[2] = { cc_cmp, rev_cc_cmp };
++	  for (walk = seq; walk; walk = NEXT_INSN (walk))
++	    {
++	      note_stores (walk, check_for_cc_cmp_clobbers, cc_cmp_pair);
++	      if (cc_cmp_pair[0] == NULL_RTX)
++		{
++		  cc_cmp = NULL_RTX;
++		  rev_cc_cmp = NULL_RTX;
++		  break;
++		}
++	    }
++	}
++
+       /* End the sub sequence and emit to the main sequence.  */
+       emit_insn (seq);
+ 
+diff --git a/gcc/testsuite/gcc.dg/torture/pr106590.c b/gcc/testsuite/gcc.dg/torture/pr106590.c
+new file mode 100644
+index 00000000000..b7b84720148
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr106590.c
+@@ -0,0 +1,75 @@
++/* PR rtl-optimization/106590 } */
++/* { dg-do run } */
++/* { dg-additional-options "-mtune=skylake" { target { i?86-*-* x86_64-*-* } } } */
++
++typedef struct A { short a; } A;
++typedef A *B;
++typedef struct C { int c, d; } C;
++typedef C *D;
++
++B
++foo (void)
++{
++  static A r = { .a = 1 };
++  return &r;
++}
++
++D
++bar (void)
++{
++  static C r = { .c = 1, .d = 23 };
++  return &r;
++}
++
++static inline int __attribute__((always_inline))
++baz (short a)
++{
++  int e = 1, f;
++  short g;
++  D h;
++
++  switch (a)
++    {
++    case 1:
++      f = 23;
++      g = 1;
++      break;
++    case 2:
++      f = 20;
++      g = 2;
++      break;
++    }
++
++  h = bar ();
++
++  if (h->d != f || h->c != g)
++    __builtin_abort ();
++  return e;
++}
++
++int
++qux (void)
++{
++  B i = foo ();
++  int e = 1;
++
++  switch (i->a)
++    {
++    case 1:
++    case 2:
++      e = baz (i->a);
++      break;
++    case 3:
++      e = 0;
++      break;
++    }
++
++  return e;
++}
++
++int
++main ()
++{
++  qux ();
++  return 0;
++}
+-- 
+2.25.1
+

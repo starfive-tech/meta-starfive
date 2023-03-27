@@ -1,0 +1,34 @@
+From db8e3439ae4089ac27e542ff8f9e64a7aa093d67 Mon Sep 17 00:00:00 2001
+From: Iain Buclaw <ibuclaw@gdcproject.org>
+Date: Sun, 11 Dec 2022 19:08:01 +0100
+Subject: [PATCH 272/547] d: Remove "final" and "override" from visitor method.
+
+This was added by the backport of an ICE in r12-8969.  While harmless,
+it was not until r13-758 that "final" and "override" were introduced to
+all visitor methods in the D front-end.  Removing it from the release
+branch just for consistency with the rest of the file.
+
+gcc/d/ChangeLog:
+
+	* imports.cc (ImportVisitor::visit (OverloadSet *)): Remove "final"
+	and "override" from visitor method.
+---
+ gcc/d/imports.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/d/imports.cc b/gcc/d/imports.cc
+index 4ce6f026b29..dfda2401ee8 100644
+--- a/gcc/d/imports.cc
++++ b/gcc/d/imports.cc
+@@ -161,7 +161,7 @@ public:
+   }
+ 
+   /* Build IMPORTED_DECLs for all overloads in a set.  */
+-  void visit (OverloadSet *d) final override
++  void visit (OverloadSet *d)
+   {
+     vec<tree, va_gc> *tset = NULL;
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,53 @@
+From f323610375f4f87098f98b501ab01d033c930558 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Mon, 12 Sep 2022 15:05:04 -0400
+Subject: [PATCH 059/547] libstdc++: Add already-accepted <ranges> testcase
+ [PR106320]
+
+Although PR106320 affected only the 10 and 11 branches, and the testcase
+from there is already correctly accepted on trunk and the 12 branch, we
+still should add the testcase to trunk/12 too for inter-branch consistency.
+
+	PR libstdc++/106320
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/std/ranges/adaptors/join.cc (test13): New test.
+
+(cherry picked from commit db19cfdac8ede93172aecc58612171c239c993ad)
+---
+ libstdc++-v3/testsuite/std/ranges/adaptors/join.cc | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/libstdc++-v3/testsuite/std/ranges/adaptors/join.cc b/libstdc++-v3/testsuite/std/ranges/adaptors/join.cc
+index 8986f718229..530ab6663b5 100644
+--- a/libstdc++-v3/testsuite/std/ranges/adaptors/join.cc
++++ b/libstdc++-v3/testsuite/std/ranges/adaptors/join.cc
+@@ -205,6 +205,18 @@ test12()
+   }();
+ }
+ 
++void
++test13()
++{
++  // PR libstdc++/106320
++  auto l = std::views::transform([](auto x) {
++    return x | std::views::transform([i=0](auto y) {
++      return y;
++    });
++  });
++  std::vector<std::vector<int>> v{{5, 6, 7}};
++  v | l | std::views::join;
++}
+ int
+ main()
+ {
+@@ -220,4 +232,5 @@ main()
+   test10();
+   test11();
+   test12();
++  test13();
+ }
+-- 
+2.25.1
+

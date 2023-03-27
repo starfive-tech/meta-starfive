@@ -1,0 +1,54 @@
+From 98fb37efba1160c84c5de3b9989ecb73f5bcdbc3 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 6 Sep 2022 00:20:21 +0000
+Subject: [PATCH 046/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6f5f7110f57..80e4d819fed 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220905
++20220906
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 9a0f264235d..8450af3bf75 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2022-09-05  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-09-04  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100136
++	* trans-expr.cc (gfc_conv_procedure_call): Add handling of pointer
++	expressions.
++
+ 2022-08-30  Tobias Burnus  <tobias@codesourcery.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index da17094268e..76cf6e0abe6 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-09-05  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-09-04  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100136
++	* gfortran.dg/PR100136.f90: New test.
++
+ 2022-09-03  Peter Bergner  <bergner@linux.ibm.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

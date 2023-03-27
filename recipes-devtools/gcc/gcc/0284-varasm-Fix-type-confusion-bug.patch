@@ -1,0 +1,54 @@
+From 0e939c60bc55491af4fcda1fb8175ca6138c4089 Mon Sep 17 00:00:00 2001
+From: Alex Coplan <alex.coplan@arm.com>
+Date: Thu, 1 Dec 2022 17:36:02 +0000
+Subject: [PATCH 284/547] varasm: Fix type confusion bug
+
+This patch fixes a type confusion bug in varasm.cc:assemble_variable.
+The problem is that the current code calls:
+
+  sect = get_variable_section (decl, false);
+
+and then accesses sect->named.name without checking whether the section
+is in fact a named section. In the surrounding else clause, we only know
+that SECTION_STYLE (sect) != SECTION_NOSWITCH, so it is possible that
+the section is an unnamed section.
+
+In practice, this means that we end up doing a wild string compare
+between a function pointer and the string literal ".vtable_map_vars".
+This is because sect->named.name aliases sect->unnamed.callback in the
+section union.
+
+This can be seen in GDB with a simple testcase such as "int x;".
+
+This patch fixes the issue by checking the SECTION_STYLE of the section
+is in fact SECTION_NAMED before trying to do the string comparison.
+
+We drop the existing check of whether sect->named.name is non-NULL
+because this should presumably always be the case for a named section.
+
+gcc/ChangeLog:
+
+	* varasm.cc (assemble_variable): Fix type confusion bug when
+	checking for ".vtable_map_vars" section.
+
+(cherry picked from commit de144fdab17dbbb64ccb540056ab78b4ffb3fbbc)
+---
+ gcc/varasm.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/varasm.cc b/gcc/varasm.cc
+index 021e912a37c..a4b1cc68680 100644
+--- a/gcc/varasm.cc
++++ b/gcc/varasm.cc
+@@ -2404,7 +2404,7 @@ assemble_variable (tree decl, int top_level ATTRIBUTE_UNUSED,
+   else
+     {
+       /* Special-case handling of vtv comdat sections.  */
+-      if (sect->named.name
++      if (SECTION_STYLE (sect) == SECTION_NAMED
+ 	  && (strcmp (sect->named.name, ".vtable_map_vars") == 0))
+ 	handle_vtv_comdat_section (sect, decl);
+       else
+-- 
+2.25.1
+

@@ -1,0 +1,87 @@
+From a3dfcaac560f5589028fdd967bfaa60d84c265ac Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Mon, 12 Dec 2022 17:52:46 +0100
+Subject: [PATCH 366/547] tree-optimization/108076 - if-conversion and forced
+ labels
+
+When doing if-conversion we simply throw away labels without checking
+whether they are possibly targets of non-local gotos or have their
+address taken.  The following rectifies this and refuses to if-convert
+such loops.
+
+	PR tree-optimization/108076
+	* tree-if-conv.cc (if_convertible_loop_p_1): Reject blocks
+	with non-local or forced labels that we later remove
+	labels from.
+
+	* gcc.dg/torture/pr108076.c: New testcase.
+
+(cherry picked from commit b4fddbe9592e9feb37ce567d90af822b75995531)
+---
+ gcc/testsuite/gcc.dg/torture/pr108076.c | 17 +++++++++++++++++
+ gcc/tree-if-conv.cc                     | 14 ++++++++++++--
+ 2 files changed, 29 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr108076.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr108076.c b/gcc/testsuite/gcc.dg/torture/pr108076.c
+new file mode 100644
+index 00000000000..ebe2e51bee0
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr108076.c
+@@ -0,0 +1,17 @@
++/* { dg-do link } */
++
++static void *j;
++int v, g;
++__attribute__((__leaf__)) int atoi (const char *);
++
++int
++main ()
++{
++  j = &&lab1;
++  &&lab2;
++  atoi ("42");
++lab1:
++lab2:
++  if (v)
++    goto *j;
++}
+diff --git a/gcc/tree-if-conv.cc b/gcc/tree-if-conv.cc
+index 7495ed653c0..3574c673ed8 100644
+--- a/gcc/tree-if-conv.cc
++++ b/gcc/tree-if-conv.cc
+@@ -1431,10 +1431,20 @@ if_convertible_loop_p_1 (class loop *loop, vec<data_reference_p> *refs)
+       basic_block bb = ifc_bbs[i];
+       gimple_stmt_iterator gsi;
+ 
++      bool may_have_nonlocal_labels
++	= bb_with_exit_edge_p (loop, bb) || bb == loop->latch;
+       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi))
+ 	switch (gimple_code (gsi_stmt (gsi)))
+ 	  {
+ 	  case GIMPLE_LABEL:
++	    if (!may_have_nonlocal_labels)
++	      {
++		tree label
++		  = gimple_label_label (as_a <glabel *> (gsi_stmt (gsi)));
++		if (DECL_NONLOCAL (label) || FORCED_LABEL (label))
++		  return false;
++	      }
++	    /* Fallthru.  */
+ 	  case GIMPLE_ASSIGN:
+ 	  case GIMPLE_CALL:
+ 	  case GIMPLE_DEBUG:
+@@ -2646,8 +2656,8 @@ remove_conditions_and_labels (loop_p loop)
+       basic_block bb = ifc_bbs[i];
+ 
+       if (bb_with_exit_edge_p (loop, bb)
+-        || bb == loop->latch)
+-      continue;
++	  || bb == loop->latch)
++	continue;
+ 
+       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); )
+ 	switch (gimple_code (gsi_stmt (gsi)))
+-- 
+2.25.1
+

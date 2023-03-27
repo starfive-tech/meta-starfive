@@ -1,0 +1,68 @@
+From 936fdf056944989c49dc4fff399ca5dc0d0213ee Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Sat, 28 Jan 2023 17:59:23 +0100
+Subject: [PATCH 403/547] Fortran: diagnose USE associated symbols in COMMON
+ blocks [PR108453]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108453
+	* match.cc (gfc_match_common): A USE associated name shall not appear
+	in a COMMON block (F2018:C8121).
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108453
+	* gfortran.dg/common_27.f90: New test.
+
+(cherry picked from commit aba9ff8f30d4245294ea2583de1dc28f1c7ccf7b)
+---
+ gcc/fortran/match.cc                    | 10 ++++++++++
+ gcc/testsuite/gfortran.dg/common_27.f90 | 14 ++++++++++++++
+ 2 files changed, 24 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/common_27.f90
+
+diff --git a/gcc/fortran/match.cc b/gcc/fortran/match.cc
+index 205811bb969..673662e9087 100644
+--- a/gcc/fortran/match.cc
++++ b/gcc/fortran/match.cc
+@@ -5339,6 +5339,16 @@ gfc_match_common (void)
+ 		goto cleanup;
+ 	    }
+ 
++	  /* F2018:R874:  common-block-object is variable-name [ (array-spec) ]
++	     F2018:C8121: A variable-name shall not be a name made accessible
++	     by use association.  */
++	  if (sym->attr.use_assoc)
++	    {
++	      gfc_error ("Symbol %qs at %C is USE associated from module %qs "
++			 "and cannot occur in COMMON", sym->name, sym->module);
++	      goto cleanup;
++	    }
++
+ 	  /* Deal with an optional array specification after the
+ 	     symbol name.  */
+ 	  m = gfc_match_array_spec (&as, true, true);
+diff --git a/gcc/testsuite/gfortran.dg/common_27.f90 b/gcc/testsuite/gfortran.dg/common_27.f90
+new file mode 100644
+index 00000000000..dcde5de2bd2
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/common_27.f90
+@@ -0,0 +1,14 @@
++! { dg-do compile }
++! PR fortran/108453 - a use associated variable cannot occur in COMMON
++! Contributed by G.Steinmetz
++
++module m
++  type t
++  end type
++  real :: r
++end
++program p
++  use m, only: t, r
++  common t      ! { dg-error "USE associated from module" }
++  common /cm/ r ! { dg-error "USE associated from module" }
++end
+-- 
+2.25.1
+

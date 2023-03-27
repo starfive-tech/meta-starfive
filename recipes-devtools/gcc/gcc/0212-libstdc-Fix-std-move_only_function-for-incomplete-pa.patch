@@ -1,0 +1,69 @@
+From 9c45321cdbf48419ced5d7d442e2f033ab8f476e Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 18 Oct 2022 20:49:42 +0100
+Subject: [PATCH 212/547] libstdc++: Fix std::move_only_function for incomplete
+ parameter types
+
+The std::move_only_function::__param_t alias template attempts to
+optimize argument passing for the invoker, by passing by rvalue
+reference for types that are non-trivial or large. However, the
+precondition for is_trivally_copyable makes it unsuitable for using
+here, and can cause ODR violations. Just use is_scalar instead, and pass
+all class types (even small, trivial ones) by value.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/mofunc_impl.h (move_only_function::__param_t):
+	Use __is_scalar instead of is_trivially_copyable.
+	* testsuite/20_util/move_only_function/call.cc: Check parameters
+	involving incomplete types.
+---
+ libstdc++-v3/include/bits/mofunc_impl.h               |  5 +----
+ .../testsuite/20_util/move_only_function/call.cc      | 11 +++++++++++
+ 2 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/mofunc_impl.h b/libstdc++-v3/include/bits/mofunc_impl.h
+index 405c4054642..47e1e506306 100644
+--- a/libstdc++-v3/include/bits/mofunc_impl.h
++++ b/libstdc++-v3/include/bits/mofunc_impl.h
+@@ -205,10 +205,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+     private:
+       template<typename _Tp>
+-	using __param_t
+-	  = __conditional_t<is_trivially_copyable_v<_Tp>
+-			      && sizeof(_Tp) <= sizeof(long),
+-			    _Tp, _Tp&&>;
++	using __param_t = __conditional_t<is_scalar_v<_Tp>, _Tp, _Tp&&>;
+ 
+       using _Invoker = _Res (*)(_Mofunc_base _GLIBCXX_MOF_CV*,
+ 				__param_t<_ArgTypes>...) noexcept(_Noex);
+diff --git a/libstdc++-v3/testsuite/20_util/move_only_function/call.cc b/libstdc++-v3/testsuite/20_util/move_only_function/call.cc
+index 9ca0a60a24e..0c7f58d77a0 100644
+--- a/libstdc++-v3/testsuite/20_util/move_only_function/call.cc
++++ b/libstdc++-v3/testsuite/20_util/move_only_function/call.cc
+@@ -190,10 +190,21 @@ test04()
+   VERIFY( std::move(std::as_const(f5))() == 3 );
+ }
+ 
++struct Incomplete;
++
++void
++test_params()
++{
++  std::move_only_function<void(Incomplete)> f1;
++  std::move_only_function<void(Incomplete&)> f2;
++  std::move_only_function<void(Incomplete&&)> f3;
++}
++
+ int main()
+ {
+   test01();
+   test02();
+   test03();
+   test04();
++  test_params();
+ }
+-- 
+2.25.1
+

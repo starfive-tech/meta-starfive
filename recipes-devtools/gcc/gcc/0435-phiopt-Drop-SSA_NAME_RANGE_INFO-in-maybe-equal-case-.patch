@@ -1,0 +1,91 @@
+From 86d252ab555d487aefb616562e770ffa46e05b01 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 22 Dec 2022 12:52:48 +0100
+Subject: [PATCH 435/547] phiopt: Drop SSA_NAME_RANGE_INFO in maybe equal case
+ [PR108166]
+
+The following place in value_replacement is after proving that
+x == cst1 ? cst2 : x
+phi result is only used in a comparison with constant which doesn't
+care if it compares cst1 or cst2 and replaces it with x.
+The testcase is miscompiled because we have after the replacement
+incorrect range info for the phi result, we would need to
+effectively union the phi result range with cst1 (oarg in the code)
+because previously that constant might be missing in the range, but
+newly it can appear (we've just verified that the single use stmt
+of the phi result doesn't care about that value in particular).
+
+The following patch just resets the info, bootstrapped/regtested
+on x86_64-linux and i686-linux, ok for trunk?
+
+Aldy/Andrew, how would one instead union the SSA_NAME_RANGE_INFO
+with some INTEGER_CST and store it back into SSA_NAME_RANGE_INFO
+(including adjusting non-zero bits and the like)?
+
+2022-12-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108166
+	* tree-ssa-phiopt.cc (value_replacement): For the maybe_equal_p
+	case turned into equal_p reset SSA_NAME_RANGE_INFO of phi result.
+
+	* g++.dg/torture/pr108166.C: New test.
+
+(cherry picked from commit 5c17adfb5d08e34da7a7f234dfc2ed1f0aaadaa9)
+---
+ gcc/testsuite/g++.dg/torture/pr108166.C | 26 +++++++++++++++++++++++++
+ gcc/tree-ssa-phiopt.cc                  |  6 ++++++
+ 2 files changed, 32 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/torture/pr108166.C
+
+diff --git a/gcc/testsuite/g++.dg/torture/pr108166.C b/gcc/testsuite/g++.dg/torture/pr108166.C
+new file mode 100644
+index 00000000000..037fc275e3d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/torture/pr108166.C
+@@ -0,0 +1,26 @@
++// PR tree-optimization/108166
++// { dg-do run }
++
++bool a, b;
++int d, c;
++
++const int &
++foo (const int &f, const int &g)
++{
++  return !f ? f : g;
++}
++
++__attribute__((noipa)) void
++bar (int)
++{
++}
++
++int
++main ()
++{
++  c = foo (b, 0) > ((b ? d : b) ?: 8);
++  a = b ? d : b;
++  bar (a);
++  if (a != 0)
++    __builtin_abort ();
++}
+diff --git a/gcc/tree-ssa-phiopt.cc b/gcc/tree-ssa-phiopt.cc
+index b8e57bb470e..c56d0b9ff15 100644
+--- a/gcc/tree-ssa-phiopt.cc
++++ b/gcc/tree-ssa-phiopt.cc
+@@ -1454,6 +1454,12 @@ value_replacement (basic_block cond_bb, basic_block middle_bb,
+ 		  default:
+ 		    break;
+ 		  }
++	      if (equal_p)
++		/* After the optimization PHI result can have value
++		   which it couldn't have previously.
++		   We could instead of resetting it union the range
++		   info with oarg.  */
++		reset_flow_sensitive_info (gimple_phi_result (phi));
+ 	      if (equal_p && MAY_HAVE_DEBUG_BIND_STMTS)
+ 		{
+ 		  imm_use_iterator imm_iter;
+-- 
+2.25.1
+

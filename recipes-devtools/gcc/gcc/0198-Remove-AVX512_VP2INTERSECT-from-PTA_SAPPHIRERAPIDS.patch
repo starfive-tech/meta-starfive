@@ -1,0 +1,83 @@
+From d644dfe36d9733c767af62d37250253ced6efd8c Mon Sep 17 00:00:00 2001
+From: "Cui,Lili" <lili.cui@intel.com>
+Date: Mon, 7 Nov 2022 11:25:41 +0800
+Subject: [PATCH 198/547] Remove AVX512_VP2INTERSECT from PTA_SAPPHIRERAPIDS
+
+gcc/ChangeLog:
+
+	* config/i386/driver-i386.cc (host_detect_local_cpu):
+	Move sapphirerapids out of AVX512_VP2INTERSECT.
+	* config/i386/i386.h: Remove AVX512_VP2INTERSECT from PTA_SAPPHIRERAPIDS
+	* doc/invoke.texi: Remove AVX512_VP2INTERSECT from SAPPHIRERAPIDS
+---
+ gcc/config/i386/driver-i386.cc | 13 +++++--------
+ gcc/config/i386/i386.h         |  7 +++----
+ gcc/doc/invoke.texi            |  8 ++++----
+ 3 files changed, 12 insertions(+), 16 deletions(-)
+
+diff --git a/gcc/config/i386/driver-i386.cc b/gcc/config/i386/driver-i386.cc
+index 9e0ae0b2baa..fcf23fd921d 100644
+--- a/gcc/config/i386/driver-i386.cc
++++ b/gcc/config/i386/driver-i386.cc
+@@ -574,15 +574,12 @@ const char *host_detect_local_cpu (int argc, const char **argv)
+ 	      /* This is unknown family 0x6 CPU.  */
+ 	      if (has_feature (FEATURE_AVX))
+ 		{
++		  /* Assume Tiger Lake */
+ 		  if (has_feature (FEATURE_AVX512VP2INTERSECT))
+-		    {
+-		      if (has_feature (FEATURE_TSXLDTRK))
+-			/* Assume Sapphire Rapids.  */
+-			cpu = "sapphirerapids";
+-		      else
+-			/* Assume Tiger Lake */
+-			cpu = "tigerlake";
+-		    }
++		    cpu = "tigerlake";
++		  /* Assume Sapphire Rapids.  */
++		  else if (has_feature (FEATURE_TSXLDTRK))
++		    cpu = "sapphirerapids";
+ 		  /* Assume Cooper Lake */
+ 		  else if (has_feature (FEATURE_AVX512BF16))
+ 		    cpu = "cooperlake";
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index 363082ba47b..a61c32b8957 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -2328,10 +2328,9 @@ constexpr wide_int_bitmask PTA_ICELAKE_SERVER = PTA_ICELAKE_CLIENT
+ constexpr wide_int_bitmask PTA_TIGERLAKE = PTA_ICELAKE_CLIENT | PTA_MOVDIRI
+   | PTA_MOVDIR64B | PTA_CLWB | PTA_AVX512VP2INTERSECT | PTA_KL | PTA_WIDEKL;
+ constexpr wide_int_bitmask PTA_SAPPHIRERAPIDS = PTA_ICELAKE_SERVER | PTA_MOVDIRI
+-  | PTA_MOVDIR64B | PTA_AVX512VP2INTERSECT | PTA_ENQCMD | PTA_CLDEMOTE
+-  | PTA_PTWRITE | PTA_WAITPKG | PTA_SERIALIZE | PTA_TSXLDTRK | PTA_AMX_TILE
+-  | PTA_AMX_INT8 | PTA_AMX_BF16 | PTA_UINTR | PTA_AVXVNNI | PTA_AVX512FP16
+-  | PTA_AVX512BF16;
++  | PTA_MOVDIR64B | PTA_ENQCMD | PTA_CLDEMOTE | PTA_PTWRITE | PTA_WAITPKG
++  | PTA_SERIALIZE | PTA_TSXLDTRK | PTA_AMX_TILE | PTA_AMX_INT8 | PTA_AMX_BF16
++  | PTA_UINTR | PTA_AVXVNNI | PTA_AVX512FP16 | PTA_AVX512BF16;
+ constexpr wide_int_bitmask PTA_KNL = PTA_BROADWELL | PTA_AVX512PF
+   | PTA_AVX512ER | PTA_AVX512F | PTA_AVX512CD | PTA_PREFETCHWT1;
+ constexpr wide_int_bitmask PTA_BONNELL = PTA_CORE2 | PTA_MOVBE;
+diff --git a/gcc/doc/invoke.texi b/gcc/doc/invoke.texi
+index 3749e06f13e..cee057a70bf 100644
+--- a/gcc/doc/invoke.texi
++++ b/gcc/doc/invoke.texi
+@@ -31541,11 +31541,11 @@ Intel sapphirerapids CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3,
+ SSSE3, SSE4.1, SSE4.2, POPCNT, CX16, SAHF, FXSR, AVX, XSAVE, PCLMUL, FSGSBASE,
+ RDRND, F16C, AVX2, BMI, BMI2, LZCNT, FMA, MOVBE, HLE, RDSEED, ADCX, PREFETCHW,
+ AES, CLFLUSHOPT, XSAVEC, XSAVES, SGX, AVX512F, AVX512VL, AVX512BW, AVX512DQ,
+-AVX512CD, PKU, AVX512VBMI, AVX512IFMA, SHA, AVX512VNNI, GFNI, VAES, AVX512VBMI2
++AVX512CD, PKU, AVX512VBMI, AVX512IFMA, SHA, AVX512VNNI, GFNI, VAES, AVX512VBMI2,
+ VPCLMULQDQ, AVX512BITALG, RDPID, AVX512VPOPCNTDQ, PCONFIG, WBNOINVD, CLWB,
+-MOVDIRI, MOVDIR64B, AVX512VP2INTERSECT, ENQCMD, CLDEMOTE, PTWRITE, WAITPKG,
+-SERIALIZE, TSXLDTRK, UINTR, AMX-BF16, AMX-TILE, AMX-INT8, AVX-VNNI, AVX512FP16
+-and AVX512BF16 instruction set support.
++MOVDIRI, MOVDIR64B, ENQCMD, CLDEMOTE, PTWRITE, WAITPKG, SERIALIZE, TSXLDTRK,
++UINTR, AMX-BF16, AMX-TILE, AMX-INT8, AVX-VNNI, AVX512FP16 and AVX512BF16
++instruction set support.
+ 
+ @item alderlake
+ Intel Alderlake CPU with 64-bit extensions, MOVBE, MMX, SSE, SSE2, SSE3, SSSE3,
+-- 
+2.25.1
+

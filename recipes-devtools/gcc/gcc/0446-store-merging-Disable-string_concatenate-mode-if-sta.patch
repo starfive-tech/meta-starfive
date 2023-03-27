@@ -1,0 +1,285 @@
+From 671b7c29dd666cb74dfe5ab01b501d6a0ca7b41c Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 25 Jan 2023 10:50:27 +0100
+Subject: [PATCH 446/547] store-merging: Disable string_concatenate mode if
+ start or end aren't byte aligned [PR108498]
+
+The first of the following testcases is miscompiled on powerpc64-linux -O2
+-m64 at least, the latter at least on x86_64-linux -m32/-m64.
+Since GCC 11 store-merging has a separate string_concatenation mode which
+turns stores into setting a MEM_REF from a STRING_CST.
+This mode is triggered if at least one of the to be merged stores
+is a STRING_CST store and either the first store (to earliest address)
+is that STRING_CST store or the first store is 8-bit INTEGER_CST store
+and then there are some rules when to turn that mode off or not merge
+further stores into it.
+
+The problem with these 2 testcases is that the actual implementation
+relies on start/width of the store to be at byte boundaries, as it
+simply creates a char array, MEM_REF can be only on byte boundaries
+and the char array too, plus obviously STRING_CST as well.
+But as can be easily seen in the second testcase, nothing verifies this,
+while the first store has to be a STRING_CST (which will be aligned)
+or 8-bit INTEGER_CST, that 8-bit INTEGER_CST store could be a bitfield
+store, nothing verifies any stores in between whether they actually are
+8-bit and aligned, the only major requirement is that all the stores
+are consecutive.
+
+For GCC 14 I think we should reconsider this, simply treat STRING_CST
+stores during the merging like INTEGER_CST stores and deal with it only
+during split_group where we can create multiple parts, this part
+would be a normal store, this part would be STRING_CST store, this part
+another normal store etc.  But that is quite a lot of work, the following
+patch just disables the string_concatenate mode if boundaries aren't byte
+aligned in the spot where we disable it if it is too short too.
+If that happens, we'll just try to do the merging using normal 1/2/4/8 etc.
+byte stores as usually with RMW masking for any bits that shouldn't be
+touched or punt if we end up with too many stores compared to the original.
+
+Note, an original STRING_CST store will count as one store in that case,
+something we might want to reconsider later too (but, after all, CONSTRUCTOR
+stores (aka zeroing) already have the same problem, they can be large and
+expensive and we still count them as one store).
+
+2023-01-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108498
+	* gimple-ssa-store-merging.cc (class store_operand_info):
+	End coment with full stop rather than comma.
+	(split_group): Likewise.
+	(merged_store_group::apply_stores): Clear string_concatenation if
+	start or end aren't on a byte boundary.
+
+	* gcc.c-torture/execute/pr108498-1.c: New test.
+	* gcc.c-torture/execute/pr108498-2.c: New test.
+
+(cherry picked from commit 617be7ba436bcbf9d7b883968c6b3c011206b56c)
+---
+ gcc/gimple-ssa-store-merging.cc               |  8 +-
+ .../gcc.c-torture/execute/pr108498-1.c        | 82 +++++++++++++++++
+ .../gcc.c-torture/execute/pr108498-2.c        | 91 +++++++++++++++++++
+ 3 files changed, 179 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/execute/pr108498-1.c
+ create mode 100644 gcc/testsuite/gcc.c-torture/execute/pr108498-2.c
+
+diff --git a/gcc/gimple-ssa-store-merging.cc b/gcc/gimple-ssa-store-merging.cc
+index 8c98a524672..5ec4a94ca70 100644
+--- a/gcc/gimple-ssa-store-merging.cc
++++ b/gcc/gimple-ssa-store-merging.cc
+@@ -1614,7 +1614,7 @@ namespace {
+    then VAL represents the constant and all the other fields are zero, or
+    a memory load, then VAL represents the reference, BASE_ADDR is non-NULL
+    and the other fields also reflect the memory load, or an SSA name, then
+-   VAL represents the SSA name and all the other fields are zero,  */
++   VAL represents the SSA name and all the other fields are zero.  */
+ 
+ class store_operand_info
+ {
+@@ -2309,6 +2309,10 @@ merged_store_group::apply_stores ()
+   if (buf_size <= MOVE_MAX)
+     string_concatenation = false;
+ 
++  /* String concatenation only works for byte aligned start and end.  */
++  if (start % BITS_PER_UNIT != 0 || width % BITS_PER_UNIT != 0)
++    string_concatenation = false;
++
+   /* Create a power-of-2-sized buffer for native_encode_expr.  */
+   if (!string_concatenation)
+     buf_size = 1 << ceil_log2 (buf_size);
+@@ -3631,7 +3635,7 @@ split_group (merged_store_group *group, bool allow_unaligned_store,
+ 
+   /* For bswap framework using sets of stores, all the checking has been done
+      earlier in try_coalesce_bswap and the result always needs to be emitted
+-     as a single store.  Likewise for string concatenation,  */
++     as a single store.  Likewise for string concatenation.  */
+   if (group->stores[0]->rhs_code == LROTATE_EXPR
+       || group->stores[0]->rhs_code == NOP_EXPR
+       || group->string_concatenation)
+diff --git a/gcc/testsuite/gcc.c-torture/execute/pr108498-1.c b/gcc/testsuite/gcc.c-torture/execute/pr108498-1.c
+new file mode 100644
+index 00000000000..217c1e4ecd2
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/execute/pr108498-1.c
+@@ -0,0 +1,82 @@
++/* PR tree-optimization/108498 */
++
++struct A
++{
++  signed char a1;
++  int a2;
++};
++
++struct B
++{
++  struct A b1;
++  unsigned char b2:1, b3:1, b4:2, b5:1, b6:1, b7[4];
++};
++
++struct C
++{
++  unsigned char c1;
++  char c2;
++  signed char c3;
++  unsigned char c4, c5[4], c6:1, c7:1, c8:1, c9:3, c10:1;
++  struct A c11;
++  struct B c12[3];
++};
++
++static inline struct C
++foo (unsigned char a, unsigned b, int c, struct A d,
++     unsigned e, struct B f, struct B g, struct B h)
++{
++  struct C x
++    = { .c1 = b, .c2 = 0, .c3 = c, .c6 = a, .c4 = e, .c7 = 0,
++        .c8 = 0, .c9 = 7, .c10 = 0, .c5 = {0, 1, 2, 3}, .c11 = d,
++        .c12 = {f, g, h} };
++  return x;
++}
++
++static inline struct A
++bar (int a, int b)
++{
++  struct A x = { .a1 = a, .a2 = b };
++  return x;
++}
++
++static inline struct B
++baz (struct A b1)
++{
++  struct B x = { .b1 = b1, .b6 = 0, .b5 = 0, .b7 = {0, 1, 2, 3}, .b2 = 0 };
++  return x;
++}
++
++struct C
++qux (void)
++{
++  const struct B a = baz (bar (0, 0));
++  struct C b;
++  struct B c[2];
++  struct A d = { 0, 1 };
++  c[0].b1.a1 = 0;
++  c[0].b1.a2 = 2;
++  c[1].b1.a1 = 4;
++  c[1].b1.a2 = 8;
++  return foo (0, 2, -1, d, 3, c[0], c[1], a);
++}
++
++__attribute__((noipa)) void
++corge (struct C *x)
++{
++  char buf[1024];
++  __builtin_memset (buf, 0xaa, sizeof (buf));
++  asm volatile ("" : : "r" (buf));
++  __builtin_memset (x, 0x55, sizeof (struct C));
++  asm volatile ("" : : "r" (x));
++}
++
++int
++main ()
++{
++  struct C x;
++  corge (&x);
++  x = qux ();
++  if (x.c6 || x.c9 != 7)
++    __builtin_abort ();
++}
+diff --git a/gcc/testsuite/gcc.c-torture/execute/pr108498-2.c b/gcc/testsuite/gcc.c-torture/execute/pr108498-2.c
+new file mode 100644
+index 00000000000..ad930488c33
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/execute/pr108498-2.c
+@@ -0,0 +1,91 @@
++/* PR tree-optimization/108498 */
++
++struct U { char c[16]; };
++struct V { char c[16]; };
++struct S { unsigned int a : 3, b : 8, c : 21; struct U d; unsigned int e; struct V f; unsigned int g : 5, h : 27; };
++struct T { unsigned int a : 16, b : 8, c : 8; struct U d; unsigned int e; struct V f; unsigned int g : 5, h : 27; };
++
++__attribute__((noipa)) void
++foo (struct S *p)
++{
++  p->b = 231;
++  p->c = 42;
++  p->d = (struct U) { "abcdefghijklmno" };
++  p->e = 0xdeadbeef;
++  p->f = (struct V) { "ABCDEFGHIJKLMNO" };
++}
++
++__attribute__((noipa)) void
++bar (struct S *p)
++{
++  p->b = 231;
++  p->c = 42;
++  p->d = (struct U) { "abcdefghijklmno" };
++  p->e = 0xdeadbeef;
++  p->f = (struct V) { "ABCDEFGHIJKLMNO" };
++  p->g = 12;
++}
++
++__attribute__((noipa)) void
++baz (struct T *p)
++{
++  p->c = 42;
++  p->d = (struct U) { "abcdefghijklmno" };
++  p->e = 0xdeadbeef;
++  p->f = (struct V) { "ABCDEFGHIJKLMNO" };
++  p->g = 12;
++}
++
++int
++main ()
++{
++  if (__CHAR_BIT__ != 8 || __SIZEOF_INT__ != 4)
++    return 0;
++  struct S s = {};
++  struct T t = {};
++  foo (&s);
++  if (s.a != 0 || s.b != 231 || s.c != 42
++      || __builtin_memcmp (&s.d.c, "abcdefghijklmno", 16) || s.e != 0xdeadbeef
++      || __builtin_memcmp (&s.f.c, "ABCDEFGHIJKLMNO", 16) || s.g != 0 || s.h != 0)
++    __builtin_abort ();
++  __builtin_memset (&s, 0, sizeof (s));
++  s.a = 7;
++  s.g = 31;
++  s.h = (1U << 27) - 1;
++  foo (&s);
++  if (s.a != 7 || s.b != 231 || s.c != 42
++      || __builtin_memcmp (&s.d.c, "abcdefghijklmno", 16) || s.e != 0xdeadbeef
++      || __builtin_memcmp (&s.f.c, "ABCDEFGHIJKLMNO", 16) || s.g != 31 || s.h != (1U << 27) - 1)
++    __builtin_abort ();
++  __builtin_memset (&s, 0, sizeof (s));
++  bar (&s);
++  if (s.a != 0 || s.b != 231 || s.c != 42
++      || __builtin_memcmp (&s.d.c, "abcdefghijklmno", 16) || s.e != 0xdeadbeef
++      || __builtin_memcmp (&s.f.c, "ABCDEFGHIJKLMNO", 16) || s.g != 12 || s.h != 0)
++    __builtin_abort ();
++  __builtin_memset (&s, 0, sizeof (s));
++  s.a = 7;
++  s.g = 31;
++  s.h = (1U << 27) - 1;
++  bar (&s);
++  if (s.a != 7 || s.b != 231 || s.c != 42
++      || __builtin_memcmp (&s.d.c, "abcdefghijklmno", 16) || s.e != 0xdeadbeef
++      || __builtin_memcmp (&s.f.c, "ABCDEFGHIJKLMNO", 16) || s.g != 12 || s.h != (1U << 27) - 1)
++    __builtin_abort ();
++  baz (&t);
++  if (t.a != 0 || t.b != 0 || t.c != 42
++      || __builtin_memcmp (&t.d.c, "abcdefghijklmno", 16) || t.e != 0xdeadbeef
++      || __builtin_memcmp (&t.f.c, "ABCDEFGHIJKLMNO", 16) || t.g != 12 || t.h != 0)
++    __builtin_abort ();
++  __builtin_memset (&s, 0, sizeof (s));
++  t.a = 7;
++  t.b = 255;
++  t.g = 31;
++  t.h = (1U << 27) - 1;
++  baz (&t);
++  if (t.a != 7 || t.b != 255 || t.c != 42
++      || __builtin_memcmp (&t.d.c, "abcdefghijklmno", 16) || t.e != 0xdeadbeef
++      || __builtin_memcmp (&t.f.c, "ABCDEFGHIJKLMNO", 16) || t.g != 12 || t.h != (1U << 27) - 1)
++    __builtin_abort ();
++  return 0;
++}
+-- 
+2.25.1
+

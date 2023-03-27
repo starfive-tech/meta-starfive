@@ -1,0 +1,127 @@
+From d633e1cf67ad06c2fef6c33280b548f9c6ea9eba Mon Sep 17 00:00:00 2001
+From: Mikael Morin <mikael@gcc.gnu.org>
+Date: Sat, 3 Sep 2022 11:58:47 +0200
+Subject: [PATCH 128/547] fortran: Move clobbers after evaluation of all
+ arguments [PR106817]
+
+For actual arguments whose dummy is INTENT(OUT), we used to generate
+clobbers on them at the same time we generated the argument reference
+for the function call.  This was wrong if for an argument coming
+later, the value expression was depending on the value of the just-
+clobbered argument, and we passed an undefined value in that case.
+
+With this change, clobbers are collected separatedly and appended
+to the procedure call preliminary code after all the arguments have been
+evaluated.
+
+	PR fortran/106817
+
+gcc/fortran/ChangeLog:
+
+	* trans-expr.cc (gfc_conv_procedure_call): Collect all clobbers
+	to their own separate block.  Append the block of clobbers to
+	the procedure preliminary block after the argument evaluation
+	codes for all the arguments.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/intent_optimize_4.f90: New test.
+
+(cherry picked from commit 29919bf3b6449bafd02e795abbb1966e3990c1fc)
+---
+ gcc/fortran/trans-expr.cc                     |  6 ++-
+ .../gfortran.dg/intent_optimize_4.f90         | 43 +++++++++++++++++++
+ 2 files changed, 47 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/intent_optimize_4.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index fe979ce852d..704cbc297f7 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -6024,7 +6024,6 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+   gfc_charlen cl;
+   gfc_expr *e;
+   gfc_symbol *fsym;
+-  stmtblock_t post;
+   enum {MISSING = 0, ELEMENTAL, SCALAR, SCALAR_POINTER, ARRAY};
+   gfc_component *comp = NULL;
+   int arglen;
+@@ -6068,7 +6067,9 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+   else
+     info = NULL;
+ 
++  stmtblock_t post, clobbers;
+   gfc_init_block (&post);
++  gfc_init_block (&clobbers);
+   gfc_init_interface_mapping (&mapping);
+   if (!comp)
+     {
+@@ -6537,7 +6538,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 			  var = build_fold_indirect_ref_loc (input_location,
+ 							     parmse.expr);
+ 			  tree clobber = build_clobber (TREE_TYPE (var));
+-			  gfc_add_modify (&se->pre, var, clobber);
++			  gfc_add_modify (&clobbers, var, clobber);
+ 			}
+ 		    }
+ 		  /* Catch base objects that are not variables.  */
+@@ -7405,6 +7406,7 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 
+       vec_safe_push (arglist, parmse.expr);
+     }
++  gfc_add_block_to_block (&se->pre, &clobbers);
+   gfc_finish_interface_mapping (&mapping, &se->pre, &se->post);
+ 
+   if (comp)
+diff --git a/gcc/testsuite/gfortran.dg/intent_optimize_4.f90 b/gcc/testsuite/gfortran.dg/intent_optimize_4.f90
+new file mode 100644
+index 00000000000..effbaa12a2d
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/intent_optimize_4.f90
+@@ -0,0 +1,43 @@
++! { dg-do run }
++! { dg-additional-options "-fdump-tree-original" }
++! { dg-final { scan-tree-dump-times "CLOBBER" 2 "original" } }
++!
++! PR fortran/106817
++! Check that for an actual argument whose dummy is INTENT(OUT),
++! the clobber that is emitted in the caller before a procedure call
++! happens after any expression depending on the argument value has been
++! evaluated.
++! 
++
++module m
++  implicit none
++contains
++  subroutine copy1(out, in)
++    integer, intent(in) :: in
++    integer, intent(out) :: out
++    out = in
++  end subroutine copy1
++  subroutine copy2(in, out)
++    integer, intent(in) :: in
++    integer, intent(out) :: out
++    out = in
++  end subroutine copy2
++end module m
++
++program p
++  use m
++  implicit none
++  integer :: a, b
++
++  ! Clobbering of a should happen after a+1 has been evaluated.
++  a = 3
++  call copy1(a, a+1)
++  if (a /= 4) stop 1
++
++  ! Clobbering order does not depend on the order of arguments.
++  ! It should also come last with reversed arguments.
++  b = 12
++  call copy2(b+1, b)
++  if (b /= 13) stop 2
++
++end program p
+-- 
+2.25.1
+

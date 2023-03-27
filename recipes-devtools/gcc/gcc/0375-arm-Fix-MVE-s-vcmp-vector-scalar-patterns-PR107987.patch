@@ -1,0 +1,75 @@
+From 27b6fb155dfefae8dc6ac8d8264851f104dff4e4 Mon Sep 17 00:00:00 2001
+From: Andre Vieira <andre.simoesdiasvieira@arm.com>
+Date: Tue, 6 Dec 2022 12:06:33 +0000
+Subject: [PATCH 375/547] arm: Fix MVE's vcmp vector-scalar patterns [PR107987]
+
+This patch surrounds the scalar operand of the MVE vcmp patterns with a
+vec_duplicate to ensure both operands of the comparision operator have the same
+(vector) mode.
+
+gcc/ChangeLog:
+
+	PR target/107987
+	* config/arm/mve.md (mve_vcmp<mve_cmp_op>q_n_<mode>,
+	@mve_vcmp<mve_cmp_op>q_n_f<mode>): Apply vec_duplicate to scalar
+	operand.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/arm/mve/pr107987.c: New test.
+
+(cherry picked from commit ed34c3bc3428bce663d42e9eeda10bc0c5d56d5c)
+---
+ gcc/config/arm/mve.md                       | 10 ++++++----
+ gcc/testsuite/gcc.target/arm/mve/pr107987.c | 11 +++++++++++
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/arm/mve/pr107987.c
+
+diff --git a/gcc/config/arm/mve.md b/gcc/config/arm/mve.md
+index 01448717b7a..1d957dd2539 100644
+--- a/gcc/config/arm/mve.md
++++ b/gcc/config/arm/mve.md
+@@ -834,8 +834,9 @@
+ (define_insn "mve_vcmp<mve_cmp_op>q_n_<mode>"
+   [
+    (set (match_operand:<MVE_VPRED> 0 "vpr_register_operand" "=Up")
+-	(MVE_COMPARISONS:<MVE_VPRED> (match_operand:MVE_2 1 "s_register_operand" "w")
+-		    (match_operand:<V_elem> 2 "s_register_operand" "r")))
++	(MVE_COMPARISONS:<MVE_VPRED>
++	 (match_operand:MVE_2 1 "s_register_operand" "w")
++	 (vec_duplicate:MVE_2 (match_operand:<V_elem> 2 "s_register_operand" "r"))))
+   ]
+   "TARGET_HAVE_MVE"
+   "vcmp.<mve_cmp_type>%#<V_sz_elem>	<mve_cmp_op>, %q1, %2"
+@@ -1924,8 +1925,9 @@
+ (define_insn "@mve_vcmp<mve_cmp_op>q_n_f<mode>"
+   [
+    (set (match_operand:<MVE_VPRED> 0 "vpr_register_operand" "=Up")
+-	(MVE_FP_COMPARISONS:<MVE_VPRED> (match_operand:MVE_0 1 "s_register_operand" "w")
+-			       (match_operand:<V_elem> 2 "s_register_operand" "r")))
++	(MVE_FP_COMPARISONS:<MVE_VPRED>
++	 (match_operand:MVE_0 1 "s_register_operand" "w")
++	 (vec_duplicate:MVE_0 (match_operand:<V_elem> 2 "s_register_operand" "r"))))
+   ]
+   "TARGET_HAVE_MVE && TARGET_HAVE_MVE_FLOAT"
+   "vcmp.f%#<V_sz_elem>	<mve_cmp_op>, %q1, %2"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/pr107987.c b/gcc/testsuite/gcc.target/arm/mve/pr107987.c
+new file mode 100644
+index 00000000000..e19a3f2ec51
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/arm/mve/pr107987.c
+@@ -0,0 +1,11 @@
++/* { dg-options "-O2" } */
++/* { dg-require-effective-target arm_v8_1m_mve_ok } */
++/* { dg-add-options arm_v8_1m_mve } */
++
++#include <arm_mve.h>
++
++uint32x4_t foo (uint32x4_t a, uint32x4_t b)
++{
++  mve_pred16_t p = vcmpneq_n_u32 (vandq_u32 (a, b), 0);
++  return vaddq_x_u32 (a, b, p);
++}
+-- 
+2.25.1
+

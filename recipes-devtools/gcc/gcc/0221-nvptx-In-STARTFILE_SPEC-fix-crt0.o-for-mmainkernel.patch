@@ -1,0 +1,59 @@
+From fab0fce5c198b4cc51e07caca6421928b832efe2 Mon Sep 17 00:00:00 2001
+From: Thomas Schwinge <thomas@codesourcery.com>
+Date: Fri, 18 Nov 2022 23:57:52 +0100
+Subject: [PATCH 221/547] nvptx: In 'STARTFILE_SPEC', fix 'crt0.o' for
+ '-mmainkernel'
+
+A recent nvptx-tools change: commit 886a95faf66bf66a82fc0fe7d2a9fd9e9fec2820
+"ld: Don't search for input files in '-L'directories" (of
+<https://github.com/MentorEmbedded/nvptx-tools/pull/38>
+"Match standard 'ld' "search" behavior") in GCC/nvptx target testing
+generally causes linking to fail with:
+
+    error opening crt0.o
+    collect2: error: ld returned 1 exit status
+    compiler exited with status 1
+
+Indeed per GCC '-v' output, there is an undecorated 'crt0.o' on the linker
+('collect2') command line:
+
+     [...]/build-gcc/./gcc/collect2 -o [...] crt0.o [...]
+
+This is due to:
+
+    gcc/config/nvptx/nvptx.h:#define STARTFILE_SPEC "%{mmainkernel:crt0.o}"
+
+..., and the fix, as used by numerous other GCC targets, is to instead use
+'crt0.o%s'; for '%s' means, per 'gcc/gcc.cc', "The Specs Language":
+
+     %s     current argument is the name of a library or startup file of some sort.
+            Search for that file in a standard list of directories
+            and substitute the full name found.
+
+With that, we get the expected path to 'crt0.o'.
+
+	gcc/
+	* config/nvptx/nvptx.h (STARTFILE_SPEC): Fix 'crt0.o' for
+	'-mmainkernel'.
+
+(cherry picked from commit dda43e1ef0c9f6c32ad022d3a08ce7651e42a129)
+---
+ gcc/config/nvptx/nvptx.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config/nvptx/nvptx.h b/gcc/config/nvptx/nvptx.h
+index ed72c253191..294dd715c3d 100644
+--- a/gcc/config/nvptx/nvptx.h
++++ b/gcc/config/nvptx/nvptx.h
+@@ -27,7 +27,7 @@
+ 
+ /* Run-time Target.  */
+ 
+-#define STARTFILE_SPEC "%{mmainkernel:crt0.o}"
++#define STARTFILE_SPEC "%{mmainkernel:crt0.o%s}"
+ 
+ #define TARGET_CPU_CPP_BUILTINS() nvptx_cpu_cpp_builtins ()
+ 
+-- 
+2.25.1
+

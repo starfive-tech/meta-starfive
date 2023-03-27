@@ -1,0 +1,111 @@
+From b428bb449be1bdbbd4000b51bb7c665981dc8c8f Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Sun, 4 Dec 2022 10:47:24 -0500
+Subject: [PATCH 298/547] c++: pack in requires-expr parm list [PR107417]
+
+Here find_parameter_packs_r isn't detecting the pack T inside the
+requires-expr's parameter list ultimately because cp_walk_trees
+deliberately avoids walking the list so as to avoid false positives in
+the unexpanded pack checker.
+
+But it should still be fine to walk the TREE_TYPE of each parameter,
+which we already need to do from for_each_template_parm_r, and is
+sufficient to fix the testcase.
+
+	PR c++/107417
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (for_each_template_parm_r) <case REQUIRES_EXPR>: Move
+	walking of the TREE_TYPE of each parameter to ...
+	* tree.cc (cp_walk_subtrees) <case REQUIRES_EXPR>: ... here.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/concepts-requires33.C: New test.
+
+(cherry picked from commit 079add3ad39d6620d34665dd9c26c21951eb657c)
+---
+ gcc/cp/pt.cc                                  | 15 -------------
+ gcc/cp/tree.cc                                | 21 +++++++++++--------
+ .../g++.dg/cpp2a/concepts-requires33.C        | 10 +++++++++
+ 3 files changed, 22 insertions(+), 24 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/concepts-requires33.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index cb674cc2258..a5f14ef98e8 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -10648,21 +10648,6 @@ for_each_template_parm_r (tree *tp, int *walk_subtrees, void *d)
+ 	return error_mark_node;
+       break;
+ 
+-    case REQUIRES_EXPR:
+-      {
+-	if (!fn)
+-	  return error_mark_node;
+-
+-	/* Recursively walk the type of each constraint variable.  */
+-	tree p = TREE_OPERAND (t, 0);
+-	while (p)
+-	  {
+-	    WALK_SUBTREE (TREE_TYPE (p));
+-	    p = TREE_CHAIN (p);
+-	  }
+-      }
+-      break;
+-
+     default:
+       break;
+     }
+diff --git a/gcc/cp/tree.cc b/gcc/cp/tree.cc
+index 3b37567cbd7..bc521f8ae9c 100644
+--- a/gcc/cp/tree.cc
++++ b/gcc/cp/tree.cc
+@@ -5488,15 +5488,18 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
+       break;
+  
+     case REQUIRES_EXPR:
+-      // Only recurse through the nested expression. Do not
+-      // walk the parameter list. Doing so causes false
+-      // positives in the pack expansion checker since the
+-      // requires parameters are introduced as pack expansions.
+-      ++cp_unevaluated_operand;
+-      result = cp_walk_tree (&REQUIRES_EXPR_REQS (*tp), func, data, pset);
+-      --cp_unevaluated_operand;
+-      *walk_subtrees_p = 0;
+-      break;
++      {
++	cp_unevaluated u;
++	for (tree parm = REQUIRES_EXPR_PARMS (*tp); parm; parm = DECL_CHAIN (parm))
++	  /* Walk the types of each parameter, but not the parameter itself,
++	     since doing so would cause false positives in the unexpanded pack
++	     checker if the requires-expr introduces a function parameter pack,
++	     e.g. requires (Ts... ts) { }.   */
++	  WALK_SUBTREE (TREE_TYPE (parm));
++	WALK_SUBTREE (REQUIRES_EXPR_REQS (*tp));
++	*walk_subtrees_p = 0;
++	break;
++      }
+ 
+     case DECL_EXPR:
+       /* User variables should be mentioned in BIND_EXPR_VARS
+diff --git a/gcc/testsuite/g++.dg/cpp2a/concepts-requires33.C b/gcc/testsuite/g++.dg/cpp2a/concepts-requires33.C
+new file mode 100644
+index 00000000000..1ff237ac382
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/concepts-requires33.C
+@@ -0,0 +1,10 @@
++// PR c++/107417
++// { dg-do compile { target c++20 } }
++
++template<class... T>
++void f() requires (requires (T x) { true; } && ...);
++
++int main() {
++  f<int>();
++  f<int, void>(); // { dg-error "no match" }
++}
+-- 
+2.25.1
+

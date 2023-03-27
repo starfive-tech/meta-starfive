@@ -1,0 +1,41 @@
+From 1342c7f46e6e3f8f29d7971531a0af18cd8429bc Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 4 Nov 2022 12:10:32 +0000
+Subject: [PATCH 195/547] doc: Document correct -fwide-exec-charset defaults
+ [PR41041]
+
+As shown in the PR, the default is not UTF-32 but rather UTF-32BE or
+UTF-32LE, avoiding the need for a byte order mark in literals.
+
+gcc/ChangeLog:
+
+	PR c/41041
+	* doc/cppopts.texi: Document -fwide-exec-charset defaults
+	correctly.
+
+(cherry picked from commit e50ea3a42f058c14ee29327d5277ab0435e3d36b)
+---
+ gcc/doc/cppopts.texi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/doc/cppopts.texi b/gcc/doc/cppopts.texi
+index 75c56a368ca..c0a92b37018 100644
+--- a/gcc/doc/cppopts.texi
++++ b/gcc/doc/cppopts.texi
+@@ -318,9 +318,10 @@ supported by the system's @code{iconv} library routine.
+ @opindex fwide-exec-charset
+ @cindex character set, wide execution
+ Set the wide execution character set, used for wide string and
+-character constants.  The default is UTF-32 or UTF-16, whichever
+-corresponds to the width of @code{wchar_t}.  As with
+-@option{-fexec-charset}, @var{charset} can be any encoding supported
++character constants.  The default is one of UTF-32BE, UTF-32LE, UTF-16BE,
++or UTF-16LE, whichever corresponds to the width of @code{wchar_t} and the
++big-endian or little-endian byte order being used for code generation.  As
++with @option{-fexec-charset}, @var{charset} can be any encoding supported
+ by the system's @code{iconv} library routine; however, you will have
+ problems with encodings that do not fit exactly in @code{wchar_t}.
+ 
+-- 
+2.25.1
+

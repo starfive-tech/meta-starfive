@@ -1,0 +1,72 @@
+From cb6861acc4074fd2c30a96b52d68c2cd33b9e94d Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Wed, 18 Jan 2023 02:34:25 -0600
+Subject: [PATCH 472/547] rs6000: Fix typo on vec_vsubcuq in
+ rs6000-overload.def [PR108396]
+
+As Andrew pointed out in PR108396, there is one typo in
+rs6000-overload.def on built-in function vec_vsubcuq:
+
+  [VEC_VSUBCUQ, vec_vsubcuqP, __builtin_vec_vsubcuq]
+
+"vec_vsubcuqP" should be "vec_vsubcuq", this typo caused
+us to define vec_vsubcuqP in rs6000-vecdefines.h instead
+of vec_vsubcuq, so that compiler is not able to realize
+the built-in function name vec_vsubcuq any more.
+
+Co-authored-By: Andrew Pinski <apinski@marvell.com>
+
+	PR target/108396
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000-overload.def (VEC_VSUBCUQ): Fix typo
+	vec_vsubcuqP with vec_vsubcuq.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr108396.c: New test.
+
+(cherry picked from commit aaf29ae6cdbaad58b709a77784375d15138174b3)
+---
+ gcc/config/rs6000/rs6000-overload.def       |  2 +-
+ gcc/testsuite/gcc.target/powerpc/pr108396.c | 14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108396.c
+
+diff --git a/gcc/config/rs6000/rs6000-overload.def b/gcc/config/rs6000/rs6000-overload.def
+index 44e2945aaa0..9135b8d6966 100644
+--- a/gcc/config/rs6000/rs6000-overload.def
++++ b/gcc/config/rs6000/rs6000-overload.def
+@@ -5930,7 +5930,7 @@
+   unsigned int __builtin_vec_scalar_test_data_class_sp (float, const int);
+     VSTDCSP  VSTDCSP_DEPR1
+ 
+-[VEC_VSUBCUQ, vec_vsubcuqP, __builtin_vec_vsubcuq]
++[VEC_VSUBCUQ, vec_vsubcuq, __builtin_vec_vsubcuq]
+   vsq __builtin_vec_vsubcuq (vsq, vsq);
+     VSUBCUQ  VSUBCUQ_DEPR1
+   vuq __builtin_vec_vsubcuq (vuq, vuq);
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108396.c b/gcc/testsuite/gcc.target/powerpc/pr108396.c
+new file mode 100644
+index 00000000000..a783f0823a6
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108396.c
+@@ -0,0 +1,14 @@
++/* { dg-require-effective-target powerpc_p8vector_ok } */
++/* { dg-require-effective-target int128 } */
++/* { dg-options "-mdejagnu-cpu=power8" } */
++
++/* Verify there is no error message.  */
++
++#include <altivec.h>
++
++vector unsigned __int128
++vsubcuq (vector unsigned __int128 a, vector unsigned __int128 b)
++{
++  return vec_vsubcuq (a, b);
++}
++
+-- 
+2.25.1
+

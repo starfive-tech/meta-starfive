@@ -1,0 +1,68 @@
+From 9e242f8a2d5987ddaa74696e5ad809303ddc8dd0 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Mon, 21 Nov 2022 07:56:06 +0100
+Subject: [PATCH 277/547] tree-optimization/107766 - ICE with recent
+ -ffp-contract=off fix
+
+The following uses *node to check for FP types rather than the
+child nodes which could be constant leafs and thus without a
+vector type.
+
+	PR tree-optimization/107766
+	* tree-vect-slp-patterns.cc (complex_mul_pattern::matches):
+	Use *node to check for FP vector types.
+
+	* g++.dg/vect/pr107766.cc: New testcase.
+
+(cherry picked from commit 1a06ae6f2f4f292fd05a900bcf433cb4282da1e3)
+---
+ gcc/testsuite/g++.dg/vect/pr107766.cc | 23 +++++++++++++++++++++++
+ gcc/tree-vect-slp-patterns.cc         |  2 +-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/vect/pr107766.cc
+
+diff --git a/gcc/testsuite/g++.dg/vect/pr107766.cc b/gcc/testsuite/g++.dg/vect/pr107766.cc
+new file mode 100644
+index 00000000000..744bcc900b0
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/vect/pr107766.cc
+@@ -0,0 +1,23 @@
++// { dg-do compile }
++// { dg-additional-options "-ffp-contract=off" }
++
++typedef double btScalar;
++struct btVector3 {
++  operator btScalar *() const;
++};
++double m_vec[2];
++struct btShapeMatrix {
++  double &operator[](int i) { return m_vec[i]; }
++};
++btScalar shape_function___1pxt1pz, shape_function__fac;
++struct btMiniSDF {
++  void shape_function_(btVector3 const &) const;
++};
++void btMiniSDF::shape_function_(btVector3 const &xi) const {
++  btShapeMatrix res;
++  btScalar _1m3y = 1.0 - 3.0 * xi[1], _1p3y = 1.0 + 3.0 * xi[1],
++           fact1m3y = shape_function__fac * _1m3y,
++           fact1p3y = shape_function__fac * _1p3y;
++  res[22] = fact1m3y * shape_function___1pxt1pz;
++  res[23] = fact1p3y * shape_function___1pxt1pz;
++}
+diff --git a/gcc/tree-vect-slp-patterns.cc b/gcc/tree-vect-slp-patterns.cc
+index 5c6ce8729bd..9157d713291 100644
+--- a/gcc/tree-vect-slp-patterns.cc
++++ b/gcc/tree-vect-slp-patterns.cc
+@@ -1039,7 +1039,7 @@ complex_mul_pattern::matches (complex_operation_t op,
+      with -ffp-contract=fast.  */
+   if (!mul0
+       && (flag_fp_contract_mode == FP_CONTRACT_FAST
+-	  || !FLOAT_TYPE_P (SLP_TREE_VECTYPE (l0node[0])))
++	  || !FLOAT_TYPE_P (SLP_TREE_VECTYPE (*node)))
+       && vect_match_expression_p (l0node[0], PLUS_EXPR))
+     {
+       auto vals = SLP_TREE_CHILDREN (l0node[0]);
+-- 
+2.25.1
+

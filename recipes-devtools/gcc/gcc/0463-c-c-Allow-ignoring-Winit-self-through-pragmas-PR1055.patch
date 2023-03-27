@@ -1,0 +1,213 @@
+From 732d744e82332e7cc269694197c0df2a3635730f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 16 Jan 2023 09:40:14 +0100
+Subject: [PATCH 463/547] c, c++: Allow ignoring -Winit-self through pragmas
+ [PR105593]
+
+As mentioned in the PR, various x86 intrinsics need to return
+an uninitialized vector.  Currently they use self initialization
+to avoid -Wuninitialized warnings, which works fine in C, but
+doesn't work in C++ where -Winit-self is enabled in -Wall.
+We don't have an attribute to mark a variable as knowingly
+uninitialized (the uninitialized attribute exists but means
+something else, only in the -ftrivial-auto-var-init context),
+and trying to suppress either -Wuninitialized or -Winit-self
+inside of the _mm_undefined_ps etc. intrinsic definitions
+doesn't work, one needs to currently disable through pragmas
+-Wuninitialized warning at the point where _mm_undefined_ps etc.
+result is actually used, but that goes against the intent of
+those intrinsics.
+
+The -Winit-self warning option actually doesn't do any warning,
+all we do is record a suppression for -Winit-self if !warn_init_self
+on the decl definition and later look that up in uninit pass.
+
+The following patch changes those !warn_init_self tests which
+are true only based on the command line option setting, not based
+on GCC diagnostic pragma overrides to
+!warning_enabled_at (DECL_SOURCE_LOCATION (decl), OPT_Winit_self)
+such that it takes them into account.
+
+2023-01-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/105593
+gcc/c/
+	* c-parser.cc (c_parser_initializer): Check warning_enabled_at
+	at the DECL_SOURCE_LOCATION (decl) for OPT_Winit_self instead
+	of warn_init_self.
+gcc/cp/
+	* decl.cc (cp_finish_decl): Check warning_enabled_at
+	at the DECL_SOURCE_LOCATION (decl) for OPT_Winit_self instead
+	of warn_init_self.
+gcc/testsuite/
+	* c-c++-common/Winit-self3.c: New test.
+	* c-c++-common/Winit-self4.c: New test.
+	* c-c++-common/Winit-self5.c: New test.
+
+(cherry picked from commit 98b41fd4045b7856e7b85dd58d67c600bd909379)
+---
+ gcc/c/c-parser.cc                        |  2 +-
+ gcc/cp/decl.cc                           |  2 +-
+ gcc/testsuite/c-c++-common/Winit-self3.c | 36 ++++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/Winit-self4.c | 36 ++++++++++++++++++++++++
+ gcc/testsuite/c-c++-common/Winit-self5.c | 36 ++++++++++++++++++++++++
+ 5 files changed, 110 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/Winit-self3.c
+ create mode 100644 gcc/testsuite/c-c++-common/Winit-self4.c
+ create mode 100644 gcc/testsuite/c-c++-common/Winit-self5.c
+
+diff --git a/gcc/c/c-parser.cc b/gcc/c/c-parser.cc
+index 80f86c177fa..78a313fe31e 100644
+--- a/gcc/c/c-parser.cc
++++ b/gcc/c/c-parser.cc
+@@ -5228,7 +5228,7 @@ c_parser_initializer (c_parser *parser, tree decl)
+ 	  && !DECL_EXTERNAL (decl)
+ 	  && !TREE_STATIC (decl)
+ 	  && ret.value == decl
+-	  && !warn_init_self)
++	  && !warning_enabled_at (DECL_SOURCE_LOCATION (decl), OPT_Winit_self))
+ 	suppress_warning (decl, OPT_Winit_self);
+       if (TREE_CODE (ret.value) != STRING_CST
+ 	  && TREE_CODE (ret.value) != COMPOUND_LITERAL_EXPR)
+diff --git a/gcc/cp/decl.cc b/gcc/cp/decl.cc
+index 7569785988e..fd1a1cbbf2c 100644
+--- a/gcc/cp/decl.cc
++++ b/gcc/cp/decl.cc
+@@ -8246,7 +8246,7 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
+       if (!DECL_EXTERNAL (decl)
+ 	  && !TREE_STATIC (decl)
+ 	  && decl == tree_strip_any_location_wrapper (init)
+-	  && !warn_init_self)
++	  && !warning_enabled_at (DECL_SOURCE_LOCATION (decl), OPT_Winit_self))
+ 	suppress_warning (decl, OPT_Winit_self);
+     }
+ 
+diff --git a/gcc/testsuite/c-c++-common/Winit-self3.c b/gcc/testsuite/c-c++-common/Winit-self3.c
+new file mode 100644
+index 00000000000..b83135f193b
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/Winit-self3.c
+@@ -0,0 +1,36 @@
++/* PR c++/105593 */
++/* { dg-do compile } */
++/* { dg-options "-W -Wall" } */
++
++void bar (int);
++
++static inline int
++baz (void)
++{
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Winit-self"
++  int u = u;		/* { dg-bogus "'u' is used uninitialized" } */
++#pragma GCC diagnostic pop
++  return u;
++}
++
++void
++foo (void)
++{
++  int u = baz ();
++  bar (u);
++}
++
++static inline int
++qux (void)
++{
++  int u = u;		/* { dg-warning "'u' is used uninitialized" "" { target c++ } } */
++  return u;		/* { dg-message "'u' was declared here" "" { target c++ } .-1 } */
++}
++
++void
++corge (void)
++{
++  int u = qux ();
++  bar (u);
++}
+diff --git a/gcc/testsuite/c-c++-common/Winit-self4.c b/gcc/testsuite/c-c++-common/Winit-self4.c
+new file mode 100644
+index 00000000000..b38b7cc60b5
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/Winit-self4.c
+@@ -0,0 +1,36 @@
++/* PR c++/105593 */
++/* { dg-do compile } */
++/* { dg-options "-W -Wall -Winit-self" } */
++
++void bar (int);
++
++static inline int
++baz (void)
++{
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Winit-self"
++  int u = u;		/* { dg-bogus "'u' is used uninitialized" } */
++#pragma GCC diagnostic pop
++  return u;
++}
++
++void
++foo (void)
++{
++  int u = baz ();
++  bar (u);
++}
++
++static inline int
++qux (void)
++{
++  int u = u;		/* { dg-warning "'u' is used uninitialized" } */
++  return u;		/* { dg-message "'u' was declared here" "" { target *-*-* } .-1 } */
++}
++
++void
++corge (void)
++{
++  int u = qux ();
++  bar (u);
++}
+diff --git a/gcc/testsuite/c-c++-common/Winit-self5.c b/gcc/testsuite/c-c++-common/Winit-self5.c
+new file mode 100644
+index 00000000000..db2d9a13219
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/Winit-self5.c
+@@ -0,0 +1,36 @@
++/* PR c++/105593 */
++/* { dg-do compile } */
++/* { dg-options "-W -Wall -Wno-init-self" } */
++
++void bar (int);
++
++static inline int
++baz (void)
++{
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Winit-self"
++  int u = u;		/* { dg-bogus "'u' is used uninitialized" } */
++#pragma GCC diagnostic pop
++  return u;
++}
++
++void
++foo (void)
++{
++  int u = baz ();
++  bar (u);
++}
++
++static inline int
++qux (void)
++{
++  int u = u;		/* { dg-bogus "'u' is used uninitialized" } */
++  return u;
++}
++
++void
++corge (void)
++{
++  int u = qux ();
++  bar (u);
++}
+-- 
+2.25.1
+

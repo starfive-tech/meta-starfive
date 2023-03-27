@@ -1,0 +1,67 @@
+From 2b3352b5d65bdb3fd612bbe0abe336226987d602 Mon Sep 17 00:00:00 2001
+From: Steve Kargl <kargl@gcc.gnu.org>
+Date: Tue, 7 Feb 2023 20:18:42 +0100
+Subject: [PATCH 420/547] Fortran: error handling of global entity appearing in
+ COMMON block [PR103259]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/103259
+	* resolve.cc (resolve_common_vars): Avoid NULL pointer dereference
+	when a symbol's location is not set.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/103259
+	* gfortran.dg/pr103259.f90: New test.
+
+(cherry picked from commit 7e9f20f5517429cfaadec14d6b04705e59078565)
+---
+ gcc/fortran/resolve.cc                 | 12 +++++++++---
+ gcc/testsuite/gfortran.dg/pr103259.f90 | 11 +++++++++++
+ 2 files changed, 20 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr103259.f90
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index a1a91dc425f..565b212c4c8 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -953,9 +953,15 @@ resolve_common_vars (gfc_common_head *common_block, bool named_common)
+     {
+       gsym = gfc_find_gsymbol (gfc_gsym_root, csym->name);
+       if (gsym && (gsym->type == GSYM_MODULE || gsym->type == GSYM_PROGRAM))
+-	gfc_error_now ("Global entity %qs at %L cannot appear in a "
+-			"COMMON block at %L", gsym->name,
+-			&gsym->where, &csym->common_block->where);
++	{
++	  if (csym->common_block)
++	    gfc_error_now ("Global entity %qs at %L cannot appear in a "
++			   "COMMON block at %L", gsym->name,
++			   &gsym->where, &csym->common_block->where);
++	  else
++	    gfc_error_now ("Global entity %qs at %L cannot appear in a "
++			   "COMMON block", gsym->name, &gsym->where);
++	}
+ 
+       /* gfc_add_in_common may have been called before, but the reported errors
+ 	 have been ignored to continue parsing.
+diff --git a/gcc/testsuite/gfortran.dg/pr103259.f90 b/gcc/testsuite/gfortran.dg/pr103259.f90
+new file mode 100644
+index 00000000000..f78ff26180e
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr103259.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/103259 - ICE in resolve_common_vars
++! Contributed by G.Steinmetz
++
++module m
++  integer :: p
++  common /c/ p
++end
++program p ! { dg-error "cannot appear in a COMMON block" }
++  use m   ! { dg-error "is also the name of the current program unit" }
++end
+-- 
+2.25.1
+

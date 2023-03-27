@@ -1,0 +1,54 @@
+From 4b25752a2970745ccc9f7ad0294b9e19e56c5300 Mon Sep 17 00:00:00 2001
+From: Sergei Trofimovich <siarheit@google.com>
+Date: Fri, 16 Sep 2022 18:33:11 +0100
+Subject: [PATCH 109/547] gcc/config/t-i386: add build dependencies on
+ i386-builtin-types.inc
+
+i386-builtin-types.inc is included indirectly via i386-builtins.h
+into 4 files: i386.cc i386-builtins.cc i386-expand.cc i386-features.cc
+
+Only i386.cc dependency was present in gcc/config/t-i386 makefile.
+
+As a result parallel builds occasionally fail as:
+
+    g++ ... -o i386-builtins.o ... ../../gcc-13-20220911/gcc/config/i386/i386-builtins.cc
+    In file included from ../../gcc-13-20220911/gcc/config/i386/i386-builtins.cc:92:
+    ../../gcc-13-20220911/gcc/config/i386/i386-builtins.h:25:10:
+     fatal error: i386-builtin-types.inc: No such file or directory
+       25 | #include "i386-builtin-types.inc"
+          |          ^~~~~~~~~~~~~~~~~~~~~~~~
+    compilation terminated.
+    make[3]: *** [../../gcc-13-20220911/gcc/config/i386/t-i386:54: i386-builtins.o]
+      Error 1 shuffle=1663349189
+
+gcc/
+	PR target/107064
+	* config/i386/t-i386: Add build-time dependencies against
+	i386-builtin-types.inc to i386-builtins.o, i386-expand.o,
+	i386-features.o.
+
+(cherry picked from commit ef3165736d9daafba88adb2db65b2e8ebf0024ca)
+---
+ gcc/config/i386/t-i386 | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/gcc/config/i386/t-i386 b/gcc/config/i386/t-i386
+index 4e2a0efc615..ffdbbdfe8ce 100644
+--- a/gcc/config/i386/t-i386
++++ b/gcc/config/i386/t-i386
+@@ -62,7 +62,12 @@ i386-features.o: $(srcdir)/config/i386/i386-features.cc
+ 	$(COMPILE) $<
+ 	$(POSTCOMPILE)
+ 
++# i386-builtin-types.inc is included into i386-builtins.h.
++# Below are direct users of i386-builtins.h:
+ i386.o: i386-builtin-types.inc
++i386-builtins.o: i386-builtin-types.inc
++i386-expand.o: i386-builtin-types.inc
++i386-features.o: i386-builtin-types.inc
+ 
+ i386-builtin-types.inc: s-i386-bt ; @true
+ s-i386-bt: $(srcdir)/config/i386/i386-builtin-types.awk \
+-- 
+2.25.1
+

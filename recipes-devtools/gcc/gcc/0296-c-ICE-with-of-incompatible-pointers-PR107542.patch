@@ -1,0 +1,84 @@
+From 37595f8354e3e48e4a1a94537f3d1ae095ed75df Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Tue, 29 Nov 2022 19:25:37 -0500
+Subject: [PATCH 296/547] c++: ICE with <=> of incompatible pointers [PR107542]
+
+In a SFINAE context composite_pointer_type returns error_mark_node if
+the given pointer types are incompatible.  But the SPACESHIP_EXPR case
+of cp_build_binary_op wasn't prepared for this error_mark_node result,
+which led to an ICE (from spaceship_comp_cat) for the below testcase.
+(In a non-SFINAE context composite_pointer_type issues a permerror and
+returns cv void* in this case, so this ICE seems specific to SFINAE.)
+
+	PR c++/107542
+
+gcc/cp/ChangeLog:
+
+	* typeck.cc (cp_build_binary_op): In the SPACESHIP_EXPR case,
+	handle an error_mark_node result type.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/spaceship-sfinae2.C: New test.
+
+(cherry picked from commit 000e9863120cbc75a0f8d497264519974c97669f)
+---
+ gcc/cp/typeck.cc                              |  5 ++--
+ .../g++.dg/cpp2a/spaceship-sfinae2.C          | 29 +++++++++++++++++++
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/spaceship-sfinae2.C
+
+diff --git a/gcc/cp/typeck.cc b/gcc/cp/typeck.cc
+index b2ffde34dde..c36508b8cc5 100644
+--- a/gcc/cp/typeck.cc
++++ b/gcc/cp/typeck.cc
+@@ -5921,8 +5921,9 @@ cp_build_binary_op (const op_location_t &location,
+       tree_code orig_code0 = TREE_CODE (orig_type0);
+       tree orig_type1 = TREE_TYPE (orig_op1);
+       tree_code orig_code1 = TREE_CODE (orig_type1);
+-      if (!result_type)
+-	/* Nope.  */;
++      if (!result_type || result_type == error_mark_node)
++	/* Nope.  */
++	result_type = NULL_TREE;
+       else if ((orig_code0 == BOOLEAN_TYPE) != (orig_code1 == BOOLEAN_TYPE))
+ 	/* "If one of the operands is of type bool and the other is not, the
+ 	   program is ill-formed."  */
+diff --git a/gcc/testsuite/g++.dg/cpp2a/spaceship-sfinae2.C b/gcc/testsuite/g++.dg/cpp2a/spaceship-sfinae2.C
+new file mode 100644
+index 00000000000..7105a2c7f2a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/spaceship-sfinae2.C
+@@ -0,0 +1,29 @@
++// PR c++/107542
++// { dg-do compile { target c++20 } }
++
++#include <compare>
++
++template<class T, class U>
++concept same_as = __is_same(T, U);
++
++template<class Lhs, class Rhs>
++concept Ord = requires(Lhs lhs, Rhs rhs) {
++  { lhs <=> rhs } -> same_as<std::strong_ordering>;
++};
++
++static_assert(Ord<int*, int*>);   // Works.
++static_assert(!Ord<int*, char*>); // ICE.
++
++template<class T>
++struct S {
++  T* p;
++};
++
++template<class T, class U>
++  requires(Ord<const T*, const U*>)
++constexpr inline auto operator<=>(const S<T>& l, const S<U>& r) noexcept {
++  return l.p <=> r.p;
++}
++
++static_assert(Ord<S<int>, S<int>>);   // Works.
++static_assert(!Ord<S<int>, S<char>>); // ICE.
+-- 
+2.25.1
+

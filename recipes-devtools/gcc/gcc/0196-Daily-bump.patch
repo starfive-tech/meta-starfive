@@ -1,0 +1,58 @@
+From 64f22c4ee39f75c08e3c6585f23a9f5092da1c4c Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 6 Nov 2022 11:09:16 +0000
+Subject: [PATCH 196/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 15 +++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  6 ++++++
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 197fa081cf3..4caf735f460 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,18 @@
++2022-11-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR c/41041
++	* doc/cppopts.texi: Document -fwide-exec-charset defaults
++	correctly.
++
++2022-11-04  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* fold-const.cc (operand_compare::operand_equal_p) <COMPONENT_REF>:
++	Do not take into account operand 2.
++	(operand_compare::hash_operand) <COMPONENT_REF>: Likewise.
++
+ 2022-11-03  Uros Bizjak  <ubizjak@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index c96f2246e01..a9017fbbe6b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221104
++20221106
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 674b98d053d..f40f824c3c6 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,9 @@
++2022-11-04  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/opt99.adb: New test.
++	* gnat.dg/opt99_pkg1.ads, gnat.dg/opt99_pkg1.adb: New helper.
++	* gnat.dg/opt99_pkg2.ads: Likewise.
++
+ 2022-11-03  Uros Bizjak  <ubizjak@gmail.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

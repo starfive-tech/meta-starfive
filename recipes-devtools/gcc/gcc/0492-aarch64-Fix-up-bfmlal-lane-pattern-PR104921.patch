@@ -1,0 +1,99 @@
+From 5b99b0f1ee65ad50b5e6d3a57aace616273cc814 Mon Sep 17 00:00:00 2001
+From: Alex Coplan <alex.coplan@arm.com>
+Date: Mon, 6 Feb 2023 14:32:21 +0000
+Subject: [PATCH 492/547] aarch64: Fix up bfmlal lane pattern [PR104921]
+
+As the testcase shows, this pattern had an incorrect constraint leading
+to GCC's output getting rejected by the assembler.
+
+This patch fixes the constraint accordingly.
+
+The test is split into two: one that can run without bf16 support from
+the assembler and another that checks that the output actually assembles
+when such support is available.
+
+gcc/ChangeLog:
+
+	PR target/104921
+	* config/aarch64/aarch64-simd.md (aarch64_bfmlal<bt>_lane<q>v4sf):
+	Use correct constraint for operand 3.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/104921
+	* gcc.target/aarch64/pr104921-1.c: New test.
+	* gcc.target/aarch64/pr104921-2.c: New test.
+	* gcc.target/aarch64/pr104921.x: Include file for new tests.
+
+(cherry picked from commit 277e1f30a5e4e634304a7b8a532825119f0ea47f)
+---
+ gcc/config/aarch64/aarch64-simd.md            |  2 +-
+ gcc/testsuite/gcc.target/aarch64/pr104921-1.c | 12 ++++++++++++
+ gcc/testsuite/gcc.target/aarch64/pr104921-2.c |  6 ++++++
+ gcc/testsuite/gcc.target/aarch64/pr104921.x   |  9 +++++++++
+ 4 files changed, 28 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/pr104921-1.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/pr104921-2.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/pr104921.x
+
+diff --git a/gcc/config/aarch64/aarch64-simd.md b/gcc/config/aarch64/aarch64-simd.md
+index a00e1c6ef8d..ee7f0b89cff 100644
+--- a/gcc/config/aarch64/aarch64-simd.md
++++ b/gcc/config/aarch64/aarch64-simd.md
+@@ -9047,7 +9047,7 @@
+   [(set (match_operand:V4SF 0 "register_operand" "=w")
+         (plus: V4SF (match_operand:V4SF 1 "register_operand" "0")
+                     (unspec:V4SF [(match_operand:V8BF 2 "register_operand" "w")
+-                                  (match_operand:VBF 3 "register_operand" "w")
++                                  (match_operand:VBF 3 "register_operand" "x")
+                                   (match_operand:SI 4 "const_int_operand" "n")]
+                      BF_MLA)))]
+   "TARGET_BF16_SIMD"
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr104921-1.c b/gcc/testsuite/gcc.target/aarch64/pr104921-1.c
+new file mode 100644
+index 00000000000..dcf6fe7d90d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/pr104921-1.c
+@@ -0,0 +1,12 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-O2 -march=armv8.2-a+bf16 -std=gnu99 -save-temps" }  */
++/* { dg-final { check-function-bodies "**" "" } } */
++
++#include "pr104921.x"
++
++/*
++**foo:
++**	mov	v([0-9]|1[0-5])\.8b, v16\.8b
++**	bfmlalb	v0\.4s, v1\.8h, v([0-9]|1[0-5])\.h\[0\]
++**	ret
++*/
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr104921-2.c b/gcc/testsuite/gcc.target/aarch64/pr104921-2.c
+new file mode 100644
+index 00000000000..211fcd0aca9
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/pr104921-2.c
+@@ -0,0 +1,6 @@
++/* { dg-do assemble } */
++/* { dg-add-options arm_v8_2a_bf16_neon }  */
++/* { dg-additional-options "-O2 -std=gnu99" }  */
++/* { dg-require-effective-target arm_v8_2a_bf16_neon_ok } */
++
++#include "pr104921.x"
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr104921.x b/gcc/testsuite/gcc.target/aarch64/pr104921.x
+new file mode 100644
+index 00000000000..1e1a6f24e22
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/pr104921.x
+@@ -0,0 +1,9 @@
++#include <arm_neon.h>
++
++float32x4_t
++foo(float32x4_t x, bfloat16x8_t a)
++{
++  register bfloat16x4_t b asm ("v16");
++  asm volatile ("" : "=w"(b));
++  return vbfmlalbq_lane_f32 (x, a, b, 0);
++}
+-- 
+2.25.1
+

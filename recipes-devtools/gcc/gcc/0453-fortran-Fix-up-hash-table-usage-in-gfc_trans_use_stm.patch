@@ -1,0 +1,48 @@
+From f2731d1b9a52a7c97af9bbb6ea76603630cc11c2 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 3 Feb 2023 21:37:27 +0100
+Subject: [PATCH 453/547] fortran: Fix up hash table usage in
+ gfc_trans_use_stmts [PR108451]
+
+The first testcase in the PR (which I haven't included in the patch because
+it is unclear to me if it is supposed to be valid or not) ICEs since extra
+hash table checking has been added recently.  The problem is that
+gfc_trans_use_stmts does
+          tree *slot = entry->decls->find_slot_with_hash (rent->use_name, hash,
+                                                          INSERT);
+          if (*slot == NULL)
+and later on doesn't store anything into *slot and continues.  Another spot
+a few lines later correctly clears the slot if it decides not to use the
+slot, so the following patch does the same.
+
+2023-02-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/108451
+	* trans-decl.cc (gfc_trans_use_stmts): Call clear_slot before
+	doing continue.
+
+(cherry picked from commit 76f7f0eddcb7c418d1ec3dea3e2341ca99097301)
+---
+ gcc/fortran/trans-decl.cc | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/fortran/trans-decl.cc b/gcc/fortran/trans-decl.cc
+index 9ec554cdca3..0e91553108f 100644
+--- a/gcc/fortran/trans-decl.cc
++++ b/gcc/fortran/trans-decl.cc
+@@ -5336,7 +5336,11 @@ gfc_trans_use_stmts (gfc_namespace * ns)
+ 	      /* Sometimes, generic interfaces wind up being over-ruled by a
+ 		 local symbol (see PR41062).  */
+ 	      if (!st->n.sym->attr.use_assoc)
+-		continue;
++		{
++		  *slot = error_mark_node;
++		  entry->decls->clear_slot (slot);
++		  continue;
++		}
+ 
+ 	      if (st->n.sym->backend_decl
+ 		  && DECL_P (st->n.sym->backend_decl)
+-- 
+2.25.1
+

@@ -1,0 +1,54 @@
+From 646c208608723046e29cc529614df1584f34d9d2 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 4 Feb 2023 00:20:02 +0000
+Subject: [PATCH 406/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/cp/ChangeLog        | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 12b84840cd1..65026ee2abb 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230203
++20230204
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index d4c7582078c..92634fec032 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-03  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-02-03  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107461
++	* semantics.cc (finish_call_expr): Strip ADDR_EXPR from
++	the selected callee during overload set pruning.
++
+ 2023-02-01  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f6348f028b4..a0fe37c0f39 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-03  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-02-03  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/107461
++	* g++.dg/template/call9.C: New test.
++
+ 2023-02-02  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

@@ -1,0 +1,54 @@
+From 336162e701a81320ced8336d72bbce562b9be15d Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 9 Feb 2023 00:21:17 +0000
+Subject: [PATCH 419/547] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index a48b5a401cf..afa750637c5 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230208
++20230209
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 28686e5655a..2cce483b090 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-08  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-07  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/95107
++	* trans-decl.cc (gfc_finish_var_decl): With -fno-automatic, do not
++	make ASSOCIATE variables TREE_STATIC.
++
+ 2023-02-05  Mikael Morin  <mikael@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index c34afabfae9..1c270686c69 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-08  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-07  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/95107
++	* gfortran.dg/save_7.f90: New test.
++
+ 2023-02-07  Andrew Pinski  <apinski@marvell.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

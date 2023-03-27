@@ -1,0 +1,111 @@
+From 985a8962712a56d1c9418cf05e1761f8bd20cf8f Mon Sep 17 00:00:00 2001
+From: Martin Jambor <mjambor@suse.cz>
+Date: Wed, 16 Nov 2022 13:11:27 +0100
+Subject: [PATCH 215/547] SRA: Limit replacement creation for accesses
+ propagated from LHSs
+
+PR 107206 is fallout from the fix to PR 92706 where we started
+propagating accesses across assignments also from LHS to RHS of
+assignments so that we would not do harmful total scalarization of the
+aggregates on the RHS.
+
+But this can lead to new scalarization of these aggregates and in the
+testcase of PR 107206 these can appear in superfluous uses of
+un-initialized values and spurious warnings.
+
+Fixed by making sure the the accesses created by propagation in this
+direction are only used as a basis for replacements when the structure
+would be totally scalarized anyway.
+
+gcc/ChangeLog:
+
+2022-10-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/107206
+	* tree-sra.cc (struct access): New field grp_result_of_prop_from_lhs.
+	(analyze_access_subtree): Do not create replacements for accesses with
+	this flag when not toally scalarizing.
+	(propagate_subaccesses_from_lhs): Set the new flag.
+
+gcc/testsuite/ChangeLog:
+
+2022-10-18  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/107206
+	* g++.dg/tree-ssa/pr107206.C: New test.
+
+(cherry picked from commit f6c168f8c06047bfaa3005e570126831b8855dcc)
+---
+ gcc/testsuite/g++.dg/tree-ssa/pr107206.C | 27 ++++++++++++++++++++++++
+ gcc/tree-sra.cc                          |  7 ++++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/tree-ssa/pr107206.C
+
+diff --git a/gcc/testsuite/g++.dg/tree-ssa/pr107206.C b/gcc/testsuite/g++.dg/tree-ssa/pr107206.C
+new file mode 100644
+index 00000000000..34810ad2b7b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/tree-ssa/pr107206.C
+@@ -0,0 +1,27 @@
++// { dg-do compile }
++// { dg-require-effective-target c++17 }
++// { dg-options "-O -Wuninitialized" }
++
++#include <optional>
++struct X {
++    X() = default;
++    X(X const& r) : i(r.i) {}
++    int i;
++};
++struct Y {
++    Y() : x() {}
++    X x;
++    std::optional<int> o;
++};
++struct Z {
++    Y y;
++    explicit Z(Y y) : y(y) {}
++};
++void f(Y const&);
++void test() {
++    Y const y;
++    Z z(y);
++    z.y.o = 1;
++    auto const w = z;
++    f(w.y);
++}
+diff --git a/gcc/tree-sra.cc b/gcc/tree-sra.cc
+index 099e8dbe873..95291e8df93 100644
+--- a/gcc/tree-sra.cc
++++ b/gcc/tree-sra.cc
+@@ -260,6 +260,9 @@ struct access
+ 
+   /* Should TREE_NO_WARNING of a replacement be set?  */
+   unsigned grp_no_warning : 1;
++
++  /* Result of propagation accross link from LHS to RHS.  */
++  unsigned grp_result_of_prop_from_lhs : 1;
+ };
+ 
+ typedef struct access *access_p;
+@@ -2532,6 +2535,9 @@ analyze_access_subtree (struct access *root, struct access *parent,
+   if (allow_replacements && expr_with_var_bounded_array_refs_p (root->expr))
+     allow_replacements = false;
+ 
++  if (!totally && root->grp_result_of_prop_from_lhs)
++    allow_replacements = false;
++
+   for (child = root->first_child; child; child = child->next_sibling)
+     {
+       hole |= covered_to < child->offset;
+@@ -2959,6 +2965,7 @@ propagate_subaccesses_from_lhs (struct access *lacc, struct access *racc)
+ 	  struct access *new_acc
+ 	    = create_artificial_child_access (racc, lchild, norm_offset,
+ 					      true, false);
++	  new_acc->grp_result_of_prop_from_lhs = 1;
+ 	  propagate_subaccesses_from_lhs (lchild, new_acc);
+ 	}
+       else
+-- 
+2.25.1
+

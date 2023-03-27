@@ -1,0 +1,72 @@
+From d31bd7138610a883310dce212bb0bdaaa8da7304 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 2 Feb 2023 00:21:59 +0000
+Subject: [PATCH 399/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 9 +++++++++
+ gcc/DATESTAMP           | 2 +-
+ gcc/cp/ChangeLog        | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 4 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 4f8b0b6fbb3..06f457cb681 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-01  Martin Jambor  <mjambor@suse.cz>
++
++	Backported from master:
++	2023-01-18  Martin Jambor  <mjambor@suse.cz>
++
++	PR ipa/107944
++	* cgraph.cc (cgraph_node::remove): Check whether nodes up the
++	lcone_of chain also do not need the body.
++
+ 2023-01-30  Andrew MacLeod  <amacleod@redhat.com>
+ 
+ 	PR tree-optimization/108306
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f295cfe77a7..05457af7293 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230201
++20230202
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 8517cf4b662..d4c7582078c 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-01  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-01  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107755
++	* call.cc (build_new_op): Don't call warn_logical_operator when
++	processing a template.
++
+ 2023-01-31  Marek Polacek  <polacek@redhat.com>
+ 
+ 	PR c++/107593
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 436b0f51021..7395d521941 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-01  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-01  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107755
++	* g++.dg/warn/Wlogical-op-4.C: New test.
++
+ 2023-01-31  Marek Polacek  <polacek@redhat.com>
+ 
+ 	PR c++/107593
+-- 
+2.25.1
+

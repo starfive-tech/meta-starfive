@@ -1,0 +1,281 @@
+From 92ee4e1f2792355744bf8740dccf39441b437bcf Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Tue, 20 Dec 2022 21:02:08 -0600
+Subject: [PATCH 331/547] rs6000: Raise error for __vector_{quad,pair} uses
+ without MMA enabled [PR106736]
+
+As PR106736 shows, it's unexpected to use __vector_quad and
+__vector_pair types without MMA support, it would cause ICE
+when expanding the corresponding assignment.  We can't guard
+these built-in types registering under MMA support as Peter
+pointed out in that PR, because the registering is global,
+it doesn't work for target pragma/attribute support with MMA
+enabled.  The existing verify_type_context mentioned in [2]
+can help to make the diagnostics invalid built-in type uses
+better, but as Richard pointed out in [4], it can't deal with
+all cases.  As the discussions in [1][3], this patch is to
+check the invalid use of built-in types __vector_quad and
+__vector_pair in mov pattern of OOmode and XOmode, on the
+currently being expanded gimple assignment statement.  It
+still puts an assertion in else arm rather than just makes
+it go through, it's to ensure we can catch any other possible
+unexpected cases in time if there are.
+
+[1] https://gcc.gnu.org/pipermail/gcc/2022-December/240218.html
+[2] https://gcc.gnu.org/pipermail/gcc/2022-December/240220.html
+[3] https://gcc.gnu.org/pipermail/gcc/2022-December/240223.html
+[4] https://gcc.gnu.org/pipermail/gcc-patches/2022-December/608083.html
+
+	PR target/106736
+
+gcc/ChangeLog:
+
+	* config/rs6000/mma.md (define_expand movoo): Call function
+	rs6000_opaque_type_invalid_use_p to check and emit error message for
+	the invalid use of opaque type.
+	(define_expand movxo): Likewise.
+	* config/rs6000/rs6000-protos.h
+	(rs6000_opaque_type_invalid_use_p): New function declaration.
+	(currently_expanding_gimple_stmt): New extern declaration.
+	* config/rs6000/rs6000.cc (rs6000_opaque_type_invalid_use_p): New
+	function.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr106736-1.c: New test.
+	* gcc.target/powerpc/pr106736-2.c: Likewise.
+	* gcc.target/powerpc/pr106736-3.c: Likewise.
+	* gcc.target/powerpc/pr106736-4.c: Likewise.
+	* gcc.target/powerpc/pr106736-5.c: Likewise.
+---
+ gcc/config/rs6000/mma.md                      | 10 ++++-
+ gcc/config/rs6000/rs6000-protos.h             |  2 +
+ gcc/config/rs6000/rs6000.cc                   | 39 ++++++++++++++++++-
+ gcc/testsuite/gcc.target/powerpc/pr106736-1.c | 20 ++++++++++
+ gcc/testsuite/gcc.target/powerpc/pr106736-2.c | 17 ++++++++
+ gcc/testsuite/gcc.target/powerpc/pr106736-3.c | 18 +++++++++
+ gcc/testsuite/gcc.target/powerpc/pr106736-4.c | 19 +++++++++
+ gcc/testsuite/gcc.target/powerpc/pr106736-5.c | 18 +++++++++
+ 8 files changed, 140 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106736-1.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106736-2.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106736-3.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106736-4.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr106736-5.c
+
+diff --git a/gcc/config/rs6000/mma.md b/gcc/config/rs6000/mma.md
+index 032f4263cb0..f2952a3c3be 100644
+--- a/gcc/config/rs6000/mma.md
++++ b/gcc/config/rs6000/mma.md
+@@ -285,8 +285,11 @@
+ 	 expanding to RTL and have seen errors.  It would not cause further ICEs
+ 	 as the compilation would stop soon after expanding.  */
+     }
++  else if (rs6000_opaque_type_invalid_use_p (currently_expanding_gimple_stmt))
++    ;
+   else
+-    gcc_unreachable ();
++    /* Catch unexpected cases.  */
++    gcc_assert (false);
+ })
+ 
+ (define_insn_and_split "*movoo"
+@@ -329,8 +332,11 @@
+ 	 some missing required conditions.  So do the same handlings for XOmode
+ 	 as OOmode here.  */
+     }
++  else if (rs6000_opaque_type_invalid_use_p (currently_expanding_gimple_stmt))
++    ;
+   else
+-    gcc_unreachable ();
++    /* Catch unexpected cases.  */
++    gcc_assert (false);
+ })
+ 
+ (define_insn_and_split "*movxo"
+diff --git a/gcc/config/rs6000/rs6000-protos.h b/gcc/config/rs6000/rs6000-protos.h
+index 5d203d96346..36f7f7faac3 100644
+--- a/gcc/config/rs6000/rs6000-protos.h
++++ b/gcc/config/rs6000/rs6000-protos.h
+@@ -345,4 +345,6 @@ extern rtx rs6000_gen_lvx (enum machine_mode, rtx, rtx);
+ extern rtx rs6000_gen_stvx (enum machine_mode, rtx, rtx);
+ 
+ extern void rs6000_emit_xxspltidp_v2df (rtx, long value);
++extern gimple *currently_expanding_gimple_stmt;
++extern bool rs6000_opaque_type_invalid_use_p (gimple *);
+ #endif  /* rs6000-protos.h */
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index e382f5f1135..19ef1e983fc 100644
+--- a/gcc/config/rs6000/rs6000.cc
++++ b/gcc/config/rs6000/rs6000.cc
+@@ -28770,7 +28770,44 @@ constant_generates_xxspltidp (vec_const_128bit_type *vsx_const)
+   return sf_value;
+ }
+ 
+-
++/* Now we have only two opaque types, they are __vector_quad and
++   __vector_pair built-in types.  They are target specific and
++   only available when MMA is supported.  With MMA supported, it
++   simply returns true, otherwise it checks if the given gimple
++   STMT is an assignment stmt and uses either of these two opaque
++   types unexpectedly, if yes, it would raise an error message
++   and returns true, otherwise it returns false.  */
++
++bool
++rs6000_opaque_type_invalid_use_p (gimple *stmt)
++{
++  if (TARGET_MMA)
++    return false;
++
++  if (stmt)
++    {
++      /* The usage of MMA opaque types is very limited for now,
++	 to check with gassign is enough so far.  */
++      if (gassign *ga = dyn_cast<gassign *> (stmt))
++	{
++	  tree lhs = gimple_assign_lhs (ga);
++	  tree type = TREE_TYPE (lhs);
++	  if (type == vector_quad_type_node)
++	    {
++	      error ("type %<__vector_quad%> requires the %qs option", "-mmma");
++	      return true;
++	    }
++	  else if (type == vector_pair_type_node)
++	    {
++	      error ("type %<__vector_pair%> requires the %qs option", "-mmma");
++	      return true;
++	    }
++	}
++    }
++
++  return false;
++}
++
+ struct gcc_target targetm = TARGET_INITIALIZER;
+ 
+ #include "gt-rs6000.h"
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106736-1.c b/gcc/testsuite/gcc.target/powerpc/pr106736-1.c
+new file mode 100644
+index 00000000000..65bd79d3dce
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106736-1.c
+@@ -0,0 +1,20 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr106736-1" } */
++
++extern void bar (__vector_quad *);
++
++void
++foo (__vector_quad *a, __vector_quad *b)
++{
++  __vector_quad arr[2] = {*a, *b};
++  bar (&arr[0]);
++}
++
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106736-2.c b/gcc/testsuite/gcc.target/powerpc/pr106736-2.c
+new file mode 100644
+index 00000000000..12ad936fccc
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106736-2.c
+@@ -0,0 +1,17 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_pair is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr106736-2" } */
++
++void
++foo (__vector_pair *a, __vector_pair *b)
++{
++  *a = *b;
++}
++
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106736-3.c b/gcc/testsuite/gcc.target/powerpc/pr106736-3.c
+new file mode 100644
+index 00000000000..4fb368b8fb5
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106736-3.c
+@@ -0,0 +1,18 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr106736-3" } */
++
++__vector_quad ga;
++void
++foo (__vector_quad *a)
++{
++  ga = *a;
++}
++
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106736-4.c b/gcc/testsuite/gcc.target/powerpc/pr106736-4.c
+new file mode 100644
+index 00000000000..4b366416b0a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106736-4.c
+@@ -0,0 +1,19 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr106736-4" } */
++
++__vector_quad ga;
++__vector_quad gb;
++void
++foo ()
++{
++  gb = ga;
++}
++
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr106736-5.c b/gcc/testsuite/gcc.target/powerpc/pr106736-5.c
+new file mode 100644
+index 00000000000..d7370b81e81
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr106736-5.c
+@@ -0,0 +1,18 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_pair is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr106736-5" } */
++
++__vector_pair ga;
++void
++foo (__vector_pair *a)
++{
++  *a = ga;
++}
++
+-- 
+2.25.1
+

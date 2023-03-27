@@ -1,0 +1,207 @@
+From b4e5003eb7d7f26266ea8aadaa53b4ca376b95b6 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Wed, 15 Dec 2021 10:54:23 +0100
+Subject: [PATCH 267/547] i386: simplify cpu_feature handling
+
+The patch removes unneeded loops for cpu_features2 and CONVERT_EXPR
+that can be simplified with NOP_EXPR.
+
+gcc/ChangeLog:
+
+	* common/config/i386/cpuinfo.h (has_cpu_feature): Directly
+	compute index in cpu_features2.
+	(set_cpu_feature): Likewise.
+	* config/i386/i386-builtins.cc (fold_builtin_cpu): Also remove
+	loop for cpu_features2 and use NOP_EXPRs.
+
+(cherry picked from commit ef14bba0a6f3836d41d75863e6516d21aef0e936)
+---
+ gcc/common/config/i386/cpuinfo.h | 50 +++++++++++---------
+ gcc/config/i386/i386-builtins.cc | 79 ++++++++++++++++----------------
+ 2 files changed, 67 insertions(+), 62 deletions(-)
+
+diff --git a/gcc/common/config/i386/cpuinfo.h b/gcc/common/config/i386/cpuinfo.h
+index 4abd5480d28..8843f43be54 100644
+--- a/gcc/common/config/i386/cpuinfo.h
++++ b/gcc/common/config/i386/cpuinfo.h
+@@ -55,43 +55,49 @@ struct __processor_model2
+ static inline int
+ has_cpu_feature (struct __processor_model *cpu_model,
+ 		 unsigned int *cpu_features2,
+-		 enum processor_features f)
++		 enum processor_features feature)
+ {
+-  unsigned int i;
++  unsigned index, offset;
++  unsigned f = feature;
++
+   if (f < 32)
+     {
+       /* The first 32 features.  */
+-      return cpu_model->__cpu_features[0] & (1U << (f & 31));
++      return cpu_model->__cpu_features[0] & (1U << f);
++    }
++  else
++    {
++      /* The rest of features.  cpu_features2[i] contains features from
++	 (32 + i * 32) to (31 + 32 + i * 32), inclusively.  */
++      f -= 32;
++      index = f / 32;
++      offset = f % 32;
++      return cpu_features2[index] & (1U << offset);
+     }
+-  /* The rest of features.  cpu_features2[i] contains features from
+-     (32 + i * 32) to (31 + 32 + i * 32), inclusively.  */
+-  for (i = 0; i < SIZE_OF_CPU_FEATURES; i++)
+-    if (f < (32 + 32 + i * 32))
+-    return cpu_features2[i] & (1U << ((f - (32 + i * 32)) & 31));
+-  gcc_unreachable ();
+ }
+ 
+ static inline void
+ set_cpu_feature (struct __processor_model *cpu_model,
+ 		 unsigned int *cpu_features2,
+-		 enum processor_features f)
++		 enum processor_features feature)
+ {
+-  unsigned int i;
++  unsigned index, offset;
++  unsigned f = feature;
++
+   if (f < 32)
+     {
+       /* The first 32 features.  */
+-      cpu_model->__cpu_features[0] |= (1U << (f & 31));
+-      return;
++      cpu_model->__cpu_features[0] |= (1U << f);
++    }
++  else
++    {
++      /* The rest of features.  cpu_features2[i] contains features from
++	 (32 + i * 32) to (31 + 32 + i * 32), inclusively.  */
++      f -= 32;
++      index = f / 32;
++      offset = f % 32;
++      cpu_features2[index] |= (1U << offset);
+     }
+-  /* The rest of features.  cpu_features2[i] contains features from
+-     (32 + i * 32) to (31 + 32 + i * 32), inclusively.  */
+-  for (i = 0; i < SIZE_OF_CPU_FEATURES; i++)
+-    if (f < (32 + 32 + i * 32))
+-      {
+-	cpu_features2[i] |= (1U << ((f - (32 + i * 32)) & 31));
+-	return;
+-      }
+-  gcc_unreachable ();
+ }
+ 
+ /* Get the specific type of AMD CPU and return AMD CPU name.  Return
+diff --git a/gcc/config/i386/i386-builtins.cc b/gcc/config/i386/i386-builtins.cc
+index 8c6d0fe9631..59c7da25a14 100644
+--- a/gcc/config/i386/i386-builtins.cc
++++ b/gcc/config/i386/i386-builtins.cc
+@@ -2280,7 +2280,7 @@ fold_builtin_cpu (tree fndecl, tree *args)
+       /* Check the value.  */
+       final = build2 (EQ_EXPR, unsigned_type_node, ref,
+ 		      build_int_cstu (unsigned_type_node, field_val));
+-      return build1 (CONVERT_EXPR, integer_type_node, final);
++      return build1 (NOP_EXPR, integer_type_node, final);
+     }
+   else if (fn_code == IX86_BUILTIN_CPU_SUPPORTS)
+     {
+@@ -2305,7 +2305,8 @@ fold_builtin_cpu (tree fndecl, tree *args)
+ 	  return integer_zero_node;
+ 	}
+ 
+-      if (isa_names_table[i].feature >= 32)
++      unsigned feature = isa_names_table[i].feature;
++      if (feature >= INT_TYPE_SIZE)
+ 	{
+ 	  if (ix86_cpu_features2_var == nullptr)
+ 	    {
+@@ -2323,46 +2324,44 @@ fold_builtin_cpu (tree fndecl, tree *args)
+ 	      varpool_node::add (ix86_cpu_features2_var);
+ 	    }
+ 
+-	  for (unsigned int j = 0; j < SIZE_OF_CPU_FEATURES; j++)
+-	    if (isa_names_table[i].feature < (32 + 32 + j * 32))
+-	      {
+-		field_val = (1U << (isa_names_table[i].feature
+-				    - (32 + j * 32)));
+-		tree index = size_int (j);
+-		array_elt = build4 (ARRAY_REF, unsigned_type_node,
+-				    ix86_cpu_features2_var,
+-				    index, NULL_TREE, NULL_TREE);
+-		/* Return __cpu_features2[index] & field_val  */
+-		final = build2 (BIT_AND_EXPR, unsigned_type_node,
+-				array_elt,
+-				build_int_cstu (unsigned_type_node,
+-						field_val));
+-		return build1 (CONVERT_EXPR, integer_type_node, final);
+-	      }
++	  feature -= INT_TYPE_SIZE;
++	  field_val = 1U << (feature % INT_TYPE_SIZE);
++	  tree index = size_int (feature / INT_TYPE_SIZE);
++	  array_elt = build4 (ARRAY_REF, unsigned_type_node,
++			      ix86_cpu_features2_var,
++			      index, NULL_TREE, NULL_TREE);
++	  /* Return __cpu_features2[index] & field_val  */
++	  final = build2 (BIT_AND_EXPR, unsigned_type_node,
++			  array_elt,
++			  build_int_cstu (unsigned_type_node,
++					  field_val));
++	  return build1 (NOP_EXPR, integer_type_node, final);
+ 	}
+-
+-      field = TYPE_FIELDS (ix86_cpu_model_type_node);
+-      /* Get the last field, which is __cpu_features.  */
+-      while (DECL_CHAIN (field))
+-        field = DECL_CHAIN (field);
+-
+-      /* Get the appropriate field: __cpu_model.__cpu_features  */
+-      ref = build3 (COMPONENT_REF, TREE_TYPE (field), ix86_cpu_model_var,
+-		    field, NULL_TREE);
+-
+-      /* Access the 0th element of __cpu_features array.  */
+-      array_elt = build4 (ARRAY_REF, unsigned_type_node, ref,
+-			  integer_zero_node, NULL_TREE, NULL_TREE);
+-
+-      field_val = (1U << isa_names_table[i].feature);
+-      /* Return __cpu_model.__cpu_features[0] & field_val  */
+-      final = build2 (BIT_AND_EXPR, unsigned_type_node, array_elt,
+-		      build_int_cstu (unsigned_type_node, field_val));
+-      if (isa_names_table[i].feature == (INT_TYPE_SIZE - 1))
+-	return build2 (NE_EXPR, integer_type_node, final,
+-		       build_int_cst (unsigned_type_node, 0));
+       else
+-	return build1 (CONVERT_EXPR, integer_type_node, final);
++	{
++	  field = TYPE_FIELDS (ix86_cpu_model_type_node);
++	  /* Get the last field, which is __cpu_features.  */
++	  while (DECL_CHAIN (field))
++	    field = DECL_CHAIN (field);
++
++	  /* Get the appropriate field: __cpu_model.__cpu_features  */
++	  ref = build3 (COMPONENT_REF, TREE_TYPE (field), ix86_cpu_model_var,
++			field, NULL_TREE);
++
++	  /* Access the 0th element of __cpu_features array.  */
++	  array_elt = build4 (ARRAY_REF, unsigned_type_node, ref,
++			      integer_zero_node, NULL_TREE, NULL_TREE);
++
++	  field_val = (1U << feature);
++	  /* Return __cpu_model.__cpu_features[0] & field_val  */
++	  final = build2 (BIT_AND_EXPR, unsigned_type_node, array_elt,
++			  build_int_cstu (unsigned_type_node, field_val));
++	  if (feature == (INT_TYPE_SIZE - 1))
++	    return build2 (NE_EXPR, integer_type_node, final,
++			   build_int_cst (unsigned_type_node, 0));
++	  else
++	    return build1 (NOP_EXPR, integer_type_node, final);
++	}
+     }
+   gcc_unreachable ();
+ }
+-- 
+2.25.1
+

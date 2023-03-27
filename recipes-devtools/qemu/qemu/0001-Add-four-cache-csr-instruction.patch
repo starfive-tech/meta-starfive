@@ -1,0 +1,110 @@
+From 88a95b9fd65bae7c13a79bf3f99f9904bf33ca6c Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Wed, 29 Sep 2021 16:08:51 +0800
+Subject: [PATCH 1/6] Add four cache csr instruction
+
+---
+ target/riscv/helper.h                   |  7 +++++++
+ target/riscv/insn32.decode              |  9 +++++++++
+ target/riscv/insn_trans/trans_rvi.c.inc | 24 ++++++++++++++++++++++++
+ target/riscv/op_helper.c                |  6 ++++++
+ 4 files changed, 46 insertions(+)
+
+diff --git a/target/riscv/helper.h b/target/riscv/helper.h
+index a03014fe67..a20d092f44 100644
+--- a/target/riscv/helper.h
++++ b/target/riscv/helper.h
+@@ -104,6 +104,13 @@ DEF_HELPER_4(csrrw, tl, env, int, tl, tl)
+ DEF_HELPER_2(csrr_i128, tl, env, int)
+ DEF_HELPER_4(csrw_i128, void, env, int, tl, tl)
+ DEF_HELPER_6(csrrw_i128, tl, env, int, tl, tl, tl, tl)
++
++/* Custom Cache CSR */
++DEF_HELPER_1(cflush_d_l1, void, tl)
++DEF_HELPER_1(cdiscard_d_l1, void, tl)
++DEF_HELPER_1(cflush_d_l2, void, tl)
++DEF_HELPER_1(cdiscard_d_l2, void, tl)
++
+ #ifndef CONFIG_USER_ONLY
+ DEF_HELPER_1(sret, tl, env)
+ DEF_HELPER_1(mret, tl, env)
+diff --git a/target/riscv/insn32.decode b/target/riscv/insn32.decode
+index d0253b8104..a2072e9322 100644
+--- a/target/riscv/insn32.decode
++++ b/target/riscv/insn32.decode
+@@ -101,6 +101,9 @@
+ # Formats 128:
+ @sh6       ...... ...... ..... ... ..... ....... &shift shamt=%sh6 %rs1 %rd
+ 
++# Custom Cache CSR
++@csr_cache  ............ ..... ... ..... .......    %rs1
++
+ # *** Privileged Instructions ***
+ ecall       000000000000     00000 000 00000 1110011
+ ebreak      000000000001     00000 000 00000 1110011
+@@ -111,6 +114,12 @@ wfi         0001000    00101 00000 000 00000 1110011
+ sfence_vma  0001001    ..... ..... 000 00000 1110011 @sfence_vma
+ sfence_vm   0001000    00100 ..... 000 00000 1110011 @sfence_vm
+ 
++# *** Custom cache CSR ***
++cflush_d_l1     111111000000 ..... 000 00000 1110011 @csr_cache
++cdiscard_d_l1   111111000010 ..... 000 00000 1110011 @csr_cache
++cflush_d_l2     111111000100 ..... 000 00000 1110011 @csr_cache
++cdiscard_d_l2   111111000110 ..... 000 00000 1110011 @csr_cache
++
+ # *** RV32I Base Instruction Set ***
+ lui      ....................       ..... 0110111 @u
+ auipc    ....................       ..... 0010111 @u
+diff --git a/target/riscv/insn_trans/trans_rvi.c.inc b/target/riscv/insn_trans/trans_rvi.c.inc
+index c49dbec0eb..4d8f2668de 100644
+--- a/target/riscv/insn_trans/trans_rvi.c.inc
++++ b/target/riscv/insn_trans/trans_rvi.c.inc
+@@ -1100,3 +1100,27 @@ static bool trans_csrrci(DisasContext *ctx, arg_csrrci * a)
+                              ctx->zero, ctx->zero, mask, ctx->zero);
+     }
+ }
++
++static bool trans_cflush_d_l1(DisasContext *ctx, arg_cflush_d_l1 *a)
++{
++    gen_helper_cflush_d_l1(cpu_gpr[a->rs1]);
++    return true;
++}
++
++static bool trans_cdiscard_d_l1(DisasContext *ctx, arg_cflush_d_l1 *a)
++{
++    gen_helper_cdiscard_d_l1(cpu_gpr[a->rs1]);
++    return true;
++}
++
++static bool trans_cflush_d_l2(DisasContext *ctx, arg_cflush_d_l1 *a)
++{
++    gen_helper_cflush_d_l2(cpu_gpr[a->rs1]);
++    return true;
++}
++
++static bool trans_cdiscard_d_l2(DisasContext *ctx, arg_cflush_d_l1 *a)
++{
++    gen_helper_cdiscard_d_l2(cpu_gpr[a->rs1]);
++    return true;
++}
+\ No newline at end of file
+diff --git a/target/riscv/op_helper.c b/target/riscv/op_helper.c
+index 09f1f5185d..d4d3b734f2 100644
+--- a/target/riscv/op_helper.c
++++ b/target/riscv/op_helper.c
+@@ -123,6 +123,12 @@ target_ulong helper_csrrw_i128(CPURISCVState *env, int csr,
+     return int128_getlo(rv);
+ }
+ 
++void helper_cflush_d_l1(target_ulong rs1) {}
++void helper_cdiscard_d_l1(target_ulong rs1) {}
++void helper_cflush_d_l2(target_ulong rs1) {}
++void helper_cdiscard_d_l2(target_ulong rs1) {}
++
++
+ #ifndef CONFIG_USER_ONLY
+ 
+ target_ulong helper_sret(CPURISCVState *env)
+-- 
+2.25.1
+

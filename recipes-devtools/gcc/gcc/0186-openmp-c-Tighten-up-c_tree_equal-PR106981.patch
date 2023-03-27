@@ -1,0 +1,123 @@
+From a46f71c1a5c286b8cc4802fffe235909016cd34f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 24 Sep 2022 09:19:26 +0200
+Subject: [PATCH 186/547] openmp, c: Tighten up c_tree_equal [PR106981]
+
+This patch changes c_tree_equal to work more like cp_tree_equal, be
+more strict in what it accepts.  The ICE on the first testcase was
+due to INTEGER_CST wi::wide (t1) == wi::wide (t2) comparison which
+ICEs if the two constants have different precision, but as the second
+testcase shows, being too lenient in it can also lead to miscompilation
+of valid OpenMP programs where we think certain expression is the same
+even when it isn't and can be guaranteed at runtime to represent different
+memory location.  So, the patch looks through only NON_LVALUE_EXPRs
+and for constants as well as casts requires that the types match before
+actually comparing the constant values or recursing on the cast operands.
+
+2022-09-24  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/106981
+gcc/c/
+	* c-typeck.cc (c_tree_equal): Only strip NON_LVALUE_EXPRs at the
+	start.  For CONSTANT_CLASS_P or CASE_CONVERT: return false if t1 and
+	t2 have different types.
+gcc/testsuite/
+	* c-c++-common/gomp/pr106981.c: New test.
+libgomp/
+	* testsuite/libgomp.c-c++-common/pr106981.c: New test.
+
+(cherry picked from commit 3c5bccb608c665ac3f62adb1817c42c845812428)
+---
+ gcc/c/c-typeck.cc                             | 16 ++++++++++------
+ gcc/testsuite/c-c++-common/gomp/pr106981.c    |  9 +++++++++
+ .../testsuite/libgomp.c-c++-common/pr106981.c | 19 +++++++++++++++++++
+ 3 files changed, 38 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/gomp/pr106981.c
+ create mode 100644 libgomp/testsuite/libgomp.c-c++-common/pr106981.c
+
+diff --git a/gcc/c/c-typeck.cc b/gcc/c/c-typeck.cc
+index 0e55fd1db4b..5ad49479370 100644
+--- a/gcc/c/c-typeck.cc
++++ b/gcc/c/c-typeck.cc
+@@ -15922,14 +15922,10 @@ c_tree_equal (tree t1, tree t2)
+   if (!t1 || !t2)
+     return false;
+ 
+-  for (code1 = TREE_CODE (t1);
+-       CONVERT_EXPR_CODE_P (code1)
+-	 || code1 == NON_LVALUE_EXPR;
++  for (code1 = TREE_CODE (t1); code1 == NON_LVALUE_EXPR;
+        code1 = TREE_CODE (t1))
+     t1 = TREE_OPERAND (t1, 0);
+-  for (code2 = TREE_CODE (t2);
+-       CONVERT_EXPR_CODE_P (code2)
+-	 || code2 == NON_LVALUE_EXPR;
++  for (code2 = TREE_CODE (t2); code2 == NON_LVALUE_EXPR;
+        code2 = TREE_CODE (t2))
+     t2 = TREE_OPERAND (t2, 0);
+ 
+@@ -15940,6 +15936,9 @@ c_tree_equal (tree t1, tree t2)
+   if (code1 != code2)
+     return false;
+ 
++  if (CONSTANT_CLASS_P (t1) && !comptypes (TREE_TYPE (t1), TREE_TYPE (t2)))
++    return false;
++
+   switch (code1)
+     {
+     case INTEGER_CST:
+@@ -16059,6 +16058,11 @@ c_tree_equal (tree t1, tree t2)
+ 	return true;
+       }
+ 
++    CASE_CONVERT:
++      if (!comptypes (TREE_TYPE (t1), TREE_TYPE (t2)))
++	return false;
++      break;
++
+     default:
+       break;
+     }
+diff --git a/gcc/testsuite/c-c++-common/gomp/pr106981.c b/gcc/testsuite/c-c++-common/gomp/pr106981.c
+new file mode 100644
+index 00000000000..a21d3c2029d
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/gomp/pr106981.c
+@@ -0,0 +1,9 @@
++/* PR c/106981 */
++/* { dg-do compile } */
++
++void
++foo (int a, double *b, double *c, double *d, long long e)
++{
++#pragma omp atomic capture
++  c[a] = d[((int) (e / 10 + 1))] = b[a] + d[((int) e / 10 + 1)];	/* { dg-error "invalid form" } */
++}
+diff --git a/libgomp/testsuite/libgomp.c-c++-common/pr106981.c b/libgomp/testsuite/libgomp.c-c++-common/pr106981.c
+new file mode 100644
+index 00000000000..ed48d2774f2
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c-c++-common/pr106981.c
+@@ -0,0 +1,19 @@
++/* PR c/106981 */
++
++int
++main ()
++{
++  int a[0x101];
++  unsigned int b = 0x100;
++  if ((unsigned char) b || (unsigned short) b != 0x100)
++    return 0;
++  a[0] = 0;
++  a[0x100] = 42;
++  #pragma omp atomic update
++  a[(unsigned char) b] = a[(unsigned short) b] + a[(unsigned char) b];
++  #pragma omp atomic update
++  a[(unsigned char) b] = a[(unsigned char) b] + a[(unsigned short) b];
++  if (a[0] != 84 || a[0x100] != 42)
++    __builtin_abort ();
++  return 0;
++}
+-- 
+2.25.1
+

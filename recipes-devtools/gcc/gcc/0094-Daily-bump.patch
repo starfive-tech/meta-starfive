@@ -1,0 +1,52 @@
+From 7f323c284f785397c9794c1936aacbcd7cc63ba8 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 29 Sep 2022 00:22:00 +0000
+Subject: [PATCH 094/547] Daily bump.
+
+---
+ gcc/ChangeLog | 24 ++++++++++++++++++++++++
+ gcc/DATESTAMP |  2 +-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index dabbe18d29f..cb12da91056 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,27 @@
++2022-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	Backported from master:
++	2022-09-23  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
++
++	* config/aarch64/aarch64-cores.def (neoverse-v2): New entry.
++	(demeter): Update tunings to neoversev2.
++	* config/aarch64/aarch64-tune.md: Regenerate.
++	* config/aarch64/aarch64.cc (demeter_addrcost_table): Rename to
++	neoversev2_addrcost_table.
++	(demeter_regmove_cost): Rename to neoversev2_addrcost_table.
++	(demeter_advsimd_vector_cost): Rename to neoversev2_advsimd_vector_cost.
++	(demeter_sve_vector_cost): Rename to neoversev2_sve_vector_cost.
++	(demeter_scalar_issue_info): Rename to neoversev2_scalar_issue_info.
++	(demeter_advsimd_issue_info): Rename to neoversev2_advsimd_issue_info.
++	(demeter_sve_issue_info): Rename to neoversev2_sve_issue_info.
++	(demeter_vec_issue_info): Rename to neoversev2_vec_issue_info.
++	Update references to above.
++	(demeter_vector_cost): Rename to neoversev2_vector_cost.
++	(demeter_tunings): Rename to neoversev2_tunings.
++	(aarch64_vec_op_count::rename_cycles_per_iter): Use
++	neoversev2_sve_issue_info instead of demeter_sve_issue_info.
++	* doc/invoke.texi (AArch64 Options): Document neoverse-v2.
++
+ 2022-09-21  Richard Sandiford  <richard.sandiford@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8830fa8da31..ea4b4d1bd3b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220928
++20220929
+-- 
+2.25.1
+

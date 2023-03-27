@@ -1,0 +1,153 @@
+From a62d952064c896eaf94e70d7999e6e27343babcf Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 1 Feb 2023 10:38:46 +0100
+Subject: [PATCH 450/547] c++, openmp: Handle some OMP_*/OACC_* constructs
+ during constant expression evaluation [PR108607]
+
+While potential_constant_expression_1 handled most of OMP_* codes (by saying that
+they aren't potential constant expressions), OMP_SCOPE was missing in that list.
+I've also added OMP_SCAN, though that is less important (similarly to OMP_SECTION
+it ought to appear solely inside of OMP_{FOR,SIMD} resp. OMP_SECTIONS).
+As the testcase shows, it isn't enough, potential_constant_expression_1
+can catch only some cases, as soon as one uses switch or ifs where at least
+one of the possible paths could be constant expression, we can run into the
+same codes during cxx_eval_constant_expression, so this patch handles those
+there as well.
+
+2023-02-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108607
+	* constexpr.cc (cxx_eval_constant_expression): Handle OMP_*
+	and OACC_* constructs as non-constant.
+	(potential_constant_expression_1): Handle OMP_SCAN and OMP_SCOPE.
+
+	* g++.dg/gomp/pr108607.C: New test.
+
+(cherry picked from commit bfc070595bfb00abef88a002eee5d9117f5b86a7)
+---
+ gcc/cp/constexpr.cc                  | 47 ++++++++++++++++++++++++++++
+ gcc/testsuite/g++.dg/gomp/pr108607.C | 47 ++++++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/gomp/pr108607.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 3566f6ef724..6ac1b33d41d 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -7598,6 +7598,51 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
+       r = cxx_eval_bit_cast (ctx, t, non_constant_p, overflow_p);
+       break;
+ 
++    case OMP_PARALLEL:
++    case OMP_TASK:
++    case OMP_FOR:
++    case OMP_SIMD:
++    case OMP_DISTRIBUTE:
++    case OMP_TASKLOOP:
++    case OMP_LOOP:
++    case OMP_TEAMS:
++    case OMP_TARGET_DATA:
++    case OMP_TARGET:
++    case OMP_SECTIONS:
++    case OMP_ORDERED:
++    case OMP_CRITICAL:
++    case OMP_SINGLE:
++    case OMP_SCAN:
++    case OMP_SCOPE:
++    case OMP_SECTION:
++    case OMP_MASTER:
++    case OMP_MASKED:
++    case OMP_TASKGROUP:
++    case OMP_TARGET_UPDATE:
++    case OMP_TARGET_ENTER_DATA:
++    case OMP_TARGET_EXIT_DATA:
++    case OMP_ATOMIC:
++    case OMP_ATOMIC_READ:
++    case OMP_ATOMIC_CAPTURE_OLD:
++    case OMP_ATOMIC_CAPTURE_NEW:
++    case OMP_DEPOBJ:
++    case OACC_PARALLEL:
++    case OACC_KERNELS:
++    case OACC_SERIAL:
++    case OACC_DATA:
++    case OACC_HOST_DATA:
++    case OACC_LOOP:
++    case OACC_CACHE:
++    case OACC_DECLARE:
++    case OACC_ENTER_DATA:
++    case OACC_EXIT_DATA:
++    case OACC_UPDATE:
++      if (!ctx->quiet)
++	error_at (EXPR_LOCATION (t),
++		  "statement is not a constant expression");
++      *non_constant_p = true;
++      break;
++
+     default:
+       if (STATEMENT_CODE_P (TREE_CODE (t)))
+ 	{
+@@ -9041,6 +9086,8 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
+     case OMP_ORDERED:
+     case OMP_CRITICAL:
+     case OMP_SINGLE:
++    case OMP_SCAN:
++    case OMP_SCOPE:
+     case OMP_SECTION:
+     case OMP_MASTER:
+     case OMP_MASKED:
+diff --git a/gcc/testsuite/g++.dg/gomp/pr108607.C b/gcc/testsuite/g++.dg/gomp/pr108607.C
+new file mode 100644
+index 00000000000..1071d037c6b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/gomp/pr108607.C
+@@ -0,0 +1,47 @@
++// PR c++/108607
++// { dg-do compile { target c++14 } }
++// { dg-options "-fopenmp" }
++
++constexpr int
++bar (int x)
++{
++  return x;
++}
++
++constexpr int
++foo (int x)			// { dg-message "declared here" "" { target c++20_down } }
++{
++  #pragma omp scope		// { dg-error "is not a constant expression" }
++  x = bar (x);
++  return x;
++}
++
++constexpr int
++baz (int x)
++{
++  switch (x)
++    {
++    case 42:
++      return 0;
++    case 2:
++      #pragma omp scope		// { dg-error "statement is not a constant expression" }
++      x = bar (x);
++      return x;
++    case 3:
++      #pragma omp parallel	// { dg-error "statement is not a constant expression" }
++      x = bar (x);
++      return x;
++    case 4:
++      #pragma omp task		// { dg-error "statement is not a constant expression" }
++      x = bar (x);
++      return x;
++    default:
++      return -1;
++    }
++}
++
++constexpr int a = foo (1);	// { dg-error "called in a constant expression" }
++constexpr int b = baz (42);
++constexpr int c = baz (2);
++constexpr int d = baz (3);
++constexpr int e = baz (4);
+-- 
+2.25.1
+

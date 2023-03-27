@@ -1,0 +1,69 @@
+From 849c3cf7b4189342b4a0df941afddf8327585570 Mon Sep 17 00:00:00 2001
+From: Kyrylo Tkachov <kyrylo.tkachov@arm.com>
+Date: Mon, 19 Dec 2022 11:16:47 +0000
+Subject: [PATCH 339/547] aarch64: PR target/108140 Handle NULL target in data
+ intrinsic expansion
+
+In this PR we ICE when expanding the __rbit builtin with a NULL target rtx.
+I *think* that only happens when the result is unused and hence maybe we shouldn't be expanding
+any RTL at all, but the ICE here is easily fixed by deriving the mode from the type of the expression
+rather than the target.
+
+This patch does that.
+Bootstrapped and tested on aarch64-none-linux-gnu.
+
+gcc/ChangeLog:
+
+	PR target/108140
+	* config/aarch64/aarch64-builtins.cc
+	(aarch64_expand_builtin_data_intrinsic): Handle NULL target.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/108140
+	* gcc.target/aarch64/acle/pr108140.c: New test.
+
+(cherry picked from commit 98756bcbe27647f263f2b312d1d933d70cf56ba9)
+---
+ gcc/config/aarch64/aarch64-builtins.cc           |  2 +-
+ gcc/testsuite/gcc.target/aarch64/acle/pr108140.c | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/acle/pr108140.c
+
+diff --git a/gcc/config/aarch64/aarch64-builtins.cc b/gcc/config/aarch64/aarch64-builtins.cc
+index 1b0db677f34..60966fef099 100644
+--- a/gcc/config/aarch64/aarch64-builtins.cc
++++ b/gcc/config/aarch64/aarch64-builtins.cc
+@@ -2437,7 +2437,7 @@ static rtx
+ aarch64_expand_builtin_data_intrinsic (unsigned int fcode, tree exp, rtx target)
+ {
+   expand_operand ops[2];
+-  machine_mode mode = GET_MODE (target);
++  machine_mode mode = TYPE_MODE (TREE_TYPE (exp));
+   create_output_operand (&ops[0], target, mode);
+   create_input_operand (&ops[1], expand_normal (CALL_EXPR_ARG (exp, 0)), mode);
+   enum insn_code icode;
+diff --git a/gcc/testsuite/gcc.target/aarch64/acle/pr108140.c b/gcc/testsuite/gcc.target/aarch64/acle/pr108140.c
+new file mode 100644
+index 00000000000..967928a7dca
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/acle/pr108140.c
+@@ -0,0 +1,15 @@
++/* PR target/108140  */
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++#include<arm_acle.h>
++
++int
++main(int argc, char *argv[])
++{
++	unsigned long long input = argc-1;
++	unsigned long long v = __clz(__rbit(input));
++	__builtin_printf("%d %d\n", argc, v >= 64 ? 123 : 456);
++	return 0;
++}
++
+-- 
+2.25.1
+

@@ -1,0 +1,73 @@
+From 377f954242420c6bba380db400bf89ec677647bc Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 1 Nov 2022 13:47:24 +0000
+Subject: [PATCH 238/547] libstdc++: Remove unnecessary variant member in
+ std::expected
+
+Hui Xie pointed out that we don't need a dummy member in the union,
+because all constructors always initialize either _M_val or _M_unex.
+
+We still need the _M_void member of the expected<void, E>
+specialization, because the constructor has to initialize something when
+not using the _M_unex member.
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/expected (expected::_M_invalid): Remove.
+
+(cherry picked from commit f4874691812bc20e3d8e3302db439c27f30c472c)
+---
+ libstdc++-v3/include/std/expected | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/libstdc++-v3/include/std/expected b/libstdc++-v3/include/std/expected
+index 3ee13aa95f6..e491ce41591 100644
+--- a/libstdc++-v3/include/std/expected
++++ b/libstdc++-v3/include/std/expected
+@@ -359,7 +359,7 @@ namespace __expected
+       requires is_copy_constructible_v<_Tp> && is_copy_constructible_v<_Er>
+       && (!is_trivially_copy_constructible_v<_Tp>
+ 	  || !is_trivially_copy_constructible_v<_Er>)
+-      : _M_invalid(), _M_has_value(__x._M_has_value)
++      : _M_has_value(__x._M_has_value)
+       {
+ 	if (_M_has_value)
+ 	  std::construct_at(__builtin_addressof(_M_val), __x._M_val);
+@@ -376,7 +376,7 @@ namespace __expected
+       requires is_move_constructible_v<_Tp> && is_move_constructible_v<_Er>
+       && (!is_trivially_move_constructible_v<_Tp>
+ 	  || !is_trivially_move_constructible_v<_Er>)
+-      : _M_invalid(), _M_has_value(__x._M_has_value)
++      : _M_has_value(__x._M_has_value)
+       {
+ 	if (_M_has_value)
+ 	  std::construct_at(__builtin_addressof(_M_val),
+@@ -394,7 +394,7 @@ namespace __expected
+ 	expected(const expected<_Up, _Gr>& __x)
+ 	noexcept(__and_v<is_nothrow_constructible<_Tp, const _Up&>,
+ 			 is_nothrow_constructible<_Er, const _Gr&>>)
+-	: _M_invalid(), _M_has_value(__x._M_has_value)
++	: _M_has_value(__x._M_has_value)
+ 	{
+ 	  if (_M_has_value)
+ 	    std::construct_at(__builtin_addressof(_M_val), __x._M_val);
+@@ -410,7 +410,7 @@ namespace __expected
+ 	expected(expected<_Up, _Gr>&& __x)
+ 	noexcept(__and_v<is_nothrow_constructible<_Tp, _Up>,
+ 			 is_nothrow_constructible<_Er, _Gr>>)
+-	: _M_invalid(), _M_has_value(__x._M_has_value)
++	: _M_has_value(__x._M_has_value)
+ 	{
+ 	  if (_M_has_value)
+ 	    std::construct_at(__builtin_addressof(_M_val),
+@@ -890,7 +890,6 @@ namespace __expected
+       }
+ 
+       union {
+-	struct { } _M_invalid;
+ 	_Tp _M_val;
+ 	_Er _M_unex;
+       };
+-- 
+2.25.1
+

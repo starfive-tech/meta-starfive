@@ -1,0 +1,200 @@
+From eda24f6c12b6d3777ff3bf3656187e695a3e8dc2 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Sun, 5 Feb 2023 21:35:33 -0500
+Subject: [PATCH 412/547] c++: equivalence of non-dependent calls [PR107461]
+
+After r13-5684-g59e0376f607805 the (pruned) callee of a non-dependent
+CALL_EXPR is a bare FUNCTION_DECL rather than ADDR_EXPR of FUNCTION_DECL.
+This innocent change revealed that cp_tree_equal doesn't first check
+dependence of a CALL_EXPR before treating a FUNCTION_DECL callee as a
+dependent name, which leads to us incorrectly accepting the first two
+testcases below and rejecting the third:
+
+ * In the first testcase, cp_tree_equal incorrectly returns true for
+   the two non-dependent CALL_EXPRs f(0) and f(0) (whose CALL_EXPR_FN
+   are different FUNCTION_DECLs) which causes us to treat #2 as a
+   redeclaration of #1.
+
+ * Same issue in the second testcase, for f<int*>() and f<char>().
+
+ * In the third testcase, cp_tree_equal incorrectly returns true for
+   f<int>() and f<void(*)(int)>() which causes us to conflate the two
+   dependent specializations A<decltype(f<int>()(U()))> and
+   A<decltype(f<void(*)(int)>()(U()))>.
+
+This patch fixes this by making called_fns_equal treat two callees as
+dependent names only if the overall CALL_EXPRs are dependent, via a new
+convenience function call_expr_dependent_name that is like dependent_name
+but also checks dependence of the overall CALL_EXPR.
+
+	PR c++/107461
+
+gcc/cp/ChangeLog:
+
+	* cp-tree.h (call_expr_dependent_name): Declare.
+	* pt.cc (iterative_hash_template_arg) <case CALL_EXPR>: Use
+	call_expr_dependent_name instead of dependent_name.
+	* tree.cc (call_expr_dependent_name): Define.
+	(called_fns_equal): Adjust to take two CALL_EXPRs instead of
+	CALL_EXPR_FNs thereof.  Use call_expr_dependent_name instead
+	of dependent_name.
+	(cp_tree_equal) <case CALL_EXPR>: Adjust call to called_fns_equal.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/overload5.C: New test.
+	* g++.dg/cpp0x/overload5a.C: New test.
+	* g++.dg/cpp0x/overload6.C: New test.
+
+(cherry picked from commit 31924665c86d47af6b1f22a74f594f2e1dc0ed2d)
+---
+ gcc/cp/cp-tree.h                        |  1 +
+ gcc/cp/pt.cc                            |  2 +-
+ gcc/cp/tree.cc                          | 24 +++++++++++++++++++-----
+ gcc/testsuite/g++.dg/cpp0x/overload5.C  | 12 ++++++++++++
+ gcc/testsuite/g++.dg/cpp0x/overload5a.C | 10 ++++++++++
+ gcc/testsuite/g++.dg/cpp0x/overload6.C  | 16 ++++++++++++++++
+ 6 files changed, 59 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/overload5.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/overload5a.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/overload6.C
+
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index cd51dd288b0..40563a151fe 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -7860,6 +7860,7 @@ extern tree lookup_maybe_add			(tree fns, tree lookup,
+ extern int is_overloaded_fn			(tree) ATTRIBUTE_PURE;
+ extern bool really_overloaded_fn		(tree) ATTRIBUTE_PURE;
+ extern tree dependent_name			(tree);
++extern tree call_expr_dependent_name		(tree);
+ extern tree maybe_get_fns			(tree) ATTRIBUTE_PURE;
+ extern tree get_fns				(tree) ATTRIBUTE_PURE;
+ extern tree get_first_fn			(tree) ATTRIBUTE_PURE;
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 735c106c7d6..0af7033589a 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -1910,7 +1910,7 @@ iterative_hash_template_arg (tree arg, hashval_t val)
+     case CALL_EXPR:
+       {
+ 	tree fn = CALL_EXPR_FN (arg);
+-	if (tree name = dependent_name (fn))
++	if (tree name = call_expr_dependent_name (arg))
+ 	  {
+ 	    if (TREE_CODE (fn) == TEMPLATE_ID_EXPR)
+ 	      val = iterative_hash_template_arg (TREE_OPERAND (fn, 1), val);
+diff --git a/gcc/cp/tree.cc b/gcc/cp/tree.cc
+index bc521f8ae9c..e8a9c473ef6 100644
+--- a/gcc/cp/tree.cc
++++ b/gcc/cp/tree.cc
+@@ -2596,6 +2596,18 @@ dependent_name (tree x)
+   return NULL_TREE;
+ }
+ 
++/* Like dependent_name, but instead takes a CALL_EXPR and also checks
++   its dependence.  */
++
++tree
++call_expr_dependent_name (tree x)
++{
++  if (TREE_TYPE (x) != NULL_TREE)
++    /* X isn't dependent, so its callee isn't a dependent name.  */
++    return NULL_TREE;
++  return dependent_name (CALL_EXPR_FN (x));
++}
++
+ /* Returns true iff X is an expression for an overloaded function
+    whose type cannot be known without performing overload
+    resolution.  */
+@@ -3829,16 +3841,18 @@ decl_anon_ns_mem_p (const_tree decl)
+   return !TREE_PUBLIC (decl);
+ }
+ 
+-/* Subroutine of cp_tree_equal: t1 and t2 are the CALL_EXPR_FNs of two
+-   CALL_EXPRS.  Return whether they are equivalent.  */
++/* Subroutine of cp_tree_equal: t1 and t2 are two CALL_EXPRs.
++   Return whether their CALL_EXPR_FNs are equivalent.  */
+ 
+ static bool
+ called_fns_equal (tree t1, tree t2)
+ {
+   /* Core 1321: dependent names are equivalent even if the overload sets
+      are different.  But do compare explicit template arguments.  */
+-  tree name1 = dependent_name (t1);
+-  tree name2 = dependent_name (t2);
++  tree name1 = call_expr_dependent_name (t1);
++  tree name2 = call_expr_dependent_name (t2);
++  t1 = CALL_EXPR_FN (t1);
++  t2 = CALL_EXPR_FN (t2);
+   if (name1 || name2)
+     {
+       tree targs1 = NULL_TREE, targs2 = NULL_TREE;
+@@ -3952,7 +3966,7 @@ cp_tree_equal (tree t1, tree t2)
+ 	if (KOENIG_LOOKUP_P (t1) != KOENIG_LOOKUP_P (t2))
+ 	  return false;
+ 
+-	if (!called_fns_equal (CALL_EXPR_FN (t1), CALL_EXPR_FN (t2)))
++	if (!called_fns_equal (t1, t2))
+ 	  return false;
+ 
+ 	call_expr_arg_iterator iter1, iter2;
+diff --git a/gcc/testsuite/g++.dg/cpp0x/overload5.C b/gcc/testsuite/g++.dg/cpp0x/overload5.C
+new file mode 100644
+index 00000000000..e05b1594f51
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/overload5.C
+@@ -0,0 +1,12 @@
++// PR c++/107461
++// { dg-do compile { target c++11 } }
++
++int f(...);
++template<class T> decltype(T() + f(0)) g(); // #1
++
++char f(int);
++template<class T> decltype(T() + f(0)) g(); // #2, distinct from #1
++
++int main() {
++  g<int>(); // { dg-error "ambiguous" }
++}
+diff --git a/gcc/testsuite/g++.dg/cpp0x/overload5a.C b/gcc/testsuite/g++.dg/cpp0x/overload5a.C
+new file mode 100644
+index 00000000000..037114f199c
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/overload5a.C
+@@ -0,0 +1,10 @@
++// PR c++/107461
++// { dg-do compile { target c++11 } }
++
++template<class T> T f();
++template<class T> decltype(T() + f<int*>()) g(); // #1
++template<class T> decltype(T() + f<char>()) g(); // #2, distinct from #1
++
++int main() {
++  g<int>(); // { dg-error "ambiguous" }
++}
+diff --git a/gcc/testsuite/g++.dg/cpp0x/overload6.C b/gcc/testsuite/g++.dg/cpp0x/overload6.C
+new file mode 100644
+index 00000000000..1fbee0501de
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/overload6.C
+@@ -0,0 +1,16 @@
++// PR c++/107461
++// { dg-do compile { target c++11 } }
++
++template<class T> T f();
++
++template<class> struct A { };
++
++template<class T> struct B {
++  template<class U, class = A<decltype(f<T>()(U()))>>
++  static void g(U);
++};
++
++int main() {
++  B<int> b;
++  B<void(*)(int)>::g(0); // { dg-bogus "no match" }
++}
+-- 
+2.25.1
+

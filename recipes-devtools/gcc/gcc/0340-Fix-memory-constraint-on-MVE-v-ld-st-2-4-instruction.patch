@@ -1,0 +1,471 @@
+From 25edc76f2afba0b4eaf22174d42de042a6969dbe Mon Sep 17 00:00:00 2001
+From: Stam Markianos-Wright <stam.markianos-wright@arm.com>
+Date: Fri, 30 Dec 2022 11:25:22 +0000
+Subject: [PATCH 340/547] Fix memory constraint on MVE v[ld/st][2/4]
+ instructions [PR107714]
+
+In the M-Class Arm-ARM:
+
+https://developer.arm.com/documentation/ddi0553/bu/?lang=en
+
+these MVE instructions only have '!' writeback variant and at:
+
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=107714
+
+we found that the Um constraint would also allow through a
+register offset writeback, resulting in an assembler error.
+
+Here I have added a new constraint and predicate for these
+instructions, which (uniquely, AFAICT), only support a `!` writeback
+increment by the data size (inside the compiler this is a POST_INC).
+
+No regressions in arm-none-eabi with MVE and MVE.FP.
+
+gcc/ChangeLog:
+	PR target/107714
+	* config/arm/arm-protos.h (mve_struct_mem_operand): New protoype.
+	* config/arm/arm.cc (mve_struct_mem_operand): New function.
+	* config/arm/constraints.md (Ug): New constraint.
+	* config/arm/mve.md (mve_vst4q<mode>): Change constraint.
+	(mve_vst2q<mode>): Likewise.
+	(mve_vld4q<mode>): Likewise.
+	(mve_vld2q<mode>): Likewise.
+	* config/arm/predicates.md (mve_struct_operand): New predicate.
+
+gcc/testsuite/ChangeLog:
+	PR target/107714
+	* gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c: New test.
+
+(cherry picked from commit 4269a6567eb991e6838f40bda5be9e3a7972530c)
+---
+ gcc/config/arm/arm-protos.h                   |   1 +
+ gcc/config/arm/arm.cc                         |  18 ++
+ gcc/config/arm/constraints.md                 |   5 +
+ gcc/config/arm/mve.md                         |   8 +-
+ gcc/config/arm/predicates.md                  |   4 +
+ .../arm/mve/intrinsics/vldst24q_reg_offset.c  | 300 ++++++++++++++++++
+ 6 files changed, 332 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c
+
+diff --git a/gcc/config/arm/arm-protos.h b/gcc/config/arm/arm-protos.h
+index adcde586e2f..f8a63e98ef4 100644
+--- a/gcc/config/arm/arm-protos.h
++++ b/gcc/config/arm/arm-protos.h
+@@ -123,6 +123,7 @@ extern int arm_coproc_mem_operand_wb (rtx, int);
+ extern int neon_vector_mem_operand (rtx, int, bool);
+ extern int mve_vector_mem_operand (machine_mode, rtx, bool);
+ extern int neon_struct_mem_operand (rtx);
++extern int mve_struct_mem_operand (rtx);
+ 
+ extern rtx *neon_vcmla_lane_prepare_operands (rtx *);
+ 
+diff --git a/gcc/config/arm/arm.cc b/gcc/config/arm/arm.cc
+index d88086fbd13..b700c23b866 100644
+--- a/gcc/config/arm/arm.cc
++++ b/gcc/config/arm/arm.cc
+@@ -13657,6 +13657,24 @@ neon_vector_mem_operand (rtx op, int type, bool strict)
+   return FALSE;
+ }
+ 
++/* Return TRUE if OP is a mem suitable for loading/storing an MVE struct
++   type.  */
++int
++mve_struct_mem_operand (rtx op)
++{
++  rtx ind = XEXP (op, 0);
++
++  /* Match: (mem (reg)).  */
++  if (REG_P (ind))
++    return arm_address_register_rtx_p (ind, 0);
++
++  /* Allow only post-increment by the mode size.  */
++  if (GET_CODE (ind) == POST_INC)
++    return arm_address_register_rtx_p (XEXP (ind, 0), 0);
++
++  return FALSE;
++}
++
+ /* Return TRUE if OP is a mem suitable for loading/storing a Neon struct
+    type.  */
+ int
+diff --git a/gcc/config/arm/constraints.md b/gcc/config/arm/constraints.md
+index 2b411b0cb0f..db316d81dcc 100644
+--- a/gcc/config/arm/constraints.md
++++ b/gcc/config/arm/constraints.md
+@@ -466,6 +466,11 @@
+  (and (match_code "mem")
+       (match_test "TARGET_32BIT && arm_coproc_mem_operand (op, FALSE)")))
+ 
++(define_memory_constraint "Ug"
++ "@internal
++  In Thumb-2 state a valid MVE struct load/store address."
++ (match_operand 0 "mve_struct_operand"))
++
+ (define_memory_constraint "Uj"
+  "@internal
+   In ARM/Thumb-2 state a VFP load/store address that supports writeback
+diff --git a/gcc/config/arm/mve.md b/gcc/config/arm/mve.md
+index 469e7e7f8dc..01448717b7a 100644
+--- a/gcc/config/arm/mve.md
++++ b/gcc/config/arm/mve.md
+@@ -92,7 +92,7 @@
+ ;; [vst4q])
+ ;;
+ (define_insn "mve_vst4q<mode>"
+-  [(set (match_operand:XI 0 "neon_struct_operand" "=Um")
++  [(set (match_operand:XI 0 "mve_struct_operand" "=Ug")
+ 	(unspec:XI [(match_operand:XI 1 "s_register_operand" "w")
+ 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
+ 	 VST4Q))
+@@ -9952,7 +9952,7 @@
+ ;; [vst2q])
+ ;;
+ (define_insn "mve_vst2q<mode>"
+-  [(set (match_operand:OI 0 "neon_struct_operand" "=Um")
++  [(set (match_operand:OI 0 "mve_struct_operand" "=Ug")
+ 	(unspec:OI [(match_operand:OI 1 "s_register_operand" "w")
+ 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
+ 	 VST2Q))
+@@ -9981,7 +9981,7 @@
+ ;;
+ (define_insn "mve_vld2q<mode>"
+   [(set (match_operand:OI 0 "s_register_operand" "=w")
+-	(unspec:OI [(match_operand:OI 1 "neon_struct_operand" "Um")
++	(unspec:OI [(match_operand:OI 1 "mve_struct_operand" "Ug")
+ 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
+ 	 VLD2Q))
+   ]
+@@ -10009,7 +10009,7 @@
+ ;;
+ (define_insn "mve_vld4q<mode>"
+   [(set (match_operand:XI 0 "s_register_operand" "=w")
+-	(unspec:XI [(match_operand:XI 1 "neon_struct_operand" "Um")
++	(unspec:XI [(match_operand:XI 1 "mve_struct_operand" "Ug")
+ 		    (unspec:MVE_VLD_ST [(const_int 0)] UNSPEC_VSTRUCTDUMMY)]
+ 	 VLD4Q))
+   ]
+diff --git a/gcc/config/arm/predicates.md b/gcc/config/arm/predicates.md
+index aab5a91ad4d..67f2fdb4f8f 100644
+--- a/gcc/config/arm/predicates.md
++++ b/gcc/config/arm/predicates.md
+@@ -876,6 +876,10 @@
+   (and (match_code "mem")
+        (match_test "TARGET_32BIT && neon_vector_mem_operand (op, 2, true)")))
+ 
++(define_predicate "mve_struct_operand"
++  (and (match_code "mem")
++       (match_test "TARGET_HAVE_MVE && mve_struct_mem_operand (op)")))
++
+ (define_predicate "neon_permissive_struct_operand"
+   (and (match_code "mem")
+        (match_test "TARGET_32BIT && neon_vector_mem_operand (op, 2, false)")))
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c
+new file mode 100644
+index 00000000000..d028b91e81a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vldst24q_reg_offset.c
+@@ -0,0 +1,300 @@
++/* { dg-require-effective-target arm_v8_1m_mve_ok } */
++/* { dg-add-options arm_v8_1m_mve } */
++/* { dg-additional-options "-O1" } */
++/* { dg-final { check-function-bodies "**" "" } } */
++
++#include "arm_mve.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/*
++**test:
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test(const uint8_t * in, uint8_t * out, int width)
++{
++  uint8x16x2_t rg = vld2q(in);
++  uint8x16x2_t gb = vld2q(in + width);
++  vst2q (out, rg);
++  vst2q (out + width, gb);
++}
++
++/*
++**test2:
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]!
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]!
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test2(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x2_t rg = vld2q(in);
++  uint8x16x2_t gb = vld2q(in + 32);
++  vst2q (out, rg);
++  vst2q (out + 32, gb);
++}
++
++/*
++**test3:
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test3(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x2_t rg = vld2q(in);
++  uint8x16x2_t gb = vld2q(in - 32);
++  vst2q (out, rg);
++  vst2q (out - 32, gb);
++}
++
++/*
++**test4:
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test4(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x2_t rg = vld2q(in);
++  uint8x16x2_t gb = vld2q(in + 64);
++  vst2q (out, rg);
++  vst2q (out + 64, gb);
++}
++
++/*
++**test5:
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst20.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst21.8	{q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test5(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x2_t rg = vld2q(in);
++  uint8x16x2_t gb = vld2q(in + 42);
++  vst2q (out, rg);
++  vst2q (out + 42, gb);
++}
++
++/*
++**test6:
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test6(const uint8_t * in, uint8_t * out, int width)
++{
++  uint8x16x4_t rg = vld4q(in);
++  uint8x16x4_t gb = vld4q(in + width);
++  vst4q (out, rg);
++  vst4q (out + width, gb);
++}
++
++/*
++**test7:
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test7(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x4_t rg = vld4q(in);
++  uint8x16x4_t gb = vld4q(in + 32);
++  vst4q (out, rg);
++  vst4q (out + 32, gb);
++}
++
++/*
++**test8:
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]!
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]!
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test8(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x4_t rg = vld4q(in);
++  uint8x16x4_t gb = vld4q(in + 64);
++  vst4q (out, rg);
++  vst4q (out + 64, gb);
++}
++
++/*
++**test9:
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test9(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x4_t rg = vld4q(in);
++  uint8x16x4_t gb = vld4q(in - 64);
++  vst4q (out, rg);
++  vst4q (out - 64, gb);
++}
++
++/*
++**test10:
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vld40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vld43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++**	vst40.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst41.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst42.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	vst43.8	{q[0-9]+, q[0-9]+, q[0-9]+, q[0-9]+}, \[(?:ip|fp|r[0-9]+)\]
++**	...
++*/
++void
++test10(const uint8_t * in, uint8_t * out)
++{
++  uint8x16x4_t rg = vld4q(in);
++  uint8x16x4_t gb = vld4q(in + 42);
++  vst4q (out, rg);
++  vst4q (out + 42, gb);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++/* { dg-final { scan-assembler-not "__ARM_undef" } } */
+\ No newline at end of file
+-- 
+2.25.1
+

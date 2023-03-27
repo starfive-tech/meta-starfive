@@ -1,0 +1,137 @@
+From 00136f439e2849af2bfd9934d79a8297ab09a1d9 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 8 Feb 2023 18:41:21 +0100
+Subject: [PATCH 454/547] vect-patterns: Fix up vect_widened_op_tree [PR108692]
+
+The following testcase is miscompiled on aarch64-linux since r11-5160.
+Given
+  <bb 3> [local count: 955630225]:
+  # i_22 = PHI <i_20(6), 0(5)>
+  # r_23 = PHI <r_19(6), 0(5)>
+...
+  a.0_5 = (unsigned char) a_15;
+  _6 = (int) a.0_5;
+  b.1_7 = (unsigned char) b_17;
+  _8 = (int) b.1_7;
+  c_18 = _6 - _8;
+  _9 = ABS_EXPR <c_18>;
+  r_19 = _9 + r_23;
+...
+where SSA_NAMEs 15/17 have signed char, 5/7 unsigned char and rest is int
+we first pattern recognize c_18 as
+patt_34 = (a.0_5) w- (b.1_7);
+which is still correct, 5/7 are unsigned char subtracted in wider type,
+but then vect_recog_sad_pattern turns it into
+SAD_EXPR <a_15, b_17, r_23>
+which is incorrect, because 15/17 are signed char and so it is
+sum of absolute signed differences rather than unsigned sum of
+absolute unsigned differences.
+The reason why this happens is that vect_recog_sad_pattern calls
+vect_widened_op_tree with MINUS_EXPR, WIDEN_MINUS_EXPR on the
+patt_34 = (a.0_5) w- (b.1_7); statement's vinfo and vect_widened_op_tree
+calls vect_look_through_possible_promotion on the operands of the
+WIDEN_MINUS_EXPR, which looks through the further casts.
+vect_look_through_possible_promotion has careful code to stop when there
+would be nested casts that need to be preserved, but the problem here
+is that the WIDEN_*_EXPR operation itself has an implicit cast on the
+operands already - in this case of WIDEN_MINUS_EXPR the unsigned char
+5/7 SSA_NAMEs are widened to unsigned short before the subtraction,
+and vect_look_through_possible_promotion obviously isn't told about that.
+
+Now, I think when we see those WIDEN_{MULT,MINUS,PLUS}_EXPR codes, we had
+to look through possible promotions already when creating those and so
+vect_look_through_possible_promotion again isn't really needed, all we need
+to do is arrange what that function will do if the operand isn't result
+of any cast.  Other option would be let vect_look_through_possible_promotion
+know about the implicit promotion from the WIDEN_*_EXPR, but I'm afraid
+that would be much harder.
+
+2023-02-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/108692
+	* tree-vect-patterns.cc (vect_widened_op_tree): If rhs_code is
+	widened_code which is different from code, don't call
+	vect_look_through_possible_promotion but instead just check op is
+	SSA_NAME with integral type for which vect_is_simple_use is true
+	and call set_op on this_unprom.
+
+	* gcc.dg/pr108692.c: New test.
+
+(cherry picked from commit 6ad1c1027628f094260037536f6b6fcdb63b5add)
+---
+ gcc/testsuite/gcc.dg/pr108692.c | 31 +++++++++++++++++++++++++++++++
+ gcc/tree-vect-patterns.cc       | 20 +++++++++++++++++++-
+ 2 files changed, 50 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108692.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr108692.c b/gcc/testsuite/gcc.dg/pr108692.c
+new file mode 100644
+index 00000000000..fc25bf54e45
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108692.c
+@@ -0,0 +1,31 @@
++/* PR tree-optimization/108692 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -ftree-vectorize" } */
++
++__attribute__((noipa)) int
++foo (signed char *x, signed char *y, int n)
++{
++  int i, r = 0;
++  signed char a, b;
++  for (i = 0; i < n; i++)
++    {
++      a = x[i];
++      b = y[i];
++      int c = (unsigned char) a - (unsigned char) b;
++      r = r + (c < 0 ? -c : c);
++    }
++  return r;
++}
++
++int
++main ()
++{
++  signed char x[64] = {}, y[64] = {};
++  if (__CHAR_BIT__ != 8 || __SIZEOF_INT__ != 4)
++    return 0;
++  x[32] = -128;
++  y[32] = 1;
++  if (foo (x, y, 64) != 127)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-patterns.cc b/gcc/tree-vect-patterns.cc
+index 6c157b93eb1..a4572454478 100644
+--- a/gcc/tree-vect-patterns.cc
++++ b/gcc/tree-vect-patterns.cc
+@@ -593,7 +593,25 @@ vect_widened_op_tree (vec_info *vinfo, stmt_vec_info stmt_info, tree_code code,
+ 	  if (shift_p && i == 1)
+ 	    return 0;
+ 
+-	  if (!vect_look_through_possible_promotion (vinfo, op, this_unprom))
++	  if (rhs_code != code)
++	    {
++	      /* If rhs_code is widened_code, don't look through further
++		 possible promotions, there is a promotion already embedded
++		 in the WIDEN_*_EXPR.  */
++	      if (TREE_CODE (op) != SSA_NAME
++		  || !INTEGRAL_TYPE_P (TREE_TYPE (op)))
++		return 0;
++
++	      stmt_vec_info def_stmt_info;
++	      gimple *def_stmt;
++	      vect_def_type dt;
++	      if (!vect_is_simple_use (op, vinfo, &dt, &def_stmt_info,
++				       &def_stmt))
++		return 0;
++	      this_unprom->set_op (op, dt, NULL);
++	    }
++	  else if (!vect_look_through_possible_promotion (vinfo, op,
++							  this_unprom))
+ 	    return 0;
+ 
+ 	  if (TYPE_PRECISION (this_unprom->type) == TYPE_PRECISION (type))
+-- 
+2.25.1
+

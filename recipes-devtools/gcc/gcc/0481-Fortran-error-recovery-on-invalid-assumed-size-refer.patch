@@ -1,0 +1,63 @@
+From e2c6bc6bb5628bb51b56d1da3f9907ae45a3a01b Mon Sep 17 00:00:00 2001
+From: Steve Kargl <kargl@gcc.gnu.org>
+Date: Wed, 15 Feb 2023 22:20:22 +0100
+Subject: [PATCH 481/547] Fortran: error recovery on invalid assumed size
+ reference [PR104554]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/104554
+	* resolve.cc (check_assumed_size_reference): Avoid NULL pointer
+	dereference.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/104554
+	* gfortran.dg/pr104554.f90: New test.
+
+(cherry picked from commit a418129273725fd02e881e6fb5e0877287a1356c)
+---
+ gcc/fortran/resolve.cc                 |  8 +++++---
+ gcc/testsuite/gfortran.dg/pr104554.f90 | 11 +++++++++++
+ 2 files changed, 16 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr104554.f90
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index 565b212c4c8..532ca05b69c 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -1670,9 +1670,11 @@ check_assumed_size_reference (gfc_symbol *sym, gfc_expr *e)
+ 
+   /* FIXME: The comparison "e->ref->u.ar.type == AR_FULL" is wrong.
+      What should it be?  */
+-  if (e->ref && (e->ref->u.ar.end[e->ref->u.ar.as->rank - 1] == NULL)
+-	  && (e->ref->u.ar.as->type == AS_ASSUMED_SIZE)
+-	       && (e->ref->u.ar.type == AR_FULL))
++  if (e->ref
++      && e->ref->u.ar.as
++      && (e->ref->u.ar.end[e->ref->u.ar.as->rank - 1] == NULL)
++      && (e->ref->u.ar.as->type == AS_ASSUMED_SIZE)
++      && (e->ref->u.ar.type == AR_FULL))
+     {
+       gfc_error ("The upper bound in the last dimension must "
+ 		 "appear in the reference to the assumed size "
+diff --git a/gcc/testsuite/gfortran.dg/pr104554.f90 b/gcc/testsuite/gfortran.dg/pr104554.f90
+new file mode 100644
+index 00000000000..099f219c85d
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr104554.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/104554 - ICE in check_assumed_size_reference
++! Contributed by G.Steinmetz
++
++program p
++  type t
++     integer :: a
++  end type
++  class(t) :: x(*) ! { dg-error "Assumed size array" }
++  x%a = 3
++end
+-- 
+2.25.1
+

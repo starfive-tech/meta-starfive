@@ -1,0 +1,38 @@
+From 3668a59ae22a4c7c07da598ab7c9f40659ee34e5 Mon Sep 17 00:00:00 2001
+From: Philipp Tomsich <philipp.tomsich@vrull.eu>
+Date: Mon, 8 Aug 2022 00:30:52 +0200
+Subject: [PATCH 171/547] aarch64: update Ampere-1 core definition
+
+This brings the extensions detected by -mcpu=native on Ampere-1 systems
+in sync with the defaults generated for -mcpu=ampere1.
+
+Note that some early kernel versions on Ampere1 may misreport the
+presence of PAUTH and PREDRES (i.e., -mcpu=native will add 'nopauth'
+and 'nopredres').
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64-cores.def (AARCH64_CORE): Update
+	Ampere-1 core entry.
+
+(cherry picked from commit db2f5d661239737157cf131de7d4df1c17d8d88d)
+---
+ gcc/config/aarch64/aarch64-cores.def | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config/aarch64/aarch64-cores.def b/gcc/config/aarch64/aarch64-cores.def
+index 8da254f6924..e65b8f23eb8 100644
+--- a/gcc/config/aarch64/aarch64-cores.def
++++ b/gcc/config/aarch64/aarch64-cores.def
+@@ -69,7 +69,7 @@ AARCH64_CORE("thunderxt81",   thunderxt81,   thunderx,  8A,  AARCH64_FL_FOR_ARCH
+ AARCH64_CORE("thunderxt83",   thunderxt83,   thunderx,  8A,  AARCH64_FL_FOR_ARCH8 | AARCH64_FL_CRC | AARCH64_FL_CRYPTO, thunderx,  0x43, 0x0a3, -1)
+ 
+ /* Ampere Computing ('\xC0') cores. */
+-AARCH64_CORE("ampere1", ampere1, cortexa57, 8_6A, AARCH64_FL_FOR_ARCH8_6, ampere1, 0xC0, 0xac3, -1)
++AARCH64_CORE("ampere1", ampere1, cortexa57, 8_6A, AARCH64_FL_FOR_ARCH8_6 | AARCH64_FL_CRYPTO | AARCH64_FL_F16 | AARCH64_FL_RNG | AARCH64_FL_SHA3, ampere1, 0xC0, 0xac3, -1)
+ /* Do not swap around "emag" and "xgene1",
+    this order is required to handle variant correctly. */
+ AARCH64_CORE("emag",        emag,      xgene1,    8A,  AARCH64_FL_FOR_ARCH8 | AARCH64_FL_CRC | AARCH64_FL_CRYPTO, emag, 0x50, 0x000, 3)
+-- 
+2.25.1
+

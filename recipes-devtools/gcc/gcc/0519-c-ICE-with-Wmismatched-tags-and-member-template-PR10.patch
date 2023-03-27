@@ -1,0 +1,139 @@
+From 3a2310d4b229e707bbc5440150bf180e0499273a Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 1 Mar 2023 14:28:46 -0500
+Subject: [PATCH 519/547] c++: ICE with -Wmismatched-tags and member template
+ [PR106259]
+
+-Wmismatched-tags warns about the (harmless) struct/class mismatch.
+For, e.g.,
+
+  template<typename T> struct A { };
+  class A<int> a;
+
+it works by adding A<T> to the class2loc hash table while parsing the
+class-head and then, while parsing the elaborate type-specifier, we
+add A<int>.  At the end of c_parse_file we go through the table and
+warn about the class-key mismatches.  In this PR we crash though; we
+have
+
+  template<typename T> struct A {
+    template<typename U> struct W { };
+  };
+  struct A<int>::W<int> w; // #1
+
+where while parsing A and #1 we've stashed
+   A<T>
+   A<T>::W<U>
+   A<int>::W<int>
+into class2loc.  Then in class_decl_loc_t::diag_mismatched_tags TYPE
+is A<int>::W<int>, and specialization_of gets us A<int>::W<U>, which
+is not in class2loc, so we crash on gcc_assert (cdlguide).  But it's
+OK not to have found A<int>::W<U>, we should just look one "level" up,
+that is, A<T>::W<U>.
+
+It's important to handle class specializations, so e.g.
+
+  template<>
+  struct A<char> {
+    template<typename U>
+    class W { };
+  };
+
+where W's class-key is different than in the primary template above,
+so we should warn depending on whether we're looking into A<char>
+or into a different instantiation.
+
+	PR c++/106259
+
+gcc/cp/ChangeLog:
+
+	* parser.cc (class_decl_loc_t::diag_mismatched_tags): If the first
+	lookup of SPEC didn't find anything, try to look for
+	most_general_template.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/warn/Wmismatched-tags-11.C: New test.
+
+(cherry picked from commit 71afd0628419c5d670701cb35bc9860380c7d9fb)
+---
+ gcc/cp/parser.cc                              | 30 +++++++++++++++----
+ .../g++.dg/warn/Wmismatched-tags-11.C         | 23 ++++++++++++++
+ 2 files changed, 47 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wmismatched-tags-11.C
+
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index 39f7eda4b56..e5211d8075e 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -33670,14 +33670,32 @@ class_decl_loc_t::diag_mismatched_tags (tree type_decl)
+ 	 be (and inevitably is) at index zero.  */
+       tree spec = specialization_of (type);
+       cdlguide = class2loc.get (spec);
++      /* It's possible that we didn't find SPEC.  Consider:
++
++	   template<typename T> struct A {
++	     template<typename U> struct W { };
++	   };
++	   struct A<int>::W<int> w; // #1
++
++	 where while parsing A and #1 we've stashed
++	   A<T>
++	   A<T>::W<U>
++	   A<int>::W<int>
++	 into CLASS2LOC.  If TYPE is A<int>::W<int>, specialization_of
++	 will yield A<int>::W<U> which may be in CLASS2LOC if we had
++	 an A<int> class specialization, but otherwise won't be in it.
++	 So try to look up A<T>::W<U>.  */
++      if (!cdlguide)
++	{
++	  spec = DECL_TEMPLATE_RESULT (most_general_template (spec));
++	  cdlguide = class2loc.get (spec);
++	}
++      /* Now we really should have found something.  */
+       gcc_assert (cdlguide != NULL);
+     }
+-  else
+-    {
+-      /* Skip declarations that consistently use the same class-key.  */
+-      if (def_class_key != none_type)
+-	return;
+-    }
++  /* Skip declarations that consistently use the same class-key.  */
++  else if (def_class_key != none_type)
++    return;
+ 
+   /* Set if a definition for the class has been seen.  */
+   const bool def_p = cdlguide->def_p ();
+diff --git a/gcc/testsuite/g++.dg/warn/Wmismatched-tags-11.C b/gcc/testsuite/g++.dg/warn/Wmismatched-tags-11.C
+new file mode 100644
+index 00000000000..6c4e571726a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wmismatched-tags-11.C
+@@ -0,0 +1,23 @@
++// PR c++/106259
++// { dg-do compile }
++// { dg-options "-Wmismatched-tags" }
++
++template<typename T> struct A {
++  template<typename U>
++  struct W { };
++};
++
++template<>
++struct A<char> {
++  template<typename U>
++  class W { };
++};
++
++void
++g ()
++{
++  struct A<char>::W<int> w1; // { dg-warning "mismatched" }
++  struct A<int>::W<int> w2;
++  class A<char>::W<int> w3;
++  class A<int>::W<int> w4; // { dg-warning "mismatched" }
++}
+-- 
+2.25.1
+

@@ -1,0 +1,44 @@
+From e4f6149fe272101af6de3a19be4e41d0e77e7f6c Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 19 Dec 2022 15:05:16 +0100
+Subject: [PATCH 432/547] testsuite: Fix up pr64536.c for LLP64 targets
+ [PR108151]
+
+Apparently llp64 had 2 further warnings, fixed thusly.
+
+2022-12-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/108151
+	* gcc.dg/pr64536.c (bar): Cast long to __INTPTR_TYPE__
+	before casting to long *.
+
+(cherry picked from commit 6e85f89a7d59a99a3395b6e153b99262a58b2f6c)
+---
+ gcc/testsuite/gcc.dg/pr64536.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/pr64536.c b/gcc/testsuite/gcc.dg/pr64536.c
+index bca2d4f0efe..18afa9d0232 100644
+--- a/gcc/testsuite/gcc.dg/pr64536.c
++++ b/gcc/testsuite/gcc.dg/pr64536.c
+@@ -40,7 +40,7 @@ bar (int x)
+ 	      h->q = *f;
+ 	    }
+ 	  else
+-	    i = (long *) (h->q = *f);
++	    i = (long *) (__INTPTR_TYPE__) (h->q = *f);
+ 	  *c++ = (__INTPTR_TYPE__) f;
+ 	  e += 6;
+ 	}
+@@ -54,7 +54,7 @@ bar (int x)
+ 	      h->q = *f;
+ 	    }
+ 	  else
+-	    i = (long *) (h->q = *f);
++	    i = (long *) (__INTPTR_TYPE__) (h->q = *f);
+ 	  *c++ = (__INTPTR_TYPE__) f;
+ 	  e += 6;
+ 	}
+-- 
+2.25.1
+

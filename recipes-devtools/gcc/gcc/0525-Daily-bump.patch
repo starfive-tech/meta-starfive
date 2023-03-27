@@ -1,0 +1,193 @@
+From 541c61a520f73b92bb5323ce458954cd794ebdd8 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 5 Mar 2023 00:20:40 +0000
+Subject: [PATCH 525/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/c-family/ChangeLog  | 19 ++++++++++++
+ gcc/cp/ChangeLog        | 24 +++++++++++++++
+ gcc/fortran/ChangeLog   | 30 +++++++++++++++++++
+ gcc/testsuite/ChangeLog | 65 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 139 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 887270c7322..f76ec6afe5b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230304
++20230305
+diff --git a/gcc/c-family/ChangeLog b/gcc/c-family/ChangeLog
+index d33ab53b3ec..95356b1fb97 100644
+--- a/gcc/c-family/ChangeLog
++++ b/gcc/c-family/ChangeLog
+@@ -1,3 +1,22 @@
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-22  Marek Polacek  <polacek@redhat.com>
++
++	PR c/108880
++	* c-gimplify.cc (c_genericize_control_stmt) <case STATEMENT_LIST>: Pass
++	pset to walk_tree_1.
++	(c_genericize): Call walk_tree with an explicit pset.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-28  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107938
++	* c-warn.cc (check_address_or_pointer_of_packed_member): Check
++	POINTER_TYPE_P.
++
+ 2023-02-10  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index f80334802d5..80d94e02d80 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,27 @@
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/108550
++	* pt.cc (lookup_and_finish_template_variable): Clear tf_partial.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-03-02  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/106259
++	* parser.cc (class_decl_loc_t::diag_mismatched_tags): If the first
++	lookup of SPEC didn't find anything, try to look for
++	most_general_template.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-03-01  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107574
++	* constexpr.cc (cxx_eval_constant_expression): Emit an error when
++	a PTRMEM_CST cannot be evaluated.
++
+ 2023-02-20  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index ed3520772a3..34c1fd8fee5 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,33 @@
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-27  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108937
++	* trans-intrinsic.cc (gfc_conv_intrinsic_ibits): Handle corner case
++	LEN argument of IBITS equal to BITSIZE(I).
++
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-22  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/96024
++	* resolve.cc (resolve_component): The type of a CHARACTER length
++	expression must be INTEGER.
++
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-21  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/96025
++	* parse.cc (check_function_result_typed): Improve type check of
++	specification expression for character length and return status.
++	(parse_spec): Use status from above.
++	* resolve.cc (resolve_fntype): Prevent use of invalid specification
++	expression for character length.
++
+ 2023-02-16  Steve Kargl  <kargl@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 684ea8b15b9..275041719e8 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,68 @@
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-27  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/108937
++	* gfortran.dg/ibits_2.f90: New test.
++
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-22  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/96024
++	* gfortran.dg/pr96024.f90: New test.
++
++2023-03-04  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2023-02-21  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/96025
++	* gfortran.dg/pr96025.f90: New test.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/108550
++	* g++.dg/cpp1y/var-templ70.C: New test.
++	* g++.dg/cpp1y/var-templ71.C: New test.
++	* g++.dg/cpp1y/var-templ72.C: New test.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-22  Marek Polacek  <polacek@redhat.com>
++
++	PR c/108880
++	* c-c++-common/ubsan/pr108880.c: New test.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-03-02  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/106259
++	* g++.dg/warn/Wmismatched-tags-11.C: New test.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-03-01  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107574
++	* g++.dg/cpp0x/ptrmem-cst1.C: New test.
++
++2023-03-04  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-02-28  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/107938
++	* g++.dg/cpp1y/var-templ73.C: New test.
++	* g++.dg/cpp1y/var-templ74.C: New test.
++	* g++.dg/warn/Waddress-of-packed-member3.C: New test.
++
+ 2023-03-03  Iain Buclaw  <ibuclaw@gdcproject.org>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

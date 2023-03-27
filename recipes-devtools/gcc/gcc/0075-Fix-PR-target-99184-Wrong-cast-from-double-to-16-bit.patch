@@ -1,0 +1,109 @@
+From 57896e8cddd2eb952145fa32ca25635fd63246b4 Mon Sep 17 00:00:00 2001
+From: Georg-Johann Lay <avr@gjlay.de>
+Date: Mon, 19 Sep 2022 09:46:58 +0200
+Subject: [PATCH 075/547] Fix PR target/99184: Wrong cast from double to 16-bit
+ and 32-bit ints
+
+this patch fixed PR target/99184 which incorrectly rounded during 64-bit
+(long) double to 16-bit and 32-bit integers.
+
+The patch just removes the respective roundings from
+libf7-asm.sx::to_integer and ::to_unsigned.  Luckily, LibF7 does nowhere
+use respective functions internally, the only user is in libf7.c::f7_exp
+
+which reads
+
+   f7_round (qq, qq);
+   int16_t q = f7_get_s16 (qq);
+
+so that f7_get_s16() operates on an already rounded value, and therefore
+this code works unaltered with or without rounding in to_integer.
+
+	PR target/99184
+libgcc/config/avr/libf7/
+	* libf7-asm.sx (to_integer, to_unsigned): Don't round 16-bit
+	and 32-bit integers.
+
+(cherry picked from commit 0b5b8ac5cb7fe92dd17ae8bd7de84640daa59e84)
+---
+ libgcc/config/avr/libf7/libf7-asm.sx | 50 ----------------------------
+ 1 file changed, 50 deletions(-)
+
+diff --git a/libgcc/config/avr/libf7/libf7-asm.sx b/libgcc/config/avr/libf7/libf7-asm.sx
+index cfdbecdeffe..752a939f616 100644
+--- a/libgcc/config/avr/libf7/libf7-asm.sx
++++ b/libgcc/config/avr/libf7/libf7-asm.sx
+@@ -601,9 +601,6 @@ DEFUN to_integer
+     tst     C6
+     brmi    .Lsaturate.T    ;   > INTxx_MAX  =>  saturate
+ 
+-    rcall   .Lround
+-    brmi    .Lsaturate.T    ;   > INTxx_MAX  =>  saturate
+-
+     brtc 9f                 ;   >= 0         =>  return
+     sbrc    Mask,   5
+     .global __negdi2
+@@ -658,30 +655,6 @@ DEFUN to_integer
+     .global __clr_8
+     XJMP    __clr_8
+ 
+-.Lround:
+-    ;; C6.7 is known to be 0 here.
+-    ;; Return N = 1 iff we have to saturate.
+-    cpi     Mask,   0xf
+-    breq .Lround16
+-    cpi     Mask,   0x1f
+-    breq .Lround32
+-
+-    ;; For now, no rounding in the 64-bit case.  This rounding
+-    ;; would have to be integrated into the right-shift.
+-    cln
+-    ret
+-
+-.Lround32:
+-    rol     C2
+-    adc     C3,     ZERO
+-    adc     C4,     ZERO
+-    rjmp 2f
+-
+-.Lround16:
+-    rol     C4
+-2:  adc     C5,     ZERO
+-    adc     C6,     ZERO
+-    ret
+ ENDF to_integer
+ #endif /* F7MOD_to_integer_ */
+ 
+@@ -725,29 +698,6 @@ DEFUN to_unsigned
+     clr     CA
+     F7call  lshrdi3
+     POP     r16
+-
+-    ;; Rounding
+-    ;; ??? C6.7 is known to be 0 here.
+-    cpi     Mask,   0xf
+-    breq .Lround16
+-    cpi     Mask,   0x1f
+-    breq .Lround32
+-
+-    ;; For now, no rounding in the 64-bit case.  This rounding
+-    ;; would have to be integrated into the right-shift.
+-    ret
+-
+-.Lround32:
+-    rol     C2
+-    adc     C3,     ZERO
+-    adc     C4,     ZERO
+-    rjmp 2f
+-
+-.Lround16:
+-    rol     C4
+-2:  adc     C5,     ZERO
+-    adc     C6,     ZERO
+-    brcs    .Lset_0xffff    ; Rounding overflow  =>  saturate
+     ret
+ 
+ .Lset_0xffff:
+-- 
+2.25.1
+

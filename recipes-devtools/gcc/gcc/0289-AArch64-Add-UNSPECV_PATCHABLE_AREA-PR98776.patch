@@ -1,0 +1,195 @@
+From 7525c9d7e72ac3818e08fe7aa98396bd41e4ec8c Mon Sep 17 00:00:00 2001
+From: Sebastian Pop <spop@amazon.com>
+Date: Wed, 30 Nov 2022 19:45:24 +0000
+Subject: [PATCH 289/547] AArch64: Add UNSPECV_PATCHABLE_AREA [PR98776]
+
+Currently patchable area is at the wrong place on AArch64.  It is placed
+immediately after function label, before .cfi_startproc.  This patch
+adds UNSPECV_PATCHABLE_AREA for pseudo patchable area instruction and
+modifies aarch64_print_patchable_function_entry to avoid placing
+patchable area before .cfi_startproc.
+
+gcc/
+	PR target/98776
+	* config/aarch64/aarch64-protos.h (aarch64_output_patchable_area):
+	Declared.
+	* config/aarch64/aarch64.cc (aarch64_print_patchable_function_entry):
+	Emit an UNSPECV_PATCHABLE_AREA pseudo instruction.
+	(aarch64_output_patchable_area): New.
+	* config/aarch64/aarch64.md (UNSPECV_PATCHABLE_AREA): New.
+	(patchable_area): Define.
+
+gcc/testsuite/
+	PR target/98776
+	* gcc.target/aarch64/pr98776.c: New.
+	* gcc.target/aarch64/pr92424-2.c: Adjust pattern.
+	* gcc.target/aarch64/pr92424-3.c: Adjust pattern.
+---
+ gcc/config/aarch64/aarch64-protos.h          |  2 +
+ gcc/config/aarch64/aarch64.cc                | 56 ++++++++++++++------
+ gcc/config/aarch64/aarch64.md                | 14 +++++
+ gcc/testsuite/gcc.target/aarch64/pr92424-2.c |  2 +-
+ gcc/testsuite/gcc.target/aarch64/pr92424-3.c |  2 +-
+ gcc/testsuite/gcc.target/aarch64/pr98776.c   | 11 ++++
+ 6 files changed, 70 insertions(+), 17 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/pr98776.c
+
+diff --git a/gcc/config/aarch64/aarch64-protos.h b/gcc/config/aarch64/aarch64-protos.h
+index 031c6d74775..82c8896c7fe 100644
+--- a/gcc/config/aarch64/aarch64-protos.h
++++ b/gcc/config/aarch64/aarch64-protos.h
+@@ -1079,4 +1079,6 @@ const char *aarch64_indirect_call_asm (rtx);
+ extern bool aarch64_harden_sls_retbr_p (void);
+ extern bool aarch64_harden_sls_blr_p (void);
+ 
++extern void aarch64_output_patchable_area (unsigned int, bool);
++
+ #endif /* GCC_AARCH64_PROTOS_H */
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index 4a2d58bb343..263bd138d27 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -22593,30 +22593,56 @@ aarch64_declare_function_name (FILE *stream, const char* name,
+   cfun->machine->label_is_assembled = true;
+ }
+ 
+-/* Implement PRINT_PATCHABLE_FUNCTION_ENTRY.  Check if the patch area is after
+-   the function label and emit a BTI if necessary.  */
++/* Implement PRINT_PATCHABLE_FUNCTION_ENTRY.  */
+ 
+ void
+ aarch64_print_patchable_function_entry (FILE *file,
+ 					unsigned HOST_WIDE_INT patch_area_size,
+ 					bool record_p)
+ {
+-  if (cfun->machine->label_is_assembled
+-      && aarch64_bti_enabled ()
+-      && !cgraph_node::get (cfun->decl)->only_called_directly_p ())
++  if (!cfun->machine->label_is_assembled)
+     {
+-      /* Remove the BTI that follows the patch area and insert a new BTI
+-	 before the patch area right after the function label.  */
+-      rtx_insn *insn = next_real_nondebug_insn (get_insns ());
+-      if (insn
+-	  && INSN_P (insn)
+-	  && GET_CODE (PATTERN (insn)) == UNSPEC_VOLATILE
+-	  && XINT (PATTERN (insn), 1) == UNSPECV_BTI_C)
+-	delete_insn (insn);
+-      asm_fprintf (file, "\thint\t34 // bti c\n");
++      /* Emit the patching area before the entry label, if any.  */
++      default_print_patchable_function_entry (file, patch_area_size,
++					      record_p);
++      return;
++    }
++
++  rtx pa = gen_patchable_area (GEN_INT (patch_area_size),
++			       GEN_INT (record_p));
++  basic_block bb = ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb;
++
++  if (!aarch64_bti_enabled ()
++      || cgraph_node::get (cfun->decl)->only_called_directly_p ())
++    {
++      /* Emit the patchable_area at the beginning of the function.  */
++      rtx_insn *insn = emit_insn_before (pa, BB_HEAD (bb));
++      INSN_ADDRESSES_NEW (insn, -1);
++      return;
++    }
++
++  rtx_insn *insn = next_real_nondebug_insn (get_insns ());
++  if (!insn
++      || !INSN_P (insn)
++      || GET_CODE (PATTERN (insn)) != UNSPEC_VOLATILE
++      || XINT (PATTERN (insn), 1) != UNSPECV_BTI_C)
++    {
++      /* Emit a BTI_C.  */
++      insn = emit_insn_before (gen_bti_c (), BB_HEAD (bb));
+     }
+ 
+-  default_print_patchable_function_entry (file, patch_area_size, record_p);
++  /* Emit the patchable_area after BTI_C.  */
++  insn = emit_insn_after (pa, insn);
++  INSN_ADDRESSES_NEW (insn, -1);
++}
++
++/* Output patchable area.  */
++
++void
++aarch64_output_patchable_area (unsigned int patch_area_size, bool record_p)
++{
++  default_print_patchable_function_entry (asm_out_file, patch_area_size,
++					  record_p);
+ }
+ 
+ /* Implement ASM_OUTPUT_DEF_FROM_DECLS.  Output .variant_pcs for aliases.  */
+diff --git a/gcc/config/aarch64/aarch64.md b/gcc/config/aarch64/aarch64.md
+index 7a04f45cacc..d24c8afcfa6 100644
+--- a/gcc/config/aarch64/aarch64.md
++++ b/gcc/config/aarch64/aarch64.md
+@@ -303,6 +303,7 @@
+     UNSPEC_TAG_SPACE		; Translate address to MTE tag address space.
+     UNSPEC_LD1RO
+     UNSPEC_SALT_ADDR
++    UNSPECV_PATCHABLE_AREA
+ ])
+ 
+ (define_c_enum "unspecv" [
+@@ -7710,6 +7711,19 @@
+   [(set_attr "type" "ls64")]
+ )
+ 
++(define_insn "patchable_area"
++  [(unspec_volatile [(match_operand 0 "const_int_operand")
++		     (match_operand 1 "const_int_operand")]
++		    UNSPECV_PATCHABLE_AREA)]
++  ""
++{
++  aarch64_output_patchable_area (INTVAL (operands[0]),
++			         INTVAL (operands[1]) != 0);
++  return "";
++}
++  [(set (attr "length") (symbol_ref "INTVAL (operands[0])"))]
++)
++
+ ;; AdvSIMD Stuff
+ (include "aarch64-simd.md")
+ 
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr92424-2.c b/gcc/testsuite/gcc.target/aarch64/pr92424-2.c
+index 0e75657a153..86bb92e6f32 100644
+--- a/gcc/testsuite/gcc.target/aarch64/pr92424-2.c
++++ b/gcc/testsuite/gcc.target/aarch64/pr92424-2.c
+@@ -9,4 +9,4 @@ __attribute__ ((target("branch-protection=bti"),
+ f10_bti ()
+ {
+ }
+-/* { dg-final { scan-assembler "f10_bti:\n\thint\t34 // bti c\n.*\.LPFE1:\n\tnop\n.*\tret\n" } } */
++/* { dg-final { scan-assembler "hint\t34 // bti c\n.*\.LPFE1:\n\tnop\n.*\tret\n" } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr92424-3.c b/gcc/testsuite/gcc.target/aarch64/pr92424-3.c
+index 0a1f74d4096..daac2faf18e 100644
+--- a/gcc/testsuite/gcc.target/aarch64/pr92424-3.c
++++ b/gcc/testsuite/gcc.target/aarch64/pr92424-3.c
+@@ -9,4 +9,4 @@ __attribute__ ((target("branch-protection=bti+pac-ret+leaf"),
+ f10_pac ()
+ {
+ }
+-/* { dg-final { scan-assembler "f10_pac:\n\thint\t34 // bti c\n.*\.LPFE1:\n\tnop\n.*\thint\t25 // paciasp\n.*\thint\t29 // autiasp\n.*\tret\n" } } */
++/* { dg-final { scan-assembler "hint\t34 // bti c\n.*\.LPFE1:\n\tnop\n.*\thint\t25 // paciasp\n.*\thint\t29 // autiasp\n.*\tret\n" } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr98776.c b/gcc/testsuite/gcc.target/aarch64/pr98776.c
+new file mode 100644
+index 00000000000..d193df8e66d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/pr98776.c
+@@ -0,0 +1,11 @@
++/* { dg-do "compile" } */
++/* { dg-options "-O1 -fpatchable-function-entry=1 -fasynchronous-unwind-tables" } */
++
++/* Test the placement of the .LPFE1 label.  */
++
++void
++foo (void)
++{
++}
++
++/* { dg-final { scan-assembler "\t\.cfi_startproc\n.*\.LPFE1:\n\tnop\n\tret\n" } } */
+-- 
+2.25.1
+

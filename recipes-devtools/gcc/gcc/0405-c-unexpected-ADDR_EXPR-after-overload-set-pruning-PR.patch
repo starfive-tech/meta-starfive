@@ -1,0 +1,99 @@
+From 534aea1ca7e7538dc6af3eac3cd2ec6c7343fdee Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 3 Feb 2023 09:41:10 -0500
+Subject: [PATCH 405/547] c++: unexpected ADDR_EXPR after overload set pruning
+ [PR107461]
+
+Here the ahead-of-time overload set pruning in finish_call_expr is
+unintentionally returning a CALL_EXPR whose (pruned) callee is wrapped
+in an ADDR_EXPR, despite the original callee not being wrapped in an
+ADDR_EXPR.  This ends up causing a bogus declaration mismatch error in
+the below testcase because the call to min in #1 gets expressed as a
+CALL_EXPR of ADDR_EXPR of FUNCTION_DECL, whereas the level-lowered call
+to min in #2 gets expressed instead as a CALL_EXPR of FUNCTION_DECL.
+
+This patch fixes this by stripping the spurious ADDR_EXPR appropriately.
+Thus the first call to min now also gets expressed as a CALL_EXPR of
+FUNCTION_DECL, matching the behavior before r12-6075-g2decd2cabe5a4f.
+
+	PR c++/107461
+
+gcc/cp/ChangeLog:
+
+	* semantics.cc (finish_call_expr): Strip ADDR_EXPR from
+	the selected callee during overload set pruning.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/template/call9.C: New test.
+
+(cherry picked from commit 59e0376f607805ef9b67fd7b0a4a3084ab3571a5)
+---
+ gcc/cp/semantics.cc                   | 15 ++++++++++-----
+ gcc/testsuite/g++.dg/template/call9.C | 26 ++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/template/call9.C
+
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index de755904d50..687fec019d3 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -2920,13 +2920,18 @@ finish_call_expr (tree fn, vec<tree, va_gc> **args, bool disallow_virtual,
+       if (TREE_CODE (result) == CALL_EXPR
+ 	  && really_overloaded_fn (orig_fn))
+ 	{
+-	  orig_fn = CALL_EXPR_FN (result);
+-	  if (TREE_CODE (orig_fn) == COMPONENT_REF)
++	  tree sel_fn = CALL_EXPR_FN (result);
++	  if (TREE_CODE (sel_fn) == COMPONENT_REF)
+ 	    {
+ 	      /* The non-dependent result of build_new_method_call.  */
+-	      orig_fn = TREE_OPERAND (orig_fn, 1);
+-	      gcc_assert (BASELINK_P (orig_fn));
+-	    }
++	      sel_fn = TREE_OPERAND (sel_fn, 1);
++	      gcc_assert (BASELINK_P (sel_fn));
++	    }
++	  else if (TREE_CODE (sel_fn) == ADDR_EXPR)
++	    /* Our original callee wasn't wrapped in an ADDR_EXPR,
++	       so strip this ADDR_EXPR added by build_over_call.  */
++	    sel_fn = TREE_OPERAND (sel_fn, 0);
++	  orig_fn = sel_fn;
+ 	}
+ 
+       result = build_call_vec (TREE_TYPE (result), orig_fn, orig_args);
+diff --git a/gcc/testsuite/g++.dg/template/call9.C b/gcc/testsuite/g++.dg/template/call9.C
+new file mode 100644
+index 00000000000..6bdfd932582
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/call9.C
+@@ -0,0 +1,26 @@
++// PR c++/107461
++// { dg-do compile { target c++11 } }
++
++template<class T>
++constexpr T min(T t0, T t1) {
++  return t0 < t1 ? t0 : t1;
++}
++
++template<int MAX>
++struct Matrix;
++
++template<int MAXOP, int other_MAXOP>
++Matrix<min(MAXOP, other_MAXOP)>
++operator+(Matrix<MAXOP> const& lhs, Matrix<other_MAXOP> const& rhs); // #1
++
++template<int MAX>
++struct Matrix {
++  template<int MAXOP, int other_MAXOP>
++  friend Matrix<min(MAXOP, other_MAXOP)>
++  operator+(Matrix<MAXOP> const& lhs, Matrix<other_MAXOP> const& rhs); // #2
++};
++
++int main() {
++  Matrix<1> a;
++  a+a;
++}
+-- 
+2.25.1
+

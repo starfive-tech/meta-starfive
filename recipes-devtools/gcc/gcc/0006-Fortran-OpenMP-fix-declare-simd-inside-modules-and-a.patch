@@ -1,0 +1,97 @@
+From 50b7cf395656ccd32d4d5d8e0e338135d28f52f6 Mon Sep 17 00:00:00 2001
+From: Tobias Burnus <tobias@codesourcery.com>
+Date: Tue, 23 Aug 2022 11:29:23 +0200
+Subject: [PATCH 006/547] Fortran: OpenMP fix declare simd inside modules and
+ absent linear step [PR106566]
+
+Partial backport from commit r13-2093, only, as 'OpenMP 5.2 linear
+clause syntax' is not on GCC 12.
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/106566
+	* openmp.cc (gfc_match_omp_declare_simd): Accept module procedures.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/106566
+	* gfortran.dg/gomp/declare-simd-6.f90: New test.
+
+(cherry picked from commit 1513512ec7d0751cba30c9c8804f2be462acfb9b)
+---
+ gcc/fortran/openmp.cc                         |  8 +++-
+ .../gfortran.dg/gomp/declare-simd-6.f90       | 42 +++++++++++++++++++
+ 2 files changed, 48 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/gomp/declare-simd-6.f90
+
+diff --git a/gcc/fortran/openmp.cc b/gcc/fortran/openmp.cc
+index 5018a37ec46..14f2521f1df 100644
+--- a/gcc/fortran/openmp.cc
++++ b/gcc/fortran/openmp.cc
+@@ -4027,9 +4027,13 @@ gfc_match_omp_declare_simd (void)
+   gfc_omp_declare_simd *ods;
+   bool needs_space = false;
+ 
+-  switch (gfc_match (" ( %s ) ", &proc_name))
++  switch (gfc_match (" ( "))
+     {
+-    case MATCH_YES: break;
++    case MATCH_YES:
++      if (gfc_match_symbol (&proc_name, /* host assoc = */ true) != MATCH_YES
++	  || gfc_match (" ) ") != MATCH_YES)
++	return MATCH_ERROR;
++      break;
+     case MATCH_NO: proc_name = NULL; needs_space = true; break;
+     case MATCH_ERROR: return MATCH_ERROR;
+     }
+diff --git a/gcc/testsuite/gfortran.dg/gomp/declare-simd-6.f90 b/gcc/testsuite/gfortran.dg/gomp/declare-simd-6.f90
+new file mode 100644
+index 00000000000..83f2c0ab7cb
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/gomp/declare-simd-6.f90
+@@ -0,0 +1,42 @@
++! { dg-do compile }
++! { dg-additional-options "-fdump-tree-gimple" }
++!
++! PR fortran/106566
++!
++! { dg-final { scan-tree-dump-times "__attribute__\\(\\(omp declare simd \\(linear\\(ref\\(0\\):4\\) simdlen\\(8\\)\\)\\)\\)" 2 "gimple" } }
++! { dg-final { scan-tree-dump-times "__attribute__\\(\\(omp declare simd \\(linear\\(ref\\(0\\):8\\) simdlen\\(8\\)\\)\\)\\)" 2 "gimple" } }
++
++subroutine add_one2(p)
++  implicit none
++  !$omp declare simd(add_one2) linear(ref(p)) simdlen(8)
++  integer(kind=4) :: p
++
++  p = p + 1
++end subroutine
++
++subroutine linear_add_one2(p)
++  implicit none
++  !$omp declare simd(linear_add_one2) linear(ref(p) : 2) simdlen(8)
++  integer(kind=4) :: p
++
++  p = p + 1
++end subroutine
++
++module m
++   integer, parameter :: NN = 1023
++   integer(kind=4) :: a(NN)
++contains
++  subroutine module_add_one2(q)
++    implicit none
++    !$omp declare simd(module_add_one2) linear(ref(q)) simdlen(8)
++    integer(kind=4) :: q
++    q = q + 1
++  end subroutine
++
++  subroutine linear_add_one2(q)
++    implicit none
++    !$omp declare simd(linear_add_one2) linear(ref(q) : 2) simdlen(8)
++    integer(kind=4) :: q
++    q = q + 1
++  end subroutine
++end module
+-- 
+2.25.1
+

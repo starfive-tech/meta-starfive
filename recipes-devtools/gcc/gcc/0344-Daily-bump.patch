@@ -1,0 +1,64 @@
+From c142b30b3a2feb8c99335bf54b514d9c5bf5b0d3 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 12 Jan 2023 00:24:45 +0000
+Subject: [PATCH 344/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 15 +++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 12 ++++++++++++
+ 3 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d1d7b49a7cc..e9e0b550e93 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,18 @@
++2023-01-11  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR tree-optimization/108199
++	* tree-sra.cc (sra_modify_expr): Deal with reverse storage order
++	for bit-field references.
++
++2023-01-11  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-12-28  Martin Liska  <mliska@suse.cz>
++
++	PR tree-optimization/108137
++	* tree-ssa-strlen.cc (get_range_strlen_phi): Reject anything
++	different from INTEGER_CST.
++
+ 2023-01-10  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 35defd81c7a..02b5c084d5f 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230111
++20230112
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index b6511e3a967..1395871f38a 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,15 @@
++2023-01-11  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gcc.dg/sso-17.c: New test.
++
++2023-01-11  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-12-28  Martin Liska  <mliska@suse.cz>
++
++	PR tree-optimization/108137
++	* gcc.dg/tree-ssa/pr108137.c: New test.
++
+ 2023-01-10  Stam Markianos-Wright  <stam.markianos-wright@arm.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

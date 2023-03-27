@@ -1,0 +1,73 @@
+From 8794633003318113e03147a727e63f5d55b350ab Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 11 Oct 2022 14:16:54 -0400
+Subject: [PATCH 131/547] c++: ICE with VEC_INIT_EXPR and defarg [PR106925]
+
+Since r12-8066, in cxx_eval_vec_init we perform expand_vec_init_expr
+while processing the default argument in this test.  At this point
+start_preparsed_function hasn't yet set current_function_decl.
+expand_vec_init_expr then leads to maybe_splice_retval_cleanup which
+checks DECL_CONSTRUCTOR_P (current_function_decl) without checking that
+c_f_d is non-null first.  It seems correct that c_f_d is null here, so
+it seems to me that maybe_splice_retval_cleanup should check c_f_d as
+in the following patch.
+
+	PR c++/106925
+
+gcc/cp/ChangeLog:
+
+	* except.cc (maybe_splice_retval_cleanup): Check current_function_decl.
+	Make the bool const.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/initlist-defarg3.C: New test.
+
+(cherry picked from commit 3130e70dab1e64a7b014391fe941090d5f3b6b7d)
+---
+ gcc/cp/except.cc                              |  7 +++++--
+ gcc/testsuite/g++.dg/cpp0x/initlist-defarg3.C | 13 +++++++++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/initlist-defarg3.C
+
+diff --git a/gcc/cp/except.cc b/gcc/cp/except.cc
+index da0a65c613d..58d8772fc95 100644
+--- a/gcc/cp/except.cc
++++ b/gcc/cp/except.cc
+@@ -1322,9 +1322,12 @@ maybe_splice_retval_cleanup (tree compound_stmt)
+ {
+   /* If we need a cleanup for the return value, add it in at the same level as
+      pushdecl_outermost_localscope.  And also in try blocks.  */
+-  bool function_body
++  const bool function_body
+     = (current_binding_level->level_chain
+-       && current_binding_level->level_chain->kind == sk_function_parms);
++       && current_binding_level->level_chain->kind == sk_function_parms
++      /* When we're processing a default argument, c_f_d may not have been
++	 set.  */
++       && current_function_decl);
+ 
+   if ((function_body || current_binding_level->kind == sk_try)
+       && !DECL_CONSTRUCTOR_P (current_function_decl)
+diff --git a/gcc/testsuite/g++.dg/cpp0x/initlist-defarg3.C b/gcc/testsuite/g++.dg/cpp0x/initlist-defarg3.C
+new file mode 100644
+index 00000000000..5c3e886b306
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/initlist-defarg3.C
+@@ -0,0 +1,13 @@
++// PR c++/106925
++// { dg-do compile { target c++11 } }
++
++struct Foo;
++template <int _Nm> struct __array_traits { typedef Foo _Type[_Nm]; };
++template <int _Nm> struct array {
++  typename __array_traits<_Nm>::_Type _M_elems;
++};
++template <int size> struct MyVector { array<size> data{}; };
++struct Foo {
++  float a{0};
++};
++void foo(MyVector<1> = MyVector<1>());
+-- 
+2.25.1
+

@@ -1,0 +1,37 @@
+From 24b8b44ea3bc232f4fe8daf24900ccaca98e8280 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 30 Nov 2022 00:21:50 +0000
+Subject: [PATCH 250/547] Daily bump.
+
+---
+ gcc/ChangeLog | 9 +++++++++
+ gcc/DATESTAMP | 2 +-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a07ca91fdd2..39406dadc78 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-29  Max Filippov  <jcmvbkbc@gmail.com>
++
++	Backported from master:
++	2022-11-08  Max Filippov  <jcmvbkbc@gmail.com>
++
++	PR rtl-optimization/107482
++	* ira-color.cc (assign_hard_reg): Only call
++	update_costs_from_copies when retry_p is false.
++
+ 2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* range-op.cc (operator_bitwise_xor::op1_range): Fix thinko.
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 7063790611d..e6a7597e85b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221129
++20221130
+-- 
+2.25.1
+

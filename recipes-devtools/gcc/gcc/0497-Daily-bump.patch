@@ -1,0 +1,49 @@
+From df36b5d873594c0621742d0d668bffca6b2ea57c Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 22 Feb 2023 00:22:57 +0000
+Subject: [PATCH 497/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6d7db2787db..e7a86509777 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230221
++20230222
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index b55625a6609..179367e2798 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,24 @@
++2023-02-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-31  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/refwrap.h (reference_wrapper::operator()): Add
++	noexcept-specifier and use __invoke_result instead of result_of.
++	* testsuite/20_util/reference_wrapper/invoke-noexcept.cc: New test.
++
++2023-02-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2023-02-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/108636
++	* include/bits/fs_path.h (path::path(string_view, _Type))
++	(path::_Cmpt::_Cmpt(string_view, _Type, size_t)): Move inline
++	definitions to ...
++	* src/c++17/fs_path.cc: ... here.
++	* testsuite/27_io/filesystem/path/108636.cc: New test.
++
+ 2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

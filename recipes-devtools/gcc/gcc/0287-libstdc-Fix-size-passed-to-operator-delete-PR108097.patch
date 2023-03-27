@@ -1,0 +1,40 @@
+From e9d58614b0b8eebd64d568fa22cd31faaa5f8dce Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 14 Dec 2022 11:58:05 +0000
+Subject: [PATCH 287/547] libstdc++: Fix size passed to operator delete
+ [PR108097]
+
+The number of elements gets stored in _M_capacity so use a separate
+variable for the number of bytes to allocate.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/108097
+	* include/std/stacktrace (basic_stracktrace::_Impl): Do not
+	multiply N by sizeof(value_type) when allocating.
+
+(cherry picked from commit 881c6cabce5d0b27285ed41bd6dabdf48848cce7)
+---
+ libstdc++-v3/include/std/stacktrace | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/include/std/stacktrace b/libstdc++-v3/include/std/stacktrace
+index 8e6c79a2f4f..a067d629a16 100644
+--- a/libstdc++-v3/include/std/stacktrace
++++ b/libstdc++-v3/include/std/stacktrace
+@@ -600,8 +600,10 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	    {
+ 	      if constexpr (is_same_v<allocator_type, allocator<value_type>>)
+ 		{
+-		  __n *= sizeof(value_type);
+-		  void* const __p = _GLIBCXX_OPERATOR_NEW (__n, nothrow_t{});
++		  // For std::allocator we use nothrow-new directly so we
++		  // don't need to handle bad_alloc exceptions.
++		  size_t __nb = __n * sizeof(value_type);
++		  void* const __p = _GLIBCXX_OPERATOR_NEW (__nb, nothrow_t{});
+ 		  if (__p == nullptr) [[unlikely]]
+ 		    return nullptr;
+ 		  _M_frames = static_cast<pointer>(__p);
+-- 
+2.25.1
+

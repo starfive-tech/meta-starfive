@@ -1,0 +1,109 @@
+From 5fa1f732537883908f071f0b0c32f0e9dc5194ff Mon Sep 17 00:00:00 2001
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Mon, 13 Feb 2023 18:38:53 +0800
+Subject: [PATCH 489/547] LoongArch: Fix multiarch tuple canonization
+
+Multiarch tuple will be coded in file or directory names in
+multiarch-aware distros, so one ABI should have only one multiarch
+tuple.  For example, "--target=loongarch64-linux-gnu --with-abi=lp64s"
+and "--target=loongarch64-linux-gnusf" should both set multiarch tuple
+to "loongarch64-linux-gnusf".  Before this commit,
+"--target=loongarch64-linux-gnu --with-abi=lp64s --disable-multilib"
+will produce wrong result (loongarch64-linux-gnu).
+
+A recent LoongArch psABI revision mandates "loongarch64-linux-gnu" to be
+used for -mabi=lp64d (instead of "loongarch64-linux-gnuf64") for some
+non-technical reason [1].  Note that we cannot make
+"loongarch64-linux-gnuf64" an alias for "loongarch64-linux-gnu" because
+to implement such an alias, we must create thousands of symlinks in the
+distro and doing so would be completely unpractical.  This commit also
+aligns GCC with the revision.
+
+Tested by building cross compilers with --enable-multiarch and multiple
+combinations of --target=loongarch64-linux-gnu*, --with-abi=lp64{s,f,d},
+and --{enable,disable}-multilib; and run "xgcc --print-multiarch" then
+manually verify the result with eyesight.
+
+[1]: https://github.com/loongson/LoongArch-Documentation/pull/80
+
+gcc/ChangeLog:
+
+	* config.gcc (triplet_abi): Set its value based on $with_abi,
+	instead of $target.
+	(la_canonical_triplet): Set it after $triplet_abi is set
+	correctly.
+	* config/loongarch/t-linux (MULTILIB_OSDIRNAMES): Make the
+	multiarch tuple for lp64d "loongarch64-linux-gnu" (without
+	"f64" suffix).
+
+(cherry picked from commit 017849d9d88f021770a90f12fffec9aa2425ed27)
+---
+ gcc/config.gcc               | 14 +++++++-------
+ gcc/config/loongarch/t-linux |  2 +-
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index ed02caa18c0..5c378c698ff 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -4981,20 +4981,16 @@ case "${target}" in
+ 		case ${target} in
+ 		loongarch64-*-*-*f64)
+ 			abi_pattern="lp64d"
+-			triplet_abi="f64"
+ 			;;
+ 		loongarch64-*-*-*f32)
+ 			abi_pattern="lp64f"
+-			triplet_abi="f32"
+ 			;;
+ 		loongarch64-*-*-*sf)
+ 			abi_pattern="lp64s"
+-			triplet_abi="sf"
+ 			;;
+ 		loongarch64-*-*-*)
+ 			abi_pattern="lp64[dfs]"
+ 			abi_default="lp64d"
+-			triplet_abi=""
+ 			;;
+ 		*)
+ 			echo "Unsupported target ${target}." 1>&2
+@@ -5015,9 +5011,6 @@ case "${target}" in
+ 			  ;;
+ 		esac
+ 
+-		la_canonical_triplet="loongarch64-${triplet_os}${triplet_abi}"
+-
+-
+ 		# Perform initial sanity checks on --with-* options.
+ 		case ${with_arch} in
+ 		"" | loongarch64 | la464) ;; # OK, append here.
+@@ -5088,6 +5081,13 @@ case "${target}" in
+ 			;;
+ 		esac
+ 
++		case ${with_abi} in
++		  "lp64d") triplet_abi="";;
++		  "lp64f") triplet_abi="f32";;
++		  "lp64s") triplet_abi="sf";;
++		esac
++		la_canonical_triplet="loongarch64-${triplet_os}${triplet_abi}"
++
+ 		# Set default value for with_abiext (internal)
+ 		case ${with_abiext} in
+ 		"")
+diff --git a/gcc/config/loongarch/t-linux b/gcc/config/loongarch/t-linux
+index 5b9796aea2b..136b27d0a8d 100644
+--- a/gcc/config/loongarch/t-linux
++++ b/gcc/config/loongarch/t-linux
+@@ -40,7 +40,7 @@ ifeq ($(filter LA_DISABLE_MULTILIB,$(tm_defines)),)
+ 
+     MULTILIB_OSDIRNAMES = \
+       mabi.lp64d=../lib64$\
+-      $(call if_multiarch,:loongarch64-linux-gnuf64)
++      $(call if_multiarch,:loongarch64-linux-gnu)
+ 
+     MULTILIB_OSDIRNAMES += \
+       mabi.lp64f=../lib64/f32$\
+-- 
+2.25.1
+

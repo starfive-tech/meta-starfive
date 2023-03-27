@@ -1,0 +1,119 @@
+From 477b3f9d58589b3af7a5a7d038d78352ad66406e Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 22 Nov 2022 18:15:56 +0000
+Subject: [PATCH 229/547] libstdc++: Add workaround for fs::path constraint
+ recursion [PR106201]
+
+This works around a compiler bug where overload resolution attempts
+implicit conversion to path in order to call a function with a path&
+parameter. Such conversion would produce a prvalue, which would not be
+able to bind to the lvalue reference anyway. Attempting to check the
+conversion causes a constraint recursion because the arguments to the
+path constructor are checked to see if they're iterators, which checks
+if they're swappable, which tries to use the swap function that
+triggered the conversion in the first place.
+
+This replaces the swap function with an abbreviated function template
+that is constrained with same_as<path> auto& so that the invalid
+conversion is never considered.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/106201
+	* include/bits/fs_path.h (filesystem::swap(path&, path&)):
+	Replace with abbreviated function template.
+	* include/experimental/bits/fs_path.h (filesystem::swap):
+	Likewise.
+	* testsuite/27_io/filesystem/iterators/106201.cc: New test.
+	* testsuite/experimental/filesystem/iterators/106201.cc: New test.
+---
+ libstdc++-v3/include/bits/fs_path.h                |  7 +++++++
+ libstdc++-v3/include/experimental/bits/fs_path.h   |  9 ++++++++-
+ .../testsuite/27_io/filesystem/iterators/106201.cc | 14 ++++++++++++++
+ .../experimental/filesystem/iterators/106201.cc    | 14 ++++++++++++++
+ 4 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 libstdc++-v3/testsuite/27_io/filesystem/iterators/106201.cc
+ create mode 100644 libstdc++-v3/testsuite/experimental/filesystem/iterators/106201.cc
+
+diff --git a/libstdc++-v3/include/bits/fs_path.h b/libstdc++-v3/include/bits/fs_path.h
+index 65682c2a185..1b4a1b69f37 100644
+--- a/libstdc++-v3/include/bits/fs_path.h
++++ b/libstdc++-v3/include/bits/fs_path.h
+@@ -737,7 +737,14 @@ namespace __detail
+   /// @{
+   /// @relates std::filesystem::path
+ 
++#if __cpp_concepts >= 201907L
++  // Workaround for PR libstdc++/106201
++  inline void
++  swap(same_as<path> auto& __lhs, same_as<path> auto& __rhs) noexcept
++  { __lhs.swap(__rhs); }
++#else
+   inline void swap(path& __lhs, path& __rhs) noexcept { __lhs.swap(__rhs); }
++#endif
+ 
+   size_t hash_value(const path& __p) noexcept;
+ 
+diff --git a/libstdc++-v3/include/experimental/bits/fs_path.h b/libstdc++-v3/include/experimental/bits/fs_path.h
+index a493e17a37e..ba6acb2158d 100644
+--- a/libstdc++-v3/include/experimental/bits/fs_path.h
++++ b/libstdc++-v3/include/experimental/bits/fs_path.h
+@@ -537,7 +537,14 @@ namespace __detail
+   /// @relates std::experimental::filesystem::path @{
+ 
+   /// Swap overload for paths
+-  inline void swap(path& __lhs, path& __rhs) noexcept { __lhs.swap(__rhs); }
++#if __cpp_concepts >= 201907L
++  // Workaround for PR libstdc++/106201
++  inline void
++  swap(same_as<path> auto& __lhs, same_as<path> auto& __rhs) noexcept
++  { __lhs.swap(__rhs); }
++#else
++   inline void swap(path& __lhs, path& __rhs) noexcept { __lhs.swap(__rhs); }
++#endif
+ 
+   /// Compute a hash value for a path
+   size_t hash_value(const path& __p) noexcept;
+diff --git a/libstdc++-v3/testsuite/27_io/filesystem/iterators/106201.cc b/libstdc++-v3/testsuite/27_io/filesystem/iterators/106201.cc
+new file mode 100644
+index 00000000000..c5fefd9ac3f
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/filesystem/iterators/106201.cc
+@@ -0,0 +1,14 @@
++// { dg-options "-std=gnu++20" }
++// { dg-do compile { target c++20 } }
++// { dg-require-filesystem-ts "" }
++
++// PR libstdc++/106201 constraint recursion in path(Source const&) constructor.
++
++#include <filesystem>
++#include <iterator>
++#include <concepts>
++namespace fs = std::filesystem;
++using I = std::counted_iterator<fs::directory_iterator>;
++static_assert( std::swappable<I> );
++using R = std::counted_iterator<fs::recursive_directory_iterator>;
++static_assert( std::swappable<R> );
+diff --git a/libstdc++-v3/testsuite/experimental/filesystem/iterators/106201.cc b/libstdc++-v3/testsuite/experimental/filesystem/iterators/106201.cc
+new file mode 100644
+index 00000000000..017b72ef5f6
+--- /dev/null
++++ b/libstdc++-v3/testsuite/experimental/filesystem/iterators/106201.cc
+@@ -0,0 +1,14 @@
++// { dg-options "-std=gnu++20" }
++// { dg-do compile { target c++20 } }
++// { dg-require-filesystem-ts "" }
++
++// PR libstdc++/106201 constraint recursion in path(Source const&) constructor.
++
++#include <experimental/filesystem>
++#include <iterator>
++#include <concepts>
++namespace fs = std::experimental::filesystem;
++using I = std::counted_iterator<fs::directory_iterator>;
++static_assert( std::swappable<I> );
++using R = std::counted_iterator<fs::recursive_directory_iterator>;
++static_assert( std::swappable<R> );
+-- 
+2.25.1
+

@@ -1,0 +1,54 @@
+From 156607e5ae6419211884316cdf100104bf768a07 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 8 Sep 2022 00:22:43 +0000
+Subject: [PATCH 050/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 26 ++++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index a4aec9eaaa2..2e552cf7ab7 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220907
++20220908
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index a2d49420ea4..7cfc53992dc 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,29 @@
++2022-09-07  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-22  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/106695
++	* include/bits/std_thread.h (thread::_State_impl): Forward
++	individual arguments to _Invoker constructor.
++	(thread::_Invoker): Add constructor. Delete copies.
++	* include/std/future (__future_base::_Deferred_state): Forward
++	individual arguments to _Invoker constructor.
++	(__future_base::_Async_state_impl): Likewise.
++	* testsuite/30_threads/async/106695.cc: New test.
++	* testsuite/30_threads/thread/106695.cc: New test.
++
++2022-09-07  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-22  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/106607
++	* include/bits/regex_compiler.tcc (_Compiler::_M_cur_int_value):
++	Use built-ins to check for integer overflow in back-reference
++	number.
++	* testsuite/28_regex/basic_regex/106607.cc: New test.
++
+ 2022-08-24  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

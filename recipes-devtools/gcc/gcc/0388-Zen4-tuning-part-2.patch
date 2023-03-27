@@ -1,0 +1,207 @@
+From 489c81db7d4f75894e9d34aa90fe7224cfafb53a Mon Sep 17 00:00:00 2001
+From: Jan Hubicka <jh@suse.cz>
+Date: Thu, 22 Dec 2022 10:55:46 +0100
+Subject: [PATCH 388/547] Zen4 tuning part 2
+
+Adds tunes needed for zen4 microarchitecture.  I added two new knobs.
+TARGET_AVX512_SPLIT_REGS which is used to specify that internally 512 vectors
+are split to 256 vectors.  This affects vectorization costs and reassociation
+width. It probably should also affect RTX costs however I doubt it is very useful
+since RTL optimizers are usually not judging between 256 and 512 vectors.
+
+I also added X86_TUNE_AVOID_256FMA_CHAINS. Since fma has improved in zen4 this
+flag may not be a win except for very specific benchmarks. I am still doing some
+more detailed testing here.
+
+Oherwise I disabled gathers on zen4 for 2 parts nad 4 parts. We can open code them
+and since the latencies has only increased since zen3 opencoding is better than
+actual instrucction.  This shows at 4 tsvc benchmarks.
+
+I ended up setting AVX256_OPTIMAL. This is a compromise.  There are some tsvc
+benchmarks that increase noticeably (up to 250%) however there are also few
+regressions.  Most of these can be solved by incrasing vec_perm cost in the
+vectorizer.  However this does not cure about 14% regression on x264 that is
+quite important.  Here we produce vectorized loops for avx512 that probably
+would be faster if the loops in question had high enough iteration count.
+We hit this problem with avx256 too: since the loop iterates few times, only
+prologues/epilogues are used.  Adding another round of prologue/epilogue
+code does not make it better.
+
+Finally I enabled avx stores for constnat sized memcpy and memset.  I am not
+sure why this is an opt-in feature.  I think for most hardware this is a win.
+
+gcc/ChangeLog:
+
+2022-12-22  Jan Hubicka  <hubicka@ucw.cz>
+
+	* config/i386/i386-expand.cc (ix86_expand_set_or_cpymem): Add
+	TARGET_AVX512_SPLIT_REGS
+	* config/i386/i386-options.cc (ix86_option_override_internal):
+	Honor x86_TONE_AVOID_256FMA_CHAINS.
+	* config/i386/i386.cc (ix86_vec_cost): Honor TARGET_AVX512_SPLIT_REGS.
+	(ix86_reassociation_width): Likewise.
+	* config/i386/i386.h (TARGET_AVX512_SPLIT_REGS): New tune.
+	* config/i386/x86-tune.def (X86_TUNE_USE_GATHER_2PARTS): Disable
+	for znver4.
+	(X86_TUNE_USE_GATHER_4PARTS): Likewise.
+	(X86_TUNE_AVOID_256FMA_CHAINS): Set for znver4.
+	(X86_TUNE_AVOID_512FMA_CHAINS): New utne; set for znver4.
+	(X86_TUNE_AVX256_OPTIMAL): Add znver4.
+	(X86_TUNE_AVX512_SPLIT_REGS): New tune.
+	(X86_TUNE_AVX256_MOVE_BY_PIECES): Add znver1-3.
+	(X86_TUNE_AVX256_STORE_BY_PIECES): Add znver1-3.
+	(X86_TUNE_AVX512_MOVE_BY_PIECES): Add znver4.
+	(X86_TUNE_AVX512_STORE_BY_PIECES): Add znver4.
+
+(cherry picked from commit eef81eefcdc2a58111e50eb2162ea1f5becc8004)
+---
+ gcc/config/i386/i386-expand.cc  |  2 ++
+ gcc/config/i386/i386-options.cc |  2 ++
+ gcc/config/i386/i386.cc         | 11 ++++++++---
+ gcc/config/i386/i386.h          |  2 ++
+ gcc/config/i386/x86-tune.def    | 23 +++++++++++++++--------
+ 5 files changed, 29 insertions(+), 11 deletions(-)
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index faa63a48bcd..c967817726c 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -8461,6 +8461,8 @@ ix86_expand_set_or_cpymem (rtx dst, rtx src, rtx count_exp, rtx val_exp,
+ 
+       if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (move_mode) > 128)
+ 	move_mode = TImode;
++      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (move_mode) > 256)
++	move_mode = OImode;
+ 
+       /* Find the corresponding vector mode with the same size as MOVE_MODE.
+ 	 MOVE_MODE is an integer mode at the moment (SI, DI, TI, etc.).  */
+diff --git a/gcc/config/i386/i386-options.cc b/gcc/config/i386/i386-options.cc
+index 520da45097a..b9bce613f25 100644
+--- a/gcc/config/i386/i386-options.cc
++++ b/gcc/config/i386/i386-options.cc
+@@ -2936,6 +2936,8 @@ ix86_option_override_internal (bool main_args_p,
+     }
+ 
+   if (ix86_tune_features [X86_TUNE_AVOID_256FMA_CHAINS])
++    SET_OPTION_IF_UNSET (opts, opts_set, param_avoid_fma_max_bits, 512);
++  else if (ix86_tune_features [X86_TUNE_AVOID_256FMA_CHAINS])
+     SET_OPTION_IF_UNSET (opts, opts_set, param_avoid_fma_max_bits, 256);
+   else if (ix86_tune_features [X86_TUNE_AVOID_128FMA_CHAINS])
+     SET_OPTION_IF_UNSET (opts, opts_set, param_avoid_fma_max_bits, 128);
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 4ead65c921f..ad37f84fe06 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -20218,10 +20218,13 @@ ix86_vec_cost (machine_mode mode, int cost)
+ 
+   if (GET_MODE_BITSIZE (mode) == 128
+       && TARGET_SSE_SPLIT_REGS)
+-    return cost * 2;
+-  if (GET_MODE_BITSIZE (mode) > 128
++    return cost * GET_MODE_BITSIZE (mode) / 64;
++  else if (GET_MODE_BITSIZE (mode) > 128
+       && TARGET_AVX256_SPLIT_REGS)
+     return cost * GET_MODE_BITSIZE (mode) / 128;
++  else if (GET_MODE_BITSIZE (mode) > 256
++      && TARGET_AVX512_SPLIT_REGS)
++    return cost * GET_MODE_BITSIZE (mode) / 256;
+   return cost;
+ }
+ 
+@@ -22803,7 +22806,9 @@ ix86_reassociation_width (unsigned int op, machine_mode mode)
+ 	return 1;
+ 
+       /* Account for targets that splits wide vectors into multiple parts.  */
+-      if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
++      if (TARGET_AVX512_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 256)
++	div = GET_MODE_BITSIZE (mode) / 256;
++      else if (TARGET_AVX256_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 128)
+ 	div = GET_MODE_BITSIZE (mode) / 128;
+       else if (TARGET_SSE_SPLIT_REGS && GET_MODE_BITSIZE (mode) > 64)
+ 	div = GET_MODE_BITSIZE (mode) / 64;
+diff --git a/gcc/config/i386/i386.h b/gcc/config/i386/i386.h
+index 009c5b5a7b9..7a079072e19 100644
+--- a/gcc/config/i386/i386.h
++++ b/gcc/config/i386/i386.h
+@@ -414,6 +414,8 @@ extern unsigned char ix86_tune_features[X86_TUNE_LAST];
+ 	ix86_tune_features[X86_TUNE_SOFTWARE_PREFETCHING_BENEFICIAL]
+ #define TARGET_AVX256_SPLIT_REGS \
+ 	ix86_tune_features[X86_TUNE_AVX256_SPLIT_REGS]
++#define TARGET_AVX512_SPLIT_REGS \
++	ix86_tune_features[X86_TUNE_AVX512_SPLIT_REGS]
+ #define TARGET_GENERAL_REGS_SSE_SPILL \
+ 	ix86_tune_features[X86_TUNE_GENERAL_REGS_SSE_SPILL]
+ #define TARGET_AVOID_MEM_OPND_FOR_CMOVE \
+diff --git a/gcc/config/i386/x86-tune.def b/gcc/config/i386/x86-tune.def
+index 1e1b206a71c..eb3ab800264 100644
+--- a/gcc/config/i386/x86-tune.def
++++ b/gcc/config/i386/x86-tune.def
+@@ -467,12 +467,12 @@ DEF_TUNE (X86_TUNE_AVOID_4BYTE_PREFIXES, "avoid_4byte_prefixes",
+ /* X86_TUNE_USE_GATHER_2PARTS: Use gather instructions for vectors with 2
+    elements.  */
+ DEF_TUNE (X86_TUNE_USE_GATHER_2PARTS, "use_gather_2parts",
+-	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ALDERLAKE | m_GENERIC))
++	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ZNVER4 | m_ALDERLAKE | m_GENERIC))
+ 
+ /* X86_TUNE_USE_GATHER_4PARTS: Use gather instructions for vectors with 4
+    elements.  */
+ DEF_TUNE (X86_TUNE_USE_GATHER_4PARTS, "use_gather_4parts",
+-	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ALDERLAKE | m_GENERIC))
++	  ~(m_ZNVER1 | m_ZNVER2 | m_ZNVER3 | m_ZNVER4 |  m_ALDERLAKE | m_GENERIC))
+ 
+ /* X86_TUNE_USE_GATHER: Use gather instructions for vectors with 8 or more
+    elements.  */
+@@ -485,9 +485,13 @@ DEF_TUNE (X86_TUNE_AVOID_128FMA_CHAINS, "avoid_fma_chains", m_ZNVER)
+ 
+ /* X86_TUNE_AVOID_256FMA_CHAINS: Avoid creating loops with tight 256bit or
+    smaller FMA chain.  */
+-DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3
++DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3 | m_ZNVER4
+ 	  | m_ALDERLAKE | m_SAPPHIRERAPIDS)
+ 
++/* X86_TUNE_AVOID_512FMA_CHAINS: Avoid creating loops with tight 512bit or
++   smaller FMA chain.  */
++DEF_TUNE (X86_TUNE_AVOID_512FMA_CHAINS, "avoid_fma512_chains", m_ZNVER4)
++
+ /* X86_TUNE_V2DF_REDUCTION_PREFER_PHADDPD: Prefer haddpd
+    for v2df vector reduction.  */
+ DEF_TUNE (X86_TUNE_V2DF_REDUCTION_PREFER_HADDPD,
+@@ -518,27 +522,30 @@ DEF_TUNE (X86_TUNE_AVX128_OPTIMAL, "avx128_optimal", m_BDVER | m_BTVER2
+ 
+ /* X86_TUNE_AVX256_OPTIMAL: Use 256-bit AVX instructions instead of 512-bit AVX
+    instructions in the auto-vectorizer.  */
+-DEF_TUNE (X86_TUNE_AVX256_OPTIMAL, "avx256_optimal", m_CORE_AVX512)
++DEF_TUNE (X86_TUNE_AVX256_OPTIMAL, "avx256_optimal", m_CORE_AVX512 | m_ZNVER4)
++
++/* X86_TUNE_AVX256_SPLIT_REGS: if true, AVX512 ops are split into two AVX256 ops.  */
++DEF_TUNE (X86_TUNE_AVX512_SPLIT_REGS, "avx512_split_regs", m_ZNVER4)
+ 
+ /* X86_TUNE_AVX256_MOVE_BY_PIECES: Optimize move_by_pieces with 256-bit
+    AVX instructions.  */
+ DEF_TUNE (X86_TUNE_AVX256_MOVE_BY_PIECES, "avx256_move_by_pieces",
+-	  m_CORE_AVX512)
++	  m_CORE_AVX512 | m_ZNVER1 | m_ZNVER2 | m_ZNVER3)
+ 
+ /* X86_TUNE_AVX256_STORE_BY_PIECES: Optimize store_by_pieces with 256-bit
+    AVX instructions.  */
+ DEF_TUNE (X86_TUNE_AVX256_STORE_BY_PIECES, "avx256_store_by_pieces",
+-	  m_CORE_AVX512)
++	  m_CORE_AVX512 | m_ZNVER1 | m_ZNVER2 | m_ZNVER3)
+ 
+ /* X86_TUNE_AVX512_MOVE_BY_PIECES: Optimize move_by_pieces with 512-bit
+    AVX instructions.  */
+ DEF_TUNE (X86_TUNE_AVX512_MOVE_BY_PIECES, "avx512_move_by_pieces",
+-	  m_SAPPHIRERAPIDS)
++	  m_SAPPHIRERAPIDS | m_ZNVER4)
+ 
+ /* X86_TUNE_AVX512_STORE_BY_PIECES: Optimize store_by_pieces with 512-bit
+    AVX instructions.  */
+ DEF_TUNE (X86_TUNE_AVX512_STORE_BY_PIECES, "avx512_store_by_pieces",
+-	  m_SAPPHIRERAPIDS)
++	  m_SAPPHIRERAPIDS | m_ZNVER4)
+ 
+ /*****************************************************************************/
+ /*****************************************************************************/
+-- 
+2.25.1
+

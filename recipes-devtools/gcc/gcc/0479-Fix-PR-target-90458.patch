@@ -1,0 +1,51 @@
+From 25b80834e2ce6725e676ef33fbf0d009b3173955 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 15 Feb 2023 23:32:12 +0100
+Subject: [PATCH 479/547] Fix PR target/90458
+
+This is the incompatibility of -fstack-clash-protection with Windows SEH.
+Now the Windows ports always enable TARGET_STACK_PROBE, which means that
+the stack is always probed (out of line) so -fstack-clash-protection does
+nothing more.
+
+gcc/
+	PR target/90458
+	* config/i386/i386.cc (ix86_compute_frame_layout): Disable the
+	effects of -fstack-clash-protection for TARGET_STACK_PROBE.
+	(ix86_expand_prologue): Likewise.
+---
+ gcc/config/i386/i386.cc | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 962f8c82b48..669b1efdb62 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -6818,7 +6818,9 @@ ix86_compute_frame_layout (void)
+ 	 stack clash protections are enabled and the allocated frame is
+ 	 larger than the probe interval, then use pushes to save
+ 	 callee saved registers.  */
+-      || (flag_stack_clash_protection && to_allocate > get_probe_interval ()))
++      || (flag_stack_clash_protection
++	  && !ix86_target_stack_probe ()
++	  && to_allocate > get_probe_interval ()))
+     frame->save_regs_using_mov = false;
+ 
+   if (ix86_using_red_zone ()
+@@ -8703,8 +8705,11 @@ ix86_expand_prologue (void)
+       sse_registers_saved = true;
+     }
+ 
+-  /* If stack clash protection is requested, then probe the stack.  */
+-  if (allocate >= 0 && flag_stack_clash_protection)
++  /* If stack clash protection is requested, then probe the stack, unless it
++     is already probed on the target.  */
++  if (allocate >= 0
++      && flag_stack_clash_protection
++      && !ix86_target_stack_probe ())
+     {
+       ix86_adjust_stack_and_probe (allocate, int_registers_saved, false);
+       allocate = 0;
+-- 
+2.25.1
+

@@ -1,0 +1,215 @@
+From e5a63c986978699a25f4bfb9b58a0111951e7d43 Mon Sep 17 00:00:00 2001
+From: Kewen Lin <linkw@linux.ibm.com>
+Date: Mon, 16 Jan 2023 02:15:39 -0600
+Subject: [PATCH 470/547] rs6000: Teach rs6000_opaque_type_invalid_use_p about
+ inline asm [PR108272]
+
+As PR108272 shows, there are some invalid uses of MMA opaque
+types in inline asm statements.  This patch is to teach the
+function rs6000_opaque_type_invalid_use_p for inline asm,
+check and error any invalid use of MMA opaque types in input
+and output operands.
+
+	PR target/108272
+
+gcc/ChangeLog:
+
+	* config/rs6000/rs6000.cc (rs6000_opaque_type_invalid_use_p): Add the
+	support for invalid uses in inline asm, factor out the checking and
+	erroring to lambda function check_and_error_invalid_use.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/powerpc/pr108272-1.c: New test.
+	* gcc.target/powerpc/pr108272-2.c: New test.
+	* gcc.target/powerpc/pr108272-3.c: New test.
+	* gcc.target/powerpc/pr108272-4.c: New test.
+
+(cherry picked from commit 074b0c03eabeb8e9c8de813c81bf87a1f88fdb65)
+---
+ gcc/config/rs6000/rs6000.cc                   | 51 +++++++++++++++----
+ gcc/testsuite/gcc.target/powerpc/pr108272-1.c | 17 +++++++
+ gcc/testsuite/gcc.target/powerpc/pr108272-2.c | 17 +++++++
+ gcc/testsuite/gcc.target/powerpc/pr108272-3.c | 17 +++++++
+ gcc/testsuite/gcc.target/powerpc/pr108272-4.c | 18 +++++++
+ 5 files changed, 110 insertions(+), 10 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108272-1.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108272-2.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108272-3.c
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr108272-4.c
+
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index 19ef1e983fc..e8cc82c389a 100644
+--- a/gcc/config/rs6000/rs6000.cc
++++ b/gcc/config/rs6000/rs6000.cc
+@@ -28774,9 +28774,9 @@ constant_generates_xxspltidp (vec_const_128bit_type *vsx_const)
+    __vector_pair built-in types.  They are target specific and
+    only available when MMA is supported.  With MMA supported, it
+    simply returns true, otherwise it checks if the given gimple
+-   STMT is an assignment stmt and uses either of these two opaque
+-   types unexpectedly, if yes, it would raise an error message
+-   and returns true, otherwise it returns false.  */
++   STMT is an assignment or asm stmt and uses either of these two
++   opaque types unexpectedly, if yes, it would raise an error
++   message and returns true, otherwise it returns false.  */
+ 
+ bool
+ rs6000_opaque_type_invalid_use_p (gimple *stmt)
+@@ -28784,23 +28784,54 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
+   if (TARGET_MMA)
+     return false;
+ 
++  /* If the given TYPE is one MMA opaque type, emit the corresponding
++     error messages and return true, otherwise return false.  */
++  auto check_and_error_invalid_use = [](tree type)
++  {
++    tree mv = TYPE_MAIN_VARIANT (type);
++    if (mv == vector_quad_type_node)
++      {
++	error ("type %<__vector_quad%> requires the %qs option", "-mmma");
++	return true;
++      }
++    else if (mv == vector_pair_type_node)
++      {
++	error ("type %<__vector_pair%> requires the %qs option", "-mmma");
++	return true;
++      }
++    return false;
++  };
++
+   if (stmt)
+     {
+       /* The usage of MMA opaque types is very limited for now,
+-	 to check with gassign is enough so far.  */
++	 to check with gassign and gasm is enough so far.  */
+       if (gassign *ga = dyn_cast<gassign *> (stmt))
+ 	{
+ 	  tree lhs = gimple_assign_lhs (ga);
+ 	  tree type = TREE_TYPE (lhs);
+-	  if (type == vector_quad_type_node)
++	  if (check_and_error_invalid_use (type))
++	    return true;
++	}
++      else if (gasm *gs = dyn_cast<gasm *> (stmt))
++	{
++	  unsigned ninputs = gimple_asm_ninputs (gs);
++	  for (unsigned i = 0; i < ninputs; i++)
+ 	    {
+-	      error ("type %<__vector_quad%> requires the %qs option", "-mmma");
+-	      return true;
++	      tree op = gimple_asm_input_op (gs, i);
++	      tree val = TREE_VALUE (op);
++	      tree type = TREE_TYPE (val);
++	      if (check_and_error_invalid_use (type))
++		return true;
+ 	    }
+-	  else if (type == vector_pair_type_node)
++	  unsigned noutputs = gimple_asm_noutputs (gs);
++	  for (unsigned i = 0; i < noutputs; i++)
+ 	    {
+-	      error ("type %<__vector_pair%> requires the %qs option", "-mmma");
+-	      return true;
++	      tree op = gimple_asm_output_op (gs, i);
++	      tree val = TREE_VALUE (op);
++	      tree type = TREE_TYPE (val);
++	      if (check_and_error_invalid_use (type))
++		return true;
+ 	    }
+ 	}
+     }
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108272-1.c b/gcc/testsuite/gcc.target/powerpc/pr108272-1.c
+new file mode 100644
+index 00000000000..b99e6a4d86d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108272-1.c
+@@ -0,0 +1,17 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr108272-1" } */
++
++void
++foo (void)
++{
++  __vector_quad acc;
++  asm("#..." : "=d"(acc));
++}
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108272-2.c b/gcc/testsuite/gcc.target/powerpc/pr108272-2.c
+new file mode 100644
+index 00000000000..51b2100d0f1
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108272-2.c
+@@ -0,0 +1,17 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_pair is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr108272-2" } */
++
++void
++foo (void)
++{
++  __vector_pair acc;
++  asm("#..." :: "d"(acc));
++}
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108272-3.c b/gcc/testsuite/gcc.target/powerpc/pr108272-3.c
+new file mode 100644
+index 00000000000..634a529b5c8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108272-3.c
+@@ -0,0 +1,17 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_quad is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr108272-3" } */
++
++void
++foo (void)
++{
++  volatile __vector_quad acc;
++  asm("#..." : "=d"(acc));
++}
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr108272-4.c b/gcc/testsuite/gcc.target/powerpc/pr108272-4.c
+new file mode 100644
+index 00000000000..7eecd6c5a0d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr108272-4.c
+@@ -0,0 +1,18 @@
++/* { dg-require-effective-target powerpc_p9modulo_ok } */
++/* If the default cpu type is power10 or later, type __vector_pair is
++   supported.  To keep the test point available all the time, this case
++   specifies -mdejagnu-cpu=power9 here.  */
++/* { dg-options "-mdejagnu-cpu=power9" } */
++
++/* Verify there is no ICE and don't check the error messages on unsupported
++   type since they could be fragile and are not test points of this case.  */
++
++/* { dg-excess-errors "pr108272-4" } */
++
++typedef __vector_pair vpair_t;
++void
++foo (void)
++{
++  vpair_t acc;
++  asm("#..." : "=d"(acc));
++}
+-- 
+2.25.1
+

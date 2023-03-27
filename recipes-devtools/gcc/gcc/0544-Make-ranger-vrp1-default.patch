@@ -1,0 +1,94 @@
+From 7dbeab5113a7c68284b5913046758d5a065df115 Mon Sep 17 00:00:00 2001
+From: Andrew MacLeod <amacleod@redhat.com>
+Date: Tue, 25 Oct 2022 16:42:41 -0400
+Subject: [PATCH 544/547] Make ranger vrp1 default.
+
+Turn on ranger as the default vrp1 pass and adjust testcases.
+
+	gcc/
+	* params.opt (param_vrp1_mode): Make ranger default.
+
+	gcc/testsuite/
+	* gcc.dg/pr68217.c: Test [-INF, -INF][0, 0] instead of [-INF, 0].
+	* gcc.dg/tree-ssa/vrp-unreachable.c: New.  Test unreachable removal.
+---
+ gcc/params.opt                                |  2 +-
+ gcc/testsuite/gcc.dg/pr68217.c                |  2 +-
+ .../gcc.dg/tree-ssa/vrp-unreachable.c         | 42 +++++++++++++++++++
+ 3 files changed, 44 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/vrp-unreachable.c
+
+diff --git a/gcc/params.opt b/gcc/params.opt
+index b88e1372005..f629246d9fa 100644
+--- a/gcc/params.opt
++++ b/gcc/params.opt
+@@ -1185,7 +1185,7 @@ Common Joined UInteger Var(param_vect_induction_float) Init(1) IntegerRage(0, 1)
+ Enable loop vectorization of floating point inductions.
+ 
+ -param=vrp1-mode=
+-Common Joined Var(param_vrp1_mode) Enum(vrp_mode) Init(VRP_MODE_VRP) Param Optimization
++Common Joined Var(param_vrp1_mode) Enum(vrp_mode) Init(VRP_MODE_RANGER) Param Optimization
+ --param=vrp1-mode=[vrp|ranger] Specifies the mode VRP1 should operate in.
+ 
+ -param=vrp2-mode=
+diff --git a/gcc/testsuite/gcc.dg/pr68217.c b/gcc/testsuite/gcc.dg/pr68217.c
+index eb4f15e048f..60c80106760 100644
+--- a/gcc/testsuite/gcc.dg/pr68217.c
++++ b/gcc/testsuite/gcc.dg/pr68217.c
+@@ -10,4 +10,4 @@ int foo (void)
+     return 0;
+ }
+ 
+-/* { dg-final { scan-tree-dump "\\\[-INF, 0\\\]" "vrp1" } } */
++/* { dg-final { scan-tree-dump "\\\[-INF, -INF\\\]\\\[0, 0\\\]" "vrp1" } } */
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/vrp-unreachable.c b/gcc/testsuite/gcc.dg/tree-ssa/vrp-unreachable.c
+new file mode 100644
+index 00000000000..cdc57403c6e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/vrp-unreachable.c
+@@ -0,0 +1,42 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fdump-tree-vrp1-alias -fdump-tree-vrp2-alias" } */
++
++void dead (unsigned n);
++void alive (unsigned n);
++
++void func (unsigned n, unsigned m)
++{
++  if (n == 0)
++    __builtin_unreachable();
++  if (n == 1)
++    __builtin_unreachable();
++  if (n & 0x1)
++    __builtin_unreachable();
++  if (n == 2)
++    __builtin_unreachable();
++  if (n == 3)
++    __builtin_unreachable();
++  if (n & 0x2)
++    __builtin_unreachable();
++  if (n == 4)
++    __builtin_unreachable();
++  if (n == 5)
++    __builtin_unreachable();
++  if (n & 0x4)
++    __builtin_unreachable();
++  if (n == 6)
++    __builtin_unreachable();
++  if (n == 7)
++    __builtin_unreachable();
++ if (n <8)
++   dead (n);
++ if (n != m)
++    __builtin_unreachable();
++ alive (n);
++ alive (m);
++}
++
++/* { dg-final { scan-tree-dump-not "dead" "vrp1" } } */
++/* { dg-final { scan-tree-dump-times "builtin_unreachable" 1 "vrp1" } } */
++/* { dg-final { scan-tree-dump-not "builtin_unreachable" "vrp2" } } */
++/* { dg-final { scan-tree-dump-times "fff8" 4 "vrp2" } } */
+-- 
+2.25.1
+

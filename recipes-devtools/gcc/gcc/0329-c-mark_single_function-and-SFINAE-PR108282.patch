@@ -1,0 +1,69 @@
+From 26741a0f64686648a5b39415d819f1acfd4ad6d2 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Wed, 4 Jan 2023 14:12:25 -0500
+Subject: [PATCH 329/547] c++: mark_single_function and SFINAE [PR108282]
+
+We typically ignore mark_used failure when in a non-SFINAE context for
+sake of better error recovery.  But in mark_single_function we're
+instead ignoring mark_used failure in a SFINAE context, which ends up
+causing the second static_assert here to incorrectly fail.
+
+	PR c++/108282
+
+gcc/cp/ChangeLog:
+
+	* decl2.cc (mark_single_function): Ignore mark_used failure
+	only in a non-SFINAE context rather than in a SFINAE one.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/concepts-requires34.C: New test.
+
+(cherry picked from commit 238e292cf5d822f3bd12d9b58eb04cf377758b2a)
+---
+ gcc/cp/decl2.cc                               |  2 +-
+ .../g++.dg/cpp2a/concepts-requires34.C        | 19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/concepts-requires34.C
+
+diff --git a/gcc/cp/decl2.cc b/gcc/cp/decl2.cc
+index d7e9980ff1e..37985a37df6 100644
+--- a/gcc/cp/decl2.cc
++++ b/gcc/cp/decl2.cc
+@@ -5779,7 +5779,7 @@ mark_single_function (tree expr, tsubst_flags_t complain)
+ 
+   if (is_overloaded_fn (expr) == 1
+       && !mark_used (expr, complain)
+-      && (complain & tf_error))
++      && !(complain & tf_error))
+     return false;
+   return true;
+ }
+diff --git a/gcc/testsuite/g++.dg/cpp2a/concepts-requires34.C b/gcc/testsuite/g++.dg/cpp2a/concepts-requires34.C
+new file mode 100644
+index 00000000000..5bbd62f6d8e
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/concepts-requires34.C
+@@ -0,0 +1,19 @@
++// PR c++/108282
++// { dg-do compile { target c++20 } }
++
++template<class T>
++concept TEST = requires { T::TT; };
++
++struct C { };
++
++template<class AT>
++struct B {
++  static void TT() requires TEST<AT>;
++};
++
++int main() {
++  static_assert( !TEST<C> );
++  static_assert( !TEST<B<C>> );
++
++  B<C>::TT();  // { dg-error "no match" }
++}
+-- 
+2.25.1
+

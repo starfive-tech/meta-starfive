@@ -1,0 +1,74 @@
+From e8000b7a0244e55f624709022883b1eadf335cf5 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 27 Jan 2023 00:22:41 +0000
+Subject: [PATCH 374/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 19 +++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 18 ++++++++++++++++++
+ 3 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 948824b5012..c9b017d76df 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,22 @@
++2023-01-26  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-01-26  Marek Polacek  <polacek@redhat.com>
++
++	PR middle-end/108543
++	* opts.cc (parse_sanitizer_options): Don't always clear SANITIZE_ADDRESS
++	if it was previously set.
++
++2023-01-26  Dimitar Dimitrov  <dimitar@dinux.eu>
++
++	Backported from master:
++	2023-01-22  Dimitar Dimitrov  <dimitar@dinux.eu>
++
++	* config/pru/pru.h (CLZ_DEFINED_VALUE_AT_ZERO): Fix value for QI
++	and HI input modes.
++	* config/pru/pru.md (clz): Fix generated code for QI and HI
++	input modes.
++
+ 2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index b0742d6879d..af4c41feca1 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230126
++20230127
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index bf0369980d9..5c856e799d9 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,21 @@
++2023-01-26  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2023-01-26  Marek Polacek  <polacek@redhat.com>
++
++	PR middle-end/108543
++	* c-c++-common/asan/pointer-subtract-5.c: New test.
++	* c-c++-common/asan/pointer-subtract-6.c: New test.
++	* c-c++-common/asan/pointer-subtract-7.c: New test.
++	* c-c++-common/asan/pointer-subtract-8.c: New test.
++
++2023-01-26  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-11-14  Richard Biener  <rguenther@suse.de>
++
++	* gcc.dg/pr107554.c: Restrict to lp64.
++
+ 2023-01-25  Christophe Lyon  <christophe.lyon@arm.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

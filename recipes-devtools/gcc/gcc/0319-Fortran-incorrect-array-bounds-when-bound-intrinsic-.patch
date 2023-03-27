@@ -1,0 +1,100 @@
+From f97f032f28b3f875e50000061d6b9d7ecf35897a Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Sat, 17 Dec 2022 22:04:32 +0100
+Subject: [PATCH 319/547] Fortran: incorrect array bounds when bound intrinsic
+ used in decl [PR108131]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108131
+	* array.cc (match_array_element_spec): Avoid too early simplification
+	of matched array element specs that can lead to a misinterpretation
+	when used as array bounds in array declarations.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108131
+	* gfortran.dg/pr103505.f90: Adjust expected patterns.
+	* gfortran.dg/pr108131.f90: New test.
+
+(cherry picked from commit 6a95f0e0a06d78d94138d4c3dd64d41591197281)
+---
+ gcc/fortran/array.cc                   |  4 ----
+ gcc/testsuite/gfortran.dg/pr103505.f90 |  8 +++++---
+ gcc/testsuite/gfortran.dg/pr108131.f90 | 25 +++++++++++++++++++++++++
+ 3 files changed, 30 insertions(+), 7 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108131.f90
+
+diff --git a/gcc/fortran/array.cc b/gcc/fortran/array.cc
+index bbdb5b392fc..f4003c2a2fe 100644
+--- a/gcc/fortran/array.cc
++++ b/gcc/fortran/array.cc
+@@ -499,8 +499,6 @@ match_array_element_spec (gfc_array_spec *as)
+   if (!gfc_expr_check_typed (*upper, gfc_current_ns, false))
+     return AS_UNKNOWN;
+ 
+-  gfc_try_simplify_expr (*upper, 0);
+-
+   if (((*upper)->expr_type == EXPR_CONSTANT
+ 	&& (*upper)->ts.type != BT_INTEGER) ||
+       ((*upper)->expr_type == EXPR_FUNCTION
+@@ -533,8 +531,6 @@ match_array_element_spec (gfc_array_spec *as)
+   if (!gfc_expr_check_typed (*upper, gfc_current_ns, false))
+     return AS_UNKNOWN;
+ 
+-  gfc_try_simplify_expr (*upper, 0);
+-
+   if (((*upper)->expr_type == EXPR_CONSTANT
+ 	&& (*upper)->ts.type != BT_INTEGER) ||
+       ((*upper)->expr_type == EXPR_FUNCTION
+diff --git a/gcc/testsuite/gfortran.dg/pr103505.f90 b/gcc/testsuite/gfortran.dg/pr103505.f90
+index 522e53efcb2..01308019b2c 100644
+--- a/gcc/testsuite/gfortran.dg/pr103505.f90
++++ b/gcc/testsuite/gfortran.dg/pr103505.f90
+@@ -3,7 +3,9 @@
+ ! Testcase by G.Steinmetz
+ 
+ program p
+-  integer, parameter :: a((2.))   = [4,8] ! { dg-error "scalar INTEGER" }
+-  integer, parameter :: z(1:(2.)) = [4,8] ! { dg-error "scalar INTEGER" }
+-  print *, a(1:1)                         ! { dg-error "Syntax error" }
++  integer, parameter :: a((2.))   = [4,8] ! { dg-error "INTEGER type" }
++  integer, parameter :: z(1:(2.)) = [4,8] ! { dg-error "INTEGER type" }
++  print *, a(1:1)
+ end
++
++! { dg-prune-output "Parameter array" }
+diff --git a/gcc/testsuite/gfortran.dg/pr108131.f90 b/gcc/testsuite/gfortran.dg/pr108131.f90
+new file mode 100644
+index 00000000000..8bf36d361ba
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108131.f90
+@@ -0,0 +1,25 @@
++! { dg-do run }
++! { dg-additional-options "-fdump-tree-original" }
++! PR fortran/108131
++!
++! Incorrect array bounds when bound intrinsic used in declaration
++
++program test
++  implicit none
++  integer, parameter :: mg(7:10)                 = 0
++  integer, parameter :: u =   ubound(mg, dim=1)
++  integer, parameter :: cx(-1:ubound(mg, dim=1)) = 1
++  integer, parameter :: dx(lbound(mg, dim=1):ubound(cx, dim=1)) = 2
++
++  write(*,*) ubound(mg, dim=1)
++  write(*,*) ubound(cx, dim=1)
++  if (u /= 10) stop 1
++  if (ubound(mg, dim=1) /= 10) stop 2
++  if (ubound(cx, dim=1) /= 10) stop 3
++  if (ubound(dx, dim=1) /= 10) stop 4
++  if (lbound(mg, dim=1) /=  7) stop 5
++  if (lbound(cx, dim=1) /= -1) stop 6
++  if (lbound(dx, dim=1) /=  7) stop 7
++end program test
++
++! { dg-final { scan-tree-dump-not "_gfortran_stop_numeric" "original" } }
+-- 
+2.25.1
+

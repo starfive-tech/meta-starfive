@@ -1,0 +1,455 @@
+From 85adc2ec2b0736d07c0df35ad9a450f97ff59a7c Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 28 Sep 2022 12:39:41 +0100
+Subject: [PATCH 096/547] libstdc++: Disable volatile-qualified std::bind for
+ C++20
+
+LWG 2487 added a precondition to std::bind for C++17, making
+volatile-qualified uses undefined. We still support it, but with a
+deprecated warning.
+
+P1065R2 made it explicitly ill-formed for C++20, so we should no longer
+accept it as deprecated. This implements that change.
+
+libstdc++-v3/ChangeLog:
+
+	* doc/xml/manual/evolution.xml: Document std::bind API
+	changes.
+	* doc/xml/manual/intro.xml: Document LWG 2487 status.
+	* doc/xml/manual/using.xml: Clarify default value of
+	_GLIBCXX_USE_DEPRECATED.
+	* doc/html/*: Regenerate.
+	* include/std/functional (_Bind::operator()(Args&&...) volatile)
+	(_Bind::operator()(Args&&...) const volatile)
+	(_Bind_result::operator()(Args&&...) volatile)
+	(_Bind_result::operator()(Args&&...) const volatile): Replace
+	with deleted overload for C++20 and later.
+	* testsuite/20_util/bind/cv_quals.cc: Check for deprecated
+	warnings in C++17.
+	* testsuite/20_util/bind/cv_quals_2.cc: Likewise, and check for
+	ill-formed in C++20.
+
+(cherry picked from commit d01f112de4a54db6d2abef836e6dff3a08167389)
+---
+ libstdc++-v3/doc/html/index.html              |  2 +-
+ libstdc++-v3/doc/html/manual/api.html         |  5 +++
+ libstdc++-v3/doc/html/manual/appendix.html    |  2 +-
+ .../doc/html/manual/appendix_porting.html     |  2 +-
+ libstdc++-v3/doc/html/manual/bugs.html        |  6 ++++
+ libstdc++-v3/doc/html/manual/index.html       |  2 +-
+ .../doc/html/manual/using_macros.html         |  5 +--
+ libstdc++-v3/doc/xml/manual/evolution.xml     | 13 ++++++++
+ libstdc++-v3/doc/xml/manual/intro.xml         |  9 ++++++
+ libstdc++-v3/doc/xml/manual/using.xml         |  5 +--
+ libstdc++-v3/include/std/functional           | 32 ++++++++++++++-----
+ .../testsuite/20_util/bind/cv_quals.cc        | 25 ++++++++-------
+ .../testsuite/20_util/bind/cv_quals_2.cc      | 12 ++++---
+ 13 files changed, 87 insertions(+), 33 deletions(-)
+
+diff --git a/libstdc++-v3/doc/html/index.html b/libstdc++-v3/doc/html/index.html
+index 5cc9226f4a1..1e0cecbcc4f 100644
+--- a/libstdc++-v3/doc/html/index.html
++++ b/libstdc++-v3/doc/html/index.html
+@@ -142,7 +142,7 @@
+     Existing tests
+ </a></span></dt><dt><span class="section"><a href="manual/test.html#test.exception.safety.containers">
+ C++11 Requirements Test Sequence Descriptions
+-</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="manual/abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="manual/abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="manual/abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_121"><code class="constant">12</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="manual/backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="manual/backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
++</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="manual/abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="manual/abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="manual/abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="manual/abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="manual/abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="manual/api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_121"><code class="constant">12</code></a></span></dt><dt><span class="section"><a href="manual/api.html#api.rel_123"><code class="constant">12.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="manual/backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="manual/backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="manual/backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
+ </a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.streamattach">
+ No <code class="code">stream::attach(int fd)</code>
+ </a></span></dt><dt><span class="section"><a href="manual/backwards.html#backwards.third.support_cxx98">
+diff --git a/libstdc++-v3/doc/html/manual/api.html b/libstdc++-v3/doc/html/manual/api.html
+index bbda6f5acf3..604380e0136 100644
+--- a/libstdc++-v3/doc/html/manual/api.html
++++ b/libstdc++-v3/doc/html/manual/api.html
+@@ -316,6 +316,8 @@ now defaults to zero.
+   <code class="classname">has_trivial_default_constructor</code>,
+   <code class="classname">has_trivial_copy_constructor</code> and
+   <code class="classname">has_trivial_copy_assign</code> removed.
++</p><p>
++Calling a <code class="code">std::bind</code> result as volatile was deprecated for C++17.
+ </p><p> Profile Mode was deprecated. </p><div class="section"><div class="titlepage"><div><div><h4 class="title"><a id="api.rel_72"></a><code class="constant">7.2</code></h4></div></div></div><p>
+   Library Fundamentals TS header
+   <code class="filename">&lt;experimental/source_location&gt;</code>
+@@ -468,4 +470,7 @@ they both derive from <code class="classname">std::__new_allocator</code> instea
+ <code class="code">noexcept(false)</code> to allow thread cancellation exceptions to
+ be thrown from <code class="function">pthread_cond_wait</code> without aborting
+ the process.
++</p></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="api.rel_123"></a><code class="constant">12.3</code></h3></div></div></div><p>
++Calling a <code class="code">std::bind</code> result as volatile is ill-formed for C++20
++and later.
+ </p></div></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="abi.html">Prev</a> </td><td width="20%" align="center"><a accesskey="u" href="appendix_porting.html">Up</a></td><td width="40%" align="right"> <a accesskey="n" href="backwards.html">Next</a></td></tr><tr><td width="40%" align="left" valign="top">ABI Policy and Guidelines </td><td width="20%" align="center"><a accesskey="h" href="../index.html">Home</a></td><td width="40%" align="right" valign="top"> Backwards Compatibility</td></tr></table></div></body></html>
+\ No newline at end of file
+diff --git a/libstdc++-v3/doc/html/manual/appendix.html b/libstdc++-v3/doc/html/manual/appendix.html
+index bd462e9dddd..c563372e441 100644
+--- a/libstdc++-v3/doc/html/manual/appendix.html
++++ b/libstdc++-v3/doc/html/manual/appendix.html
+@@ -16,7 +16,7 @@
+     Existing tests
+ </a></span></dt><dt><span class="section"><a href="test.html#test.exception.safety.containers">
+ C++11 Requirements Test Sequence Descriptions
+-</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
++</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_123"><code class="constant">12.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.streamattach">
+ No <code class="code">stream::attach(int fd)</code>
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.support_cxx98">
+diff --git a/libstdc++-v3/doc/html/manual/appendix_porting.html b/libstdc++-v3/doc/html/manual/appendix_porting.html
+index 3d7fb564f4b..55d3f2318dd 100644
+--- a/libstdc++-v3/doc/html/manual/appendix_porting.html
++++ b/libstdc++-v3/doc/html/manual/appendix_porting.html
+@@ -14,7 +14,7 @@
+     Existing tests
+ </a></span></dt><dt><span class="section"><a href="test.html#test.exception.safety.containers">
+ C++11 Requirements Test Sequence Descriptions
+-</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
++</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_123"><code class="constant">12.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.streamattach">
+ No <code class="code">stream::attach(int fd)</code>
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.support_cxx98">
+diff --git a/libstdc++-v3/doc/html/manual/bugs.html b/libstdc++-v3/doc/html/manual/bugs.html
+index 38594a9b75a..ef00beec1a8 100644
+--- a/libstdc++-v3/doc/html/manual/bugs.html
++++ b/libstdc++-v3/doc/html/manual/bugs.html
+@@ -521,6 +521,12 @@
+        </em></span>
+     </span></dt><dd><p>Avoid using <code class="code">dynamic_cast</code> when it would be
+     ill-formed.
++    </p></dd><dt><a id="manual.bugs.dr2487"></a><span class="term"><a class="link" href="http://www.open-std.org/jtc1/sc22/wg21/docs/lwg-defects.html#2487" target="_top">2487</a>:
++       <span class="emphasis"><em><code class="code">bind()</code> should be <code class="code">const</code>-overloaded
++      not cv-overloaded
++       </em></span>
++    </span></dt><dd><p>Deprecate volatile-qualified <code class="code">operator()</code>
++    for C++17, make it ill-formed for C++20.
+     </p></dd><dt><a id="manual.bugs.dr2499"></a><span class="term"><a class="link" href="http://www.open-std.org/jtc1/sc22/wg21/docs/lwg-defects.html#2499" target="_top">2499</a>:
+        <span class="emphasis"><em><code class="code">operator&gt;&gt;(basic_istream&amp;, CharT*)</code> makes it hard to avoid buffer overflows
+        </em></span>
+diff --git a/libstdc++-v3/doc/html/manual/index.html b/libstdc++-v3/doc/html/manual/index.html
+index 7122ddeaabd..2949509bca3 100644
+--- a/libstdc++-v3/doc/html/manual/index.html
++++ b/libstdc++-v3/doc/html/manual/index.html
+@@ -123,7 +123,7 @@
+     Existing tests
+ </a></span></dt><dt><span class="section"><a href="test.html#test.exception.safety.containers">
+ C++11 Requirements Test Sequence Descriptions
+-</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
++</a></span></dt></dl></dd></dl></dd></dl></dd><dt><span class="section"><a href="abi.html">ABI Policy and Guidelines</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.cxx_interface">The C++ Interface</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning">Versioning</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.versioning.goals">Goals</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.history">History</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.prereq">Prerequisites</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.config">Configuring</a></span></dt><dt><span class="section"><a href="abi.html#abi.versioning.active">Checking Active</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.changes_allowed">Allowed Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.changes_no">Prohibited Changes</a></span></dt><dt><span class="section"><a href="abi.html#abi.impl">Implementation</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing">Testing</a></span></dt><dd><dl><dt><span class="section"><a href="abi.html#abi.testing.single">Single ABI Testing</a></span></dt><dt><span class="section"><a href="abi.html#abi.testing.multi">Multiple ABI Testing</a></span></dt></dl></dd><dt><span class="section"><a href="abi.html#abi.issues">Outstanding Issues</a></span></dt></dl></dd><dt><span class="section"><a href="api.html">API Evolution and Deprecation History</a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_300"><code class="constant">3.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_310"><code class="constant">3.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_320"><code class="constant">3.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_330"><code class="constant">3.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_340"><code class="constant">3.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_400"><code class="constant">4.0</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_410"><code class="constant">4.1</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_420"><code class="constant">4.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_430"><code class="constant">4.3</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_440"><code class="constant">4.4</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_450"><code class="constant">4.5</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_460"><code class="constant">4.6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_470"><code class="constant">4.7</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_480"><code class="constant">4.8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_490"><code class="constant">4.9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_51"><code class="constant">5</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_53"><code class="constant">5.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_61"><code class="constant">6</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_71"><code class="constant">7</code></a></span></dt><dd><dl><dt><span class="section"><a href="api.html#api.rel_72"><code class="constant">7.2</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_73"><code class="constant">7.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="api.html#api.rel_81"><code class="constant">8</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_91"><code class="constant">9</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_101"><code class="constant">10</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_111"><code class="constant">11</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_121"><code class="constant">12</code></a></span></dt><dt><span class="section"><a href="api.html#api.rel_123"><code class="constant">12.3</code></a></span></dt></dl></dd><dt><span class="section"><a href="backwards.html">Backwards Compatibility</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.first">First</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.second">Second</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third">Third</a></span></dt><dd><dl><dt><span class="section"><a href="backwards.html#backwards.third.headers">Pre-ISO headers removed</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.hash">Extension headers hash_map, hash_set moved to ext or backwards</a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.nocreate_noreplace">No <code class="code">ios::nocreate/ios::noreplace</code>.
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.streamattach">
+ No <code class="code">stream::attach(int fd)</code>
+ </a></span></dt><dt><span class="section"><a href="backwards.html#backwards.third.support_cxx98">
+diff --git a/libstdc++-v3/doc/html/manual/using_macros.html b/libstdc++-v3/doc/html/manual/using_macros.html
+index edbbd03c336..a449b27b163 100644
+--- a/libstdc++-v3/doc/html/manual/using_macros.html
++++ b/libstdc++-v3/doc/html/manual/using_macros.html
+@@ -43,7 +43,7 @@
+       <a class="link" href="configure.html" title="Configure">Configure</a>),
+       with the various --enable/--disable choices being translated to
+       #define/#undef).
+-   </p><p> <acronym class="acronym">ABI</acronym> means that changing from the default value may
++   </p><p> <acronym class="acronym">ABI</acronym>-changing means that changing from the default value may
+   mean changing the <acronym class="acronym">ABI</acronym> of compiled code. In other words,
+   these choices control code which has already been compiled (i.e., in a
+   binary such as libstdc++.a/.so).  If you explicitly #define or
+@@ -53,7 +53,8 @@
+   consistent linkage requires changing the config headers before
+   building/installing the library.
+    </p><div class="variablelist"><dl class="variablelist"><dt><span class="term"><code class="code">_GLIBCXX_USE_DEPRECATED</code></span></dt><dd><p>
+-	Defined by default. Not configurable. ABI-changing. Turning this off
++	Defined to the value <code class="literal">1</code> by default.
++	Not configurable. ABI-changing. Turning this off
+ 	removes older ARM-style iostreams code, and other anachronisms
+ 	from the API.  This macro is dependent on the version of the
+ 	standard being tracked, and as a result may give different results for
+diff --git a/libstdc++-v3/doc/xml/manual/evolution.xml b/libstdc++-v3/doc/xml/manual/evolution.xml
+index 4923e8c4783..82936189179 100644
+--- a/libstdc++-v3/doc/xml/manual/evolution.xml
++++ b/libstdc++-v3/doc/xml/manual/evolution.xml
+@@ -817,6 +817,10 @@ now defaults to zero.
+   <classname>has_trivial_copy_assign</classname> removed.
+ </para>
+ 
++<para>
++Calling a <code>std::bind</code> result as volatile was deprecated for C++17.
++</para>
++
+ <para> Profile Mode was deprecated. </para>
+ 
+ <section xml:id="api.rel_72"><info><title><constant>7.2</constant></title></info>
+@@ -1067,4 +1071,13 @@ the process.
+ 
+ </section>
+ 
++
++<section xml:id="api.rel_123"><info><title><constant>12.3</constant></title></info>
++<para>
++Calling a <code>std::bind</code> result as volatile is ill-formed for C++20
++and later.
++</para>
++
++</section>
++
+ </section>
+diff --git a/libstdc++-v3/doc/xml/manual/intro.xml b/libstdc++-v3/doc/xml/manual/intro.xml
+index 290e5d3a74e..7b8abd98b0d 100644
+--- a/libstdc++-v3/doc/xml/manual/intro.xml
++++ b/libstdc++-v3/doc/xml/manual/intro.xml
+@@ -1157,6 +1157,15 @@ requirements of the license of GCC.
+     ill-formed.
+     </para></listitem></varlistentry>
+ 
++    <varlistentry xml:id="manual.bugs.dr2487"><term><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&DR;#2487">2487</link>:
++       <emphasis><code>bind()</code> should be <code>const</code>-overloaded
++      not cv-overloaded
++       </emphasis>
++    </term>
++    <listitem><para>Deprecate volatile-qualified <code>operator()</code>
++    for C++17, make it ill-formed for C++20.
++    </para></listitem></varlistentry>
++
+     <varlistentry xml:id="manual.bugs.dr2499"><term><link xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="&DR;#2499">2499</link>:
+        <emphasis><code>operator>>(basic_istream&amp;, CharT*)</code> makes it hard to avoid buffer overflows
+        </emphasis>
+diff --git a/libstdc++-v3/doc/xml/manual/using.xml b/libstdc++-v3/doc/xml/manual/using.xml
+index 0b9a0c98518..a8a549eebcd 100644
+--- a/libstdc++-v3/doc/xml/manual/using.xml
++++ b/libstdc++-v3/doc/xml/manual/using.xml
+@@ -1062,7 +1062,7 @@ g++ -Winvalid-pch -I. -include stdc++.h -H -g -O2 hello.cc -o test.exe
+       #define/#undef).
+    </para>
+ 
+-   <para> <acronym>ABI</acronym> means that changing from the default value may
++   <para> <acronym>ABI</acronym>-changing means that changing from the default value may
+   mean changing the <acronym>ABI</acronym> of compiled code. In other words,
+   these choices control code which has already been compiled (i.e., in a
+   binary such as libstdc++.a/.so).  If you explicitly #define or
+@@ -1077,7 +1077,8 @@ g++ -Winvalid-pch -I. -include stdc++.h -H -g -O2 hello.cc -o test.exe
+     <varlistentry><term><code>_GLIBCXX_USE_DEPRECATED</code></term>
+     <listitem>
+       <para>
+-	Defined by default. Not configurable. ABI-changing. Turning this off
++	Defined to the value <literal>1</literal> by default.
++	Not configurable. ABI-changing. Turning this off
+ 	removes older ARM-style iostreams code, and other anachronisms
+ 	from the API.  This macro is dependent on the version of the
+ 	standard being tracked, and as a result may give different results for
+diff --git a/libstdc++-v3/include/std/functional b/libstdc++-v3/include/std/functional
+index 685a3e167ee..0ed0578a24b 100644
+--- a/libstdc++-v3/include/std/functional
++++ b/libstdc++-v3/include/std/functional
+@@ -461,6 +461,17 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+   /// @endcond
+ 
++#if __cplusplus == 201703L && _GLIBCXX_USE_DEPRECATED
++# define _GLIBCXX_VOLATILE_BIND
++// _GLIBCXX_RESOLVE_LIB_DEFECTS
++// 2487. bind() should be const-overloaded, not cv-overloaded
++# define _GLIBCXX_DEPR_BIND \
++      [[deprecated("std::bind does not support volatile in C++17")]]
++#elif __cplusplus < 201703L
++# define _GLIBCXX_VOLATILE_BIND
++# define _GLIBCXX_DEPR_BIND
++#endif
++
+   /// Type of the function object returned from bind().
+   template<typename _Signature>
+     class _Bind;
+@@ -497,6 +508,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      );
+ 	}
+ 
++#ifdef _GLIBCXX_VOLATILE_BIND
+       // Call as volatile
+       template<typename _Result, typename... _Args, std::size_t... _Indexes>
+ 	_Result
+@@ -518,6 +530,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      _Mu<_Bound_args>()(__volget<_Indexes>(_M_bound_args), __args)...
+ 	      );
+ 	}
++#endif // volatile
+ 
+       template<typename _BoundArg, typename _CallArgs>
+ 	using _Mu_type = decltype(
+@@ -581,12 +594,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      _Bound_indexes());
+ 	}
+ 
+-#if __cplusplus > 201402L
+-# define _GLIBCXX_DEPR_BIND \
+-      [[deprecated("std::bind does not support volatile in C++17")]]
+-#else
+-# define _GLIBCXX_DEPR_BIND
+-#endif
++#ifdef _GLIBCXX_VOLATILE_BIND
+       // Call as volatile
+       template<typename... _Args,
+ 	       typename _Result = _Res_type_cv<tuple<_Args...>, add_volatile>>
+@@ -610,6 +618,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      std::forward_as_tuple(std::forward<_Args>(__args)...),
+ 	      _Bound_indexes());
+ 	}
++#endif // volatile
+     };
+ 
+   /// Type of the function object returned from bind<R>().
+@@ -645,9 +654,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 		      (std::get<_Indexes>(_M_bound_args), __args)...);
+ 	}
+ 
++#ifdef _GLIBCXX_VOLATILE_BIND
+       // Call as volatile
+       template<typename _Res, typename... _Args, std::size_t... _Indexes>
+-	_GLIBCXX20_CONSTEXPR
+ 	_Res
+ 	__call(tuple<_Args...>&& __args, _Index_tuple<_Indexes...>) volatile
+ 	{
+@@ -657,7 +666,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+       // Call as const volatile
+       template<typename _Res, typename... _Args, std::size_t... _Indexes>
+-	_GLIBCXX20_CONSTEXPR
+ 	_Res
+ 	__call(tuple<_Args...>&& __args,
+ 	       _Index_tuple<_Indexes...>) const volatile
+@@ -665,6 +673,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  return std::__invoke_r<_Res>(_M_f, _Mu<_Bound_args>()
+ 		      (__volget<_Indexes>(_M_bound_args), __args)...);
+ 	}
++#endif // volatile
+ 
+     public:
+       typedef _Result result_type;
+@@ -706,6 +715,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      _Bound_indexes());
+ 	}
+ 
++#ifdef _GLIBCXX_VOLATILE_BIND
+       // Call as volatile
+       template<typename... _Args>
+ 	_GLIBCXX_DEPR_BIND
+@@ -727,7 +737,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	      std::forward_as_tuple(std::forward<_Args>(__args)...),
+ 	      _Bound_indexes());
+ 	}
++#else
++      template<typename... _Args>
++	void operator()(_Args&&...) const volatile = delete;
++#endif // volatile
+     };
++
++#undef _GLIBCXX_VOLATILE_BIND
+ #undef _GLIBCXX_DEPR_BIND
+ 
+   /**
+diff --git a/libstdc++-v3/testsuite/20_util/bind/cv_quals.cc b/libstdc++-v3/testsuite/20_util/bind/cv_quals.cc
+index 83312397a93..79e3e2fbdb4 100644
+--- a/libstdc++-v3/testsuite/20_util/bind/cv_quals.cc
++++ b/libstdc++-v3/testsuite/20_util/bind/cv_quals.cc
+@@ -17,6 +17,7 @@
+ 
+ // 20.7.11 Function template bind
+ 
++// { dg-options "-Wdeprecated-declarations" }
+ // { dg-do run { target c++11 } }
+ 
+ #include <functional>
+@@ -48,12 +49,12 @@ void test01()
+   const auto b1 = std::bind(X());
+   VERIFY( b1() == 1 );
+ 
+-#if __cplusplus <= 201402L
++#if __cplusplus <= 201703L
+   volatile auto b2 = std::bind(X());
+-  VERIFY( b2() == 2 );
++  VERIFY( b2() == 2 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ 
+   const volatile auto b3 = std::bind(X());
+-  VERIFY( b3() == 3 );
++  VERIFY( b3() == 3 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ #endif
+ }
+ 
+@@ -65,12 +66,12 @@ void test02()
+   const auto b1 = std::bind<int>(X());
+   VERIFY( b1() == 1 );
+ 
+-#if __cplusplus <= 201402L
++#if __cplusplus <= 201703L
+   volatile auto b2 = std::bind<int>(X());
+-  VERIFY( b2() == 2 );
++  VERIFY( b2() == 2 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ 
+   const volatile auto b3 = std::bind<int>(X());
+-  VERIFY( b3() == 3 );
++  VERIFY( b3() == 3 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ #endif
+ }
+ 
+@@ -82,12 +83,12 @@ void test03()
+   const auto b1 = std::bind(X(), _1, 0, _2);
+   VERIFY( b1(0, 0) == 1 );
+ 
+-#if __cplusplus <= 201402L
++#if __cplusplus <= 201703L
+   volatile auto b2 = std::bind(X(), _1, _2, 0);
+-  VERIFY( b2(0, 0) == 2 );
++  VERIFY( b2(0, 0) == 2 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ 
+   const volatile auto b3 = std::bind(X(), _1, 0, _2);
+-  VERIFY( b3(0, 0) == 3 );
++  VERIFY( b3(0, 0) == 3 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ #endif
+ }
+ 
+@@ -99,12 +100,12 @@ void test04()
+   const auto b1 = std::bind<int>(X(), _1, 0, _2);
+   VERIFY( b1(0, 0) == 1 );
+ 
+-#if __cplusplus <= 201402L
++#if __cplusplus <= 201703L
+   volatile auto b2 = std::bind<int>(X(), _1, _2, 0);
+-  VERIFY( b2(0, 0) == 2 );
++  VERIFY( b2(0, 0) == 2 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ 
+   const volatile auto b3 = std::bind<int>(X(), _1, 0, _2);
+-  VERIFY( b3(0, 0) == 3 );
++  VERIFY( b3(0, 0) == 3 ); // { dg-warning "deprecated" "" { target c++17_only } }
+ #endif
+ }
+ 
+diff --git a/libstdc++-v3/testsuite/20_util/bind/cv_quals_2.cc b/libstdc++-v3/testsuite/20_util/bind/cv_quals_2.cc
+index 7a85568c66a..d2ebad72fdf 100644
+--- a/libstdc++-v3/testsuite/20_util/bind/cv_quals_2.cc
++++ b/libstdc++-v3/testsuite/20_util/bind/cv_quals_2.cc
+@@ -15,7 +15,9 @@
+ // with this library; see the file COPYING3.  If not see
+ // <http://www.gnu.org/licenses/>.
+ 
+-// { dg-do run { target c++11 } }
++// { dg-options "-Wdeprecated-declarations" }
++// { dg-do run { target { c++11 && c++17_down } } }
++// { dg-do compile { target c++20 } }
+ 
+ #include <functional>
+ #include <testsuite_hooks.h>
+@@ -33,13 +35,13 @@ void test01()
+   const auto b0 = std::bind(X());
+   VERIFY( b0() == 0 );
+ 
+-#if __cplusplus <= 201402L
+   volatile auto b1 = std::bind(X());
+-  VERIFY( b1() == 1 );
++  VERIFY( b1() == 1 ); // { dg-warning "deprecated" "" { target c++17_only } }
++		       // { dg-error "no match" "" { target c++20 } 39 }
+ 
+   const volatile auto b2 = std::bind(X());
+-  VERIFY( b2() == 2 );
+-#endif
++  VERIFY( b2() == 2 ); // { dg-warning "deprecated" "" { target c++17_only } }
++		       // { dg-error "no match" "" { target c++20 } 43 }
+ }
+ 
+ int main()
+-- 
+2.25.1
+

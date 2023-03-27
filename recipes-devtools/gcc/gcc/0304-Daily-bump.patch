@@ -1,0 +1,42 @@
+From 93310fe27b281601676e843a4450c379d36b8fb9 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 21 Dec 2022 00:20:23 +0000
+Subject: [PATCH 304/547] Daily bump.
+
+---
+ gcc/ChangeLog | 14 ++++++++++++++
+ gcc/DATESTAMP |  2 +-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index b52edac67bd..b66c1bda1cd 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,17 @@
++2022-12-20  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2022-12-20  Richard Biener  <rguenther@suse.de>
++
++	PR d/104749
++	* doc/install.texi (GDC): Document GDC 9.4 or later is required
++	to build the D language frontend.
++
++2022-12-20  Hongyu Wang  <hongyu.wang@intel.com>
++
++	* config/i386/x86-tune.def (X86_TUNE_AVOID_256FMA_CHAINS): Add
++	m_SAPPHIRERAPIDS, m_ALDERLAKE.
++
+ 2022-12-15  Sebastian Pop  <spop@amazon.com>
+ 
+ 	PR target/98776
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 142f05d4354..1bcb133d5ce 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221220
++20221221
+-- 
+2.25.1
+

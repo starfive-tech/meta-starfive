@@ -1,0 +1,85 @@
+From 7dc6d2f1006dd17d53e1fc6d429d8ae70f8fad0c Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 17 Sep 2022 00:23:09 +0000
+Subject: [PATCH 072/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 18 ++++++++++++++++++
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ libstdc++-v3/ChangeLog  |  5 +++++
+ 4 files changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e22a65d8c12..c5a8cbf7428 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220916
++20220917
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 8450af3bf75..dc652e2c8a3 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,21 @@
++2022-09-16  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-15  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/106857
++	* simplify.cc (gfc_simplify_pack): Check for NULL pointer dereferences
++	while walking through constructors (error recovery).
++
++2022-09-16  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-09-03  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100245
++	* trans-expr.cc (trans_class_assignment): Add if clause to handle
++	derived type in the LHS.
++
+ 2022-09-05  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 7a44c9893f6..c5e53d5b842 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2022-09-16  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-15  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/106857
++	* gfortran.dg/pr106857.f90: New test.
++
++2022-09-16  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	Backported from master:
++	2022-09-03  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
++
++	PR fortran/100245
++	* gfortran.dg/PR100245.f90: New test.
++
+ 2022-09-13  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index e30073a5eea..f9cf066cec7 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,8 @@
++2022-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/xml/manual/abi.xml: Document GLIBCXX_3.4.30 version.
++	* doc/html/manual/abi.html: Regenerate.
++
+ 2022-09-12  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

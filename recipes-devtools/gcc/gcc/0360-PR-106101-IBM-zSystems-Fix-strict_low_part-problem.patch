@@ -1,0 +1,298 @@
+From e1357577e6e39430869e294f94c2c547717b960f Mon Sep 17 00:00:00 2001
+From: Andreas Krebbel <krebbel@linux.ibm.com>
+Date: Mon, 23 Jan 2023 08:56:05 +0100
+Subject: [PATCH 360/547] PR 106101: IBM zSystems: Fix strict_low_part problem
+
+This avoids generating illegal (strict_low_part (reg ...)) RTXs. This
+required two changes:
+
+1. Do not use gen_lowpart to generate the inner expression of a
+STRICT_LOW_PART.  gen_lowpart might fold the SUBREG either because
+there is already a paradoxical subreg or because it can directly be
+applied to the register. A new wrapper function makes sure that we
+always end up having an actual SUBREG.
+
+2. Change the movstrict patterns to enforce a SUBREG as inner operand
+of the STRICT_LOW_PARTs.  The new predicate introduced for the
+destination operand requires a SUBREG expression with a
+register_operand as inner operand.  However, since reload strips away
+the majority of the SUBREGs we have to accept single registers as well
+once we reach reload.
+
+Bootstrapped and regression tested on IBM zSystems 64 bit.
+
+gcc/ChangeLog:
+
+	PR target/106101
+	* config/s390/predicates.md (subreg_register_operand): New
+	predicate.
+	* config/s390/s390-protos.h (s390_gen_lowpart_subreg): New
+	function prototype.
+	* config/s390/s390.cc (s390_gen_lowpart_subreg): New function.
+	(s390_expand_insv): Use s390_gen_lowpart_subreg instead of
+	gen_lowpart.
+	* config/s390/s390.md ("*get_tp_64", "*zero_extendhisi2_31")
+	("*zero_extendqisi2_31", "*zero_extendqihi2_31"): Likewise.
+	("movstrictqi", "movstricthi", "movstrictsi"): Use the
+	subreg_register_operand predicate instead of register_operand.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/106101
+	* gcc.c-torture/compile/pr106101.c: New test.
+
+(cherry picked from commit 585a21bab3ec688c2039bff2922cc372d8558283)
+---
+ gcc/config/s390/predicates.md                 | 12 ++++
+ gcc/config/s390/s390-protos.h                 |  1 +
+ gcc/config/s390/s390.cc                       | 27 +++++++-
+ gcc/config/s390/s390.md                       | 36 +++++------
+ .../gcc.c-torture/compile/pr106101.c          | 62 +++++++++++++++++++
+ 5 files changed, 116 insertions(+), 22 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.c-torture/compile/pr106101.c
+
+diff --git a/gcc/config/s390/predicates.md b/gcc/config/s390/predicates.md
+index 33194d3f3d6..430cf6edfd6 100644
+--- a/gcc/config/s390/predicates.md
++++ b/gcc/config/s390/predicates.md
+@@ -594,3 +594,15 @@
+ (define_predicate "addv_const_operand"
+   (and (match_code "const_int")
+        (match_test "INTVAL (op) >= -32768 && INTVAL (op) <= 32767")))
++
++; Match (subreg (reg ...)) operands.
++; Used for movstrict destination operands
++; When replacing pseudos with hard regs reload strips away the
++; subregs. Accept also plain registers then to prevent the insn from
++; becoming unrecognizable.
++(define_predicate "subreg_register_operand"
++  (ior (and (match_code "subreg")
++	    (match_test "register_operand (SUBREG_REG (op), GET_MODE (SUBREG_REG (op)))"))
++       (and (match_code "reg")
++	    (match_test "reload_completed || reload_in_progress")
++	    (match_test "register_operand (op, GET_MODE (op))"))))
+diff --git a/gcc/config/s390/s390-protos.h b/gcc/config/s390/s390-protos.h
+index 7ce4c52abe9..78117c36e03 100644
+--- a/gcc/config/s390/s390-protos.h
++++ b/gcc/config/s390/s390-protos.h
+@@ -50,6 +50,7 @@ extern void s390_set_has_landing_pad_p (bool);
+ extern bool s390_hard_regno_rename_ok (unsigned int, unsigned int);
+ extern int s390_class_max_nregs (enum reg_class, machine_mode);
+ extern bool s390_return_addr_from_memory(void);
++extern rtx s390_gen_lowpart_subreg (machine_mode, rtx);
+ extern bool s390_fma_allowed_p (machine_mode);
+ #if S390_USE_TARGET_ATTRIBUTE
+ extern tree s390_valid_target_attribute_tree (tree args,
+diff --git a/gcc/config/s390/s390.cc b/gcc/config/s390/s390.cc
+index c520dec1aff..ae0cf9ef5b9 100644
+--- a/gcc/config/s390/s390.cc
++++ b/gcc/config/s390/s390.cc
+@@ -457,6 +457,31 @@ s390_return_addr_from_memory ()
+   return cfun_gpr_save_slot(RETURN_REGNUM) == SAVE_SLOT_STACK;
+ }
+ 
++/* Generate a SUBREG for the MODE lowpart of EXPR.
++
++   In contrast to gen_lowpart it will always return a SUBREG
++   expression.  This is useful to generate STRICT_LOW_PART
++   expressions.  */
++rtx
++s390_gen_lowpart_subreg (machine_mode mode, rtx expr)
++{
++  rtx lowpart = gen_lowpart (mode, expr);
++
++  /* There might be no SUBREG in case it could be applied to the hard
++     REG rtx or it could be folded with a paradoxical subreg.  Bring
++     it back.  */
++  if (!SUBREG_P (lowpart))
++    {
++      machine_mode reg_mode = TARGET_ZARCH ? DImode : SImode;
++      gcc_assert (REG_P (lowpart));
++      lowpart = gen_lowpart_SUBREG (mode,
++				    gen_rtx_REG (reg_mode,
++						 REGNO (lowpart)));
++    }
++
++  return lowpart;
++}
++
+ /* Return nonzero if it's OK to use fused multiply-add for MODE.  */
+ bool
+ s390_fma_allowed_p (machine_mode mode)
+@@ -6519,7 +6544,7 @@ s390_expand_insv (rtx dest, rtx op1, rtx op2, rtx src)
+       /* Emit a strict_low_part pattern if possible.  */
+       if (smode_bsize == bitsize && bitpos == mode_bsize - smode_bsize)
+ 	{
+-	  rtx low_dest = gen_lowpart (smode, dest);
++	  rtx low_dest = s390_gen_lowpart_subreg (smode, dest);
+ 	  rtx low_src = gen_lowpart (smode, src);
+ 
+ 	  switch (smode)
+diff --git a/gcc/config/s390/s390.md b/gcc/config/s390/s390.md
+index 55c0064bba8..aaa247d7612 100644
+--- a/gcc/config/s390/s390.md
++++ b/gcc/config/s390/s390.md
+@@ -1971,11 +1971,12 @@
+   "TARGET_ZARCH"
+   "#"
+   "&& reload_completed"
+-  [(set (match_dup 2) (match_dup 3))
++  [(set (match_dup 2) (match_dup 4))
+    (set (match_dup 0) (ashift:DI (match_dup 0) (const_int 32)))
+-   (set (strict_low_part (match_dup 2)) (match_dup 4))]
++   (set (strict_low_part (match_dup 3)) (match_dup 5))]
+   "operands[2] = gen_lowpart (SImode, operands[0]);
+-   s390_split_access_reg (operands[1], &operands[4], &operands[3]);")
++   operands[3] = s390_gen_lowpart_subreg (SImode, operands[0]);
++   s390_split_access_reg (operands[1], &operands[5], &operands[4]);")
+ 
+ ; Splitters for storing TLS pointer to %a0:DI.
+ 
+@@ -2522,13 +2523,14 @@
+   [(set (match_dup 0) (match_dup 2))]
+   "operands[2] = get_pool_constant (operands[1]);")
+ 
++
+ ;
+-; movstrictqi instruction pattern(s).
++; movstrict instruction pattern(s).
+ ;
+ 
+ (define_insn "movstrictqi"
+-  [(set (strict_low_part (match_operand:QI 0 "register_operand" "+d,d"))
+-                         (match_operand:QI 1 "memory_operand" "R,T"))]
++  [(set (strict_low_part (match_operand:QI 0 "subreg_register_operand" "+d,d"))
++                         (match_operand:QI 1 "memory_operand"           "R,T"))]
+   ""
+   "@
+    ic\t%0,%1
+@@ -2537,13 +2539,9 @@
+    (set_attr "cpu_facility" "*,longdisp")
+    (set_attr "z10prop" "z10_super_E1,z10_super_E1")])
+ 
+-;
+-; movstricthi instruction pattern(s).
+-;
+-
+ (define_insn "movstricthi"
+-  [(set (strict_low_part (match_operand:HI 0 "register_operand" "+d,d"))
+-                         (match_operand:HI 1 "memory_operand" "Q,S"))
++  [(set (strict_low_part (match_operand:HI 0 "subreg_register_operand" "+d,d"))
++                         (match_operand:HI 1 "memory_operand"           "Q,S"))
+    (clobber (reg:CC CC_REGNUM))]
+   ""
+   "@
+@@ -2553,13 +2551,9 @@
+    (set_attr "cpu_facility" "*,longdisp")
+    (set_attr "z10prop" "z10_super_E1,z10_super_E1")])
+ 
+-;
+-; movstrictsi instruction pattern(s).
+-;
+-
+ (define_insn "movstrictsi"
+-  [(set (strict_low_part (match_operand:SI 0 "register_operand" "+d,d,d,d"))
+-                         (match_operand:SI 1 "general_operand" "d,R,T,t"))]
++  [(set (strict_low_part (match_operand:SI 0 "subreg_register_operand" "+d,d,d,d"))
++                         (match_operand:SI 1 "general_operand"          "d,R,T,t"))]
+   "TARGET_ZARCH"
+   "@
+    lr\t%0,%1
+@@ -5019,7 +5013,7 @@
+    (parallel
+     [(set (strict_low_part (match_dup 2)) (match_dup 1))
+      (clobber (reg:CC CC_REGNUM))])]
+-  "operands[2] = gen_lowpart (HImode, operands[0]);")
++  "operands[2] = s390_gen_lowpart_subreg (HImode, operands[0]);")
+ 
+ (define_insn_and_split "*zero_extendqisi2_31"
+   [(set (match_operand:SI 0 "register_operand" "=&d")
+@@ -5029,7 +5023,7 @@
+   "&& reload_completed"
+   [(set (match_dup 0) (const_int 0))
+    (set (strict_low_part (match_dup 2)) (match_dup 1))]
+-  "operands[2] = gen_lowpart (QImode, operands[0]);")
++  "operands[2] = s390_gen_lowpart_subreg (QImode, operands[0]);")
+ 
+ ;
+ ; zero_extendqihi2 instruction pattern(s).
+@@ -5061,7 +5055,7 @@
+   "&& reload_completed"
+   [(set (match_dup 0) (const_int 0))
+    (set (strict_low_part (match_dup 2)) (match_dup 1))]
+-  "operands[2] = gen_lowpart (QImode, operands[0]);")
++  "operands[2] = s390_gen_lowpart_subreg (QImode, operands[0]);")
+ 
+ ;
+ ; fixuns_trunc(dd|td|sf|df|tf)(si|di)2 expander
+diff --git a/gcc/testsuite/gcc.c-torture/compile/pr106101.c b/gcc/testsuite/gcc.c-torture/compile/pr106101.c
+new file mode 100644
+index 00000000000..dec66081f25
+--- /dev/null
++++ b/gcc/testsuite/gcc.c-torture/compile/pr106101.c
+@@ -0,0 +1,62 @@
++/* { dg-do compile } */
++
++extern char *globerr;
++char **ftpglob();
++
++static const int yypgoto[] =
++{
++     -82, -82, -82, -82
++};
++
++static const int yydefgoto[] =
++{
++       0, 1, 36, 37
++};
++
++static const int yytable[] =
++{
++      43, 129, 88, 89
++};
++
++static const int yycheck[] =
++{
++       8, 82, 4, 5
++};
++
++
++int yyparse (void)
++{
++    int yystate = 0;
++    int *yyvsp = 0;
++
++  int yyn;
++  int yyresult;
++  int yyval;
++
++yyreduce:
++
++  switch (yyn)
++    {
++  case 72: {
++
++  if (strncmp( yyvsp[0], "~", 1) == 0) {
++   *(char **)&(yyval) = *ftpglob(yyvsp[0]);
++   if (globerr != 0) {
++    yyval = 0;
++   }
++   free(yyvsp[0]);
++  }
++ }
++    break;
++    }
++
++  *++yyvsp = yyval;
++
++  {
++    const int yyi = yypgoto[0] + *yyvsp;
++    yystate = (yycheck[yyi] == *yyvsp ? 0 : 0);
++  }
++
++  return yyresult;
++}
++
+-- 
+2.25.1
+

@@ -1,0 +1,105 @@
+From c0edd2060dbc5aad0bae3ef4d68c8e85f26d0062 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 3 Mar 2023 11:37:02 -0500
+Subject: [PATCH 533/547] c++: thinko in extract_local_specs [PR108998]
+
+In order to fix PR100295, r13-4730-g18499b9f848707 attempted to make
+extract_local_specs walk the given pattern twice, ignoring unevaluated
+operands the first time around so that we prefer to process a local
+specialization in an evaluated context if it appears in one (we process
+each local specialization once even if it appears multiple times in the
+pattern).
+
+But there's a thinko in the patch, namely that we don't actually walk
+the pattern twice since we don't clear the visited set for the second
+walk (to avoid processing a local specialization twice) and so the root
+node (and any node leading up to an unevaluated operand) is considered
+visited already.  So the patch effectively made extract_local_specs
+ignore unevaluated operands altogether, which this testcase demonstrates
+isn't quite safe (extract_local_specs never sees 'aa' and we don't record
+its local specialization, so later we try to specialize 'aa' on the spot
+with the args {{int},{17}} which causes us to nonsensically substitute
+its auto with 17.)
+
+This patch fixes this by refining the second walk to start from the
+trees we skipped over during the first walk.
+
+	PR c++/108998
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (el_data::skipped_trees): New data member.
+	(extract_locals_r): Push to skipped_trees any unevaluated
+	contexts that we skipped over.
+	(extract_local_specs): For the second walk, start from each
+	tree in skipped_trees.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/lambda-generic11.C: New test.
+
+(cherry picked from commit 341e6cd8d603a334fd34657a6b454176be1c6437)
+---
+ gcc/cp/pt.cc                                  | 10 +++++++++-
+ gcc/testsuite/g++.dg/cpp2a/lambda-generic11.C | 13 +++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/lambda-generic11.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index f1ff127077e..6a49481c6a3 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -13018,6 +13018,8 @@ public:
+   tsubst_flags_t complain;
+   /* True iff we don't want to walk into unevaluated contexts.  */
+   bool skip_unevaluated_operands = false;
++  /* The unevaluated contexts that we avoided walking.  */
++  auto_vec<tree> skipped_trees;
+ 
+   el_data (tsubst_flags_t c)
+     : extra (NULL_TREE), complain (c) {}
+@@ -13032,6 +13034,7 @@ extract_locals_r (tree *tp, int *walk_subtrees, void *data_)
+   if (data.skip_unevaluated_operands
+       && unevaluated_p (TREE_CODE (*tp)))
+     {
++      data.skipped_trees.safe_push (*tp);
+       *walk_subtrees = 0;
+       return NULL_TREE;
+     }
+@@ -13134,8 +13137,13 @@ extract_local_specs (tree pattern, tsubst_flags_t complain)
+      context).  */
+   data.skip_unevaluated_operands = true;
+   cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
++  /* Now walk the unevaluated contexts we skipped the first time around.  */
+   data.skip_unevaluated_operands = false;
+-  cp_walk_tree (&pattern, extract_locals_r, &data, &data.visited);
++  for (tree t : data.skipped_trees)
++    {
++      data.visited.remove (t);
++      cp_walk_tree (&t, extract_locals_r, &data, &data.visited);
++    }
+   return data.extra;
+ }
+ 
+diff --git a/gcc/testsuite/g++.dg/cpp2a/lambda-generic11.C b/gcc/testsuite/g++.dg/cpp2a/lambda-generic11.C
+new file mode 100644
+index 00000000000..62affac542e
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/lambda-generic11.C
+@@ -0,0 +1,13 @@
++// PR c++/108999
++// { dg-do compile { target c++20 } }
++
++template<typename T>
++void ice(T a) {
++  auto aa = a;
++  auto lambda = []<int I>() {
++    if constexpr (sizeof(aa) + I != 42) { }
++  };
++  lambda.template operator()<17>();
++}
++
++template void ice(int);
+-- 
+2.25.1
+

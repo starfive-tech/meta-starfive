@@ -1,0 +1,60 @@
+From 22c2658a8b6ae9ece8b33bc483c04a767168b5f4 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Wed, 21 Sep 2022 19:55:30 +0200
+Subject: [PATCH 099/547] Fortran: fix ICE in generate_coarray_sym_init
+ [PR82868]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/82868
+	* trans-decl.cc (generate_coarray_sym_init): Skip symbol
+	if attr.associate_var.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/82868
+	* gfortran.dg/associate_26a.f90: New test.
+
+(cherry picked from commit bc71318a91286b5f00e88f07aab818ac82510692)
+---
+ gcc/fortran/trans-decl.cc                   |  1 +
+ gcc/testsuite/gfortran.dg/associate_26a.f90 | 15 +++++++++++++++
+ 2 files changed, 16 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/associate_26a.f90
+
+diff --git a/gcc/fortran/trans-decl.cc b/gcc/fortran/trans-decl.cc
+index 908a4c6d42e..5d16d640322 100644
+--- a/gcc/fortran/trans-decl.cc
++++ b/gcc/fortran/trans-decl.cc
+@@ -5529,6 +5529,7 @@ generate_coarray_sym_init (gfc_symbol *sym)
+ 
+   if (sym->attr.dummy || sym->attr.allocatable || !sym->attr.codimension
+       || sym->attr.use_assoc || !sym->attr.referenced
++      || sym->attr.associate_var
+       || sym->attr.select_type_temporary)
+     return;
+ 
+diff --git a/gcc/testsuite/gfortran.dg/associate_26a.f90 b/gcc/testsuite/gfortran.dg/associate_26a.f90
+new file mode 100644
+index 00000000000..85aebebd4d8
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/associate_26a.f90
+@@ -0,0 +1,15 @@
++! { dg-do compile }
++! { dg-options "-fcoarray=lib" }
++!
++! Test the fix for PR78152 and the followup in PR82868
++!
++! Contributed by <physiker@toast2.net>
++!
++program co_assoc
++  implicit none
++  integer, parameter :: p = 5
++  real, allocatable :: a(:,:)[:,:]
++  allocate (a(p,p)[2,*])
++  associate (i => a(1:p, 1:p))
++  end associate
++end program co_assoc
+-- 
+2.25.1
+

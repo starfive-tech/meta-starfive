@@ -1,0 +1,130 @@
+From fdde00a9001c985235a99a122fdfc4e36200b264 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 24 Aug 2022 00:20:08 +0000
+Subject: [PATCH 010/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 16 ++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   |  8 ++++++++
+ gcc/po/ChangeLog        |  6 ++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ libgomp/ChangeLog       |  8 ++++++++
+ libstdc++-v3/ChangeLog  | 11 +++++++++++
+ 7 files changed, 58 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index f267a27b057..45c79de7e03 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,19 @@
++2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-08-19  Tobias Burnus  <tobias@codesourcery.com>
++
++	* config/gcn/mkoffload.cc (main): Add dbgobj to files_to_cleanup.
++
++2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-08-17  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR middle-end/106548
++	* omp-low.cc (lower_rec_input_clauses): Use build_outer_var_ref
++	for 'simd' linear-step values that are variable.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 5d5b4de7ffd..a8087bc572d 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220823
++20220824
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 97166527031..84a7d4f5326 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,11 @@
++2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-08-17  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR fortran/106566
++	* openmp.cc (gfc_match_omp_declare_simd): Accept module procedures.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/gcc/po/ChangeLog b/gcc/po/ChangeLog
+index 688c76bcbe5..b64c1d3bcf4 100644
+--- a/gcc/po/ChangeLog
++++ b/gcc/po/ChangeLog
+@@ -1,3 +1,9 @@
++2022-08-23  Joseph Myers  <joseph@codesourcery.com>
++
++	* be.po, da.po, de.po, el.po, es.po, fi.po, fr.po, hr.po, id.po,
++	ja.po, nl.po, ru.po, sr.po, sv.po, tr.po, uk.po, vi.po, zh_CN.po,
++	zh_TW.po: Update.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index a8926aad239..874d74c97a5 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-08-17  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR fortran/106566
++	* gfortran.dg/gomp/declare-simd-6.f90: New test.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/libgomp/ChangeLog b/libgomp/ChangeLog
+index ad7a09c10ee..c0d4fbc01b5 100644
+--- a/libgomp/ChangeLog
++++ b/libgomp/ChangeLog
+@@ -1,3 +1,11 @@
++2022-08-23  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-08-17  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR middle-end/106548
++	* testsuite/libgomp.c/linear-2.c: New test.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 933d1b0809c..3021f68edb1 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,14 @@
++2022-08-23  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-22  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/105678
++	* doc/xml/manual/using.xml: Document -lstdc++_libbacktrace
++	requirement for using std::stacktrace. Also adjust -frtti and
++	-fexceptions to document non-default (i.e. negative) forms.
++	* doc/html/*: Regenerate.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

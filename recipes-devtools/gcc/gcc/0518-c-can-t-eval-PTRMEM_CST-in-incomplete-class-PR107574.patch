@@ -1,0 +1,91 @@
+From b7b50918fe52206e188c8c60c60e0d6a516e8572 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 2 Feb 2023 18:15:37 -0500
+Subject: [PATCH 518/547] c++: can't eval PTRMEM_CST in incomplete class
+ [PR107574]
+
+Here we're attempting to evaluate a PTRMEM_CST in a class that hasn't
+been completed yet, but that doesn't work:
+
+        /* We can't lower this until the class is complete.  */
+        if (!COMPLETE_TYPE_P (DECL_CONTEXT (member)))
+          return cst;
+
+and then this unlowered PTRMEM_CST is used as EXPR in
+
+    tree op1 = build_nop (ptrdiff_type_node, expr);
+
+and we crash in a subsequent cp_fold_convert which gets type=ptrdiff_type_node,
+expr=PTRMEM_CST and does
+
+  else if (TREE_CODE (expr) == PTRMEM_CST
+           && same_type_p (TYPE_PTRMEM_CLASS_TYPE (type),
+                           PTRMEM_CST_CLASS (expr)))
+
+where TYPE_PTRMEM_CLASS_TYPE (type) is going to crash since the type
+is ptrdiff_type_node.  We could just add a TYPE_PTRMEM_P check before
+accessing TYPE_PTRMEM_CLASS_TYPE but I think it's nicer to explain why
+we couldn't evaluate the expression.
+
+	PR c++/107574
+
+gcc/cp/ChangeLog:
+
+	* constexpr.cc (cxx_eval_constant_expression): Emit an error when
+	a PTRMEM_CST cannot be evaluated.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp0x/ptrmem-cst1.C: New test.
+
+(cherry picked from commit de81e06273c613d7e06cbe2c8d9e72826c638056)
+---
+ gcc/cp/constexpr.cc                      | 13 ++++++++++++-
+ gcc/testsuite/g++.dg/cpp0x/ptrmem-cst1.C | 11 +++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/ptrmem-cst1.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 6ac1b33d41d..468a58f95cc 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -7310,7 +7310,18 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
+ 	  }
+ 
+ 	if (TREE_CODE (op) == PTRMEM_CST && !TYPE_PTRMEM_P (type))
+-	  op = cplus_expand_constant (op);
++	  {
++	    op = cplus_expand_constant (op);
++	    if (TREE_CODE (op) == PTRMEM_CST)
++	      {
++		if (!ctx->quiet)
++		  error_at (loc, "%qE is not a constant expression when the "
++			    "class %qT is still incomplete", op,
++			    PTRMEM_CST_CLASS (op));
++		*non_constant_p = true;
++		return t;
++	      }
++	  }
+ 
+ 	if (TREE_CODE (op) == PTRMEM_CST && tcode == NOP_EXPR)
+ 	  {
+diff --git a/gcc/testsuite/g++.dg/cpp0x/ptrmem-cst1.C b/gcc/testsuite/g++.dg/cpp0x/ptrmem-cst1.C
+new file mode 100644
+index 00000000000..0d6a6b6445d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/ptrmem-cst1.C
+@@ -0,0 +1,11 @@
++// PR c++/107574
++// { dg-do compile { target c++11 } }
++
++struct A { int i; };
++struct B:A { int j; };
++struct C:B {
++  int k;
++  static_assert((int B::*) &C::k, ""); // { dg-error "non-constant|still incomplete" }
++};
++
++static_assert((int B::*) &C::k, "");
+-- 
+2.25.1
+

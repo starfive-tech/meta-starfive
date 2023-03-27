@@ -1,0 +1,66 @@
+From ea99f8d0f6674de2c2f20a5bc3221ae6325032ea Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Wed, 18 Jan 2023 22:13:29 +0100
+Subject: [PATCH 361/547] Fortran: error recovery for invalid CLASS component
+ [PR108434]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108434
+	* expr.cc (class_allocatable): Prevent NULL pointer dereference
+	or invalid read.
+	(class_pointer): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108434
+	* gfortran.dg/pr108434.f90: New test.
+
+(cherry picked from commit 117848f425a3c0eda85517b4bdaf2ebe3bc705c2)
+---
+ gcc/fortran/expr.cc                    |  4 ++--
+ gcc/testsuite/gfortran.dg/pr108434.f90 | 11 +++++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108434.f90
+
+diff --git a/gcc/fortran/expr.cc b/gcc/fortran/expr.cc
+index 69d0b57c688..ab54d43bce2 100644
+--- a/gcc/fortran/expr.cc
++++ b/gcc/fortran/expr.cc
+@@ -4996,14 +4996,14 @@ get_union_initializer (gfc_symbol *union_type, gfc_component **map_p)
+ static bool
+ class_allocatable (gfc_component *comp)
+ {
+-  return comp->ts.type == BT_CLASS && CLASS_DATA (comp)
++  return comp->ts.type == BT_CLASS && comp->attr.class_ok && CLASS_DATA (comp)
+     && CLASS_DATA (comp)->attr.allocatable;
+ }
+ 
+ static bool
+ class_pointer (gfc_component *comp)
+ {
+-  return comp->ts.type == BT_CLASS && CLASS_DATA (comp)
++  return comp->ts.type == BT_CLASS && comp->attr.class_ok && CLASS_DATA (comp)
+     && CLASS_DATA (comp)->attr.pointer;
+ }
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr108434.f90 b/gcc/testsuite/gfortran.dg/pr108434.f90
+new file mode 100644
+index 00000000000..e1768a57574
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108434.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/108434 - ICE in class_allocatable
++! Contributed by G.Steinmetz
++
++program p
++  type t
++     class(c), pointer :: a(2) ! { dg-error "must have a deferred shape" }
++  end type t
++  class(t), allocatable :: x
++  class(t), pointer     :: y
++end
+-- 
+2.25.1
+

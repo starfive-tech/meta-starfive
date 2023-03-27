@@ -1,0 +1,78 @@
+From 6e40f57f87c245c6aab361dcabe04c4135cf5f0a Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Sat, 29 Oct 2022 10:16:18 +0200
+Subject: [PATCH 203/547] Restore RTL alias analysis for hard frame pointer
+
+The change:
+
+	2021-07-28  Bin Cheng  <bin.cheng@linux.alibaba.com>
+
+	alias.c (init_alias_analysis): Don't skip prologue/epilogue.
+
+broke the alias analysis for the hard frame pointer (when it is used as a
+frame pointer, i.e. when the frame pointer is not eliminated) described in
+the large comment at the top of the file, because static_reg_base_value is
+set for it and, consequently, new_reg_base_value too.
+
+When the instruction saving the stack pointer into the hard frame pointer in
+the prologue is processed, it is viewed as a second set of the hard frame
+pointer and to a different value by record_set, which then proceeds to reset
+new_reg_base_value to 0 and the game is over.
+
+gcc/
+	* alias.cc (init_alias_analysis): Do not record sets to the hard
+	frame pointer if the frame pointer has not been eliminated.
+---
+ gcc/alias.cc | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
+
+diff --git a/gcc/alias.cc b/gcc/alias.cc
+index d54feb15268..c62837dd854 100644
+--- a/gcc/alias.cc
++++ b/gcc/alias.cc
+@@ -3369,6 +3369,10 @@ memory_modified_in_insn_p (const_rtx mem, const_rtx insn)
+ void
+ init_alias_analysis (void)
+ {
++  const bool frame_pointer_eliminated
++    = reload_completed
++      && !frame_pointer_needed
++      && targetm.can_eliminate (FRAME_POINTER_REGNUM, STACK_POINTER_REGNUM);
+   unsigned int maxreg = max_reg_num ();
+   int changed, pass;
+   int i;
+@@ -3446,12 +3450,8 @@ init_alias_analysis (void)
+       for (i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+ 	if (static_reg_base_value[i]
+ 	    /* Don't treat the hard frame pointer as special if we
+-	       eliminated the frame pointer to the stack pointer instead.  */
+-	    && !(i == HARD_FRAME_POINTER_REGNUM
+-		 && reload_completed
+-		 && !frame_pointer_needed
+-		 && targetm.can_eliminate (FRAME_POINTER_REGNUM,
+-					   STACK_POINTER_REGNUM)))
++	       eliminated the frame pointer to the stack pointer.  */
++	    && !(i == HARD_FRAME_POINTER_REGNUM && frame_pointer_eliminated))
+ 	  {
+ 	    new_reg_base_value[i] = static_reg_base_value[i];
+ 	    bitmap_set_bit (reg_seen, i);
+@@ -3467,10 +3467,15 @@ init_alias_analysis (void)
+ 		{
+ 		  rtx note, set;
+ 
++		  /* Treat the hard frame pointer as special unless we
++		     eliminated the frame pointer to the stack pointer.  */
++		  if (!frame_pointer_eliminated
++		      && modified_in_p (hard_frame_pointer_rtx, insn))
++		    continue;
++
+ 		  /* If this insn has a noalias note, process it,  Otherwise,
+ 		     scan for sets.  A simple set will have no side effects
+ 		     which could change the base value of any other register.  */
+-
+ 		  if (GET_CODE (PATTERN (insn)) == SET
+ 		      && REG_NOTES (insn) != 0
+ 		      && find_reg_note (insn, REG_NOALIAS, NULL_RTX))
+-- 
+2.25.1
+

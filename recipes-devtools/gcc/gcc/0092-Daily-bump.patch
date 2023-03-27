@@ -1,0 +1,32 @@
+From 8dbde52fbcd0ad5749398216064637414d639d89 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 28 Sep 2022 00:21:00 +0000
+Subject: [PATCH 092/547] Daily bump.
+
+---
+ gcc/DATESTAMP          | 2 +-
+ gcc/c-family/ChangeLog | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 38c805d4b6a..8830fa8da31 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220927
++20220928
+diff --git a/gcc/c-family/ChangeLog b/gcc/c-family/ChangeLog
+index 6fe340fbb73..75ecf66d765 100644
+--- a/gcc/c-family/ChangeLog
++++ b/gcc/c-family/ChangeLog
+@@ -1,3 +1,7 @@
++2022-09-27  Marek Polacek  <polacek@redhat.com>
++
++	* c-format.cc (c_keywords): Drop nothrow.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

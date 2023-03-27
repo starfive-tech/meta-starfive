@@ -1,0 +1,68 @@
+From 3f1ae4deb9c1524b2b1a5c9c4e751ea1c0f7478d Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 21 Feb 2023 22:06:33 +0100
+Subject: [PATCH 523/547] Fortran: reject invalid CHARACTER length of derived
+ type components [PR96024]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/96024
+	* resolve.cc (resolve_component): The type of a CHARACTER length
+	expression must be INTEGER.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/96024
+	* gfortran.dg/pr96024.f90: New test.
+
+(cherry picked from commit 31303c9b5bab200754cdb7ef8cd91ae4918f3018)
+---
+ gcc/fortran/resolve.cc                | 13 +++++++++++++
+ gcc/testsuite/gfortran.dg/pr96024.f90 | 11 +++++++++++
+ 2 files changed, 24 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr96024.f90
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index 5c66bfb15d9..59bdafecdba 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -14832,6 +14832,19 @@ resolve_component (gfc_component *c, gfc_symbol *sym)
+                     c->ts.u.cl->length ? &c->ts.u.cl->length->where : &c->loc);
+          return false;
+        }
++
++     if (c->ts.u.cl->length && c->ts.u.cl->length->ts.type != BT_INTEGER)
++       {
++	 if (!c->ts.u.cl->length->error)
++	   {
++	     gfc_error ("Character length expression of component %qs at %L "
++			"must be of INTEGER type, found %s",
++			c->name, &c->ts.u.cl->length->where,
++			gfc_basic_typename (c->ts.u.cl->length->ts.type));
++	     c->ts.u.cl->length->error = 1;
++	   }
++	 return false;
++       }
+     }
+ 
+   if (c->ts.type == BT_CHARACTER && c->ts.deferred
+diff --git a/gcc/testsuite/gfortran.dg/pr96024.f90 b/gcc/testsuite/gfortran.dg/pr96024.f90
+new file mode 100644
+index 00000000000..2c914a997f2
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr96024.f90
+@@ -0,0 +1,11 @@
++! { dg-do compile }
++! PR fortran/96024 - ICE in mio_name_expr_t
++! Contributed by G.Steinmetz
++
++module m
++  implicit none
++  type t
++     character(char(1)) :: a ! { dg-error "must be of INTEGER type" }
++  end type
++  type(t) :: z = t('a')
++end
+-- 
+2.25.1
+

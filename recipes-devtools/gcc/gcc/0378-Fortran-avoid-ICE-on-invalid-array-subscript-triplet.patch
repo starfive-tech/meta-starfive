@@ -1,0 +1,119 @@
+From daa4c49a4773f274b7a784cedd7b0e0b3c59523b Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Mon, 23 Jan 2023 21:19:03 +0100
+Subject: [PATCH 378/547] Fortran: avoid ICE on invalid array subscript
+ triplets [PR108501]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/108501
+	* interface.cc (get_expr_storage_size): Check array subscript triplets
+	that we actually have integer values before trying to extract with
+	mpz_get_si.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/108501
+	* gfortran.dg/pr108501.f90: New test.
+
+(cherry picked from commit 771d793df1622a476e1cf8d05f0a6aee350fa56b)
+---
+ gcc/fortran/interface.cc               | 23 ++++++++++++++++-------
+ gcc/testsuite/gfortran.dg/pr108501.f90 | 14 ++++++++++++++
+ 2 files changed, 30 insertions(+), 7 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr108501.f90
+
+diff --git a/gcc/fortran/interface.cc b/gcc/fortran/interface.cc
+index 0acd78d5f2e..54847301aaa 100644
+--- a/gcc/fortran/interface.cc
++++ b/gcc/fortran/interface.cc
+@@ -2894,7 +2894,8 @@ get_expr_storage_size (gfc_expr *e)
+ 
+ 	    if (ref->u.ar.stride[i])
+ 	      {
+-		if (ref->u.ar.stride[i]->expr_type == EXPR_CONSTANT)
++		if (ref->u.ar.stride[i]->expr_type == EXPR_CONSTANT
++		    && ref->u.ar.stride[i]->ts.type == BT_INTEGER)
+ 		  stride = mpz_get_si (ref->u.ar.stride[i]->value.integer);
+ 		else
+ 		  return 0;
+@@ -2902,26 +2903,30 @@ get_expr_storage_size (gfc_expr *e)
+ 
+ 	    if (ref->u.ar.start[i])
+ 	      {
+-		if (ref->u.ar.start[i]->expr_type == EXPR_CONSTANT)
++		if (ref->u.ar.start[i]->expr_type == EXPR_CONSTANT
++		    && ref->u.ar.start[i]->ts.type == BT_INTEGER)
+ 		  start = mpz_get_si (ref->u.ar.start[i]->value.integer);
+ 		else
+ 		  return 0;
+ 	      }
+ 	    else if (ref->u.ar.as->lower[i]
+-		     && ref->u.ar.as->lower[i]->expr_type == EXPR_CONSTANT)
++		     && ref->u.ar.as->lower[i]->expr_type == EXPR_CONSTANT
++		     && ref->u.ar.as->lower[i]->ts.type == BT_INTEGER)
+ 	      start = mpz_get_si (ref->u.ar.as->lower[i]->value.integer);
+ 	    else
+ 	      return 0;
+ 
+ 	    if (ref->u.ar.end[i])
+ 	      {
+-		if (ref->u.ar.end[i]->expr_type == EXPR_CONSTANT)
++		if (ref->u.ar.end[i]->expr_type == EXPR_CONSTANT
++		    && ref->u.ar.end[i]->ts.type == BT_INTEGER)
+ 		  end = mpz_get_si (ref->u.ar.end[i]->value.integer);
+ 		else
+ 		  return 0;
+ 	      }
+ 	    else if (ref->u.ar.as->upper[i]
+-		     && ref->u.ar.as->upper[i]->expr_type == EXPR_CONSTANT)
++		     && ref->u.ar.as->upper[i]->expr_type == EXPR_CONSTANT
++		     && ref->u.ar.as->upper[i]->ts.type == BT_INTEGER)
+ 	      end = mpz_get_si (ref->u.ar.as->upper[i]->value.integer);
+ 	    else
+ 	      return 0;
+@@ -2962,7 +2967,9 @@ get_expr_storage_size (gfc_expr *e)
+ 		  || ref->u.ar.as->upper[i] == NULL
+ 		  || ref->u.ar.as->lower[i] == NULL
+ 		  || ref->u.ar.as->upper[i]->expr_type != EXPR_CONSTANT
+-		  || ref->u.ar.as->lower[i]->expr_type != EXPR_CONSTANT)
++		  || ref->u.ar.as->lower[i]->expr_type != EXPR_CONSTANT
++		  || ref->u.ar.as->upper[i]->ts.type != BT_INTEGER
++		  || ref->u.ar.as->lower[i]->ts.type != BT_INTEGER)
+ 		return 0;
+ 
+ 	      elements
+@@ -2984,7 +2991,9 @@ get_expr_storage_size (gfc_expr *e)
+ 	    {
+ 	      if (!as->upper[i] || !as->lower[i]
+ 		  || as->upper[i]->expr_type != EXPR_CONSTANT
+-		  || as->lower[i]->expr_type != EXPR_CONSTANT)
++		  || as->lower[i]->expr_type != EXPR_CONSTANT
++		  || as->upper[i]->ts.type != BT_INTEGER
++		  || as->lower[i]->ts.type != BT_INTEGER)
+ 		return 0;
+ 
+ 	      elements = elements
+diff --git a/gcc/testsuite/gfortran.dg/pr108501.f90 b/gcc/testsuite/gfortran.dg/pr108501.f90
+new file mode 100644
+index 00000000000..09ab8c9f34f
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr108501.f90
+@@ -0,0 +1,14 @@
++! { dg-do compile }
++! PR fortran/108501 - ICE in get_expr_storage_size
++! Contributed by G.Steinmetz
++
++program p
++  real, parameter :: n = 2
++  real :: a(1,(n),2) ! { dg-error "must be of INTEGER type" }
++  call s(a(:,:,1))
++end
++subroutine s(x)
++  real :: x(2)
++end
++
++! { dg-prune-output "must have constant shape" }
+-- 
+2.25.1
+

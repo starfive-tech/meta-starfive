@@ -1,0 +1,99 @@
+From 6bd330777a36a1d23ca2f3ebc99a1bec0fa1b1a4 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 8 Feb 2023 00:20:29 +0000
+Subject: [PATCH 417/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 28 ++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 34 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 63 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 06f457cb681..56cdb29ac96 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,31 @@
++2023-02-07  Andrew Pinski  <apinski@marvell.com>
++
++	Backported from master:
++	2023-01-30  Andrew Pinski  <apinski@marvell.com>
++
++	PR tree-optimization/108582
++	* tree-ssa-phiopt.cc (match_simplify_replacement): Add check
++	for middlebb to have no phi nodes.
++
++2023-02-07  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	Backported from master:
++	2023-01-26  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	PR tree-optimization/108522
++	* tree-object-size.cc (compute_object_offset): Make EXPR
++	argument non-const.  Call component_ref_field_offset.
++
++2023-02-07  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	Backported from master:
++	2023-01-25  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++		    Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/108522
++	* tree-object-size.cc (compute_object_offset): Use
++	TREE_OPERAND(ref, 2) for COMPONENT_REF when available.
++
+ 2023-02-01  Martin Jambor  <mjambor@suse.cz>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 9e62c1c1935..a48b5a401cf 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230207
++20230208
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 4964eb8aad6..c34afabfae9 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,37 @@
++2023-02-07  Andrew Pinski  <apinski@marvell.com>
++
++	Backported from master:
++	2023-01-30  Andrew Pinski  <apinski@marvell.com>
++
++	PR tree-optimization/108582
++	* gcc.dg/pr108582-1.c: New test.
++
++2023-02-07  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	Backported from master:
++	2023-01-26  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	PR tree-optimization/108522
++	* gcc.dg/builtin-dynamic-object-size-0.c (DEFSTRUCT): New
++	macro.
++	(test_dynarray_struct_member_b, test_dynarray_struct_member_c,
++	test_dynarray_struct_member_d,
++	test_dynarray_struct_member_subobj_b,
++	test_dynarray_struct_member_subobj_c,
++	test_dynarray_struct_member_subobj_d): New tests.
++	(main): Call them.
++
++2023-02-07  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++
++	Backported from master:
++	2023-01-25  Siddhesh Poyarekar  <siddhesh@gotplt.org>
++		    Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/108522
++	* gcc.dg/builtin-dynamic-object-size-0.c
++	(test_dynarray_struct_member): New test.
++	(main): Call it.
++
+ 2023-02-06  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

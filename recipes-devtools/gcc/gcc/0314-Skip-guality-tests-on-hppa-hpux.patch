@@ -1,0 +1,69 @@
+From d862a689ca1deb29ee5a338e78cb5dd96286476d Mon Sep 17 00:00:00 2001
+From: John David Anglin <danglin@gcc.gnu.org>
+Date: Sun, 13 Nov 2022 17:04:44 +0000
+Subject: [PATCH 314/547] Skip guality tests on hppa-hpux.
+
+The guality check command hangs. This causes TCL errors in
+other tests and slows testsuite execution.
+
+2022-11-13  John David Anglin  <danglin@gcc.gnu.org>
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/guality/guality.exp: Skip on hppa*-*-hpux*.
+	* gcc.dg/guality/guality.exp: Likewise.
+	* gfortran.dg/guality/guality.exp: Likewise.
+---
+ gcc/testsuite/g++.dg/guality/guality.exp      | 4 ++++
+ gcc/testsuite/gcc.dg/guality/guality.exp      | 4 ++++
+ gcc/testsuite/gfortran.dg/guality/guality.exp | 4 ++++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/gcc/testsuite/g++.dg/guality/guality.exp b/gcc/testsuite/g++.dg/guality/guality.exp
+index 1d5b65fef57..2d736d292e9 100644
+--- a/gcc/testsuite/g++.dg/guality/guality.exp
++++ b/gcc/testsuite/g++.dg/guality/guality.exp
+@@ -8,6 +8,10 @@ if { [istarget *-*-darwin*] } {
+     return
+ }
+ 
++if { [istarget hppa*-*-hpux*] } {
++    return
++}
++
+ if { [istarget "powerpc-ibm-aix*"] } {
+     set torture_execute_xfail "powerpc-ibm-aix*"
+     return
+diff --git a/gcc/testsuite/gcc.dg/guality/guality.exp b/gcc/testsuite/gcc.dg/guality/guality.exp
+index ba87132aef2..075bebe34e8 100644
+--- a/gcc/testsuite/gcc.dg/guality/guality.exp
++++ b/gcc/testsuite/gcc.dg/guality/guality.exp
+@@ -8,6 +8,10 @@ if { [istarget *-*-darwin*] } {
+     return
+ }
+ 
++if { [istarget hppa*-*-hpux*] } {
++    return
++}
++
+ if { [istarget "powerpc-ibm-aix*"] } {
+     set torture_execute_xfail "powerpc-ibm-aix*"
+     return
+diff --git a/gcc/testsuite/gfortran.dg/guality/guality.exp b/gcc/testsuite/gfortran.dg/guality/guality.exp
+index 0375edfffe4..86a966a9133 100644
+--- a/gcc/testsuite/gfortran.dg/guality/guality.exp
++++ b/gcc/testsuite/gfortran.dg/guality/guality.exp
+@@ -8,6 +8,10 @@ if { [istarget *-*-darwin*] } {
+   return
+ }
+ 
++if { [istarget hppa*-*-hpux*] } {
++    return
++}
++
+ if { [istarget "powerpc-ibm-aix*"] } {
+     set torture_execute_xfail "powerpc-ibm-aix*"
+     return
+-- 
+2.25.1
+

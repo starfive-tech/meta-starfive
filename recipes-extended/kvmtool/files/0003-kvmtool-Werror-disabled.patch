@@ -1,0 +1,23 @@
+From 459ebaebf368869ae26eb8031ff44a789e238988 Mon Sep 17 00:00:00 2001
+From: Cevat Bostancioglu <bostancioglucevat@gmail.com>
+Date: Wed, 19 Jun 2019 20:36:56 +0300
+Subject: [PATCH] WERROR override disabled.
+
+WERROR override causes gcc sizeof-pointer-memaccess,  format-truncation errors.
+
+---
+ Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Makefile b/Makefile
+index 2ce753f..fe2e3cb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -4,6 +4,7 @@
+ 
+ CFLAGS += $(EXTRA_CFLAGS)
+ 
++WERROR = 0
+ ifeq ($(strip $(V)),)
+ 	ifeq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+ 		E = @echo

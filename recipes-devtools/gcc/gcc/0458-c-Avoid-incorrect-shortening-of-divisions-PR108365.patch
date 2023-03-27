@@ -1,0 +1,126 @@
+From 369454ecb53a2911946356b09347259c953f435f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 14 Jan 2023 10:17:14 +0100
+Subject: [PATCH 458/547] c++: Avoid incorrect shortening of divisions
+ [PR108365]
+
+The following testcase is miscompiled, because we shorten the division
+in a case where it should not be shortened.
+Divisions (and modulos) can be shortened if it is unsigned division/modulo,
+or if it is signed division/modulo where we can prove the dividend will
+not be the minimum signed value or divisor will not be -1, because e.g.
+on sizeof(long long)==sizeof(int)*2 && __INT_MAX__ == 0x7fffffff targets
+(-2147483647 - 1) / -1 is UB
+but
+(int) (-2147483648LL / -1LL) is not, it is -2147483648.
+The primary aim of both the C and C++ FE division/modulo shortening I assume
+was for the implicit integral promotions of {,signed,unsigned} {char,short}
+and because at this point we have no VRP information etc., the shortening
+is done if the integral promotion is from unsigned type for the divisor
+or if the dividend is an integer constant other than -1.
+This works fine for char/short -> int promotions when char/short have
+smaller precision than int - unsigned char -> int or unsigned short -> int
+will always be a positive int, so never the most negative.
+
+Now, the C FE checks whether orig_op0 is TYPE_UNSIGNED where op0 is either
+the same as orig_op0 or that promoted to int, I think that works fine,
+if it isn't promoted, either the division/modulo common type will have the
+same precision as op0 but then the division/modulo is unsigned and so
+without UB, or it will be done in wider precision (e.g. because op1 has
+wider precision), but then op0 can't be minimum signed value.  Or it has
+been promoted to int, but in that case it was again from narrower type and
+so never minimum signed int.
+
+But the C++ FE was checking if op0 is a NOP_EXPR from TYPE_UNSIGNED.
+First of all, not sure if the operand of NOP_EXPR couldn't be non-integral
+type where TYPE_UNSIGNED wouldn't be meaningful, but more importantly,
+even if it is a cast from unsigned integral type, we only know it can't be
+minimum signed value if it is a widening cast, if it is same precision or
+narrowing cast, we know nothing.
+
+So, the following patch for the NOP_EXPR cases checks just in case that
+it is from integral type and more importantly checks it is a widening
+conversion.
+
+2023-01-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108365
+	* typeck.cc (cp_build_binary_op): For integral division or modulo,
+	shorten if type0 is unsigned, or op0 is cast from narrower unsigned
+	integral type or stripped_op1 is INTEGER_CST other than -1.
+
+	* g++.dg/opt/pr108365.C: New test.
+	* g++.dg/warn/pr108365.C: New test.
+
+(cherry picked from commit 5b3a88640f962d4ffca31ae651bed2d8672f1a8c)
+---
+ gcc/cp/typeck.cc                     | 12 ++++++++++--
+ gcc/testsuite/g++.dg/opt/pr108365.C  | 13 +++++++++++++
+ gcc/testsuite/g++.dg/warn/pr108365.C |  5 +++++
+ 3 files changed, 28 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/opt/pr108365.C
+ create mode 100644 gcc/testsuite/g++.dg/warn/pr108365.C
+
+diff --git a/gcc/cp/typeck.cc b/gcc/cp/typeck.cc
+index bf42fb0ba32..e319714cc02 100644
+--- a/gcc/cp/typeck.cc
++++ b/gcc/cp/typeck.cc
+@@ -5212,7 +5212,12 @@ cp_build_binary_op (const op_location_t &location,
+ 		 it was unsigned.  */
+ 	      tree stripped_op1 = tree_strip_any_location_wrapper (op1);
+ 	      shorten = ((TREE_CODE (op0) == NOP_EXPR
+-			  && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
++			  && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (op0,
++								       0)))
++			  && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0)))
++			  && (TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op0,
++								       0)))
++			      < TYPE_PRECISION (type0)))
+ 			 || (TREE_CODE (stripped_op1) == INTEGER_CST
+ 			     && ! integer_all_onesp (stripped_op1)));
+ 	    }
+@@ -5248,7 +5253,10 @@ cp_build_binary_op (const op_location_t &location,
+ 	     only if unsigned or if dividing by something we know != -1.  */
+ 	  tree stripped_op1 = tree_strip_any_location_wrapper (op1);
+ 	  shorten = ((TREE_CODE (op0) == NOP_EXPR
+-		      && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0))))
++		      && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (op0, 0)))
++		      && TYPE_UNSIGNED (TREE_TYPE (TREE_OPERAND (op0, 0)))
++		      && (TYPE_PRECISION (TREE_TYPE (TREE_OPERAND (op0, 0)))
++			  < TYPE_PRECISION (type0)))
+ 		     || (TREE_CODE (stripped_op1) == INTEGER_CST
+ 			 && ! integer_all_onesp (stripped_op1)));
+ 	  common = 1;
+diff --git a/gcc/testsuite/g++.dg/opt/pr108365.C b/gcc/testsuite/g++.dg/opt/pr108365.C
+new file mode 100644
+index 00000000000..47eefa2b29a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/pr108365.C
+@@ -0,0 +1,13 @@
++// PR c++/108365
++// { dg-do run }
++
++char b = 1;
++
++int
++main ()
++{
++#if __CHAR_BIT__ == 8 && __SIZEOF_SHORT__ == 2 && __SIZEOF_INT__ == 4 && __SIZEOF_LONG_LONG__ == 8
++  while ((short) ((long long) (unsigned long long) (-__INT_MAX__ - 1) / (long long) (b ? -1 : 0)))
++    ;
++#endif
++}
+diff --git a/gcc/testsuite/g++.dg/warn/pr108365.C b/gcc/testsuite/g++.dg/warn/pr108365.C
+new file mode 100644
+index 00000000000..6d40957c9b3
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/pr108365.C
+@@ -0,0 +1,5 @@
++// PR c++/108365
++// { dg-do compile { target { { { ilp32 || lp64 } || llp64 } && c++11 } } }
++
++constexpr char b = 1;
++long t = (short) ((long long) (unsigned long long) (-__INT_MAX__ - 1) / (long long) (b ? -1 : 0)); // { dg-bogus "integer overflow in expression of type" }
+-- 
+2.25.1
+

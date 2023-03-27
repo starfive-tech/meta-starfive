@@ -1,0 +1,24 @@
+From aef5b371c910909c8d08e33ac28e796c7b2ea4c1 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Tue, 14 Mar 2023 22:21:47 -0700
+Subject: [PATCH 541/547] append zifenci to workaround rvi20 test failure
+
+---
+ gcc/common/config/riscv/riscv-common.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index f26874c57ab..4c5dc1efb6b 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -707,6 +707,7 @@ riscv_subset_list::parse_std_ext (const char *p)
+       p = parsing_subset_version ("i", p, &major_version, &minor_version,
+ 				  /* std_ext_p= */ true, &explicit_version_p);
+       add ("i", major_version, minor_version, explicit_version_p, false);
++      add ("zifencei", true);
+       break;
+ 
+     case 'e':
+-- 
+2.25.1
+

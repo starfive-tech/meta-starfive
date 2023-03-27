@@ -1,0 +1,245 @@
+From 1199d8653f9c8e6f7d197a040f83e6374bcb376c Mon Sep 17 00:00:00 2001
+From: "demin.han" <demin.han@starfivetech.com>
+Date: Wed, 15 Mar 2023 15:29:14 +0800
+Subject: [PATCH 1/2] [RISCV] enable align-loops=8 for optimized func
+
+---
+ sysdeps/riscv/rv64/multiarch/memchr_as.S  | 1 +
+ sysdeps/riscv/rv64/multiarch/memcmp_as.S  | 6 ++----
+ sysdeps/riscv/rv64/multiarch/memcpy_as.S  | 2 ++
+ sysdeps/riscv/rv64/multiarch/memmove_as.S | 6 ++++--
+ sysdeps/riscv/rv64/multiarch/memrchr.S    | 1 +
+ sysdeps/riscv/rv64/multiarch/memset_as.S  | 2 +-
+ sysdeps/riscv/rv64/multiarch/strcmp_as.S  | 2 +-
+ sysdeps/riscv/rv64/multiarch/strlen_as.S  | 2 +-
+ sysdeps/riscv/rv64/strchr.S               | 1 +
+ sysdeps/riscv/rv64/strchrnul.S            | 1 +
+ sysdeps/riscv/rv64/strncmp.S              | 1 +
+ sysdeps/riscv/rv64/strnlen.S              | 2 +-
+ 12 files changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/sysdeps/riscv/rv64/multiarch/memchr_as.S b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+index 4d3221c60e..1294562e1b 100644
+--- a/sysdeps/riscv/rv64/multiarch/memchr_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memchr_as.S
+@@ -55,6 +55,7 @@ ENTRY (__memchr)
+     slli    a3, a1, 32
+     or      a1, a1, a3
+     li      a5, -1
++    .p2align 3
+ .L_loop:
+     ld      a3, 0(a0)
+     xor     a3, a3, a1
+diff --git a/sysdeps/riscv/rv64/multiarch/memcmp_as.S b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+index 972f6cb5fd..8e8fd680d6 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcmp_as.S
+@@ -57,6 +57,7 @@ ENTRY (memcmp)
+     andi    t5, a1, 0x7
+     andi    a2, a2, (16-1)
+     bnez    t5, .L_merge
++    .p2align 3
+ .L_loop:
+     ld      a3, 0(a1)
+     ld      a0, 0(a5)
+@@ -99,9 +100,6 @@ ENTRY (memcmp)
+     li      a0, 0
+     ret
+ 
+-    .balign 4
+-    .option push
+-    .option norvc
+ .L_merge:
+     andi    a1, a1, -8
+     ld      t2, 0(a1)
+@@ -109,6 +107,7 @@ ENTRY (memcmp)
+     neg     t4, t3
+     andi    t4, t4, (64 - 1)
+     srl     t1, t2, t3
++    .p2align 3
+ 1:
+     ld      t2, 8(a1)
+     sll     a3, t2, t4
+@@ -123,7 +122,6 @@ ENTRY (memcmp)
+     ld      a0, 8(a5)
+     bne     a3, a0, .L_end
+     srl     t1, t2, t3
+-    .option pop
+ 
+     addi    a5, a5, 16
+     addi    a1, a1, 16
+diff --git a/sysdeps/riscv/rv64/multiarch/memcpy_as.S b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+index fae522684c..35419d2f9f 100644
+--- a/sysdeps/riscv/rv64/multiarch/memcpy_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memcpy_as.S
+@@ -78,6 +78,7 @@ ENTRY (memcpy)
+     andi    a4, a2, -32
+     beqz    a4, .L_tail
+     add     a4, a4, a5
++    .p2align  3
+ .L_loop:
+     copy_32B a5, a1
+     addi    a5, a5, 32
+@@ -121,6 +122,7 @@ ENTRY (memcpy)
+     neg     t4, t3
+     andi    t4, t4, (64 - 1)
+     srl     t1, t2, t3
++    .p2align 3
+ 1:
+     ld      t2, 8(a1)
+     sll     a3, t2, t4
+diff --git a/sysdeps/riscv/rv64/multiarch/memmove_as.S b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+index 35d0905186..b859f9778d 100644
+--- a/sysdeps/riscv/rv64/multiarch/memmove_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memmove_as.S
+@@ -58,6 +58,7 @@ ENTRY (memmove)
+     andi    a2, a2, (32 - 1)
+     beqz    a4, .L_8B_fwd
+     add     a4, a4, a5
++    .p2align 3
+ 0:
+     ld      a3, 0(a1)
+     sd      a3, 0(a5)
+@@ -102,7 +103,6 @@ ENTRY (memmove)
+ .L_ret_fwd:
+     ret
+ 
+-    .balign 4
+ .L_merge_fwd:
+     andi    a4, a2, -8
+     beqz    a4, .L_byte_tail_fwd
+@@ -113,6 +113,7 @@ ENTRY (memmove)
+     neg     t4, t3
+     andi    t4, t4, (64 - 1)
+     srl     t1, t2, t3
++    .p2align 3
+ 1:
+     ld      t2, 8(a1)
+     sll     a3, t2, t4
+@@ -149,6 +150,7 @@ ENTRY (memmove)
+     andi    a2, a2, (32 - 1)
+     beqz    a4, .L_8B_bwd
+     sub     a4, a5, a4
++    .p2align 3
+ 0:
+     addi    a5, a5, -32
+     addi    a1, a1, -32
+@@ -193,7 +195,6 @@ ENTRY (memmove)
+ .L_ret_bwd:
+     ret
+ 
+-    .balign 4
+ .L_merge_bwd:
+     andi    a4, a2, -8
+     beqz    a4, .L_byte_tail_bwd
+@@ -204,6 +205,7 @@ ENTRY (memmove)
+     neg     t4, t3
+     andi    t4, t4, (64 - 1)
+     sll     t1, t2, t4
++    .p2align 3
+ 1:
+     ld      t2, -8(a1)
+     srl     a3, t2, t3
+diff --git a/sysdeps/riscv/rv64/multiarch/memrchr.S b/sysdeps/riscv/rv64/multiarch/memrchr.S
+index b72a13e62a..223db0702a 100644
+--- a/sysdeps/riscv/rv64/multiarch/memrchr.S
++++ b/sysdeps/riscv/rv64/multiarch/memrchr.S
+@@ -59,6 +59,7 @@ ENTRY (MEMRCHR)
+     slli    a3, a1, 32
+     or      a1, a1, a3
+     li      a5, -1
++    .p2align 3
+ .L_loop:
+     ld      a3, -8(a0)
+     xor     a3, a3, a1
+diff --git a/sysdeps/riscv/rv64/multiarch/memset_as.S b/sysdeps/riscv/rv64/multiarch/memset_as.S
+index 455033adf0..0793237051 100644
+--- a/sysdeps/riscv/rv64/multiarch/memset_as.S
++++ b/sysdeps/riscv/rv64/multiarch/memset_as.S
+@@ -63,7 +63,7 @@ ENTRY (memset)
+     andi    a4, a2, -64
+     beqz    a4, .L_tail
+     add     a4, a4, a5
+-
++    .p2align 3
+ .L_loop:
+     sd      a1, 0(a5)
+     sd      a1, 8(a5)
+diff --git a/sysdeps/riscv/rv64/multiarch/strcmp_as.S b/sysdeps/riscv/rv64/multiarch/strcmp_as.S
+index 40bdbfef08..e23eb9f74c 100644
+--- a/sysdeps/riscv/rv64/multiarch/strcmp_as.S
++++ b/sysdeps/riscv/rv64/multiarch/strcmp_as.S
+@@ -57,7 +57,7 @@ ENTRY (strcmp)
+       ret
+     .endif
+   .endm
+-
++.p2align 3
+ .Lloop:
+   add   a0, a0, N*8
+   add   a1, a1, N*8
+diff --git a/sysdeps/riscv/rv64/multiarch/strlen_as.S b/sysdeps/riscv/rv64/multiarch/strlen_as.S
+index 862f5ebb72..9601ab2b11 100644
+--- a/sysdeps/riscv/rv64/multiarch/strlen_as.S
++++ b/sysdeps/riscv/rv64/multiarch/strlen_as.S
+@@ -36,7 +36,7 @@ ENTRY (strlen)
+   addi  a3, a1, 8
+   li    a4, -1
+ 
+-  .align 2
++  .p2align 3
+ .Lloop:
+   ld    a2, 8(a1)
+   addi  a1, a1, 8
+diff --git a/sysdeps/riscv/rv64/strchr.S b/sysdeps/riscv/rv64/strchr.S
+index 2d108800c1..dfeec6da7e 100644
+--- a/sysdeps/riscv/rv64/strchr.S
++++ b/sysdeps/riscv/rv64/strchr.S
+@@ -41,6 +41,7 @@ ENTRY (strchr)
+ 
+   li    a5, -1
+   addi  a0, a0, -8
++  .p2align 3
+ .Lloop:
+   addi  a0, a0, 8
+   ld    a2, 0(a0)
+diff --git a/sysdeps/riscv/rv64/strchrnul.S b/sysdeps/riscv/rv64/strchrnul.S
+index 3e48445f11..6cf125cf46 100644
+--- a/sysdeps/riscv/rv64/strchrnul.S
++++ b/sysdeps/riscv/rv64/strchrnul.S
+@@ -41,6 +41,7 @@ ENTRY (__strchrnul)
+ 
+   li    a5, -1
+   addi  a0, a0, -8
++  .p2align 3
+ .Lloop:
+   addi  a0, a0, 8
+   ld    a2, 0(a0)
+diff --git a/sysdeps/riscv/rv64/strncmp.S b/sysdeps/riscv/rv64/strncmp.S
+index 85245df98d..200bee4fe1 100644
+--- a/sysdeps/riscv/rv64/strncmp.S
++++ b/sysdeps/riscv/rv64/strncmp.S
+@@ -27,6 +27,7 @@ ENTRY (strncmp)
+   beqz  a4, .Lenter
+   j     .Lmisaligned
+ 
++  .p2align 3
+ .Lloop:
+   addi  a0, a0, 8
+   addi  a1, a1, 8
+diff --git a/sysdeps/riscv/rv64/strnlen.S b/sysdeps/riscv/rv64/strnlen.S
+index 73757b69f2..502f108710 100644
+--- a/sysdeps/riscv/rv64/strnlen.S
++++ b/sysdeps/riscv/rv64/strnlen.S
+@@ -37,7 +37,7 @@ ENTRY (__strnlen)
+   beqz  a4, .Llenth
+   addi  a5, a5, 1
+   j     .Lmisaligned  
+-
++.p2align 3
+ .Laligned:
+   addi  a5, a5, 8
+   addi  a1, a1, -8
+-- 
+2.25.1
+

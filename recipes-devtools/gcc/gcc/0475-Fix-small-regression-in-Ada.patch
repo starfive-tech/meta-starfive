@@ -1,0 +1,45 @@
+From 2155c14612ed63fc7e93d038f0a8fe01bb14fefb Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 14 Feb 2023 13:33:08 +0100
+Subject: [PATCH 475/547] Fix small regression in Ada
+
+gcc/
+	* gimplify.cc (gimplify_save_expr): Add missing guard.
+gcc/testsuite/
+	* gnat.dg/shift2.adb: New test.
+---
+ gcc/gimplify.cc                  | 2 +-
+ gcc/testsuite/gnat.dg/shift2.adb | 8 ++++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gnat.dg/shift2.adb
+
+diff --git a/gcc/gimplify.cc b/gcc/gimplify.cc
+index a3aa90262c5..a551c574a2d 100644
+--- a/gcc/gimplify.cc
++++ b/gcc/gimplify.cc
+@@ -6373,7 +6373,7 @@ gimplify_save_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
+   gcc_assert (TREE_CODE (*expr_p) == SAVE_EXPR);
+   val = TREE_OPERAND (*expr_p, 0);
+ 
+-  if (TREE_TYPE (val) == error_mark_node)
++  if (val && TREE_TYPE (val) == error_mark_node)
+     return GS_ERROR;
+ 
+   /* If the SAVE_EXPR has not been resolved, then evaluate it once.  */
+diff --git a/gcc/testsuite/gnat.dg/shift2.adb b/gcc/testsuite/gnat.dg/shift2.adb
+new file mode 100644
+index 00000000000..b45e4401813
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/shift2.adb
+@@ -0,0 +1,8 @@
++-- { dg-do compile }
++
++with Interfaces; use Interfaces;
++
++function Shift2 (V : Unsigned_32) return Unsigned_32 is
++begin
++  return Shift_Left (V, (case V is when 0 => 1, when others => 0));
++end;
+-- 
+2.25.1
+

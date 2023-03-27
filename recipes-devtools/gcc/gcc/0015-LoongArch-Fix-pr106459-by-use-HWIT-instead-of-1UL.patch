@@ -1,0 +1,115 @@
+From ce753c2792363f1b4cfe2ac56b2da562b34151f3 Mon Sep 17 00:00:00 2001
+From: Chenghua Xu <xuchenghua@loongson.cn>
+Date: Wed, 24 Aug 2022 15:34:07 +0800
+Subject: [PATCH 015/547] LoongArch: Fix pr106459 by use HWIT instead of 1UL.
+
+gcc/ChangeLog:
+
+	PR target/106459
+	* config/loongarch/loongarch.cc (loongarch_build_integer):
+	Use HOST_WIDE_INT.
+	* config/loongarch/loongarch.h (IMM_REACH): Likewise.
+	(HWIT_1U): New Defined.
+	(LU12I_OPERAND): Use HOST_WIDE_INT.
+	(LU32I_OPERAND): Likewise.
+	(LU52I_OPERAND): Likewise.
+	(HWIT_UC_0xFFF): Likwise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/loongarch/pr106459.c: New test.
+
+(cherry picked from commit b169b67d7dafe2b786f87c31d6b2efc603fd880c)
+---
+ gcc/config/loongarch/loongarch.cc             |  6 +++---
+ gcc/config/loongarch/loongarch.h              | 15 +++++++++------
+ gcc/testsuite/gcc.target/loongarch/pr106459.c | 13 +++++++++++++
+ 3 files changed, 25 insertions(+), 9 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/pr106459.c
+
+diff --git a/gcc/config/loongarch/loongarch.cc b/gcc/config/loongarch/loongarch.cc
+index 5c9a33c14f7..22901cb6101 100644
+--- a/gcc/config/loongarch/loongarch.cc
++++ b/gcc/config/loongarch/loongarch.cc
+@@ -1507,8 +1507,8 @@ loongarch_build_integer (struct loongarch_integer_op *codes,
+       bool lu32i[2] = {(value & LU32I_B) == 0, (value & LU32I_B) == LU32I_B};
+       bool lu52i[2] = {(value & LU52I_B) == 0, (value & LU52I_B) == LU52I_B};
+ 
+-      int sign31 = (value & (1UL << 31)) >> 31;
+-      int sign51 = (value & (1UL << 51)) >> 51;
++      int sign31 = (value & (HOST_WIDE_INT_1U << 31)) >> 31;
++      int sign51 = (value & (HOST_WIDE_INT_1U << 51)) >> 51;
+       /* Determine whether the upper 32 bits are sign-extended from the lower
+ 	 32 bits. If it is, the instructions to load the high order can be
+ 	 ommitted.  */
+@@ -1529,7 +1529,7 @@ loongarch_build_integer (struct loongarch_integer_op *codes,
+ 
+       /* Determine whether the 52-61 bits are sign-extended from the low order,
+ 	 and if not, load the 52-61 bits.  */
+-      if (!lu52i[(value & (1ULL << 51)) >> 51])
++      if (!lu52i[(value & (HOST_WIDE_INT_1U << 51)) >> 51])
+ 	{
+ 	  codes[cost].method = METHOD_LU52I;
+ 	  codes[cost].value = value & LU52I_B;
+diff --git a/gcc/config/loongarch/loongarch.h b/gcc/config/loongarch/loongarch.h
+index f9de9a6e4fb..015d70c469c 100644
+--- a/gcc/config/loongarch/loongarch.h
++++ b/gcc/config/loongarch/loongarch.h
+@@ -561,7 +561,8 @@ enum reg_class
+   64, 65, 66, 67, 68, 69, 70, 71, 72, 73}
+ 
+ #define IMM_BITS 12
+-#define IMM_REACH (1LL << IMM_BITS)
++#define IMM_REACH (HOST_WIDE_INT_1 << IMM_BITS)
++#define HWIT_1U HOST_WIDE_INT_1U
+ 
+ /* True if VALUE is an unsigned 6-bit number.  */
+ 
+@@ -589,18 +590,20 @@ enum reg_class
+ /* True if VALUE can be loaded into a register using LU12I.  */
+ 
+ #define LU12I_OPERAND(VALUE) \
+-  (((VALUE) | ((1UL << 31) - IMM_REACH)) == ((1UL << 31) - IMM_REACH) \
+-   || ((VALUE) | ((1UL << 31) - IMM_REACH)) + IMM_REACH == 0)
++  (((VALUE) | ((HWIT_1U << 31) - IMM_REACH)) == ((HWIT_1U << 31) - IMM_REACH) \
++   || ((VALUE) | ((HWIT_1U << 31) - IMM_REACH)) + IMM_REACH == 0)
+ 
+ /* True if VALUE can be loaded into a register using LU32I.  */
+ 
+ #define LU32I_OPERAND(VALUE) \
+-  (((VALUE) | (((1ULL << 19) - 1) << 32)) == (((1ULL << 19) - 1) << 32) \
+-   || ((VALUE) | (((1ULL << 19) - 1) << 32)) + (1ULL << 32) == 0)
++  (((VALUE) | (((HWIT_1U << 19) - 1) << 32)) == (((HWIT_1U << 19) - 1) << 32) \
++   || ((VALUE) | (((HWIT_1U << 19) - 1) << 32)) + (HWIT_1U << 32) == 0)
+ 
+ /* True if VALUE can be loaded into a register using LU52I.  */
+ 
+-#define LU52I_OPERAND(VALUE) (((VALUE) | (0xfffULL << 52)) == (0xfffULL << 52))
++#define HWIT_UC_0xFFF HOST_WIDE_INT_UC(0xfff)
++#define LU52I_OPERAND(VALUE) \
++  (((VALUE) | (HWIT_UC_0xFFF << 52)) == (HWIT_UC_0xFFF << 52))
+ 
+ /* Return a value X with the low 12 bits clear, and such that
+    VALUE - X is a signed 12-bit value.  */
+diff --git a/gcc/testsuite/gcc.target/loongarch/pr106459.c b/gcc/testsuite/gcc.target/loongarch/pr106459.c
+new file mode 100644
+index 00000000000..eb737dc49c1
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/pr106459.c
+@@ -0,0 +1,13 @@
++/* { dg-do compile } */
++
++/* https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106459 */
++
++typedef unsigned int UDItype __attribute__((mode(DI)));
++int foo(UDItype x) {
++  x = x & (((UDItype)(((UDItype)(((UDItype)0x0F << 8) | 0x0F) << (2 * 8)) |
++                      (((UDItype)0x0F << 8) | 0x0F))
++            << (4 * 8)) |
++           (((UDItype)(((UDItype)0x0F << 8) | 0x0F) << (2 * 8)) |
++            (((UDItype)0x0F << 8) | 0x0F)));
++  return x;
++}
+-- 
+2.25.1
+

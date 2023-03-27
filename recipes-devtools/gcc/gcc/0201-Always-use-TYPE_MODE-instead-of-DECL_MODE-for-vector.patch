@@ -1,0 +1,93 @@
+From 0138ebcd482c71f55d74eb9fa533fbb54a4391d6 Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Wed, 19 Oct 2022 12:53:35 -0700
+Subject: [PATCH 201/547] Always use TYPE_MODE instead of DECL_MODE for vector
+ field
+
+e034c5c8957 re PR target/78643 (ICE in convert_move, at expr.c:230)
+
+fixed the case where DECL_MODE of a vector field is BLKmode and its
+TYPE_MODE is a vector mode because of target attribute.  Remove the
+BLKmode check for the case where DECL_MODE of a vector field is a vector
+mode and its TYPE_MODE isn't a vector mode because of target attribute.
+
+gcc/
+
+	PR target/107304
+	* expr.cc (get_inner_reference): Always use TYPE_MODE for vector
+	field with vector raw mode.
+
+gcc/testsuite/
+
+	PR target/107304
+	* gcc.target/i386/pr107304.c: New test.
+
+(cherry picked from commit 1c64aba8cdf6509533f554ad86640f274cdbe37f)
+---
+ gcc/expr.cc                              |  3 +-
+ gcc/testsuite/gcc.target/i386/pr107304.c | 39 ++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr107304.c
+
+diff --git a/gcc/expr.cc b/gcc/expr.cc
+index 2103931c740..880ed89cb34 100644
+--- a/gcc/expr.cc
++++ b/gcc/expr.cc
+@@ -7640,8 +7640,7 @@ get_inner_reference (tree exp, poly_int64_pod *pbitsize,
+ 	  /* For vector fields re-check the target flags, as DECL_MODE
+ 	     could have been set with different target flags than
+ 	     the current function has.  */
+-	  if (mode == BLKmode
+-	      && VECTOR_TYPE_P (TREE_TYPE (field))
++	  if (VECTOR_TYPE_P (TREE_TYPE (field))
+ 	      && VECTOR_MODE_P (TYPE_MODE_RAW (TREE_TYPE (field))))
+ 	    mode = TYPE_MODE (TREE_TYPE (field));
+ 	}
+diff --git a/gcc/testsuite/gcc.target/i386/pr107304.c b/gcc/testsuite/gcc.target/i386/pr107304.c
+new file mode 100644
+index 00000000000..24d68795e7f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr107304.c
+@@ -0,0 +1,39 @@
++/* { dg-do compile } */
++/* { dg-options "-O0 -march=tigerlake" } */
++
++#include <stdint.h>
++
++typedef union {
++  uint8_t v __attribute__((aligned(256))) __attribute__ ((vector_size(64 * sizeof(uint8_t))));
++  uint8_t i[64] __attribute__((aligned(256)));
++} stress_vec_u8_64_t;
++
++typedef struct {
++ struct {
++  stress_vec_u8_64_t s;
++  stress_vec_u8_64_t o;
++  stress_vec_u8_64_t mask1;
++  stress_vec_u8_64_t mask2;
++ } u8_64;
++} stress_vec_data_t;
++
++__attribute__((target_clones("arch=alderlake", "default"))) 
++void
++stress_vecshuf_u8_64(stress_vec_data_t *data)
++{
++  stress_vec_u8_64_t *__restrict s;
++  stress_vec_u8_64_t *__restrict mask1;
++  stress_vec_u8_64_t *__restrict mask2;
++  register int i;
++
++  s = &data->u8_64.s;
++  mask1 = &data->u8_64.mask1;
++  mask2 = &data->u8_64.mask2;
++
++  for (i = 0; i < 256; i++) {	/* was i < 65536 */
++      stress_vec_u8_64_t tmp;
++
++      tmp.v = __builtin_shuffle(s->v, mask1->v);
++      s->v = __builtin_shuffle(tmp.v, mask2->v);
++  }
++}
+-- 
+2.25.1
+

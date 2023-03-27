@@ -1,0 +1,51 @@
+From b947611dd475a2116c67dadc356bdc3f7344bf57 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 4 Oct 2022 09:19:35 +0000
+Subject: [PATCH 110/547] Daily bump.
+
+---
+ gcc/ChangeLog    | 10 ++++++++++
+ gcc/DATESTAMP    |  2 +-
+ gcc/po/ChangeLog |  4 ++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 9476595dcfb..d2b7bc15911 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,13 @@
++2022-10-03  Sergei Trofimovich  <siarheit@google.com>
++
++	Backported from master:
++	2022-10-03  Sergei Trofimovich  <siarheit@google.com>
++
++	PR target/107064
++	* config/i386/t-i386: Add build-time dependencies against
++	i386-builtin-types.inc to i386-builtins.o, i386-expand.o,
++	i386-features.o.
++
+ 2022-09-29  H.J. Lu  <hjl.tools@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f30574676b3..59c7fe23e2a 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221003
++20221004
+diff --git a/gcc/po/ChangeLog b/gcc/po/ChangeLog
+index c443ef9f576..49711432796 100644
+--- a/gcc/po/ChangeLog
++++ b/gcc/po/ChangeLog
+@@ -1,3 +1,7 @@
++2022-10-03  Joseph Myers  <joseph@codesourcery.com>
++
++	* sv.po: Update.
++
+ 2022-09-22  Joseph Myers  <joseph@codesourcery.com>
+ 
+ 	* fr.po: Update.
+-- 
+2.25.1
+

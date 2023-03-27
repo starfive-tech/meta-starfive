@@ -1,0 +1,93 @@
+From 32502d82a5b54ca5b8e524df9fcad851727dc54a Mon Sep 17 00:00:00 2001
+From: Mikael Morin <mikael@gcc.gnu.org>
+Date: Sun, 29 Jan 2023 21:57:24 +0100
+Subject: [PATCH 410/547] fortran: Set name for *LOC default BACK argument
+ [PR108450]
+
+This change fixes an ICE caused by the double resolution of MINLOC,
+MAXLOC and FINDLOC expressions which get a default value for the BACK
+argument at resolution time.  That argument  is added without name,
+and argument reordering code is not prepared to handle unnamed arguments
+coming after named ones, so the second resolution causes a NULL pointer
+dereference.
+The problem is fixed by explicitly setting the argument name.
+
+	PR fortran/108450
+
+gcc/fortran/ChangeLog:
+
+	* check.cc (gfc_check_minloc_maxloc): Explicitly set argument name.
+	(gfc_check_findloc): Ditto.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/gomp/minmaxloc_1.f90: New test.
+
+(cherry picked from commit 2e32a12c04c72f692a7bd119fd3e4e5b74392c9d)
+---
+ gcc/fortran/check.cc                          |  2 ++
+ .../gfortran.dg/gomp/minmaxloc_1.f90          | 32 +++++++++++++++++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/gomp/minmaxloc_1.f90
+
+diff --git a/gcc/fortran/check.cc b/gcc/fortran/check.cc
+index 91d87a1b2c1..ca7cef666a7 100644
+--- a/gcc/fortran/check.cc
++++ b/gcc/fortran/check.cc
+@@ -3888,6 +3888,7 @@ gfc_check_minloc_maxloc (gfc_actual_arglist *ap)
+     {
+       b = gfc_get_logical_expr (gfc_logical_4_kind, NULL, 0);
+       ap->next->next->next->next->expr = b;
++      ap->next->next->next->next->name = gfc_get_string ("back");
+     }
+ 
+   if (m == NULL && d != NULL && d->ts.type == BT_LOGICAL
+@@ -3969,6 +3970,7 @@ gfc_check_findloc (gfc_actual_arglist *ap)
+     {
+       b = gfc_get_logical_expr (gfc_logical_4_kind, NULL, 0);
+       ap->next->next->next->next->next->expr = b;
++      ap->next->next->next->next->next->name = gfc_get_string ("back");
+     }
+ 
+   if (m == NULL && d != NULL && d->ts.type == BT_LOGICAL
+diff --git a/gcc/testsuite/gfortran.dg/gomp/minmaxloc_1.f90 b/gcc/testsuite/gfortran.dg/gomp/minmaxloc_1.f90
+new file mode 100644
+index 00000000000..b3691f774de
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/gomp/minmaxloc_1.f90
+@@ -0,0 +1,32 @@
++! { dg-do compile }
++!
++! PR fortran/108450
++! This program used to cause an ICE because of the double resolution
++! of the maxloc expression and the addition of a hidden unnamed argument
++! during the first resolution.
++!
++! Original testcase from G. Steinmetz
++
++subroutine s1
++   integer :: a(8) = 0
++   integer :: l
++   integer :: n
++   !$omp atomic
++   n = maxloc(a, mask=l) ! { dg-error ".mask. argument of .maxloc. intrinsic at .1. must be LOGICAL" }
++end
++
++subroutine s2
++   integer :: a(8) = 0
++   integer :: l
++   integer :: n
++   !$omp atomic
++   n = minloc(a, mask=l) ! { dg-error ".mask. argument of .minloc. intrinsic at .1. must be LOGICAL" }
++end
++
++subroutine s3
++   integer :: a(8) = 0
++   integer :: l
++   integer :: n
++   !$omp atomic
++   n = findloc(a, 3, mask=l) ! { dg-error ".mask. argument of .findloc. intrinsic at .1. must be LOGICAL" }
++end
+-- 
+2.25.1
+

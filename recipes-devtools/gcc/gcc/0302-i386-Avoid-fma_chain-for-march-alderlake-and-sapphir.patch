@@ -1,0 +1,35 @@
+From 8ac76d504ee1216ebffab08463a544d691d85112 Mon Sep 17 00:00:00 2001
+From: Hongyu Wang <hongyu.wang@intel.com>
+Date: Tue, 6 Dec 2022 09:53:35 +0800
+Subject: [PATCH 302/547] i386: Avoid fma_chain for -march=alderlake and
+ sapphirerapids.
+
+For Alderlake there is similar issue like PR81616, enable
+avoid_fma256_chain will also benefit on Intel latest platforms
+Alderlake and Sapphire Rapids.
+
+gcc/ChangeLog:
+
+	* config/i386/x86-tune.def (X86_TUNE_AVOID_256FMA_CHAINS): Add
+	m_SAPPHIRERAPIDS, m_ALDERLAKE.
+---
+ gcc/config/i386/x86-tune.def | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/config/i386/x86-tune.def b/gcc/config/i386/x86-tune.def
+index d983e2f6213..1e1b206a71c 100644
+--- a/gcc/config/i386/x86-tune.def
++++ b/gcc/config/i386/x86-tune.def
+@@ -485,7 +485,8 @@ DEF_TUNE (X86_TUNE_AVOID_128FMA_CHAINS, "avoid_fma_chains", m_ZNVER)
+ 
+ /* X86_TUNE_AVOID_256FMA_CHAINS: Avoid creating loops with tight 256bit or
+    smaller FMA chain.  */
+-DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3)
++DEF_TUNE (X86_TUNE_AVOID_256FMA_CHAINS, "avoid_fma256_chains", m_ZNVER2 | m_ZNVER3
++	  | m_ALDERLAKE | m_SAPPHIRERAPIDS)
+ 
+ /* X86_TUNE_V2DF_REDUCTION_PREFER_PHADDPD: Prefer haddpd
+    for v2df vector reduction.  */
+-- 
+2.25.1
+

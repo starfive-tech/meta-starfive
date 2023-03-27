@@ -1,0 +1,108 @@
+From 11c4310086719230bffef3aa28a80a0be67d0d02 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 21 Oct 2022 00:22:01 +0000
+Subject: [PATCH 156/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 40 ++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 2f112be5a20..9f8de513177 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,43 @@
++2022-10-20  Thomas Schwinge  <thomas@codesourcery.com>
++
++	Backported from master:
++	2022-05-10  Thomas Schwinge  <thomas@codesourcery.com>
++
++	PR middle-end/100400
++	* omp-oacc-kernels-decompose.cc
++	(visit_loops_in_gang_single_region) <GIMPLE_OMP_FOR>: Explicitly
++	call 'internal_error'.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	Backported from master:
++	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* config/aarch64/aarch64-sve.md (*aarch64_brk<brk_op>_cc): Remove
++	merging alternative.
++	(*aarch64_brk<brk_op>_ptest): Likewise.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	Backported from master:
++	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* config/aarch64/iterators.md (SVE_BRKP): New iterator.
++	* config/aarch64/aarch64-sve.md (*aarch64_brkn_cc): New pattern.
++	(*aarch64_brkn_ptest): Likewise.
++	(*aarch64_brk<brk_op>_cc): Restrict to SVE_BRKP.
++	(*aarch64_brk<brk_op>_ptest): Likewise.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* config/aarch64/aarch64.h (AARCH64_FL_FOR_ARCH8_3): Add
++	AARCH64_FL_RCPC.
++	(AARCH64_ISA_RCPC): New macro.
++	* config/aarch64/aarch64-cores.def (thunderx3t110, zeus, neoverse-v1)
++	(neoverse-512tvb, saphira): Remove RCPC from these Armv8.3-A+ cores.
++	* config/aarch64/aarch64-c.cc (aarch64_update_cpp_builtins): Define
++	__ARM_FEATURE_RCPC when appropriate.
++
+ 2022-10-19  Kewen Lin  <linkw@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8b08eddd863..0f7d77c700e 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221020
++20221021
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f71b53e1e6e..bf488cf3f8c 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,34 @@
++2022-10-20  Thomas Schwinge  <thomas@codesourcery.com>
++
++	Backported from master:
++	2022-05-10  Thomas Schwinge  <thomas@codesourcery.com>
++
++	PR middle-end/100400
++	* c-c++-common/goacc/kernels-decompose-pr100400-1-2.c: Specify
++	'-Wfatal-errors'.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	Backported from master:
++	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* gcc.target/aarch64/sve/acle/general/brka_1.c: Expect a separate
++	PTEST instruction.
++	* gcc.target/aarch64/sve/acle/general/brkb_1.c: Likewise.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	Backported from master:
++	2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* gcc.target/aarch64/sve/acle/general/brkn_1.c: Expect separate
++	PTEST instructions.
++	* gcc.target/aarch64/sve/acle/general/brkn_2.c: New test.
++
++2022-10-20  Richard Sandiford  <richard.sandiford@arm.com>
++
++	* gcc.target/aarch64/pragma_cpp_predefs_1.c: Add RCPC tests.
++
+ 2022-10-19  Andrew MacLeod  <amacleod@redhat.com>
+ 
+ 	PR tree-optimization/102892
+-- 
+2.25.1
+

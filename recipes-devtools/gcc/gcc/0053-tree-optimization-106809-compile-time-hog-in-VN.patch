@@ -1,0 +1,137 @@
+From e08dd36f90e74cd5be615b1ca82a38896434d48c Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 2 Sep 2022 13:36:13 +0200
+Subject: [PATCH 053/547] tree-optimization/106809 - compile time hog in VN
+
+The dominated_by_p_w_unex function is prone to high compile time.
+With GCC 12 we introduced a VN run for uninit diagnostics which now
+runs into a degenerate case with bison generated code.  Fortunately
+this case is easy to fix with a simple extra check - a more
+general fix needs more work.
+
+	PR tree-optimization/106809
+	* tree-ssa-sccvn.cc (dominaged_by_p_w_unex): Check we have
+	more than one successor before doing extra work.
+
+	* gcc.dg/torture/pr106809.c: New testcase.
+
+(cherry picked from commit be1b42de9c151d46c89f9a8f82d4c5839a19ea94)
+---
+ gcc/testsuite/gcc.dg/torture/pr106809.c | 28 ++++++++++++
+ gcc/tree-ssa-sccvn.cc                   | 57 +++++++++++++------------
+ 2 files changed, 58 insertions(+), 27 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr106809.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr106809.c b/gcc/testsuite/gcc.dg/torture/pr106809.c
+new file mode 100644
+index 00000000000..11e158185cf
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr106809.c
+@@ -0,0 +1,28 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-Wuninitialized" } */
++
++int foo (int x, int *val)
++{
++  switch (x)
++    {
++#define C(n) \
++    case n + 0: return *val; \
++    case n + 1: return *val; \
++    case n + 2: return *val; \
++    case n + 3: return *val; \
++    case n + 4: return *val; \
++    case n + 5: return *val; \
++    case n + 6: return *val; \
++    case n + 7: return *val; \
++    case n + 8: return *val; \
++    case n + 9: return *val;
++#define C1(n) \
++    C(n+00) C(n+10) C(n+20) C(n+30) C(n+40) \
++    C(n+50) C(n+60) C(n+70) C(n+80) C(n+90)
++#define C10(n) \
++    C1(n+000) C1(n+100) C1(n+200) C1(n+300) C1(n+400) \
++    C1(n+500) C1(n+600) C1(n+700) C1(n+800) C1(n+900)
++    C10(1000)
++    }
++  return 0;
++}
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index e22c7026556..2bcf44c3227 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -4660,41 +4660,44 @@ dominated_by_p_w_unex (basic_block bb1, basic_block bb2, bool allow_back)
+     }
+ 
+   /* Iterate to the single executable bb2 successor.  */
+-  edge succe = NULL;
+-  FOR_EACH_EDGE (e, ei, bb2->succs)
+-    if ((e->flags & EDGE_EXECUTABLE)
+-	|| (!allow_back && (e->flags & EDGE_DFS_BACK)))
+-      {
+-	if (succe)
+-	  {
+-	    succe = NULL;
+-	    break;
+-	  }
+-	succe = e;
+-      }
+-  if (succe)
++  if (EDGE_COUNT (bb2->succs) > 1)
+     {
+-      /* Verify the reached block is only reached through succe.
+-	 If there is only one edge we can spare us the dominator
+-	 check and iterate directly.  */
+-      if (EDGE_COUNT (succe->dest->preds) > 1)
+-	{
+-	  FOR_EACH_EDGE (e, ei, succe->dest->preds)
+-	    if (e != succe
+-		&& ((e->flags & EDGE_EXECUTABLE)
+-		    || (!allow_back && (e->flags & EDGE_DFS_BACK))))
++      edge succe = NULL;
++      FOR_EACH_EDGE (e, ei, bb2->succs)
++	if ((e->flags & EDGE_EXECUTABLE)
++	    || (!allow_back && (e->flags & EDGE_DFS_BACK)))
++	  {
++	    if (succe)
+ 	      {
+ 		succe = NULL;
+ 		break;
+ 	      }
+-	}
++	    succe = e;
++	  }
+       if (succe)
+ 	{
+-	  bb2 = succe->dest;
++	  /* Verify the reached block is only reached through succe.
++	     If there is only one edge we can spare us the dominator
++	     check and iterate directly.  */
++	  if (EDGE_COUNT (succe->dest->preds) > 1)
++	    {
++	      FOR_EACH_EDGE (e, ei, succe->dest->preds)
++		if (e != succe
++		    && ((e->flags & EDGE_EXECUTABLE)
++			|| (!allow_back && (e->flags & EDGE_DFS_BACK))))
++		  {
++		    succe = NULL;
++		    break;
++		  }
++	    }
++	  if (succe)
++	    {
++	      bb2 = succe->dest;
+ 
+-	  /* Re-do the dominance check with changed bb2.  */
+-	  if (dominated_by_p (CDI_DOMINATORS, bb1, bb2))
+-	    return true;
++	      /* Re-do the dominance check with changed bb2.  */
++	      if (dominated_by_p (CDI_DOMINATORS, bb1, bb2))
++		return true;
++	    }
+ 	}
+     }
+ 
+-- 
+2.25.1
+

@@ -1,0 +1,196 @@
+From cb39089c5a0da1e9b16ad27db557a2c3f930e668 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 23 Dec 2022 09:18:37 -0500
+Subject: [PATCH 531/547] c++: template friend with variadic constraints
+ [PR107853]
+
+When instantiating a constrained hidden template friend, we substitute
+into its template-head requirements in tsubst_friend_function.  For this
+substitution we use the template's full argument vector whose outer
+levels correspond to the instantiated class's arguments and innermost
+level corresponds to the template's own level-lowered generic arguments.
+
+But for A<int>::f here, for which the relevant argument vector is
+{{int}, {Us...}}, the substitution into (C<Ts, Us> && ...) triggers the
+assert in use_pack_expansion_extra_args_p since one argument is a pack
+expansion and the other isn't.
+
+And for A<int, int>::f, for which the relevant argument vector is
+{{int, int}, {Us...}}, the use_pack_expansion_extra_args_p assert would
+also trigger but we first get a bogus "mismatched argument pack lengths"
+error from tsubst_pack_expansion.
+
+Sidestepping the question of whether tsubst_pack_expansion should be
+able to handle such substitutions, it seems we can work around this by
+using only the instantiated class's arguments and not also the template
+friend's own generic arguments, which is consistent with how we normally
+substitute into the signature of a member template.
+
+	PR c++/107853
+
+gcc/cp/ChangeLog:
+
+	* constraint.cc (maybe_substitute_reqs_for): Substitute into
+	the template-head requirements of a template friend using only
+	its outer arguments via outer_template_args.
+	* cp-tree.h (outer_template_args): Declare.
+	* pt.cc (outer_template_args): Define, factored out and
+	generalized from ...
+	(ctor_deduction_guides_for): ... here.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/concepts-friend12.C: New test.
+	* g++.dg/cpp2a/concepts-friend13.C: New test.
+
+(cherry picked from commit bd1fc4a219d8c0fad0ec41002e895b49e384c1c2)
+---
+ gcc/cp/constraint.cc                          |  7 ++--
+ gcc/cp/cp-tree.h                              |  1 +
+ gcc/cp/pt.cc                                  | 34 +++++++++++++------
+ .../g++.dg/cpp2a/concepts-friend12.C          | 21 ++++++++++++
+ .../g++.dg/cpp2a/concepts-friend13.C          | 20 +++++++++++
+ 5 files changed, 70 insertions(+), 13 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/concepts-friend12.C
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/concepts-friend13.C
+
+diff --git a/gcc/cp/constraint.cc b/gcc/cp/constraint.cc
+index 4e074f8fdaf..5ac0ca2aadf 100644
+--- a/gcc/cp/constraint.cc
++++ b/gcc/cp/constraint.cc
+@@ -1277,11 +1277,12 @@ maybe_substitute_reqs_for (tree reqs, const_tree decl)
+   if (DECL_UNIQUE_FRIEND_P (decl) && DECL_TEMPLATE_INFO (decl))
+     {
+       tree tmpl = DECL_TI_TEMPLATE (decl);
+-      tree gargs = generic_targs_for (tmpl);
++      tree outer_args = outer_template_args (tmpl);
+       processing_template_decl_sentinel s;
+-      if (uses_template_parms (gargs))
++      if (PRIMARY_TEMPLATE_P (tmpl)
++	  || uses_template_parms (outer_args))
+ 	++processing_template_decl;
+-      reqs = tsubst_constraint (reqs, gargs,
++      reqs = tsubst_constraint (reqs, outer_args,
+ 				tf_warning_or_error, NULL_TREE);
+     }
+   return reqs;
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index 40563a151fe..51994686304 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -7019,6 +7019,7 @@ extern tree maybe_set_retval_sentinel		(void);
+ extern tree template_parms_to_args		(tree);
+ extern tree template_parms_level_to_args	(tree);
+ extern tree generic_targs_for			(tree);
++extern tree outer_template_args			(tree);
+ 
+ /* in expr.cc */
+ extern tree cplus_expand_constant		(tree);
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 4e9f587f581..f1ff127077e 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -4957,6 +4957,28 @@ generic_targs_for (tree tmpl)
+   return template_parms_to_args (DECL_TEMPLATE_PARMS (tmpl));
+ }
+ 
++/* Return the template arguments corresponding to the template parameters of
++   TMPL's enclosing scope.  When TMPL is a member of a partial specialization,
++   this returns the arguments for the partial specialization as opposed to those
++   for the primary template, which is the main difference between this function
++   and simply using e.g. the TYPE_TI_ARGS of TMPL's DECL_CONTEXT.  */
++
++tree
++outer_template_args (tree tmpl)
++{
++  tree ti = get_template_info (DECL_TEMPLATE_RESULT (tmpl));
++  if (!ti)
++    return NULL_TREE;
++  tree args = TI_ARGS (ti);
++  if (!PRIMARY_TEMPLATE_P (tmpl))
++    return args;
++  if (TMPL_ARGS_DEPTH (args) == 1)
++    return NULL_TREE;
++  args = copy_node (args);
++  --TREE_VEC_LENGTH (args);
++  return args;
++}
++
+ /* Update the declared TYPE by doing any lookups which were thought to be
+    dependent, but are not now that we know the SCOPE of the declarator.  */
+ 
+@@ -29925,16 +29947,8 @@ alias_ctad_tweaks (tree tmpl, tree uguides)
+ static tree
+ ctor_deduction_guides_for (tree tmpl, tsubst_flags_t complain)
+ {
+-  tree type = TREE_TYPE (tmpl);
+-  tree outer_args = NULL_TREE;
+-  if (DECL_CLASS_SCOPE_P (tmpl)
+-      && CLASSTYPE_TEMPLATE_INSTANTIATION (DECL_CONTEXT (tmpl)))
+-    {
+-      outer_args = copy_node (CLASSTYPE_TI_ARGS (type));
+-      gcc_assert (TMPL_ARGS_DEPTH (outer_args) > 1);
+-      --TREE_VEC_LENGTH (outer_args);
+-      type = TREE_TYPE (most_general_template (tmpl));
+-    }
++  tree outer_args = outer_template_args (tmpl);
++  tree type = TREE_TYPE (most_general_template (tmpl));
+ 
+   tree cands = NULL_TREE;
+ 
+diff --git a/gcc/testsuite/g++.dg/cpp2a/concepts-friend12.C b/gcc/testsuite/g++.dg/cpp2a/concepts-friend12.C
+new file mode 100644
+index 00000000000..9687be5931a
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/concepts-friend12.C
+@@ -0,0 +1,21 @@
++// PR c++/107853
++// { dg-do compile { target c++20 } }
++
++template<class T, class U>
++concept C = __is_same(T, U);
++
++template<class... Ts>
++struct A {
++  template<class... Us>
++    requires (C<Ts, Us> && ...)
++  friend void f(A, A<Us...>) { }
++};
++
++int main() {
++  A<int> x;
++  f(x, x);
++  A<int, int> y;
++  f(y, y);
++  A<char> z;
++  f(x, z); // { dg-error "no match" }
++}
+diff --git a/gcc/testsuite/g++.dg/cpp2a/concepts-friend13.C b/gcc/testsuite/g++.dg/cpp2a/concepts-friend13.C
+new file mode 100644
+index 00000000000..3cc4505a7ef
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/concepts-friend13.C
+@@ -0,0 +1,20 @@
++// Verify we substitute the correct outer template arguments
++// when instantiating a constrained template friend declared
++// inside a partial specialization.
++// { dg-do compile { target c++20 } }
++
++template<class U>
++  requires __is_same(int*, U)
++void f() { };
++
++template<class T>
++struct A;
++
++template<class T>
++struct A<T*> {
++  template<class U>
++    requires __is_same(T, U)
++  friend void f() { } // { dg-bogus "redefinition" }
++};
++
++template struct A<int*>;
+-- 
+2.25.1
+

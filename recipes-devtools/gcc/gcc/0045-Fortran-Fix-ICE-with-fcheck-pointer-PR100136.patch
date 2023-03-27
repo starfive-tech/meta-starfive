@@ -1,0 +1,96 @@
+From c1ba36ec779cccf6b54883d676d083df627f6d64 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Rui=20Faustino=20de=20Sousa?=
+ <jrfsousa@gmail.com>
+Date: Sun, 4 Sep 2022 21:53:09 +0200
+Subject: [PATCH 045/547] Fortran: Fix ICE with -fcheck=pointer [PR100136]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/100136
+	* trans-expr.cc (gfc_conv_procedure_call): Add handling of pointer
+	expressions.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/100136
+	* gfortran.dg/PR100136.f90: New test.
+
+(cherry picked from commit 20d30e737ad79dc36817e59f1676aa8bc0c6b325)
+---
+ gcc/fortran/trans-expr.cc              |  7 ++---
+ gcc/testsuite/gfortran.dg/PR100136.f90 | 39 ++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/PR100136.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index 850007fd2e1..e35ea2fc790 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -7220,16 +7220,15 @@ gfc_conv_procedure_call (gfc_se * se, gfc_symbol * sym,
+ 	      else
+ 		goto end_pointer_check;
+ 
++	      tmp = parmse.expr;
+ 	      if (fsym && fsym->ts.type == BT_CLASS)
+ 		{
+-		  tmp = build_fold_indirect_ref_loc (input_location,
+-						      parmse.expr);
++		  if (POINTER_TYPE_P (TREE_TYPE (tmp)))
++		    tmp = build_fold_indirect_ref_loc (input_location, tmp);
+ 		  tmp = gfc_class_data_get (tmp);
+ 		  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (tmp)))
+ 		    tmp = gfc_conv_descriptor_data_get (tmp);
+ 		}
+-	      else
+-		tmp = parmse.expr;
+ 
+ 	      /* If the argument is passed by value, we need to strip the
+ 		 INDIRECT_REF.  */
+diff --git a/gcc/testsuite/gfortran.dg/PR100136.f90 b/gcc/testsuite/gfortran.dg/PR100136.f90
+new file mode 100644
+index 00000000000..922af4aecc3
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/PR100136.f90
+@@ -0,0 +1,39 @@
++! { dg-do run }
++! { dg-options "-fcheck=pointer" }
++! { dg-shouldfail "Argument not allocated" }
++! { dg-output "Fortran runtime error: Allocatable actual argument 'c_init2' is not allocated" }
++!
++! Tests fix for PR100136
++!
++! Test cut down from PR58586
++!
++
++module test_pr58586_mod
++  implicit none
++
++  type :: a
++  end type
++
++  type :: c
++     type(a), allocatable :: a
++  end type
++
++contains
++
++  subroutine add_class_c (d)
++    class(c), value :: d
++  end subroutine
++
++  class(c) function c_init2()
++    allocatable :: c_init2
++  end function
++
++end module test_pr58586_mod
++
++program test_pr58586
++  use test_pr58586_mod
++
++  ! This needs to execute, to see whether the segfault at runtime is resolved
++  call add_class_c(c_init2())
++
++end program
+-- 
+2.25.1
+

@@ -1,0 +1,71 @@
+From df5fb9562890590ebb21acb3c3cabf5c40532333 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 22 Dec 2022 00:20:54 +0000
+Subject: [PATCH 308/547] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libgfortran/ChangeLog  |  7 +++++++
+ libstdc++-v3/ChangeLog | 27 +++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 1bcb133d5ce..4bbb3ed7e34 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221221
++20221222
+diff --git a/libgfortran/ChangeLog b/libgfortran/ChangeLog
+index e8bafe9e2aa..feb1bf9deb3 100644
+--- a/libgfortran/ChangeLog
++++ b/libgfortran/ChangeLog
+@@ -1,3 +1,10 @@
++2022-12-21  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR libfortran/108056
++	* runtime/ISO_Fortran_binding.c (cfi_desc_to_gfc_desc,
++	gfc_desc_to_cfi_desc): Mostly revert to GCC 11 version for
++	those backward-compatiblity-only functions.
++
+ 2022-08-29  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index e43750b6db9..9120913abb7 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,30 @@
++2022-12-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-23  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/107814
++	* testsuite/experimental/filesystem/iterators/error_reporting.cc:
++	Use a static buffer with space after it.
++
++2022-12-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-12-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/std/expected (expected::_M_swap_val_unex): Guard the
++	correct object.
++	(expected::swap): Move is_swappable
++	requirement from static_assert to constraint.
++	(swap): Likewise.
++	(operator==): Remove noexcept-specifier.
++	* testsuite/20_util/expected/swap.cc: Check swapping of
++	types without non-throwing move constructor. Check constraints
++	on swap.
++	* testsuite/20_util/expected/unexpected.cc: Check constraints on
++	swap.
++	* testsuite/20_util/expected/equality.cc: New test.
++
+ 2022-12-14  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

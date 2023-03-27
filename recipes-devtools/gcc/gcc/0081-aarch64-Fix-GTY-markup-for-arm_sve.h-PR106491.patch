@@ -1,0 +1,72 @@
+From a1465af240ee28fc7fcb83877c6aea94f11fb32f Mon Sep 17 00:00:00 2001
+From: Richard Sandiford <richard.sandiford@arm.com>
+Date: Wed, 21 Sep 2022 09:30:31 +0100
+Subject: [PATCH 081/547] aarch64: Fix GTY markup for arm_sve.h [PR106491]
+
+It turns out that GTY(()) markers in definitions like:
+
+  GTY(()) tree scalar_types[NUM_VECTOR_TYPES];
+
+are not effective and are silently ignored.  The GTY(()) has
+to come after an extern or static.
+
+The externs associated with the SVE ACLE GTY variables are in
+aarch64-sve-builtins.h.  This file is not in tm_include_list because
+we don't want every target-facing file to include it.  It therefore
+isn't in the list of GC header files either.
+
+In this case that's a blessing in disguise, since the variables
+belong to a namespace and gengtype doesn't understand namespaces.
+I think the fix is instead to add an extra extern before each
+variable declaration, similarly to varasm.cc and vtable-verify.cc.
+(This works due to a "using namespace" at the end of the file.)
+
+gcc/
+	PR target/106491
+	* config/aarch64/aarch64-sve-builtins.cc (scalar_types)
+	(acle_vector_types, acle_svpattern, acle_svprfop): Add GTY
+	markup to (new) extern declarations instead of to the main
+	definition.
+
+(cherry picked from commit 6bf5a704d36243c4c04b17a9408ebe881beb0051)
+---
+ gcc/config/aarch64/aarch64-sve-builtins.cc | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64-sve-builtins.cc b/gcc/config/aarch64/aarch64-sve-builtins.cc
+index 9d78b270e47..12d9beee4da 100644
+--- a/gcc/config/aarch64/aarch64-sve-builtins.cc
++++ b/gcc/config/aarch64/aarch64-sve-builtins.cc
+@@ -530,7 +530,8 @@ static CONSTEXPR const function_group_info function_groups[] = {
+ };
+ 
+ /* The scalar type associated with each vector type.  */
+-GTY(()) tree scalar_types[NUM_VECTOR_TYPES];
++extern GTY(()) tree scalar_types[NUM_VECTOR_TYPES];
++tree scalar_types[NUM_VECTOR_TYPES];
+ 
+ /* The single-predicate and single-vector types, with their built-in
+    "__SV..._t" name.  Allow an index of NUM_VECTOR_TYPES, which always
+@@ -538,13 +539,16 @@ GTY(()) tree scalar_types[NUM_VECTOR_TYPES];
+ static GTY(()) tree abi_vector_types[NUM_VECTOR_TYPES + 1];
+ 
+ /* Same, but with the arm_sve.h "sv..._t" name.  */
+-GTY(()) tree acle_vector_types[MAX_TUPLE_SIZE][NUM_VECTOR_TYPES + 1];
++extern GTY(()) tree acle_vector_types[MAX_TUPLE_SIZE][NUM_VECTOR_TYPES + 1];
++tree acle_vector_types[MAX_TUPLE_SIZE][NUM_VECTOR_TYPES + 1];
+ 
+ /* The svpattern enum type.  */
+-GTY(()) tree acle_svpattern;
++extern GTY(()) tree acle_svpattern;
++tree acle_svpattern;
+ 
+ /* The svprfop enum type.  */
+-GTY(()) tree acle_svprfop;
++extern GTY(()) tree acle_svprfop;
++tree acle_svprfop;
+ 
+ /* The list of all registered function decls, indexed by code.  */
+ static GTY(()) vec<registered_function *, va_gc> *registered_functions;
+-- 
+2.25.1
+

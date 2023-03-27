@@ -1,0 +1,215 @@
+From 1152b921b12d30bb06ea7bcf872bfa16d025daf5 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Wed, 15 Mar 2023 02:29:51 -0700
+Subject: [PATCH 546/547] add dubhe pipeline model
+
+---
+ gcc/config/riscv/riscv-cores.def   |   2 +
+ gcc/config/riscv/riscv-opts.h      |   3 +-
+ gcc/config/riscv/riscv.cc          |  15 ++++
+ gcc/config/riscv/riscv.md          |   4 +-
+ gcc/config/riscv/starfive-dubhe.md | 113 +++++++++++++++++++++++++++++
+ 5 files changed, 134 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/config/riscv/starfive-dubhe.md
+
+diff --git a/gcc/config/riscv/riscv-cores.def b/gcc/config/riscv/riscv-cores.def
+index ecb5e213d98..653338a012d 100644
+--- a/gcc/config/riscv/riscv-cores.def
++++ b/gcc/config/riscv/riscv-cores.def
+@@ -46,4 +46,6 @@ RISCV_CORE("sifive-s76",      "rv64imafdc", "sifive-7-series")
+ RISCV_CORE("sifive-u54",      "rv64imafdc", "sifive-5-series")
+ RISCV_CORE("sifive-u74",      "rv64imafdc", "sifive-7-series")
+ 
++RISCV_CORE("starfive-dubhe",  "rv64imafdc_zba_zbb_zbc_zbs", "starfive-dubhe-series")
++
+ #undef RISCV_CORE
+diff --git a/gcc/config/riscv/riscv-opts.h b/gcc/config/riscv/riscv-opts.h
+index 15bb5e76854..fcb1aaa4ba1 100644
+--- a/gcc/config/riscv/riscv-opts.h
++++ b/gcc/config/riscv/riscv-opts.h
+@@ -52,7 +52,8 @@ extern enum riscv_isa_spec_class riscv_isa_spec;
+ /* Keep this list in sync with define_attr "tune" in riscv.md.  */
+ enum riscv_microarchitecture_type {
+   generic,
+-  sifive_7
++  sifive_7,
++  starfive_dubhe
+ };
+ extern enum riscv_microarchitecture_type riscv_microarchitecture;
+ 
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 472c00ef8aa..dc0af17b715 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -332,6 +332,20 @@ static const struct riscv_tune_param optimize_size_tune_info = {
+   false,					/* slow_unaligned_access */
+ };
+ 
++/* Costs to use when optimizing for Starfive Dubhe.  */
++static const struct riscv_tune_param starfive_dubhe_tune_info = {
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* fp_add */
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* fp_mul */
++  {COSTS_N_INSNS (20), COSTS_N_INSNS (20)},	/* fp_div */
++  {COSTS_N_INSNS (3), COSTS_N_INSNS (3)},	/* int_mul */
++  {COSTS_N_INSNS (6), COSTS_N_INSNS (6)},	/* int_div */
++  8,						/* issue_rate */
++  1,						/* branch_cost */
++  3,						/* memory_cost */
++  8,						/* fmv_cost */
++  true,					/* slow_unaligned_access */
++};
++
+ static tree riscv_handle_fndecl_attribute (tree *, tree, tree, int, bool *);
+ static tree riscv_handle_type_attribute (tree *, tree, tree, int, bool *);
+ 
+@@ -368,6 +382,7 @@ static const struct riscv_tune_info riscv_tune_info_table[] = {
+   { "sifive-5-series", generic, &rocket_tune_info },
+   { "sifive-7-series", sifive_7, &sifive_7_tune_info },
+   { "thead-c906", generic, &thead_c906_tune_info },
++  { "starfive-dubhe-series", starfive_dubhe, &starfive_dubhe_tune_info },  
+   { "size", generic, &optimize_size_tune_info },
+ };
+ 
+diff --git a/gcc/config/riscv/riscv.md b/gcc/config/riscv/riscv.md
+index fdb8c102560..a04794ad25a 100644
+--- a/gcc/config/riscv/riscv.md
++++ b/gcc/config/riscv/riscv.md
+@@ -254,7 +254,7 @@
+ ;; Microarchitectures we know how to tune for.
+ ;; Keep this in sync with enum riscv_microarchitecture.
+ (define_attr "tune"
+-  "generic,sifive_7"
++  "generic,sifive_7,starfive_dubhe"
+   (const (symbol_ref "((enum attr_tune) riscv_microarchitecture)")))
+ 
+ ;; Describe a user's asm statement.
+@@ -2869,5 +2869,5 @@
+ (include "pic.md")
+ (include "generic.md")
+ (include "sifive-7.md")
+-
++(include "starfive-dubhe.md")
+ 
+diff --git a/gcc/config/riscv/starfive-dubhe.md b/gcc/config/riscv/starfive-dubhe.md
+new file mode 100644
+index 00000000000..a238c2a9406
+--- /dev/null
++++ b/gcc/config/riscv/starfive-dubhe.md
+@@ -0,0 +1,113 @@
++;; Starfive Dubhe Core
++;; Still missing bypassing info
++
++(define_automaton "starfive_dubhe")
++
++(define_cpu_unit "dubhe_alu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_alu1" "starfive_dubhe")
++(define_cpu_unit "dubhe_bru" "starfive_dubhe")
++(define_cpu_unit "dubhe_div" "starfive_dubhe")
++(define_cpu_unit "dubhe_lsu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_lsu1" "starfive_dubhe")
++(define_cpu_unit "dubhe_fpu0" "starfive_dubhe")
++(define_cpu_unit "dubhe_fpu1" "starfive_dubhe")
++(define_cpu_unit "dubhe_fpu0_resource" "starfive_dubhe")
++
++(define_insn_reservation "dubhe_load" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "load"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_fpload" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fpload"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_store" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "store"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_fpstore" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fpstore"))
++  "dubhe_lsu0 | dubhe_lsu1")
++
++(define_insn_reservation "dubhe_branch" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "branch"))
++  "dubhe_bru")
++
++(define_insn_reservation "dubhe_jump" 4
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "jump,call"))
++  "dubhe_bru")
++
++(define_insn_reservation "dubhe_alu" 1  
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "unknown,arith,shift,slt,multi,logical,move"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
++
++(define_insn_reservation "dubhe_sfb_alu" 4
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "sfb_alu"))
++  "(dubhe_alu0|dubhe_alu1)+dubhe_bru")
++
++(define_insn_reservation "dubhe_mul" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "imul"))
++  "dubhe_div")
++
++(define_insn_reservation "dubhe_div" 45
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "idiv"))
++  "dubhe_div,sifive_7_idiv*44")
++
++(define_insn_reservation "dubhe_load_immediate" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "nop,const,auipc"))
++  "dubhe_alu0|dubhe_alu1")
++
++(define_insn_reservation "dubhe_sfma" 6
++  (and (eq_attr "tune" "starfive_dubhe")
++       (and (eq_attr "type" "fadd,fmul,fmadd")
++	    (eq_attr "mode" "SF")))
++  "dubhe_fpu0 | dubhe_fpu1")
++
++(define_insn_reservation "dubhe_dfma" 6
++  (and (eq_attr "tune" "starfive_dubhe")
++       (and (eq_attr "type" "fadd,fmul,fmadd")
++	    (eq_attr "mode" "DF")))
++  "dubhe_fpu0 | dubhe_fpu1")
++
++(define_insn_reservation "dubhe_fp_other" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fcvt,fcmp,fmove"))
++  "dubhe_fpu1")
++
++(define_insn_reservation "dubhe_7_fdiv_s" 31
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fdiv,fsqrt")
++       (eq_attr "mode" "SF"))
++  "dubhe_fpu0,dubhe_fpu0_resource*30")
++
++(define_insn_reservation "dubhe_fdiv_d" 60
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "fdiv,fsqrt")
++       (eq_attr "mode" "DF"))
++  "dubhe_fpu0,dubhe_fpu0_resource*59")
++
++(define_insn_reservation "dubhe_i2f" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "mtc"))
++  "dubhe_alu0|dubhe_alu1") 
++
++(define_insn_reservation "dubhe_f2i" 3
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "mfc"))
++  "dubhe_alu0|dubhe_alu1")
++
++(define_insn_reservation "dubhe_bitmanip" 1
++  (and (eq_attr "tune" "starfive_dubhe")
++       (eq_attr "type" "bitmanip"))
++  "dubhe_alu0|dubhe_alu1|dubhe_div")
+\ No newline at end of file
+-- 
+2.25.1
+

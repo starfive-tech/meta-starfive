@@ -1,0 +1,241 @@
+From 07a310153b6ba84b8c1ac5fa4813e63f6f70d22a Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 12 Oct 2022 17:54:08 +0200
+Subject: [PATCH 189/547] libgomp: Fix up creation of artificial teams
+
+When not in explicit parallel/target/teams construct, we in some cases create
+an artificial parallel with a single thread (either to handle target nowait
+or for task reduction purposes).  In those cases, it handled again artificially
+created implicit task (created by gomp_new_icv for cases where we needed to write
+to some ICVs), but as the testcases show, didn't take into account possibility
+of this being done from explicit task(s).  The code would destroy/free the previous
+task and replace it with the new implicit task.  If task is an explicit task
+(when teams is NULL, all explicit tasks behave like if (0)), it is a pointer to
+a local stack variable, so freeing it doesn't work, and additionally we shouldn't
+lose the explicit tasks - the new implicit task should instead replace the
+ancestor task which is the first implicit one.
+
+2022-10-12  Jakub Jelinek  <jakub@redhat.com>
+
+	* task.c (gomp_create_artificial_team): Fix up handling of invocations
+	from within explicit task.
+	* target.c (GOMP_target_ext): Likewise.
+	* testsuite/libgomp.c/task-7.c: New test.
+	* testsuite/libgomp.c/task-8.c: New test.
+	* testsuite/libgomp.c-c++-common/task-reduction-17.c: New test.
+	* testsuite/libgomp.c-c++-common/task-reduction-18.c: New test.
+
+(cherry picked from commit a58a965eb73253759f6a3e1c7380392557da89c8)
+---
+ libgomp/target.c                              | 15 ++++++--
+ libgomp/task.c                                | 15 ++++++--
+ .../libgomp.c-c++-common/task-reduction-17.c  | 36 +++++++++++++++++++
+ .../libgomp.c-c++-common/task-reduction-18.c  | 17 +++++++++
+ libgomp/testsuite/libgomp.c/task-7.c          | 26 ++++++++++++++
+ libgomp/testsuite/libgomp.c/task-8.c          | 14 ++++++++
+ 6 files changed, 117 insertions(+), 6 deletions(-)
+ create mode 100644 libgomp/testsuite/libgomp.c-c++-common/task-reduction-17.c
+ create mode 100644 libgomp/testsuite/libgomp.c-c++-common/task-reduction-18.c
+ create mode 100644 libgomp/testsuite/libgomp.c/task-7.c
+ create mode 100644 libgomp/testsuite/libgomp.c/task-8.c
+
+diff --git a/libgomp/target.c b/libgomp/target.c
+index 9017458885e..fa364b9d79b 100644
+--- a/libgomp/target.c
++++ b/libgomp/target.c
+@@ -2639,6 +2639,7 @@ GOMP_target_ext (int device, void (*fn) (void *), size_t mapnum,
+ 	{
+ 	  struct gomp_team *team = gomp_new_team (1);
+ 	  struct gomp_task *task = thr->task;
++	  struct gomp_task **implicit_task = &task;
+ 	  struct gomp_task_icv *icv = task ? &task->icv : &gomp_global_icv;
+ 	  team->prev_ts = thr->ts;
+ 	  thr->ts.team = team;
+@@ -2651,15 +2652,23 @@ GOMP_target_ext (int device, void (*fn) (void *), size_t mapnum,
+ 	  thr->ts.static_trip = 0;
+ 	  thr->task = &team->implicit_task[0];
+ 	  gomp_init_task (thr->task, NULL, icv);
+-	  if (task)
++	  while (*implicit_task
++		 && (*implicit_task)->kind != GOMP_TASK_IMPLICIT)
++	    implicit_task = &(*implicit_task)->parent;
++	  if (*implicit_task)
+ 	    {
+-	      thr->task = task;
++	      thr->task = *implicit_task;
+ 	      gomp_end_task ();
+-	      free (task);
++	      free (*implicit_task);
+ 	      thr->task = &team->implicit_task[0];
+ 	    }
+ 	  else
+ 	    pthread_setspecific (gomp_thread_destructor, thr);
++	  if (implicit_task != &task)
++	    {
++	      *implicit_task = thr->task;
++	      thr->task = task;
++	    }
+ 	}
+       if (thr->ts.team
+ 	  && !thr->task->final_task)
+diff --git a/libgomp/task.c b/libgomp/task.c
+index 828348c4cf4..cc0d38e7e57 100644
+--- a/libgomp/task.c
++++ b/libgomp/task.c
+@@ -2224,6 +2224,7 @@ gomp_create_artificial_team (void)
+   struct gomp_task_icv *icv;
+   struct gomp_team *team = gomp_new_team (1);
+   struct gomp_task *task = thr->task;
++  struct gomp_task **implicit_task = &task;
+   icv = task ? &task->icv : &gomp_global_icv;
+   team->prev_ts = thr->ts;
+   thr->ts.team = team;
+@@ -2236,17 +2237,25 @@ gomp_create_artificial_team (void)
+   thr->ts.static_trip = 0;
+   thr->task = &team->implicit_task[0];
+   gomp_init_task (thr->task, NULL, icv);
+-  if (task)
++  while (*implicit_task
++	 && (*implicit_task)->kind != GOMP_TASK_IMPLICIT)
++    implicit_task = &(*implicit_task)->parent;
++  if (*implicit_task)
+     {
+-      thr->task = task;
++      thr->task = *implicit_task;
+       gomp_end_task ();
+-      free (task);
++      free (*implicit_task);
+       thr->task = &team->implicit_task[0];
+     }
+ #ifdef LIBGOMP_USE_PTHREADS
+   else
+     pthread_setspecific (gomp_thread_destructor, thr);
+ #endif
++  if (implicit_task != &task)
++    {
++      *implicit_task = thr->task;
++      thr->task = task;
++    }
+ }
+ 
+ /* The format of data is:
+diff --git a/libgomp/testsuite/libgomp.c-c++-common/task-reduction-17.c b/libgomp/testsuite/libgomp.c-c++-common/task-reduction-17.c
+new file mode 100644
+index 00000000000..4a8d1e8bb73
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c-c++-common/task-reduction-17.c
+@@ -0,0 +1,36 @@
++/* { dg-do run } */
++
++#include <omp.h>
++#include <stdlib.h>
++
++int a;
++
++int
++main ()
++{
++  #pragma omp task final (1)
++  {
++    if (!omp_in_final ())
++      abort ();
++    #pragma omp task
++    {
++      if (!omp_in_final ())
++	abort ();
++      #pragma omp taskgroup task_reduction (+: a)
++      {
++	if (!omp_in_final ())
++	  abort ();
++	#pragma omp task in_reduction (+: a)
++	{
++	  ++a;
++	  if (!omp_in_final ())
++	    abort ();
++	}
++      }
++      if (!omp_in_final ())
++	abort ();
++      #pragma omp taskwait
++    }
++  }
++  return 0;
++}
+diff --git a/libgomp/testsuite/libgomp.c-c++-common/task-reduction-18.c b/libgomp/testsuite/libgomp.c-c++-common/task-reduction-18.c
+new file mode 100644
+index 00000000000..483f4406f6f
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c-c++-common/task-reduction-18.c
+@@ -0,0 +1,17 @@
++/* { dg-do run } */
++
++int a;
++
++int
++main ()
++{
++  #pragma omp task
++  {
++    #pragma omp taskgroup task_reduction (+: a)
++    {
++      #pragma omp task in_reduction (+: a)
++      ++a;
++    }
++  }
++  return 0;
++}
+diff --git a/libgomp/testsuite/libgomp.c/task-7.c b/libgomp/testsuite/libgomp.c/task-7.c
+new file mode 100644
+index 00000000000..0307575f978
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c/task-7.c
+@@ -0,0 +1,26 @@
++/* { dg-do run } */
++
++#include <omp.h>
++#include <stdlib.h>
++
++int
++main ()
++{
++  #pragma omp task final (1)
++  {
++    if (!omp_in_final ())
++      abort ();
++    #pragma omp task
++    {
++      if (!omp_in_final ())
++	abort ();
++      #pragma omp target nowait
++      if (omp_in_final ())
++	abort ();
++      if (!omp_in_final ())
++	abort ();
++      #pragma omp taskwait
++    }
++  }
++  return 0;
++}
+diff --git a/libgomp/testsuite/libgomp.c/task-8.c b/libgomp/testsuite/libgomp.c/task-8.c
+new file mode 100644
+index 00000000000..f03aef6a030
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c/task-8.c
+@@ -0,0 +1,14 @@
++/* { dg-do run } */
++
++int
++main ()
++{
++  int i = 0;
++  #pragma omp task
++  {
++    #pragma omp target nowait private (i)
++    i = 1;
++    #pragma omp taskwait
++  }
++  return 0;
++}
+-- 
+2.25.1
+

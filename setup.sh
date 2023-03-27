@@ -128,6 +128,24 @@ case $RES in
 esac
 }
 
+updatecfg(){
+cfg=("ENABLE_INIT" "ENABLE_EXT4" "ENABLE_UBI")
+for cfgname in ${cfg[@]}; do
+    if [[ $1 == ${cfgname} ]]; then
+        if ! grep -q $1 ./conf/local.conf; then
+            echo $1="\"1"\" >> ./conf/local.conf;
+        else sed -i "s/$1=\"0\"/$1=\"1\"/g"  ./conf/local.conf;
+        fi;
+    else
+        if ! grep -q ${cfgname} ./conf/local.conf; then
+            echo ${cfgname}="\"0"\" >> ./conf/local.conf;
+        else sed -i "s/${cfgname}=\"1\"/${cfgname}=\"0\"/g"  ./conf/local.conf;
+        fi;
+    fi;
+done
+}
+
+
 # Menu script
 echo ""
 echo -e "${PURPLE}*******************************************************************"
@@ -138,30 +156,36 @@ echo -e "*******************************************************************${NC
 echo "";
 echo -e "${YELLOW}Description : ";
 echo "";
-echo "This build script can build one type of image.";
+echo "This build script can build three types of image.";
 echo "";
 echo "1) QSPI-Image";
 echo "   - Initramfs has been bundled into qspi-image.";
-echo "   - Generated output : "; 
-echo -e "     QSPI-Image.bin${NC}"; 
-#echo "2) QSPI-NFS-Image";
+echo "   - Generated output : ";
+echo "     QSPI-Image.bin";
+echo "2) Dubhe-Image-Minimal";
+echo "   - Minimal image with ext4 support.";
+echo "   - Generated output : ";
+echo "     QSPI-EXT4-Image.bin";
+echo "     SD-Image.img";
+echo "3) QSPI-Ubifs-Image";
+echo "   - Minimal image with ubifs support.";
+echo "   - Generated output : ";
+echo -e "     QSPI-Ubifs-Image.bin${NC}";
+#echo "4) QSPI-NFS-Image";
 #echo "   - NFS config has been enabled.";
 #echo "   - Generated output : ";
 #echo -e "     QSPI-NFS-Image.bin${NC}";
 echo "";
 
 PS3="Select your action : "
-options=("Build qspi-image" "Quit")
+options=("Build qspi-image" "Build dubhe-image-minimal" "Build qspi-ubifs-image" "Quit")
 
 select opt in "${options[@]}" 
 do
     case $opt in 
         "Build qspi-image")
 #            cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
-            if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
-                echo 'ENABLE_NFS="0"' >> ./conf/local.conf;
-            else sed -i 's/ENABLE_NFS="1"/ENABLE_NFS="0"/g'  ./conf/local.conf;
-            fi;
+	    updatecfg ENABLE_INIT;
             cur_ter=$(tty);
             output=$(MACHINE=starfive-dubhe bitbake qspi-image | tee $cur_ter);
             if [[ $output != *"ERROR"* ]]; then
@@ -169,27 +193,43 @@ do
                 runprog dubhe-image-initramfs;
             else echo -e "\U000274C ${RED}Build Failed${NC}"
             fi;;
-#        "Build qspi-nfs-image")
- #           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
-#	    sed -n 10p ../meta-starfive/recipes-kernel/linux/files/nfs.patch;
-#	    read -p "Kindly confirm boot argument such as nfs path and ip address before build (/meta-starfive/recipes-kernel/linux/files/nfs.patch). Proceed to build?[Y/n]:" RES;
-#	    case $RES in
-# 		[Yy])
-#            		if ! grep -q "ENABLE_NFS" ./conf/local.conf; then
-#                		echo 'ENABLE_NFS="1"' >> ./conf/local.conf;
-#            		else sed -i 's/ENABLE_NFS="0"/ENABLE_NFS="1"/g'  ./conf/local.conf
-#            		fi;
-#            		cur_ter=$(tty);
-#            		output_min=$(MACHINE=starfive-dubhe bitbake qspi-nfs-image | tee $cur_ter);
-#            		if [[ $output_min != *"ERROR"* ]]; then
-#                		echo -e "\U0002705 ${GREEN}Build Complete${NC}"
-#            		else echo -e "\U000274C ${RED}Build Failed${NC}"
-#            		fi;;
-#		 [Nn])
-#   			return;;
-# 		 *)
-#  			echo "Invalid option $RES , [Y/n] only.";
-#			esac;;
+	"Build dubhe-image-minimal")
+#           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+	    updatecfg ENABLE_EXT4
+            cur_ter=$(tty);
+            output_min=$(MACHINE=starfive-dubhe bitbake dubhe-image-minimal | tee $cur_ter);
+            if [[ $output_min != *"ERROR"* ]]; then
+                echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+                runprog console-image-minimal;
+            else echo -e "\U000274C ${RED}Build Failed${NC}"
+            fi;;
+	"Build qspi-ubifs-image")
+#            cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+	    updatecfg ENABLE_UBI
+            cur_ter=$(tty);
+            output=$(MACHINE=starfive-dubhe bitbake qspi-ubifs-image | tee $cur_ter);
+            if [[ $output != *"ERROR"* ]]; then
+                echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+            else echo -e "\U000274C ${RED}Build Failed${NC}"
+            fi;;
+        "Build qspi-nfs-image")
+#           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
+	    sed -n 10p ../meta-starfive/recipes-kernel/linux/files/nfs.patch;
+	    read -p "Kindly confirm boot argument such as nfs path and ip address before build (/meta-starfive/recipes-kernel/linux/files/nfs.patch). Proceed to build?[Y/n]:" RES;
+	    case $RES in
+		[Yy])
+			updatecfg ENABLE_NFS
+			cur_ter=$(tty);
+			output_min=$(MACHINE=starfive-dubhe bitbake qspi-nfs-image | tee $cur_ter);
+			if [[ $output_min != *"ERROR"* ]]; then
+				echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+			else echo -e "\U000274C ${RED}Build Failed${NC}"
+			fi;;
+		 [Nn])
+			return;;
+		 *)
+			echo "Invalid option $RES , [Y/n] only.";
+			esac;;
 	"Quit")
             break;;
         *)

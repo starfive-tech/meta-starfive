@@ -1,0 +1,43 @@
+From 4bd202226b1d1464d264ce578ec71710dcae0058 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 22 Nov 2022 00:21:37 +0000
+Subject: [PATCH 227/547] Daily bump.
+
+---
+ gcc/ChangeLog | 15 +++++++++++++++
+ gcc/DATESTAMP |  2 +-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 0715d8fa945..a484d91cda6 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,18 @@
++2022-11-21  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-11-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/107748
++	* config/i386/avx512fp16intrin.h (_mm512_castph512_ph128,
++	_mm512_castph512_ph256, _mm512_castph128_ph512,
++	_mm512_castph256_ph512, _mm512_set1_pch): Uglify names of local
++	variables and union members.
++	* config/i386/avx512fp16vlintrin.h (_mm256_castph256_ph128,
++	_mm256_castph128_ph256, _mm256_set1_pch, _mm_set1_pch): Likewise.
++	* config/i386/smmintrin.h (_mm_extract_ps): Likewise.
++	* config/i386/avx512bf16intrin.h (_mm_cvtsbh_ss): Likewise.
++
+ 2022-11-20  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index b4f44f494dc..00ec7aeeb71 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221121
++20221122
+-- 
+2.25.1
+

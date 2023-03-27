@@ -1,0 +1,96 @@
+From 7bd8b65bd5d51a33f31ec39dfb435b84e36260e9 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 1 Feb 2023 12:52:52 +0100
+Subject: [PATCH 451/547] ree: Fix -fcompare-debug issues in
+ combine_reaching_defs [PR108573]
+
+The PR78437 r7-4871 changes made combine_reaching_defs punt on
+WORD_REGISTER_OPERATIONS targets if a setter of smaller than word
+register has wider uses.  This unfortunately breaks -fcompare-debug,
+because if such a use appears only in DEBUG_INSN(s), while all other
+uses aren't wider than the setter, we can REE optimize it without -g
+and not with -g.
+
+Such decisions shouldn't be based on debug instructions.  We could try
+to reset them or adjust in some other way after we decide to perform the
+change, but at least on the testcase which used to fail on riscv64-linux
+the
+(debug_insn 8 7 9 2 (var_location:HI s (minus:HI (subreg:HI (and:DI (reg:DI 10 a0 [160])
+                (const_int 1 [0x1])) 0)
+        (subreg:HI (ashiftrt:DI (reg/v:DI 9 s1 [orig:151 l ] [151])
+                (debug_expr:SI D#1)) 0))) "pr108573.c":12:5 -1
+     (nil))
+clearly doesn't care about the upper bits and I have hard time imaging how
+could one end up with DEBUG_INSN which actually cares about those upper
+bits.
+
+So, the following patch just ignores uses on DEBUG_INSNs in this case,
+if we run into something where we'd need to do something further later on,
+let's deal with it when we have a testcase for it.
+
+2023-02-01  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/108573
+	* ree.cc (combine_reaching_defs): Don't return false for paradoxical
+	subregs in DEBUG_INSNs.
+
+	* gcc.dg/pr108573.c: New test.
+
+(cherry picked from commit e4473d7cf871c8ddf8f22d105c5af6375ebe37bf)
+---
+ gcc/ree.cc                      |  6 ++++--
+ gcc/testsuite/gcc.dg/pr108573.c | 18 ++++++++++++++++++
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr108573.c
+
+diff --git a/gcc/ree.cc b/gcc/ree.cc
+index de4f18e8a4d..899dff6c503 100644
+--- a/gcc/ree.cc
++++ b/gcc/ree.cc
+@@ -875,7 +875,8 @@ combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
+ 
+ 	  for (df_link *use = uses; use; use = use->next)
+ 	    if (paradoxical_subreg_p (GET_MODE (*DF_REF_LOC (use->ref)),
+-				      GET_MODE (SET_DEST (*dest_sub_rtx))))
++				      GET_MODE (SET_DEST (*dest_sub_rtx)))
++		&& !DEBUG_INSN_P (DF_REF_INSN (use->ref)))
+ 	      return false;
+ 	}
+ 
+@@ -963,7 +964,8 @@ combine_reaching_defs (ext_cand *cand, const_rtx set_pat, ext_state *state)
+ 	      rtx dest2 = SET_DEST (*dest_sub_rtx2);
+ 	      for (use = uses; use; use = use->next)
+ 		if (paradoxical_subreg_p (GET_MODE (*DF_REF_LOC (use->ref)),
+-					  GET_MODE (dest2)))
++					  GET_MODE (dest2))
++		    && !DEBUG_INSN_P (DF_REF_INSN (use->ref)))
+ 		  break;
+ 	      if (use)
+ 		break;
+diff --git a/gcc/testsuite/gcc.dg/pr108573.c b/gcc/testsuite/gcc.dg/pr108573.c
+new file mode 100644
+index 00000000000..5dd18043b2b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr108573.c
+@@ -0,0 +1,18 @@
++/* PR debug/108573 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fcompare-debug" } */
++
++unsigned g;
++
++int bar (void);
++int baz (int);
++
++void
++foo (unsigned short s, long l)
++{
++  unsigned u = bar ();
++  s &= __builtin_add_overflow_p (0, u, 0);
++  s %= g;
++  s -= l >> s;
++  baz (s);
++}
+-- 
+2.25.1
+

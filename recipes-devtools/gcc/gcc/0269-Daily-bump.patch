@@ -1,0 +1,64 @@
+From 3ee5a2371b2153e13def378a491e98f42d9fce61 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 10 Dec 2022 00:22:21 +0000
+Subject: [PATCH 269/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 20 ++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  7 +++++++
+ 3 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index bb7d1574532..04fd6883a38 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,23 @@
++2022-12-09  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-12-09  Martin Liska  <mliska@suse.cz>
++
++	* config/i386/i386-builtins.cc (fold_builtin_cpu): Use same path
++	as for PR103661.
++	* doc/extend.texi: Fix "x86-64" use.
++
++2022-12-09  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-05-11  Martin Liska  <mliska@suse.cz>
++
++	* common/config/i386/cpuinfo.h (has_cpu_feature): Directly
++	compute index in cpu_features2.
++	(set_cpu_feature): Likewise.
++	* config/i386/i386-builtins.cc (fold_builtin_cpu): Also remove
++	loop for cpu_features2 and use NOP_EXPRs.
++
+ 2022-12-06  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6f787fd296d..039ae27f009 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221209
++20221210
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 22825be9b20..3d10280ffb5 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,10 @@
++2022-12-09  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-12-09  Martin Liska  <mliska@suse.cz>
++
++	* gcc.target/i386/builtin_target.c: Add more checks.
++
+ 2022-12-06  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

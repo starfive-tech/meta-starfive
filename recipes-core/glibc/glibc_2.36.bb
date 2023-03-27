@@ -74,6 +74,8 @@ SRC_URI =  "${GLIBC_GIT_URI};branch=${SRCBRANCH};name=glibc \
            file://0017-fix-strchr-missing-index-weak-alias.patch \
            file://0018-fix-memmove-align-fail-because-of-typo.patch \
            file://0019-fix-missing-alias-functions.patch \
+	   file://0001-RISCV-enable-align-loops-8-for-optimized-func.patch \
+	   file://0002-RISCV-revert-strchrnul-strncmp-strnlen.patch \
 	   "
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build-${TARGET_SYS}"
@@ -83,6 +85,8 @@ PACKAGES_DYNAMIC = ""
 # the -isystem in bitbake.conf screws up glibc do_stage
 BUILD_CPPFLAGS = "-I${STAGING_INCDIR_NATIVE}"
 TARGET_CPPFLAGS = "-I${STAGING_DIR_TARGET}${includedir}"
+
+EXTRA_OEMAKE:class-target += "CFLAGS+=' -march=rv64gc_zba_zbb_zbc_zbs' ASFLAGS+=' -march=rv64gc_zba_zbb_zbc_zbs'"
 
 GLIBC_BROKEN_LOCALES = ""
 

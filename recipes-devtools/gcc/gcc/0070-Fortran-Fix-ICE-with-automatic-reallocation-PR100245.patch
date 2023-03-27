@@ -1,0 +1,76 @@
+From 9035eaaf028ca609660f1f55c0d9f22fb7d3b797 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jos=C3=A9=20Rui=20Faustino=20de=20Sousa?=
+ <jrfsousa@gmail.com>
+Date: Fri, 2 Sep 2022 21:35:22 +0200
+Subject: [PATCH 070/547] Fortran: Fix ICE with automatic reallocation
+ [PR100245]
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/100245
+	* trans-expr.cc (trans_class_assignment): Add if clause to handle
+	derived type in the LHS.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/100245
+	* gfortran.dg/PR100245.f90: New test.
+
+(cherry picked from commit 504424f33771be0405454e7845219d5df1bb88bb)
+---
+ gcc/fortran/trans-expr.cc              |  3 +++
+ gcc/testsuite/gfortran.dg/PR100245.f90 | 28 ++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/PR100245.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index e35ea2fc790..7895d034610 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -11435,6 +11435,9 @@ trans_class_assignment (stmtblock_t *block, gfc_expr *lhs, gfc_expr *rhs,
+       class_han = GFC_CLASS_TYPE_P (TREE_TYPE (lse->expr))
+ 	  ? gfc_class_data_get (lse->expr) : lse->expr;
+ 
++      if (!POINTER_TYPE_P (TREE_TYPE (class_han)))
++	class_han = gfc_build_addr_expr (NULL_TREE, class_han);
++
+       /* Allocate block.  */
+       gfc_init_block (&alloc);
+       gfc_allocate_using_malloc (&alloc, class_han, size, NULL_TREE);
+diff --git a/gcc/testsuite/gfortran.dg/PR100245.f90 b/gcc/testsuite/gfortran.dg/PR100245.f90
+new file mode 100644
+index 00000000000..07c1f7b3a1c
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/PR100245.f90
+@@ -0,0 +1,28 @@
++! { dg-do run }
++!
++! Test the fix for PR100245
++!
++
++program main_p
++
++  implicit none
++
++  type :: foo_t
++    integer :: a
++  end type foo_t
++
++  integer, parameter :: a = 42
++
++  class(foo_t), allocatable :: val
++  class(foo_t), allocatable :: rs1
++  type(foo_t),  allocatable :: rs2
++
++  allocate(val, source=foo_t(42))
++  if (val%a/=a) stop 1
++  rs1 = val
++  if (rs1%a/=a) stop 2
++  rs2 = val
++  if (rs2%a/=a) stop 3
++  deallocate(val, rs1, rs2)
++
++end program main_p
+-- 
+2.25.1
+

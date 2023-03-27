@@ -1,0 +1,113 @@
+From b492e3a0d801b93e6af7ed49b89aa27fb02ab1da Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Fri, 25 Nov 2022 10:49:20 +0100
+Subject: [PATCH 242/547] Fix thinko in operator_bitwise_xor::op1_range
+
+There is a thinko in the op1_range method of ranger's operator_bitwise_xor
+class in a boolean context: if the result is known to be true, it may infer
+that a specific operand is false without any basis.
+
+gcc/
+	* range-op.cc (operator_bitwise_xor::op1_range): Fix thinko.
+
+gcc/testsuite/
+	* gnat.dg/opt100.adb: New test.
+	* gnat.dg/opt100_pkg.adb, gnat.dg/opt100_pkg.ads: New helper.
+---
+ gcc/range-op.cc                      |  3 +++
+ gcc/testsuite/gnat.dg/opt100.adb     | 13 +++++++++++++
+ gcc/testsuite/gnat.dg/opt100_pkg.adb | 17 +++++++++++++++++
+ gcc/testsuite/gnat.dg/opt100_pkg.ads | 23 +++++++++++++++++++++++
+ 4 files changed, 56 insertions(+)
+ create mode 100644 gcc/testsuite/gnat.dg/opt100.adb
+ create mode 100644 gcc/testsuite/gnat.dg/opt100_pkg.adb
+ create mode 100644 gcc/testsuite/gnat.dg/opt100_pkg.ads
+
+diff --git a/gcc/range-op.cc b/gcc/range-op.cc
+index 464a1f839fd..b5f4627fe2b 100644
+--- a/gcc/range-op.cc
++++ b/gcc/range-op.cc
+@@ -3230,6 +3230,9 @@ operator_bitwise_xor::op1_range (irange &r, tree type,
+ 	    r.set_varying (type);
+ 	  else if (op2.zero_p ())
+ 	    r = range_true (type);
++	  // See get_bool_state for the rationale
++	  else if (op2.contains_p (build_zero_cst (op2.type ())))
++	    r = range_true_and_false (type);
+ 	  else
+ 	    r = range_false (type);
+ 	  break;
+diff --git a/gcc/testsuite/gnat.dg/opt100.adb b/gcc/testsuite/gnat.dg/opt100.adb
+new file mode 100644
+index 00000000000..83270b64339
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt100.adb
+@@ -0,0 +1,13 @@
++-- { dg-do run }
++-- { dg-options "-O2 -gnatp" }
++
++with Opt100_Pkg; use Opt100_Pkg;
++
++procedure Opt100 is
++  R : constant Rec := (K => B, N => 1);
++
++begin
++  if Func (R) /= 1 then
++     raise Program_Error;
++  end if;
++end;
+diff --git a/gcc/testsuite/gnat.dg/opt100_pkg.adb b/gcc/testsuite/gnat.dg/opt100_pkg.adb
+new file mode 100644
+index 00000000000..42bf8830d53
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt100_pkg.adb
+@@ -0,0 +1,17 @@
++package body Opt100_Pkg is
++
++   function Func (R : Rec) return Integer is
++   begin
++      if R in Small_Rec then
++         case R.K is
++            when A => return 0;
++            when B => return 1;
++            when C => return 2;
++            when others => raise Program_Error;
++         end case;
++      else
++         return -1;
++      end if;
++   end;
++
++end Opt100_Pkg;
+diff --git a/gcc/testsuite/gnat.dg/opt100_pkg.ads b/gcc/testsuite/gnat.dg/opt100_pkg.ads
+new file mode 100644
+index 00000000000..a45f887d665
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/opt100_pkg.ads
+@@ -0,0 +1,23 @@
++with Interfaces; use Interfaces;
++
++package Opt100_Pkg is
++
++  A : constant Unsigned_8 := 0;
++  B : constant Unsigned_8 := 1;
++  C : constant Unsigned_8 := 2;
++
++  subtype Small_Unsigned_8 is Unsigned_8 range A .. C;
++
++  type Rec is record
++    K : Unsigned_8;
++    N : Natural;
++  end record;
++
++  subtype Small_Rec is Rec
++    with Dynamic_Predicate =>
++      Small_Rec.K in Small_Unsigned_8 and
++        ((Small_Rec.N in Positive) = (Small_Rec.K in B | C));
++
++   function Func (R : Rec) return Integer;
++
++end Opt100_Pkg;
+-- 
+2.25.1
+

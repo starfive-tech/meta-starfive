@@ -1,0 +1,204 @@
+From 14a92220a2f061328aae32ee6b5cdc7f62375902 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 4 Nov 2022 00:21:37 +0000
+Subject: [PATCH 193/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 33 ++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/c/ChangeLog         | 19 ++++++++++++++++
+ gcc/cp/ChangeLog        | 19 ++++++++++++++++
+ gcc/testsuite/ChangeLog | 48 +++++++++++++++++++++++++++++++++++++++++
+ libgomp/ChangeLog       | 21 ++++++++++++++++++
+ 6 files changed, 141 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 32c8d0adeb1..197fa081cf3 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,36 @@
++2022-11-03  Uros Bizjak  <ubizjak@gmail.com>
++
++	Backported from master:
++	2022-11-03  Uroš Bizjak  <ubizjak@gmail.com>
++
++	PR target/107404
++	* config/i386/i386.md (eliminate reg-reg move by inverting the
++	condition of a cmove #2 peephole2): Check if eliminated move
++	initialized a register, used in the moved instruction.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-02  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/107121
++	* tree-cfg.cc (verify_gimple_call): Fix a typo in diagnostics,
++	DEFFERED_INIT -> DEFERRED_INIT.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/107001
++	* omp-low.cc (lower_omp_taskgroup): Don't add GOMP_RETURN statement
++	at the end.
++	* omp-expand.cc (build_omp_regions_1): Clarify GF_OMP_TARGET_KIND_DATA
++	is not stand-alone directive.  For GIMPLE_OMP_TASKGROUP, also don't
++	update parent.
++	(omp_make_gimple_edges) <case GIMPLE_OMP_TASKGROUP>: Reset
++	cur_region back after new_omp_region.
++
+ 2022-10-28  Julian Brown  <julian@codesourcery.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 99ca02330bd..c96f2246e01 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221103
++20221104
+diff --git a/gcc/c/ChangeLog b/gcc/c/ChangeLog
+index 0254f4e087d..9ca66f0b2d5 100644
+--- a/gcc/c/ChangeLog
++++ b/gcc/c/ChangeLog
+@@ -1,3 +1,22 @@
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/107358
++	* c-typeck.cc (build_binary_op): Pass operands before excess precision
++	promotions to scalar_to_vector call.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/106981
++	* c-typeck.cc (c_tree_equal): Only strip NON_LVALUE_EXPRs at the
++	start.  For CONSTANT_CLASS_P or CASE_CONVERT: return false if t1 and
++	t2 have different types.
++
+ 2022-09-19  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 9dc4d05a013..4b4e6d5ea1a 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,22 @@
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/105774
++	* constexpr.cc (cxx_eval_increment_expression): For signed types
++	that promote to int, evaluate PLUS_EXPR or MINUS_EXPR in int type.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-07  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/106829
++	* semantics.cc (finish_omp_target_clauses): If current_function_decl
++	isn't a nonstatic member function, don't set data.current_object to
++	non-NULL.
++
+ 2022-10-13  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 600ec620dcb..674b98d053d 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,51 @@
++2022-11-03  Uros Bizjak  <ubizjak@gmail.com>
++
++	Backported from master:
++	2022-11-03  Uroš Bizjak  <ubizjak@gmail.com>
++
++	PR target/107404
++	* g++.target/i386/pr107404.C: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/107358
++	* c-c++-common/pr107358.c: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/105774
++	* g++.dg/cpp1y/constexpr-105774.C: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/107001
++	* c-c++-common/gomp/pr107001.c: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/106981
++	* c-c++-common/gomp/pr106981.c: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-07  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/106829
++	* g++.dg/gomp/pr106829.C: New test.
++
+ 2022-10-29  José Rui Faustino de Sousa  <jrfsousa@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/libgomp/ChangeLog b/libgomp/ChangeLog
+index dfb73a9d183..349cc6d4769 100644
+--- a/libgomp/ChangeLog
++++ b/libgomp/ChangeLog
+@@ -1,3 +1,24 @@
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-10-12  Jakub Jelinek  <jakub@redhat.com>
++
++	* task.c (gomp_create_artificial_team): Fix up handling of invocations
++	from within explicit task.
++	* target.c (GOMP_target_ext): Likewise.
++	* testsuite/libgomp.c/task-7.c: New test.
++	* testsuite/libgomp.c/task-8.c: New test.
++	* testsuite/libgomp.c-c++-common/task-reduction-17.c: New test.
++	* testsuite/libgomp.c-c++-common/task-reduction-18.c: New test.
++
++2022-11-03  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2022-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/106981
++	* testsuite/libgomp.c-c++-common/pr106981.c: New test.
++
+ 2022-10-28  Julian Brown  <julian@codesourcery.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

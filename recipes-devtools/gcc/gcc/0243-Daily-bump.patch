@@ -1,0 +1,158 @@
+From ed8d7ecac11d587687986a0895050955c09d2f43 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 25 Nov 2022 10:07:49 +0000
+Subject: [PATCH 243/547] Daily bump.
+
+---
+ gcc/ChangeLog           |  9 ++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  9 ++++
+ libstdc++-v3/ChangeLog  | 94 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 113 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a484d91cda6..a07ca91fdd2 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* range-op.cc (operator_bitwise_xor::op1_range): Fix thinko.
++
++2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* tree-loop-distribution.cc (loop_distribution::classify_builtin_ldst):
++	Bail out if source and destination do not have the same storage order.
++
+ 2022-11-21  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 059dd7f104c..9fb04058de4 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221124
++20221125
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 7d03bb8e8dd..ac114f6083e 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,12 @@
++2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/opt100.adb: New test.
++	* gnat.dg/opt100_pkg.adb, gnat.dg/opt100_pkg.ads: New helper.
++
++2022-11-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/sso18.adb: New test.
++
+ 2022-11-20  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index f0918cddd82..56ad3b53c81 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,97 @@
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-09-15  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/std/memory: Do not include <bits/stl_algobase.h>.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-11  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/20_util/tuple/swap.cc (MoveOnly::operator==): Add
++	const qualifier.
++	* testsuite/26_numerics/valarray/87641.cc (X::operator==):
++	Likewise.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/std/expected (expected::_M_invalid): Remove.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-11-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/chrono.h (duration): Check preconditions on
++	template arguments before using them.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-10-28  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/fs_path.h (path::filename()): Fix dangling
++	reference.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-09-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/xml/manual/intro.xml: Document LWG 1203.
++	* doc/html/*: Regenerate.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-09-07  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/std/barrier: Add missing runtime exception.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-08-04  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/fs_dir.h (directory_iterator): Add comparison
++	with std::default_sentinel_t. Remove redundant operator!= for
++	C++20.
++	* (recursive_directory_iterator): Likewise.
++	* include/bits/iterator_concepts.h [!__cpp_lib_concepts]
++	(default_sentinel_t, default_sentinel): Define even if concepts
++	are not supported.
++	* include/bits/regex.h (regex_iterator): Add comparison with
++	std::default_sentinel_t. Remove redundant operator!= for C++20.
++	(regex_token_iterator): Likewise.
++	(regex_token_iterator::_M_end_of_seq()): Add noexcept.
++	* testsuite/27_io/filesystem/iterators/lwg3719.cc: New test.
++	* testsuite/28_regex/iterators/regex_iterator/lwg3719.cc:
++	New test.
++	* testsuite/28_regex/iterators/regex_token_iterator/lwg3719.cc:
++	New test.
++
++2022-11-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-09-23  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/91456
++	* include/std/type_traits (__is_nothrow_invocable): Remove.
++	(__is_invocable_impl::__nothrow_type): New member type which
++	checks if the conversion can throw.
++	(__is_nt_invocable_impl): Replace class template with alias
++	template to __is_nt_invocable_impl::__nothrow_type.
++	* testsuite/20_util/is_nothrow_invocable/91456.cc: New test.
++	* testsuite/20_util/is_nothrow_convertible/value.cc: Remove
++	macro used by value_ext.cc test.
++	* testsuite/20_util/is_nothrow_convertible/value_ext.cc: Remove
++	test for non-standard __is_nothrow_invocable trait.
++
+ 2022-11-22  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	PR libstdc++/106201
+-- 
+2.25.1
+

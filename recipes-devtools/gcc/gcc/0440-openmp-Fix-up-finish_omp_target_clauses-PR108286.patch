@@ -1,0 +1,82 @@
+From 5de999df9fa0134a1621b552eb2abd65a6384ffd Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 5 Jan 2023 11:57:30 +0100
+Subject: [PATCH 440/547] openmp: Fix up finish_omp_target_clauses [PR108286]
+
+The comment in the loop says that we shouldn't add a map clause if such
+a clause exists already, but the loop was actually using OMP_CLAUSE_DECL
+on any clause.  Target construct can have various clauses which don't
+have OMP_CLAUSE_DECL at all (e.g. nowait, device or if) or clause
+where it means something different (e.g. privatization clauses, allocate,
+depend).
+
+So, only check OMP_CLAUSE_DECL on OMP_CLAUSE_MAP clauses.
+
+2023-01-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/108286
+	* semantics.cc (finish_omp_target_clauses): Ignore clauses other than
+	OMP_CLAUSE_MAP.
+
+	* testsuite/libgomp.c++/pr108286.C: New test.
+
+(cherry picked from commit 29c3218618ef6177dc33871b26c8fbd9b21eabe1)
+---
+ gcc/cp/semantics.cc                      |  4 +++-
+ libgomp/testsuite/libgomp.c++/pr108286.C | 29 ++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 1 deletion(-)
+ create mode 100644 libgomp/testsuite/libgomp.c++/pr108286.C
+
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index 687fec019d3..cc979e19620 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -9695,7 +9695,9 @@ finish_omp_target_clauses (location_t loc, tree body, tree *clauses_ptr)
+ 
+ 	for (tree c = *clauses_ptr; c; c = OMP_CLAUSE_CHAIN (c))
+ 	  {
+-	    /* If map(this->ptr[:N] already exists, avoid creating another
++	    if (OMP_CLAUSE_CODE (c) != OMP_CLAUSE_MAP)
++	      continue;
++	    /* If map(this->ptr[:N]) already exists, avoid creating another
+ 	       such map.  */
+ 	    tree decl = OMP_CLAUSE_DECL (c);
+ 	    if ((TREE_CODE (decl) == INDIRECT_REF
+diff --git a/libgomp/testsuite/libgomp.c++/pr108286.C b/libgomp/testsuite/libgomp.c++/pr108286.C
+new file mode 100644
+index 00000000000..ee88c2f9fd0
+--- /dev/null
++++ b/libgomp/testsuite/libgomp.c++/pr108286.C
+@@ -0,0 +1,29 @@
++// PR c++/108286
++// { dg-do run }
++
++struct S {
++  int
++  foo ()
++  {
++    int res = 0;
++#pragma omp target map(size, ptr[:size], res) nowait
++    res = ptr[size - 1];
++#pragma omp taskwait
++    return res;
++  }
++
++  unsigned size;
++  int *ptr;
++};
++
++int
++main ()
++{
++  S s;
++  int buf[5];
++  s.size = 5;
++  s.ptr = buf;
++  buf[4] = 42;
++  if (s.foo () != 42)
++    __builtin_abort ();
++}
+-- 
+2.25.1
+

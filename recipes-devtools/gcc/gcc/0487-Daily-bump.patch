@@ -1,0 +1,108 @@
+From 9860b733b4c1f3b7d052077a75347a6e1d6265da Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 17 Feb 2023 00:22:02 +0000
+Subject: [PATCH 487/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   |  9 +++++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ libstdc++-v3/ChangeLog  | 45 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 63 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 22d2daa87ba..ef309477de2 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230216
++20230217
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index de4b5c6d071..ed3520772a3 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2023-02-16  Steve Kargl  <kargl@gcc.gnu.org>
++
++	Backported from master:
++	2023-02-15  Steve Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/104554
++	* resolve.cc (check_assumed_size_reference): Avoid NULL pointer
++	dereference.
++
+ 2023-02-10  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 1dbfe8e654f..a96c697c100 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2023-02-16  Steve Kargl  <kargl@gcc.gnu.org>
++
++	Backported from master:
++	2023-02-15  Steve Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/104554
++	* gfortran.dg/pr104554.f90: New test.
++
+ 2023-02-15  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 70477201021..b55625a6609 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,48 @@
++2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd_math.h (__hypot): Bitcasting
++	between scalars requires the __bit_cast helper function instead
++	of simd_bit_cast.
++
++2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd_x86.h
++	(_SimdImplX86::_S_not_equal_to, _SimdImplX86::_S_less)
++	(_SimdImplX86::_S_less_equal): Do not call
++	__builtin_is_constant_evaluated in constexpr-if.
++
++2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	* testsuite/experimental/simd/tests/bits/verify.h
++	(verify::verify): Use %zx for size_t in format string.
++
++2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	* testsuite/experimental/simd/README.md: Document the timeout
++	and timeout-factor directives. Minor typo fixed.
++
++2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2023-02-16  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/experimental/bits/simd.h
++	(_SimdWrapper::_M_is_constprop_none_of)
++	(_SimdWrapper::_M_is_constprop_all_of): Return false unless the
++	computed result still satisfies __builtin_constant_p.
++
+ 2023-02-14  Thomas W Rodgers  <rodgert@twrodgers.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

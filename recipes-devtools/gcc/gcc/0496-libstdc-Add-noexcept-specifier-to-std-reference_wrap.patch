@@ -1,0 +1,64 @@
+From 5e8ff1c84b1599c747cd161d5370235791242bf3 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 31 Aug 2022 13:57:34 +0100
+Subject: [PATCH 496/547] libstdc++: Add noexcept-specifier to
+ std::reference_wrapper::operator()
+
+This isn't required by the standard, but there's an LWG issue suggesting
+to add it.
+
+Also use __invoke_result instead of result_of, to match the spec in
+recent standards.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/refwrap.h (reference_wrapper::operator()): Add
+	noexcept-specifier and use __invoke_result instead of result_of.
+	* testsuite/20_util/reference_wrapper/invoke-noexcept.cc: New test.
+
+(cherry picked from commit e47df5eb56c4e7aca0d3e50826e5aaa1887fa446)
+---
+ libstdc++-v3/include/bits/refwrap.h               |  3 ++-
+ .../20_util/reference_wrapper/invoke-noexcept.cc  | 15 +++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+ create mode 100644 libstdc++-v3/testsuite/20_util/reference_wrapper/invoke-noexcept.cc
+
+diff --git a/libstdc++-v3/include/bits/refwrap.h b/libstdc++-v3/include/bits/refwrap.h
+index 8016f87478e..976902bc7bc 100644
+--- a/libstdc++-v3/include/bits/refwrap.h
++++ b/libstdc++-v3/include/bits/refwrap.h
+@@ -348,8 +348,9 @@ _GLIBCXX_MEM_FN_TRAITS(&& noexcept, false_type, true_type)
+ 
+       template<typename... _Args>
+ 	_GLIBCXX20_CONSTEXPR
+-	typename result_of<_Tp&(_Args&&...)>::type
++	typename __invoke_result<_Tp&, _Args...>::type
+ 	operator()(_Args&&... __args) const
++	noexcept(__is_nothrow_invocable<_Tp&, _Args...>::value)
+ 	{
+ #if __cplusplus > 201703L
+ 	  if constexpr (is_object_v<type>)
+diff --git a/libstdc++-v3/testsuite/20_util/reference_wrapper/invoke-noexcept.cc b/libstdc++-v3/testsuite/20_util/reference_wrapper/invoke-noexcept.cc
+new file mode 100644
+index 00000000000..91b5d097f08
+--- /dev/null
++++ b/libstdc++-v3/testsuite/20_util/reference_wrapper/invoke-noexcept.cc
+@@ -0,0 +1,15 @@
++// { dg-do compile { target c++11 } }
++
++// C++11 20.8.3.4 reference_wrapper invocation [refwrap.invoke]
++
++#include <functional>
++
++struct F
++{
++  int operator()() noexcept(true) { return 1; }
++  int operator()() const noexcept(false) { return 2; }
++};
++
++F f;
++static_assert( noexcept(std::ref(f)()) );
++static_assert( ! noexcept(std::cref(f)()) );
+-- 
+2.25.1
+

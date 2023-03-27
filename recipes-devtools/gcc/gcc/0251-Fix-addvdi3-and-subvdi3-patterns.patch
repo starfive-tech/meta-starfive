@@ -1,0 +1,100 @@
+From 6916332f03136441cf13d8796b39a3af16e4aa3f Mon Sep 17 00:00:00 2001
+From: John David Anglin <danglin@gcc.gnu.org>
+Date: Wed, 30 Nov 2022 18:40:10 +0000
+Subject: [PATCH 251/547] Fix addvdi3 and subvdi3 patterns
+
+While most PA 2.0 instructions support both 32 and 64-bit traps
+and conditions, the addi and subi instructions only support 32-bit
+traps and conditions. Thus, we need to force immediate operands
+to register operands on the 64-bit target and use the add/sub
+instructions which can trap on 64-bit signed overflow.
+
+2022-11-30  John David Anglin  <danglin@gcc.gnu.org>
+
+gcc/ChangeLog:
+
+	* config/pa/pa.md (addvdi3): Force operand 2 to a register.
+	Remove "addi,tsv,*" instruction from unamed pattern.
+	(subvdi3): Force operand 1 to a register.
+	Remove "subi,tsv" instruction from from unamed pattern.
+---
+ gcc/config/pa/pa.md | 40 ++++++++++++++++++++++------------------
+ 1 file changed, 22 insertions(+), 18 deletions(-)
+
+diff --git a/gcc/config/pa/pa.md b/gcc/config/pa/pa.md
+index 76ae35d4cfa..41382271e54 100644
+--- a/gcc/config/pa/pa.md
++++ b/gcc/config/pa/pa.md
+@@ -5071,23 +5071,25 @@
+ 						    (match_dup 2))))
+ 		       (const_int 0))])]
+   ""
+-  "")
++  "
++{
++  if (TARGET_64BIT)
++    operands[2] = force_reg (DImode, operands[2]);
++}")
+ 
+ (define_insn ""
+-  [(set (match_operand:DI 0 "register_operand" "=r,r")
+-	(plus:DI (match_operand:DI 1 "reg_or_0_operand" "%rM,rM")
+-		 (match_operand:DI 2 "arith11_operand" "r,I")))
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(plus:DI (match_operand:DI 1 "reg_or_0_operand" "%rM")
++		 (match_operand:DI 2 "register_operand" "r")))
+    (trap_if (ne (plus:TI (sign_extend:TI (match_dup 1))
+ 			 (sign_extend:TI (match_dup 2)))
+ 		(sign_extend:TI (plus:DI (match_dup 1)
+ 					 (match_dup 2))))
+ 	    (const_int 0))]
+   "TARGET_64BIT"
+-  "@
+-  add,tsv,* %2,%1,%0
+-  addi,tsv,* %2,%1,%0"
+-  [(set_attr "type" "binary,binary")
+-   (set_attr "length" "4,4")])
++  "add,tsv,* %2,%1,%0"
++  [(set_attr "type" "binary")
++   (set_attr "length" "4")])
+ 
+ (define_insn ""
+   [(set (match_operand:DI 0 "register_operand" "=r")
+@@ -5262,23 +5264,25 @@
+ 						     (match_dup 2))))
+ 		       (const_int 0))])]
+   ""
+-  "")
++  "
++{
++  if (TARGET_64BIT)
++    operands[1] = force_reg (DImode, operands[1]);
++}")
+ 
+ (define_insn ""
+-  [(set (match_operand:DI 0 "register_operand" "=r,r")
+-	(minus:DI (match_operand:DI 1 "arith11_operand" "r,I")
+-		  (match_operand:DI 2 "reg_or_0_operand" "rM,rM")))
++  [(set (match_operand:DI 0 "register_operand" "=r")
++	(minus:DI (match_operand:DI 1 "register_operand" "r")
++		  (match_operand:DI 2 "reg_or_0_operand" "rM")))
+    (trap_if (ne (minus:TI (sign_extend:TI (match_dup 1))
+ 			  (sign_extend:TI (match_dup 2)))
+ 		(sign_extend:TI (minus:DI (match_dup 1)
+ 					  (match_dup 2))))
+ 	    (const_int 0))]
+   "TARGET_64BIT"
+-  "@
+-  {subo|sub,tsv} %1,%2,%0
+-  {subio|subi,tsv} %1,%2,%0"
+-  [(set_attr "type" "binary,binary")
+-   (set_attr "length" "4,4")])
++  "sub,tsv,* %1,%2,%0"
++  [(set_attr "type" "binary")
++   (set_attr "length" "4")])
+ 
+ (define_insn ""
+   [(set (match_operand:DI 0 "register_operand" "=r,&r")
+-- 
+2.25.1
+

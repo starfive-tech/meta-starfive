@@ -1,0 +1,183 @@
+From 487307a19728b11cf56007476ed7eec3e18415ec Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 30 Sep 2022 00:22:49 +0000
+Subject: [PATCH 102/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 20 ++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        |  4 ++++
+ gcc/fortran/ChangeLog   | 27 +++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 47 +++++++++++++++++++++++++++++++++++++++++
+ libstdc++-v3/ChangeLog  | 21 ++++++++++++++++++
+ 6 files changed, 120 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index cb12da91056..9476595dcfb 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,23 @@
++2022-09-29  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2022-09-28  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/107061
++	* config/i386/predicates.md (encodekey128_operation): Check
++	XMM4-XMM6 as clobbered.
++	(encodekey256_operation): Likewise.
++	* config/i386/sse.md (encodekey128u32): Clobber XMM4-XMM6.
++	(encodekey256u32): Likewise.
++
++2022-09-29  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-09-26  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR middle-end/106982
++	* omp-low.cc (lower_oacc_reductions): Add some unshare_expr.
++
+ 2022-09-28  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index ea4b4d1bd3b..47b36b023d0 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20220929
++20220930
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 3a5e7f4c3fe..bc2465f68c1 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,7 @@
++2022-09-29  Jason Merrill  <jason@redhat.com>
++
++	* class.cc (check_methods): Call constraints_satisfied_p.
++
+ 2022-09-12  Jason Merrill  <jason@redhat.com>
+ 
+ 	PR c++/93259
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 4d60fd362f6..74c92bf438e 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,30 @@
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-27  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/107054
++	* simplify.cc (gfc_simplify_unpack): Replace assert by condition
++	that terminates simplification when there are not enough elements
++	in the constructor of argument VECTOR.
++
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-22  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/82868
++	* trans-decl.cc (generate_coarray_sym_init): Skip symbol
++	if attr.associate_var.
++
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-20  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/106985
++	* expr.cc (gfc_simplify_expr): Avoid NULL pointer dereference.
++
+ 2022-09-22  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index e6738e1fe92..28773dbaffb 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,50 @@
++2022-09-29  Jason Merrill  <jason@redhat.com>
++
++	* g++.dg/cpp2a/cond-triv3.C: New test.
++
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-27  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/107054
++	* gfortran.dg/pr107054.f90: New test.
++
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-22  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/82868
++	* gfortran.dg/associate_26a.f90: New test.
++
++2022-09-29  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2022-09-20  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/106985
++	* gfortran.dg/pr106985.f90: New test.
++
++2022-09-29  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2022-09-28  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/107061
++	* gcc.target/i386/keylocker-encodekey128.c: Don't check
++	XMM4-XMM6.
++	* gcc.target/i386/keylocker-encodekey256.c: Likewise.
++
++2022-09-29  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2022-09-26  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR middle-end/106982
++	* c-c++-common/goacc/reduction-7.c: New test.
++	* c-c++-common/goacc/reduction-8.c: New test.
++
+ 2022-09-22  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index f9cf066cec7..c4a29f552df 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,24 @@
++2022-09-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2022-09-28  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/xml/manual/evolution.xml: Document std::bind API
++	changes.
++	* doc/xml/manual/intro.xml: Document LWG 2487 status.
++	* doc/xml/manual/using.xml: Clarify default value of
++	_GLIBCXX_USE_DEPRECATED.
++	* doc/html/*: Regenerate.
++	* include/std/functional (_Bind::operator()(Args&&...) volatile)
++	(_Bind::operator()(Args&&...) const volatile)
++	(_Bind_result::operator()(Args&&...) volatile)
++	(_Bind_result::operator()(Args&&...) const volatile): Replace
++	with deleted overload for C++20 and later.
++	* testsuite/20_util/bind/cv_quals.cc: Check for deprecated
++	warnings in C++17.
++	* testsuite/20_util/bind/cv_quals_2.cc: Likewise, and check for
++	ill-formed in C++20.
++
+ 2022-09-16  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	* doc/xml/manual/abi.xml: Document GLIBCXX_3.4.30 version.
+-- 
+2.25.1
+

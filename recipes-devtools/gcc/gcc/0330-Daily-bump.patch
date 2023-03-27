@@ -1,0 +1,95 @@
+From 13594459d337463d8ec130de6c3d7c55006a9fbc Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 5 Jan 2023 00:20:48 +0000
+Subject: [PATCH 330/547] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        |  9 +++++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ libiberty/ChangeLog     | 14 ++++++++++++++
+ libsanitizer/ChangeLog  |  9 +++++++++
+ 5 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 488992842fa..9d39ee8c855 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230104
++20230105
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 6c0f86e9459..4d1ac08b8c4 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2023-01-04  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-01-04  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/108282
++	* decl2.cc (mark_single_function): Ignore mark_used failure
++	only in a non-SFINAE context rather than in a SFINAE one.
++
+ 2022-12-19  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 059a8f0da90..144bd30a6f3 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2023-01-04  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2023-01-04  Patrick Palka  <ppalka@redhat.com>
++
++	PR c++/108282
++	* g++.dg/cpp2a/concepts-requires34.C: New test.
++
+ 2022-12-28  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/libiberty/ChangeLog b/libiberty/ChangeLog
+index 3bfb448a1fe..86254dcc8bd 100644
+--- a/libiberty/ChangeLog
++++ b/libiberty/ChangeLog
+@@ -1,3 +1,17 @@
++2023-01-04  Florian Weimer  <fweimer@redhat.com>
++
++	Backported from master:
++	2022-10-18  Florian Weimer  <fweimer@redhat.com>
++
++	* acinclude.m4 (ac_cv_func_strncmp_works): Add missing
++	int return type and parameter list to the definition of main.
++	Include <stdlib.h> and <string.h> for prototypes.
++	(ac_cv_c_stack_direction): Add missing
++	int return type and parameter list to the definitions of
++	main, find_stack_direction.  Include <stdlib.h> for exit
++	prototype.
++	* configure: Regenerate.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+diff --git a/libsanitizer/ChangeLog b/libsanitizer/ChangeLog
+index 3a9a5ce6b03..b86d1cdf58e 100644
+--- a/libsanitizer/ChangeLog
++++ b/libsanitizer/ChangeLog
+@@ -1,3 +1,12 @@
++2023-01-04  Florian Weimer  <fweimer@redhat.com>
++
++	Backported from master:
++	2022-10-18  Florian Weimer  <fweimer@redhat.com>
++
++	* configure.ac (sanitizer_supported): Include <unistd.h> for
++	syscall prototype.
++	* configure: Regenerate.
++
+ 2022-08-19  Release Manager
+ 
+ 	* GCC 12.2.0 released.
+-- 
+2.25.1
+

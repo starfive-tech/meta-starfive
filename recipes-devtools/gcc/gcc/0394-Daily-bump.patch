@@ -1,0 +1,89 @@
+From 2a3e66c064bc9fdf7738108491d094ca4d0d5f86 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 31 Jan 2023 00:22:54 +0000
+Subject: [PATCH 394/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 13 +++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   |  8 ++++++++
+ gcc/testsuite/ChangeLog |  5 +++++
+ libgomp/ChangeLog       |  8 ++++++++
+ 5 files changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index ccd1dbf8397..4f8b0b6fbb3 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,16 @@
++2023-01-30  Andrew MacLeod  <amacleod@redhat.com>
++
++	PR tree-optimization/108306
++	* range-op.cc (operator_lshift::fold_range): Return [0, 0] not
++	varying for shifts that are always out of void range.
++	(operator_rshift::fold_range): Return [0, 0] not
++	varying for shifts that are always out of void range.
++
++2023-01-30  liuhongt  <hongtao.liu@intel.com>
++
++	* config/i386/i386.opt: Change AVX512FP16 to AVX512-FP16.
++	* doc/invoke.texi: Ditto.
++
+ 2023-01-29  Jan Hubicka  <jh@suse.cz>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6878f7c4810..aa6d8640ab9 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20230130
++20230131
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index f6361d3ebcd..85060d59c64 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,11 @@
++2023-01-30  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2023-01-27  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR fortran/108558
++	* trans-openmp.cc (gfc_split_omp_clauses): Handle has_device_addr.
++
+ 2023-01-28  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f0535c6096e..548ef8f8e7a 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,8 @@
++2023-01-30  Andrew MacLeod  <amacleod@redhat.com>
++
++	PR tree-optimization/108306
++	* gcc.dg/pr108306.c: New.
++
+ 2023-01-28  Tejas Joshi  <TejasSanjay.Joshi@amd.com>
+ 
+ 	Backported from master:
+diff --git a/libgomp/ChangeLog b/libgomp/ChangeLog
+index 349cc6d4769..ecfc1521f7b 100644
+--- a/libgomp/ChangeLog
++++ b/libgomp/ChangeLog
+@@ -1,3 +1,11 @@
++2023-01-30  Tobias Burnus  <tobias@codesourcery.com>
++
++	Backported from master:
++	2023-01-27  Tobias Burnus  <tobias@codesourcery.com>
++
++	PR fortran/108558
++	* testsuite/libgomp.fortran/has_device_addr.f90: New test.
++
+ 2022-11-03  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+

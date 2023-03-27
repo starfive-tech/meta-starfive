@@ -1,0 +1,166 @@
+From eb50091457a789e2f2a15c2e5d08e0d79d3195b1 Mon Sep 17 00:00:00 2001
+From: Xi Ruoyao <xry111@xry111.site>
+Date: Thu, 2 Mar 2023 18:05:23 +0800
+Subject: [PATCH 527/547] LoongArch: Stop -mfpu from silently breaking ABI
+ [PR109000]
+
+In the toolchain convention, we describe -mfpu= as:
+
+"Selects the allowed set of basic floating-point instructions and
+registers. This option should not change the FP calling convention
+unless it's necessary."
+
+Though not explicitly stated, the rationale of this rule is to allow
+combinations like "-mabi=lp64s -mfpu=64".  This will be useful for
+running applications with LP64S/F ABI on a double-float-capable
+LoongArch hardware and using a math library with LP64S/F ABI but native
+double float HW instructions, for a better performance.
+
+And now a case in Linux kernel has again proven the usefulness of this
+kind of combination.  The AMDGPU DCN kernel driver needs to perform some
+floating-point operation, but the entire kernel uses LP64S ABI.  So the
+translation units of the AMDGPU DCN driver need to be compiled with
+-mfpu=64 (the kernel lacks soft-FP routines in libgcc), but -mabi=lp64s
+(or you can't link it with the other part of the kernel).
+
+Unfortunately, currently GCC uses TARGET_{HARD,SOFT,DOUBLE}_FLOAT to
+determine the floating calling convention.  This causes "-mfpu=64"
+silently allow using $fa* to pass parameters and return values EVEN IF
+-mabi=lp64s is used.  To make things worse, the generated object file
+has SOFT-FLOAT set in the eflags field so the linker will happily link
+it with other LP64S ABI object files, but obviously this will lead to
+bad results at runtime.  And for now all loongarch64 CPU models (-march
+settings) implies -mfpu=64 on by default, so the issue makes a single
+"-mabi=lp64s" option basically broken (fortunately most projects for eg
+the Linux kernel have used -msoft-float which implies both -mabi=lp64s
+and -mfpu=none as we've recommended in the toolchain convention doc).
+
+The fix is simple: use TARGET_*_FLOAT_ABI instead.
+
+I consider this a bug fix: the behavior difference from the toolchain
+convention doc is a bug, and generating object files with SOFT-FLOAT
+flag but parameters/return values passed through FPRs is definitely a
+bug.
+
+Bootstrapped and regtested on loongarch64-linux-gnu.  Ok for trunk and
+release/gcc-12 branch?
+
+gcc/ChangeLog:
+
+	PR target/109000
+	* config/loongarch/loongarch.h (FP_RETURN): Use
+	TARGET_*_FLOAT_ABI instead of TARGET_*_FLOAT.
+	(UNITS_PER_FP_ARG): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/109000
+	* gcc.target/loongarch/flt-abi-isa-1.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-2.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-3.c: New test.
+	* gcc.target/loongarch/flt-abi-isa-4.c: New test.
+
+(cherry picked from commit 75eccddef5784bc5e262af31f535267a9c4e993e)
+---
+ gcc/config/loongarch/loongarch.h                   |  4 ++--
+ gcc/testsuite/gcc.target/loongarch/flt-abi-isa-1.c | 14 ++++++++++++++
+ gcc/testsuite/gcc.target/loongarch/flt-abi-isa-2.c | 10 ++++++++++
+ gcc/testsuite/gcc.target/loongarch/flt-abi-isa-3.c |  9 +++++++++
+ gcc/testsuite/gcc.target/loongarch/flt-abi-isa-4.c | 10 ++++++++++
+ 5 files changed, 45 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/flt-abi-isa-1.c
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/flt-abi-isa-2.c
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/flt-abi-isa-3.c
+ create mode 100644 gcc/testsuite/gcc.target/loongarch/flt-abi-isa-4.c
+
+diff --git a/gcc/config/loongarch/loongarch.h b/gcc/config/loongarch/loongarch.h
+index 015d70c469c..714401f2dc2 100644
+--- a/gcc/config/loongarch/loongarch.h
++++ b/gcc/config/loongarch/loongarch.h
+@@ -672,7 +672,7 @@ enum reg_class
+    point values.  */
+ 
+ #define GP_RETURN (GP_REG_FIRST + 4)
+-#define FP_RETURN ((TARGET_SOFT_FLOAT) ? GP_RETURN : (FP_REG_FIRST + 0))
++#define FP_RETURN ((TARGET_SOFT_FLOAT_ABI) ? GP_RETURN : (FP_REG_FIRST + 0))
+ 
+ #define MAX_ARGS_IN_REGISTERS 8
+ 
+@@ -1145,6 +1145,6 @@ struct GTY (()) machine_function
+ /* The largest type that can be passed in floating-point registers.  */
+ /* TODO: according to mabi.  */
+ #define UNITS_PER_FP_ARG  \
+-  (TARGET_HARD_FLOAT ? (TARGET_DOUBLE_FLOAT ? 8 : 4) : 0)
++  (TARGET_HARD_FLOAT_ABI ? (TARGET_DOUBLE_FLOAT_ABI ? 8 : 4) : 0)
+ 
+ #define FUNCTION_VALUE_REGNO_P(N) ((N) == GP_RETURN || (N) == FP_RETURN)
+diff --git a/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-1.c b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-1.c
+new file mode 100644
+index 00000000000..1c9490f6a87
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-1.c
+@@ -0,0 +1,14 @@
++/* { dg-do compile } */
++/* { dg-options "-mabi=lp64d -mfpu=64 -march=loongarch64 -O2" } */
++/* { dg-final { scan-assembler "frecip\\.d" } } */
++/* { dg-final { scan-assembler-not "movgr2fr\\.d" } } */
++/* { dg-final { scan-assembler-not "movfr2gr\\.d" } } */
++
++/* FPU is used for calculation and FPR is used for arguments and return
++   values.  */
++
++double
++t (double x)
++{
++  return 1.0 / x;
++}
+diff --git a/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-2.c b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-2.c
+new file mode 100644
+index 00000000000..0580fd65d3a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-2.c
+@@ -0,0 +1,10 @@
++/* { dg-do compile } */
++/* { dg-options "-mabi=lp64s -mfpu=64 -march=loongarch64 -O2" } */
++/* { dg-final { scan-assembler "frecip\\.d" } } */
++/* { dg-final { scan-assembler "movgr2fr\\.d" } } */
++/* { dg-final { scan-assembler "movfr2gr\\.d" } } */
++
++/* FPU is used for calculation but FPR cannot be used for arguments and
++   return values.  */
++
++#include "flt-abi-isa-1.c"
+diff --git a/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-3.c b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-3.c
+new file mode 100644
+index 00000000000..16a926f57a1
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-3.c
+@@ -0,0 +1,9 @@
++/* { dg-do compile } */
++/* { dg-options "-mabi=lp64s -mfpu=none -march=loongarch64 -O2" } */
++/* { dg-final { scan-assembler-not "frecip\\.d" } } */
++/* { dg-final { scan-assembler-not "movgr2fr\\.d" } } */
++/* { dg-final { scan-assembler-not "movfr2gr\\.d" } } */
++
++/* FPU cannot be used at all.  */
++
++#include "flt-abi-isa-1.c"
+diff --git a/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-4.c b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-4.c
+new file mode 100644
+index 00000000000..43b579c3fac
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/loongarch/flt-abi-isa-4.c
+@@ -0,0 +1,10 @@
++/* { dg-do compile } */
++/* { dg-options "-msoft-float -march=loongarch64 -O2" } */
++/* { dg-final { scan-assembler-not "frecip\\.d" } } */
++/* { dg-final { scan-assembler-not "movgr2fr\\.d" } } */
++/* { dg-final { scan-assembler-not "movfr2gr\\.d" } } */
++
++/* -msoft-float implies both -mabi=lp64s and -mfpu=none.
++   FPU cannot be used at all.  */
++
++#include "flt-abi-isa-1.c"
+-- 
+2.25.1
+

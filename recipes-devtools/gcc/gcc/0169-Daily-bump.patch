@@ -1,0 +1,87 @@
+From 29a1eb400bda97a3a8ba63ec24e066432fa98bcd Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 26 Oct 2022 00:21:29 +0000
+Subject: [PATCH 169/547] Daily bump.
+
+---
+ gcc/ChangeLog           | 34 ++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 97576f82084..f7358b6234c 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,37 @@
++2022-10-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* profile.cc (branch_prob): Be prepared for ignored functions with
++	DECL_SOURCE_LOCATION set to UNKNOWN_LOCATION.
++
++2022-10-25  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
++
++	Backported from master:
++	2022-10-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
++
++	PR target/106355
++	* config/s390/s390.cc (s390_call_saved_register_used): For a
++	parameter with BLKmode fix determining number of consecutive
++	registers.
++
++2022-10-25  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-10-25  Martin Liska  <mliska@suse.cz>
++
++	PR target/107364
++	* common/config/i386/i386-cpuinfo.h (enum processor_vendor):
++	Fix pedantic warning.
++
++2022-10-25  Martin Liska  <mliska@suse.cz>
++
++	Backported from master:
++	2022-10-24  Martin Liska  <mliska@suse.cz>
++
++	PR target/107364
++	* common/config/i386/i386-cpuinfo.h (enum processor_vendor):
++	  Reorder enum values as BUILTIN_VENDOR_MAX should not point
++	  in the middle of the valid enum values.
++
+ 2022-10-21  Julian Brown  <julian@codesourcery.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index c75820ce08e..03e9228fa2a 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20221025
++20221026
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 52da458147e..4b833c5fe03 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2022-10-25  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/specs/coverage1.ads: New test.
++	* gnat.dg/specs/variant_part.ads: Minor tweak.
++	* gnat.dg/specs/weak1.ads: Add dg directive.
++
++2022-10-25  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
++
++	Backported from master:
++	2022-10-19  Stefan Schulze Frielinghaus  <stefansf@linux.ibm.com>
++
++	* gcc.target/s390/pr106355.h: Common code for new tests.
++	* gcc.target/s390/pr106355-1.c: New test.
++	* gcc.target/s390/pr106355-2.c: New test.
++	* gcc.target/s390/pr106355-3.c: New test.
++
+ 2022-10-23  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+-- 
+2.25.1
+
