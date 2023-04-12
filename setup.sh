@@ -34,8 +34,8 @@ if [[ ":$PATH:" != *":$PWD/meta-starfive:"* ]]; then
   export PATH=$PATH:$PWD/meta-starfive
 fi
 echo "Init OE"
-export BASH_SOURCE="openembedded-core/oe-init-build-env"
-. ./openembedded-core/oe-init-build-env $DIR
+export BASH_SOURCE="poky/oe-init-build-env"
+source poky/oe-init-build-env
 
 # Symlink the cache
 #echo "Setup symlink for sstate"
