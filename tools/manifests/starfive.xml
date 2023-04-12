@@ -6,12 +6,12 @@
   <default remote="openembedded" revision="master" />
   <remote name="starfive" fetch="https://github.com/starfive-tech" />
   <remote name="kraj" fetch="https://github.com/kraj" />
+  <remote name="yoctoproject" fetch="https://github.com/yoctoproject" />
 
   <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="kirkstone" />
-  <project name="openembedded-core" remote="openembedded" path="openembedded-core" revision="kirkstone" />
-  <project name="bitbake" remote="openembedded" path="openembedded-core/bitbake" revision="2.0" />
   <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="kirkstone" />
   <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-kirkstone" />
   <project name="meta-clang" remote="kraj" path="meta-clang" revision="kirkstone" />
+  <project name="poky" remote="yoctoproject" path="poky" revision="kirkstone" />
 
 </manifest>
