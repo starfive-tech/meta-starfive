@@ -6,7 +6,7 @@ first 'init' program more efficiently."
 INITRAMFS_SCRIPTS ?= "\
                       initramfs-boot packagegroup-core-boot \
                      "
-PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} helloworld coremark dhrystone gdb gdbserver util-linux ethtool atftp iperf3 openssh dhcpcd kvmtool tmux"
+PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} helloworld coremark dhrystone perf gdb gdbserver util-linux ethtool atftp iperf3 openssh dhcpcd kvmtool tmux"
 
 
 # Do not pollute the initrd image with rootfs features
