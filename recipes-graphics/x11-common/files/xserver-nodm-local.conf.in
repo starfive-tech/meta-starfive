@@ -1,0 +1,8 @@
+# common environment file for sysvinit and systemd
+
+XSERVER=/usr/local/bin/Xorg
+LD_LIBRARY_PATH=/usr/local/lib/
+DISPLAY=:0
+ARGS=" -br -pn "
+HOME=@HOME@
+USER=@USER@
