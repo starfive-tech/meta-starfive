@@ -1,11 +1,7 @@
 LICENSE="CLOSED"
 
 PROVIDES = "virtual/libgles2"
-COMPATIBLE_MACHINE = "visionfive2"
-
-SRC_URI = " \
-    git://github.com/starfive-tech/soft_3rdpart.git;protocol=https;lfs=1;branch=JH7110_VisionFive2_devel;rev=13975a3826bb98bd9a201780131262b6dd373452 \
-"
+COMPATIBLE_MACHINE = "starfive-visionfive2"
 
 inherit update-rc.d
 
@@ -19,15 +15,23 @@ PACKAGES += " \
 "
 
 do_install () {
-    tar xz --no-same-owner -f ${S}/IMG_GPU/out/${IMG_GPU_POWERVR_VERSION}.tar.gz -C ${D}
+    tar xz --no-same-owner -f ${THISDIR}/files/${IMG_GPU_POWERVR_VERSION}.tar.gz -C ${D}
+
+    # Remove .a files from tar file
+    rm ${D}/${IMG_GPU_POWERVR_VERSION}/target/usr/local/lib/*.a
+    rm ${D}/${IMG_GPU_POWERVR_VERSION}/target/usr/local/lib/*/*.a
+
+    # Remove files that has dependency on python
+    rm ${D}/${IMG_GPU_POWERVR_VERSION}/target/usr/local/bin/pvrlogsplit
+    rm ${D}/${IMG_GPU_POWERVR_VERSION}/target/usr/local/bin/hwperfjsonmerge.py
+
+    # Create a copy of GPU firmware at the deploy directory
+    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/target/lib ${DEPLOY_DIR}
+
+    # provided via separate arch-independent firmware package
     mv ${D}/${IMG_GPU_POWERVR_VERSION}/target/* ${D}
-    install -d ${D}/usr/include/
-    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/staging/usr/include/drv/ ${D}/usr/include/
-    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/staging/usr/include/GLES/ ${D}/usr/include/
-    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/staging/usr/include/GLES2/ ${D}/usr/include/
-    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/staging/usr/include/GLES3/ ${D}/usr/include/
-    install -d ${D}/usr/lib/pkgconfig/
-    cp -r ${D}/${IMG_GPU_POWERVR_VERSION}/staging/usr/lib/pkgconfig/* ${D}/usr/lib/pkgconfig/
+    rm -rf ${D}/lib/firmware
+    rmdir ${D}/lib
 
     # cleanup unused
     rm -rf ${D}/${IMG_GPU_POWERVR_VERSION}
@@ -38,6 +42,8 @@ INITSCRIPT_NAME = "rc.pvr"
 FILES_SOLIBSDEV = ""
 FILES:${PN} += " \
     ${libdir}/*.so \
+    /usr/local/* \
+    /usr/lib/* \
 "
 
 FILES:${PN}-tools = " \
@@ -51,14 +57,24 @@ FILES:${PN}-firmware = " \
 RDEPENDS:${PN} += " \
     bash \
     libdrm \
-    ${PN}-firmware \
+    glibc \
+    libgcc \
+    libstdc++ \
+    libudev \
 "
 
 RDEPENDS:${PN}-tools += " \
     python3 \
 "
 
+# remove warning caused by wrong lib directory
+INSANE_SKIP:${PN} += "libdir"
+INSANE_SKIP:${PN}-dbg += "libdir"
+
 INSANE_SKIP:${PN} += "already-stripped dev-so"
 # ignore dependency check for python scripting
 INSANE_SKIP:${PN}-tools += "already-stripped file-rdeps"
 INSANE_SKIP:${PN}-firmware += "arch"
+
+# ignore "multiple shlib providers" error
+EXCLUDE_FROM_SHLIBS = "1"
