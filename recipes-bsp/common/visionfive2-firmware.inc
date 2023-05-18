@@ -1,6 +1,6 @@
-VISIONFIVE2FW_DATE ?= "20230320"
-# VF2_v2.11.5
-SRC_URI += "git://github.com/starfive-tech/soft_3rdpart.git;protocol=https;lfs=1;branch=JH7110_VisionFive2_devel;rev=cd7b50cd9f9eca66c23ebd19f06a172ce0be591f"
+# VF2_v3.0.4
+BRANCH = "JH7110_VisionFive2_devel"
+SRCREV = "a8d360763d203874fefe38fad2b041b98d674743"
+FORK = "starfive-tech"
+SRC_URI += "git://github.com/${FORK}/soft_3rdpart.git;protocol=https;lfs=1;branch=${BRANCH}"
 HOMEPAGE ?= "https://github.com/starfive-tech/soft_3rdpart"
-
-PV ?= "${VISIONFIVE2FW_DATE}"
