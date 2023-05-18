@@ -1,0 +1,191 @@
+Description: <short summary of the patch>
+ TODO: Put a short summary on the line above and replace this paragraph
+ with a longer explanation of this change. Complete the meta-information
+ with other relevant fields (see below for details). To make it easier, the
+ information below has been extracted from the changelog. Adjust it or drop
+ it.
+ .
+ ffmpeg (7:5.1.2-3) unstable; urgency=medium
+ .
+   * debian/rules: Disable more tests on ppc64 (Closes: #1022764)
+   * debian/patches: Add upstream patch to fix FTBFS after vulkan changes
+     (Closes: #1031447)
+Author: Sebastian Ramacher <sramacher@debian.org>
+Bug-Debian: https://bugs.debian.org/1022764
+Bug-Debian: https://bugs.debian.org/1031447
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout https://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: (upstream|backport|vendor|other), (<patch-url>|commit:<commit-id>)
+Bug: <upstream-bugtracker-url>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: (no|not-needed|<patch-forwarded-url>)
+Applied-Upstream: <version>, (<commit-url>|commit:<commid-id>)
+Reviewed-By: <name and email of someone who approved/reviewed the patch>
+Last-Update: 2023-02-21
+
+--- ffmpeg-5.1.2.orig/libavcodec/omx.c
++++ ffmpeg-5.1.2/libavcodec/omx.c
+@@ -1034,18 +1034,18 @@ static const AVClass omx_hevcenc_class =
+     .option = options_hevc,
+     .version = LIBAVUTIL_VERSION_INT,
+ };
+-AVCodec ff_hevc_omx_encoder = {
+-    .name             = "hevc_omx",
+-    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video encoder"),
+-    .type             = AVMEDIA_TYPE_VIDEO,
+-    .id               = AV_CODEC_ID_HEVC,
++FFCodec ff_hevc_omx_encoder = {
++    .p.name             = "hevc_omx",
++    .p.long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video encoder"),
++    .p.type             = AVMEDIA_TYPE_VIDEO,
++    .p.id               = AV_CODEC_ID_HEVC,
+     .priv_data_size   = sizeof(OMXCodecContext),
+     .init             = omx_encode_init,
+-    .encode2          = omx_encode_frame,
++    FF_CODEC_ENCODE_CB(omx_encode_frame),
+     .close            = omx_encode_end,
+-    .pix_fmts         = omx_encoder_pix_fmts,
+-    .profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
+-    .capabilities     = AV_CODEC_CAP_DELAY,
++    .p.pix_fmts         = omx_encoder_pix_fmts,
++    .p.profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++    .p.capabilities     = AV_CODEC_CAP_DELAY,
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+-    .priv_class       = &omx_hevcenc_class,
++    .p.priv_class       = &omx_hevcenc_class,
+ };
+--- ffmpeg-5.1.2.orig/libavcodec/omxdec.c
++++ ffmpeg-5.1.2/libavcodec/omxdec.c
+@@ -46,7 +46,7 @@
+ #include "h264.h"
+ #include "internal.h"
+ #include "profiles.h"
+-
++#include "codec_internal.h"
+ int evnet_bufferflag;
+ int dec_out_height;
+ int dec_out_width;
+@@ -1100,7 +1100,7 @@ fail:
+ }
+ 
+ 
+-static int omx_decode_frame(AVCodecContext *avctx, void *data,
++static int omx_decode_frame(AVCodecContext *avctx, AVFrame *data,
+                            int *got_packet, AVPacket *pkt)
+ {
+     OMXCodecContext *s = avctx->priv_data;
+@@ -1322,18 +1322,18 @@ static const AVClass omx_mpeg4dec_class
+     .option     = options,
+     .version    = LIBAVUTIL_VERSION_INT,
+ };
+-AVCodec ff_mpeg4_omx_decoder = {
+-    .name             = "mpeg4_omx",
+-    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL MPEG-4 video decoder"),
+-    .type             = AVMEDIA_TYPE_VIDEO,
+-    .id               = AV_CODEC_ID_MPEG4,
++FFCodec ff_mpeg4_omx_decoder = {
++    .p.name             = "mpeg4_omx",
++    .p.long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL MPEG-4 video decoder"),
++    .p.type             = AVMEDIA_TYPE_VIDEO,
++    .p.id               = AV_CODEC_ID_MPEG4,
+     .priv_data_size   = sizeof(OMXCodecContext),
+     .init             = omx_decode_init,
+-    .decode           = omx_decode_frame,
++    FF_CODEC_ENCODE_CB(omx_decode_frame),
+     .close            = omx_decode_end,
+-    .capabilities     = AV_CODEC_CAP_DELAY,
++    .p.capabilities     = AV_CODEC_CAP_DELAY,
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+-    .priv_class       = &omx_mpeg4dec_class,
++    .p.priv_class       = &omx_mpeg4dec_class,
+ };
+ 
+ static const AVClass omx_h264dec_class = {
+@@ -1342,18 +1342,18 @@ static const AVClass omx_h264dec_class =
+     .option     = options,
+     .version    = LIBAVUTIL_VERSION_INT,
+ };
+-AVCodec ff_h264_omx_decoder = {
+-    .name             = "h264_omx",
+-    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL H.264 video decoder"),
+-    .type             = AVMEDIA_TYPE_VIDEO,
+-    .id               = AV_CODEC_ID_H264,
++FFCodec ff_h264_omx_decoder = {
++    .p.name             = "h264_omx",
++    .p.long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL H.264 video decoder"),
++    .p.type             = AVMEDIA_TYPE_VIDEO,
++    .p.id               = AV_CODEC_ID_H264,
+     .priv_data_size   = sizeof(OMXCodecContext),
+     .init             = omx_decode_init,
+-    .decode           = omx_decode_frame,
++    FF_CODEC_DECODE_CB(omx_decode_frame),
+     .close            = omx_decode_end,
+-    .capabilities     = AV_CODEC_CAP_DELAY,
++    .p.capabilities     = AV_CODEC_CAP_DELAY,
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+-    .priv_class       = &omx_h264dec_class,
++    .p.priv_class       = &omx_h264dec_class,
+     .bsfs             = "h264_mp4toannexb",
+ };
+ 
+@@ -1363,19 +1363,19 @@ static const AVClass omx_hevcdec_class =
+     .option     = options_hevc,
+     .version    = LIBAVUTIL_VERSION_INT,
+ };
+-AVCodec ff_hevc_omx_decoder = {
+-    .name             = "hevc_omx",
+-    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video decoder"),
+-    .type             = AVMEDIA_TYPE_VIDEO,
+-    .id               = AV_CODEC_ID_HEVC,
++FFCodec ff_hevc_omx_decoder = {
++    .p.name             = "hevc_omx",
++    .p.long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video decoder"),
++    .p.type             = AVMEDIA_TYPE_VIDEO,
++    .p.id               = AV_CODEC_ID_HEVC,
+     .priv_data_size   = sizeof(OMXCodecContext),
+     .init             = omx_decode_init,
+-    .decode           = omx_decode_frame,
++    FF_CODEC_DECODE_CB(omx_decode_frame),
+     .close            = omx_decode_end,
+-    .profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
+-    .capabilities     = AV_CODEC_CAP_DELAY,
++    .p.profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++    .p.capabilities     = AV_CODEC_CAP_DELAY,
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+-    .priv_class       = &omx_hevcdec_class,
++    .p.priv_class       = &omx_hevcdec_class,
+     .bsfs             = "hevc_mp4toannexb",
+ };
+ 
+@@ -1385,17 +1385,17 @@ static const AVClass omx_mjpegdec_class
+     .option     = options_mjpeg,
+     .version    = LIBAVUTIL_VERSION_INT,
+ };
+-AVCodec ff_mjpeg_omx_decoder = {
+-    .name             = "mjpeg_omx",
+-    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL mjpeg video decoder"),
+-    .type             = AVMEDIA_TYPE_VIDEO,
+-    .id               = AV_CODEC_ID_MJPEG,
++FFCodec ff_mjpeg_omx_decoder = {
++    .p.name             = "mjpeg_omx",
++    .p.long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL mjpeg video decoder"),
++    .p.type             = AVMEDIA_TYPE_VIDEO,
++    .p.id               = AV_CODEC_ID_MJPEG,
+     .priv_data_size   = sizeof(OMXCodecContext),
+     .init             = omx_decode_init,
+-    .decode           = omx_decode_frame,
++    FF_CODEC_DECODE_CB(omx_decode_frame),
+     .close            = omx_decode_end,
+-    .capabilities     = AV_CODEC_CAP_DR1,
+-    .max_lowres       = 3,
++    .p.capabilities     = AV_CODEC_CAP_DR1,
++    .p.max_lowres       = 3,
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+-    .priv_class       = &omx_mjpegdec_class,
++    .p.priv_class       = &omx_mjpegdec_class,
+ };

@@ -1,0 +1,199 @@
+From 0adf789b7c3060e241b82e6afdfc2f7975f1ee39 Mon Sep 17 00:00:00 2001
+From: "sw.multimedia" <se.multimedia@starfivetech.com>
+Date: Wed, 25 May 2022 20:28:21 +0800
+Subject: [PATCH 2/8] add hevc decoder and encoder support
+
+Signed-off-by: sw.multimedia <se.multimedia@starfivetech.com>
+---
+ configure              |  2 ++
+ libavcodec/allcodecs.c |  2 ++
+ libavcodec/omx.c       | 35 +++++++++++++++++++++++++++++++++++
+ libavcodec/omxdec.c    | 35 ++++++++++++++++++++++++++++++++++-
+ libavformat/utils.c    |  7 +++++++
+ 5 files changed, 80 insertions(+), 1 deletion(-)
+
+--- a/configure
++++ b/configure
+@@ -3185,6 +3185,8 @@
+ h264_v4l2m2m_decoder_deps="v4l2_m2m h264_v4l2_m2m"
+ h264_v4l2m2m_decoder_select="h264_mp4toannexb_bsf"
+ h264_v4l2m2m_encoder_deps="v4l2_m2m h264_v4l2_m2m"
++hevc_omx_encoder_deps="omx"
++hevc_omx_decoder_deps="omx"
+ hevc_amf_encoder_deps="amf"
+ hevc_cuvid_decoder_deps="cuvid"
+ hevc_cuvid_decoder_select="hevc_mp4toannexb_bsf"
+--- a/libavcodec/allcodecs.c
++++ b/libavcodec/allcodecs.c
+@@ -824,6 +824,8 @@
+ extern const FFCodec ff_h264_nvenc_encoder;
+ extern const FFCodec ff_h264_omx_encoder;
+ extern const FFCodec ff_h264_omx_decoder;
++extern const FFCodec ff_hevc_omx_encoder;
++extern const FFCodec ff_hevc_omx_decoder;
+ extern const FFCodec ff_h264_qsv_encoder;
+ extern const FFCodec ff_h264_v4l2m2m_encoder;
+ extern const FFCodec ff_h264_vaapi_encoder;
+--- a/libavcodec/omx.c
++++ b/libavcodec/omx.c
+@@ -44,7 +44,8 @@
+ #include "codec_internal.h"
+ #include "h264.h"
+ #include "pthread_internal.h"
+-
++#include "profiles.h"
++ 
+ #ifdef OMX_SKIP64BIT
+ static OMX_TICKS to_omx_ticks(int64_t value)
+ {
+@@ -508,6 +509,8 @@
+         out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingMPEG4;
+     else if (avctx->codec->id == AV_CODEC_ID_H264)
+         out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingAVC;
++    else if (avctx->codec->id == AV_CODEC_ID_HEVC)
++        out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingHEVC;
+ 
+     err = OMX_SetParameter(s->handle, OMX_IndexParamPortDefinition, &out_port_params);
+     CHECK(err);
+@@ -666,6 +669,9 @@
+     case AV_CODEC_ID_H264:
+         role = "video_encoder.avc";
+         break;
++    case AV_CODEC_ID_HEVC:
++		role = "video_encoder.hevc";
++		break;
+     default:
+         return AVERROR(ENOSYS);
+     }
+@@ -926,6 +932,13 @@
+     { NULL }
+ };
+ 
++static const AVOption options_hevc[] = {
++    { "omx_libname", "OpenMAX library name", OFFSET(libname), AV_OPT_TYPE_STRING, { 0 }, 0, 0, VDE },
++    { "omx_libprefix", "OpenMAX library prefix", OFFSET(libprefix), AV_OPT_TYPE_STRING, { 0 }, 0, 0, VDE },
++    { "zerocopy", "Try to avoid copying input frames if possible", OFFSET(input_zerocopy), AV_OPT_TYPE_INT, { .i64 = CONFIG_OMX_RPI }, 0, 1, VE },
++	{ NULL },
++};
++
+ static const enum AVPixelFormat omx_encoder_pix_fmts[] = {
+     AV_PIX_FMT_YUV420P, AV_PIX_FMT_NONE
+ };
+@@ -971,3 +984,25 @@
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+     .p.priv_class     = &omx_h264enc_class,
+ };
++
++static const AVClass omx_hevcenc_class = {
++	.class_name = "hevc_omx",
++	.item_name = av_default_item_name,
++	.option = options_hevc,
++	.version = LIBAVUTIL_VERSION_INT,
++};
++AVCodec ff_hevc_omx_encoder = {
++	.name 			  = "hevc_omx",
++	.long_name 		  = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video encoder"),
++	.type 			  = AVMEDIA_TYPE_VIDEO,
++	.id 			  = AV_CODEC_ID_HEVC,
++	.priv_data_size   = sizeof(OMXCodecContext),
++	.init 			  = omx_encode_init,
++	.encode2 		  = omx_encode_frame,
++	.close 			  = omx_encode_end,
++	.pix_fmts 		  = omx_encoder_pix_fmts,
++	.profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++	.capabilities 	  = AV_CODEC_CAP_DELAY,
++	.caps_internal 	  = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
++	.priv_class 	  = &omx_hevcenc_class,
++};
+--- a/libavcodec/omxdec.c
++++ b/libavcodec/omxdec.c
+@@ -44,6 +44,7 @@
+ #include "avcodec.h"
+ #include "h264.h"
+ #include "internal.h"
++#include "profiles.h"
+ 
+ #ifdef OMX_SKIP64BIT
+ static OMX_TICKS to_omx_ticks(int64_t value)
+@@ -494,6 +495,8 @@
+         out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingMPEG4;
+     else if (avctx->codec->id == AV_CODEC_ID_H264)
+         out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingAVC;
++    else if (avctx->codec->id == AV_CODEC_ID_HEVC)
++        out_port_params.format.video.eCompressionFormat = OMX_VIDEO_CodingHEVC;
+ 
+     err = OMX_SetParameter(s->handle, OMX_IndexParamPortDefinition, &out_port_params);
+     CHECK(err);
+@@ -627,6 +630,9 @@
+     case AV_CODEC_ID_H264:
+         role = "video_decoder.avc";
+         break;
++    case AV_CODEC_ID_HEVC:
++		role = "video_decoder.hevc";
++		break;
+     default:
+         return AVERROR(ENOSYS);
+     }
+@@ -733,7 +739,7 @@
+ 			buffer->nFilledLen = pkt->size;
+ 		}
+ 
+-		/* reduce memcpy. point it addr*/
++		/* avoid memcpy. point it addr*/
+ 		//buffer->pAppPrivate = pkt;
+ 		//buffer->pBuffer = pkt->data;
+ 		//buffer->nFilledLen = pkt->size;
+@@ -851,6 +857,12 @@
+     { NULL }
+ };
+ 
++static const AVOption options_hevc[] = {
++    { "omx_libname", "OpenMAX library name", OFFSET(libname), AV_OPT_TYPE_STRING, { 0 }, 0, 0, VDE },
++    { "omx_libprefix", "OpenMAX library prefix", OFFSET(libprefix), AV_OPT_TYPE_STRING, { 0 }, 0, 0, VDE },
++    { "zerocopy", "Try to avoid copying input frames if possible", OFFSET(input_zerocopy), AV_OPT_TYPE_INT, { .i64 = CONFIG_OMX_RPI }, 0, 1, VE },
++	{ NULL },
++};
+ 
+ static const AVClass omx_mpeg4dec_class = {
+     .class_name = "mpeg4_omx",
+@@ -891,3 +903,24 @@
+     .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
+     .priv_class       = &omx_h264dec_class,
+ };
++
++static const AVClass omx_hevcdec_class = {
++    .class_name = "hevc_omx",
++    .item_name  = av_default_item_name,
++    .option     = options_hevc,
++    .version    = LIBAVUTIL_VERSION_INT,
++};
++AVCodec ff_hevc_omx_decoder = {
++    .name             = "hevc_omx",
++    .long_name        = NULL_IF_CONFIG_SMALL("OpenMAX IL HEVC video decoder"),
++    .type             = AVMEDIA_TYPE_VIDEO,
++    .id               = AV_CODEC_ID_HEVC,
++    .priv_data_size   = sizeof(OMXCodecContext),
++    .init             = omx_decode_init,
++    .decode           = omx_decode_frame,
++    .close            = omx_decode_end,
++    .profiles         = NULL_IF_CONFIG_SMALL(ff_hevc_profiles),
++    .capabilities     = AV_CODEC_CAP_DELAY,
++    .caps_internal    = FF_CODEC_CAP_INIT_THREADSAFE | FF_CODEC_CAP_INIT_CLEANUP,
++    .priv_class       = &omx_hevcdec_class,
++};
+--- a/libavformat/demux.c
++++ b/libavformat/demux.c
+@@ -77,6 +77,13 @@
+         return avcodec_find_decoder_by_name("h264");
+ #endif
+ 
++#if CONFIG_HEVC_DECODER
++	/* Other parts of the code assume this decoder to be used for h265,
++	 * so force it if possible. */
++	if (codec_id == AV_CODEC_ID_HEVC)
++		return avcodec_find_decoder_by_name("hevc");
++#endif
++
+     codec = ff_find_decoder(s, st, codec_id);
+     if (!codec)
+         return NULL;
