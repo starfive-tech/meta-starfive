@@ -48,6 +48,8 @@ bitbake-layers add-layer ../meta-openembedded/meta-python
 bitbake-layers add-layer ../meta-openembedded/meta-multimedia
 bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-networking
+bitbake-layers add-layer ../meta-openembedded/meta-gnome
+bitbake-layers add-layer ../meta-openembedded/meta-xfce
 bitbake-layers add-layer ../meta-riscv
 bitbake-layers add-layer ../meta-starfive
 bitbake-layers add-layer ../meta-clang
