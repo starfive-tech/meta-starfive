@@ -18,3 +18,4 @@ SRC_URI += " \
 S = "${WORKDIR}/${JPU_MODULE_SRC}"
 
 RPROVIDES:${PN} += "kernel-module-jpu"
+do_compile[depends] += "core-image-minimal-initramfs:do_image_complete"

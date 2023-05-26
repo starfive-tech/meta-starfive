@@ -20,3 +20,4 @@ S = "${WORKDIR}/${WAVE511_MODULE_SRC}"
 
 RPROVIDES:${PN} += "kernel-module-vdec"
 RDEPENDS:${PN} += "linux-firmware-visionfive2-wave511"
+do_compile[depends] += "core-image-minimal-initramfs:do_image_complete"

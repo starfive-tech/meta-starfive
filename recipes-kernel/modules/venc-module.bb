@@ -20,3 +20,4 @@ S = "${WORKDIR}/${WAVE420L_MODULE_SRC}"
 
 RPROVIDES:${PN} += "kernel-module-venc"
 RDEPENDS:${PN} += "linux-firmware-visionfive2-wave420l"
+do_compile[depends] += "core-image-minimal-initramfs:do_image_complete"
