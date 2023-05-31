@@ -40,20 +40,12 @@ FILES:${KERNEL_PACKAGE_NAME}-base += "/usr/*"
 DEPENDS:starfive-visionfive2 += " u-boot-tools-native u-boot-starfive"
 
 do_deploy:append:starfive-visionfive2 () {
-	# Unpack and repack cpio archive to include rgx firmware for DDK1.19
-	cd ${DEPLOY_DIR_IMAGE}
-	rm -rf ${DEPLOY_DIR_IMAGE}/initramfs
-	mkdir ${DEPLOY_DIR_IMAGE}/initramfs
-	cd ${DEPLOY_DIR_IMAGE}/initramfs
-	zcat ${DEPLOY_DIR_IMAGE}/core-image-minimal-initramfs-starfive-visionfive2.cpio.gz | cpio -idmv || true
-	# cp -r ${DEPLOY_DIR}/lib ./
-	find . | cpio -H newc -o | gzip > ${DEPLOY_DIR_IMAGE}/core-image-minimal-initramfs-starfive-visionfive2-temp.cpio.gz
 	# Create FitImage
 	cd ${DEPLOY_DIR_IMAGE}
 	rm -rf ${DEPLOY_DIR_IMAGE}/tmp
 	mkdir ${DEPLOY_DIR_IMAGE}/tmp
 	cp -P ${DEPLOYDIR}/* ${DEPLOY_DIR_IMAGE}/tmp/
-	mkimage -A riscv -O linux -T ramdisk -n "Initial Ram Disk" -d core-image-minimal-initramfs-starfive-visionfive2-temp.cpio.gz initramfs.img
+	mkimage -A riscv -O linux -T ramdisk -n "Initial Ram Disk" -d core-image-minimal-initramfs-starfive-visionfive2.cpio.gz initramfs.img
 	mkimage -f ${DEPLOY_DIR_IMAGE}/visionfive2-fit-image.its ${DEPLOY_DIR_IMAGE}/starfiveu.fit
 }
 
