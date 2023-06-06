@@ -1,0 +1,61 @@
+/dts-v1/;
+
+/ {
+        description = "Kernel fitImage for visionfive2";
+        #address-cells = <1>;
+
+        images {
+                kernel-1 {
+                        description = "Linux kernel";
+                        data = /incbin/("./tmp/fitImage-linux.bin-starfive-visionfive2");
+                        type = "kernel";
+                        arch = "riscv";
+                        os = "linux";
+                        compression = "none";
+                        load = <0x40200000>;
+                        entry = <0x40200000>;
+                        hash-1 {
+                                algo = "sha256";
+                        };
+                };
+                fdt-starfive_jh7110-visionfive-v2.dtb {
+                        description = "Flattened Device Tree blob";
+                        data = /incbin/("./tmp/jh7110-visionfive-v2-starfive-visionfive2.dtb");
+                        type = "flat_dt";
+                        arch = "riscv";
+                        compression = "none";
+                        load = <0x46000000>;
+                        hash-1 {
+                                algo = "sha256";
+                        };
+                };
+                ramdisk-1 {
+                        description = "core-image-minimal-initramfs";
+                        data = /incbin/("initramfs.img");
+                        type = "ramdisk";
+                        arch = "riscv";
+                        os = "linux";
+                        compression = "none";
+                        load = <0x46100000>;
+                        entry = <0x46100000>;
+                        hash-1 {
+                                algo = "sha256";
+                        };
+                };
+        };
+
+        configurations {
+                default = "conf-starfive_jh7110-visionfive-v2.dtb";
+                conf-starfive_jh7110-visionfive-v2.dtb {
+                        description = "1 Linux kernel, FDT blob, ramdisk";
+                        kernel = "kernel-1";
+                        fdt = "fdt-starfive_jh7110-visionfive-v2.dtb";
+                        ramdisk = "ramdisk-1";
+
+
+                        hash-1 {
+                                algo = "sha256";
+                        };
+                };
+        };
+};

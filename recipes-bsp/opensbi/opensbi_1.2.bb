@@ -8,8 +8,8 @@ require opensbi-payloads.inc
 
 inherit autotools-brokensep deploy
 
-SRCREV = "df3de2f059c8c7edd1ba48ea43e6d8b93553a58a"
-SRC_URI = "git://git@192.168.110.45/starfive-tech/opensbi.git;protocol=ssh;branch=starfive-v1.2-dubhe"
+SRCREV:starfive-dubhe = "df3de2f059c8c7edd1ba48ea43e6d8b93553a58a"
+SRC_URI:starfive-dubhe = "git://git@192.168.110.45/starfive-tech/opensbi.git;protocol=ssh;branch=starfive-v1.2-dubhe"
 
 SRC_URI:remove:nezha = " \
     file://0001-lib-utils-fdt-Require-match-data-to-be-const.patch \
@@ -18,8 +18,9 @@ SRC_URI:remove:nezha = " \
 
 S = "${WORKDIR}/git"
 
-#EXTRA_OEMAKE += "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= "
-EXTRA_OEMAKE += "PLATFORM=${RISCV_SBI_PLAT} PLATFORM_DEFCONFIG=starfive_defconfig I=${D} FW_PIC=n CLANG_TARGET= "
+EXTRA_OEMAKE += "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= "
+EXTRA_OEMAKE:starfive-dubhe += "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= PLATFORM_DEFCONFIG=starfive_defconfig "
+
 # If RISCV_SBI_PAYLOAD is set then include it as a payload
 EXTRA_OEMAKE:append = " ${@riscv_get_extra_oemake_image(d)}"
 EXTRA_OEMAKE:append = " ${@riscv_get_extra_oemake_fdt(d)}"
