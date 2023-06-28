@@ -48,6 +48,8 @@ bitbake-layers add-layer ../meta-openembedded/meta-python
 bitbake-layers add-layer ../meta-openembedded/meta-multimedia
 bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-networking
+bitbake-layers add-layer ../meta-openembedded/meta-gnome
+bitbake-layers add-layer ../meta-openembedded/meta-xfce
 bitbake-layers add-layer ../meta-riscv
 bitbake-layers add-layer ../meta-starfive
 bitbake-layers add-layer ../meta-clang
@@ -141,12 +143,12 @@ for cfgname in ${cfg[@]}; do
 done
 }
 
-
+dubhe(){
 # Menu script
 echo ""
 echo -e "${PURPLE}*******************************************************************"
 echo "*                                                                 *"
-echo "*                     Welcome to Starfive Yocto                   *"
+echo "*                     StarFive Dubhe Build Menu                   *"
 echo "*                                                                 *"
 echo -e "*******************************************************************${NC}"
 echo "";
@@ -233,3 +235,88 @@ do
     esac
     REPLY=
 done
+}
+
+vf2(){
+# Menu script
+echo ""
+echo -e "${PURPLE}*******************************************************************"
+echo "*                                                                 *"
+echo "*                 StarFive Visionfive2 Build Menu                 *"
+echo "*                                                                 *"
+echo -e "*******************************************************************${NC}"
+echo "";
+echo -e "${YELLOW}Description : ";
+echo "";
+echo "This build script can build two types of image.";
+echo "";
+echo "1) core-image-minimal";
+echo "   - Minimal image with ext4 support.";
+echo "   - Generated output : ";
+echo "     starfive-visionfive2-core-image-minimal.img";
+echo "2) core-image-minimal-xfce";
+echo "   - Minimal image with XFCE desktop environment.";
+echo "   - Generated output : ";
+echo "     starfive-visionfive2-core-image-minimal-xfce.img";
+echo -e "3) Quit${NC}";
+echo "";
+
+PS3="Select your action : "
+options=("Build core-image-minimal" "Build core-image-minimal-xfce" "Quit")
+
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Build core-image-minimal")
+                cur_ter=$(tty);
+                output_min=$(MACHINE=starfive-visionfive2 bitbake core-image-minimal | tee $cur_ter);
+                if [[ $output_min != *"ERROR"* ]]; then
+                	echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+                else echo -e "\U000274C ${RED}Build Failed${NC}"
+            	fi;;
+        "Build core-image-minimal-xfce")
+                cur_ter=$(tty);
+                output_min=$(MACHINE=starfive-visionfive2 bitbake core-image-minimal-xfce | tee $cur_ter);
+                if [[ $output_min != *"ERROR"* ]]; then
+                        echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+                else echo -e "\U000274C ${RED}Build Failed${NC}"
+                fi;;
+        "Quit")
+            break;;
+        *)
+            echo "Invalid option $REPLY. Kindly select choice between menu range."
+    esac
+    REPLY=
+done
+}
+
+# Menu script
+echo ""
+echo -e "${PURPLE}*******************************************************************"
+echo "*                                                                 *"
+echo "*                     Welcome to StarFive Yocto                   *"
+echo "*                                                                 *"
+echo -e "*******************************************************************${NC}"
+echo "";
+echo -e "${YELLOW}List below shows machine supported : ";
+echo "1) StarFive Dubhe";
+echo -e "2) Quit${NC}";
+echo "";
+
+PS3="Select machine : "
+options=("StarFive Dubhe" "Quit")
+
+
+select opt in "${options[@]}"
+do
+    case $opt in
+        "StarFive Dubhe")
+		dubhe;;
+	"Quit")
+            break;;
+        *)
+       	    echo "Invalid option $REPLY. Kindly select choice between menu range."
+    esac
+    REPLY=
+done
+

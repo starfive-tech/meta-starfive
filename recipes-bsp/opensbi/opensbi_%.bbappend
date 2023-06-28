@@ -1,5 +1,5 @@
 SRCREV:starfive-visionfive2 = "c6a092cd80112529cb2e92e180767ff5341b22a3"
-SRC_URI:starfive-visionfive2 = "git://git@192.168.110.45/sbc/opensbi.git;protocol=ssh \
+SRC_URI:starfive-visionfive2 = "git://github.com/starfive-tech/opensbi.git;protocol=https \
                                 file://visionfive2-uboot-fit-image.its \
                                "
 

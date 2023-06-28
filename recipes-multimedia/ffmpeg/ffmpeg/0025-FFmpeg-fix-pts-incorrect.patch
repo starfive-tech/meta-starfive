@@ -1,0 +1,42 @@
+Description: Fix omx decoder fill frames pts incorrect
+ If there is no pts value from pkt, decoder should fill the pts field 
+ according to the pkt's duration.
+ .
+ ffmpeg (7:5.1.2-1.1) UNRELEASED; urgency=medium
+ .
+   * libavcodec/omxdec:	Optimize copy for omxdec plugins.
+Author: Som Qin <som.qin@starfivetech.com>
+
+---
+The information above should follow the Patch Tagging Guidelines, please
+checkout https://dep.debian.net/deps/dep3/ to learn about the format. Here
+are templates for supplementary fields that you might want to add:
+
+Origin: (upstream|backport|vendor|other), (<patch-url>|commit:<commit-id>)
+Bug: <upstream-bugtracker-url>
+Bug-Debian: https://bugs.debian.org/<bugnumber>
+Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
+Forwarded: (no|not-needed|<patch-forwarded-url>)
+Applied-Upstream: <version>, (<commit-url>|commit:<commid-id>)
+Reviewed-By: <name and email of someone who approved/reviewed the patch>
+Last-Update: 2023-04-23
+
+--- ffmpeg-5.1.2.orig/libavcodec/omxdec.c
++++ ffmpeg-5.1.2/libavcodec/omxdec.c
+@@ -1217,7 +1217,15 @@ static int omx_decode_frame(AVCodecConte
+                                      pkt->size, pkt->pts, pkt->dts, pkt->duration);
+     av_log(avctx, AV_LOG_VERBOSE, "avctx->pts_correction_last_pts: %ld avctx->pts_correction_last_dts: %ld\n",
+                                      avctx->pts_correction_last_pts, avctx->pts_correction_last_dts);
+-    OMXDecodeQueuePush(&s->decode_pts_queue, pkt->dts);
++    if (pkt->dts != AV_NOPTS_VALUE) {
++        OMXDecodeQueuePush(&s->decode_pts_queue, pkt->dts);
++    } else {
++        if (OMXDecodeQueueEmpty(&s->decode_pts_queue)) {
++            OMXDecodeQueuePush(&s->decode_pts_queue, 0);
++        } else {
++            OMXDecodeQueuePush(&s->decode_pts_queue, s->decode_pts_queue.tail->val + pkt->duration);
++        }
++    }
+     if (pkt->size) {
+ 
+         //VPU init and fill buffer slow, so empty buf sleep to send before get vpu fill buf.

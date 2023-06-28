@@ -5,16 +5,17 @@ inherit uboot-extlinux-config
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-FORK = "sbc"
-BRANCH = "vf2-devel"
+FORK = "starfive-tech"
+BRANCH = "JH7110_VisionFive2_devel"
+SRCREV = "b6e2b0e85c774a18ae668223a6e5f7d335895243"
 
-SRC_URI = "git://git@192.168.110.45/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
+SRC_URI = "git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
            file://vf2_uEnv.txt \
 	   file://vf2_nvme_uEnv.txt \
 	   file://tftp-mmc-boot.txt \
 	   file://visionfive2-fit-image.its \
+	   file://uboot_disable_logo.patch \
           "
-SRCREV = "77781526125544acc873b51959f19bbdb50a4f2e"
 
 DEPENDS:append = " u-boot-tools-native starfive-tool-native"
 

@@ -1,0 +1,13 @@
+diff --git a/drivers/video/starfive/sf_vop.c b/drivers/video/starfive/sf_vop.c
+index dbbccdf04e..73ad226339 100644
+--- a/drivers/video/starfive/sf_vop.c
++++ b/drivers/video/starfive/sf_vop.c
+@@ -617,7 +617,7 @@ static int sf_vop_probe(struct udevice *dev)
+ 
+ 	ofnode port, node;
+ 	int ret;
+-
++	return 0;
+ 	sf_vop_power(dev);
+ 	mdelay(50);
+ 
