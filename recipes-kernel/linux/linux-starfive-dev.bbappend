@@ -1,6 +1,6 @@
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "starfive-6.1-dubhe"
-SRCREV:starfive-dubhe = "0328291313ba8ad2cd6ac94df9039f2f4a365b6f"
+SRCREV:starfive-dubhe = "0a9c9aa4208378d4da0cf13c6c5a3a92da370b26"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel"
@@ -29,6 +29,7 @@ INITRAMFS_IMAGE:starfive-visionfive2 = "core-image-minimal-initramfs"
 # Temporary remove the patch to update the kernel, will create new patches after that
 SRC_URI:append:starfive-dubhe = "${@oe.utils.conditional('ENABLE_EXT4','1','file://ext4.patch','',d)}"
 SRC_URI:append:starfive-dubhe = "${@oe.utils.conditional('ENABLE_UBI','1','file://ubi.patch','',d)}"
+SRC_URI:append:starfive-dubhe = "${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','',d)}"
 
 KBUILD_DEFCONFIG:starfive-dubhe = "starfive_dubhe_defconfig"
 KBUILD_DEFCONFIG:starfive-visionfive2 = "starfive_visionfive2_defconfig"
