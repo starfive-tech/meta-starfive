@@ -8,7 +8,7 @@ require opensbi-payloads.inc
 
 inherit autotools-brokensep deploy
 
-SRCREV:starfive-dubhe = "df3de2f059c8c7edd1ba48ea43e6d8b93553a58a"
+SRCREV:starfive-dubhe = "3b7a16171029ca0a185789ca7cba583a5bf31b19"
 SRC_URI:starfive-dubhe = "git://git@192.168.110.45/starfive-tech/opensbi.git;protocol=ssh;branch=starfive-v1.2-dubhe"
 
 SRC_URI:remove:nezha = " \
