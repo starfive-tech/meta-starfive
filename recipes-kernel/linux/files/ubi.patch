@@ -1,13 +1,13 @@
 diff --git a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
-index 3e0e0c1c79a2..db68c11b73bd 100644
+index 879d11946631..7026ca656f4a 100755
 --- a/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
 +++ b/arch/riscv/boot/dts/starfive/dubhe_fpga.dts
 @@ -12,7 +12,7 @@ aliases {
  	};
  
  	chosen {
--		bootargs = "console=ttySIF0,115200 earlycon=sbi ip=::192.168.152.1:255.255.255.0::eth0:dhcp";
-+		bootargs = "console=ttySIF0,115200 earlycon=sbi ip=::192.168.152.1:255.255.255.0::eth0:dhcp root=ubi0:starfive-dubhe-rootfs ubi.mtd=1 rw rootfstype=ubifs rootwait";
+-		bootargs = "console=ttySIF0,115200 earlycon=sbi ip=:::255.255.255.0::eth0:dhcp";
++		bootargs = "console=ttySIF0,115200 earlycon=sbi ip=:::255.255.255.0::eth0:dhcp root=ubi0:starfive-dubhe-rootfs ubi.mtd=1 rw rootfstype=ubifs rootwait";
  	};
  
  	cpus {

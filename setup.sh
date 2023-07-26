@@ -127,7 +127,7 @@ esac
 }
 
 updatecfg(){
-cfg=("ENABLE_INIT" "ENABLE_EXT4" "ENABLE_UBI")
+cfg=("ENABLE_INIT" "ENABLE_EXT4" "ENABLE_UBI" "ENABLE_NFS")
 for cfgname in ${cfg[@]}; do
     if [[ $1 == ${cfgname} ]]; then
         if ! grep -q $1 ./conf/local.conf; then
@@ -168,15 +168,15 @@ echo "     SD-Image.img";
 echo "3) QSPI-Ubifs-Image";
 echo "   - Minimal image with ubifs support.";
 echo "   - Generated output : ";
-echo -e "     QSPI-Ubifs-Image.bin${NC}";
-#echo "4) QSPI-NFS-Image";
-#echo "   - NFS config has been enabled.";
-#echo "   - Generated output : ";
-#echo -e "     QSPI-NFS-Image.bin${NC}";
+echo -e "     QSPI-Ubifs-Image.bin";
+echo "4) QSPI-NFS-Image";
+echo "   - NFS config has been enabled.";
+echo "   - Generated output : ";
+echo -e "     QSPI-NFS-Image.bin${NC}";
 echo "";
 
 PS3="Select your action : "
-options=("Build qspi-image" "Build dubhe-image-minimal" "Build qspi-ubifs-image" "Quit")
+options=("Build qspi-image" "Build dubhe-image-minimal" "Build qspi-ubifs-image" "Build qspi-nfs-image" "Quit")
 
 select opt in "${options[@]}" 
 do

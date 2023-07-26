@@ -16,3 +16,5 @@ IMAGE_INSTALL += " \
 	openssh \
 	e2fsprogs-resize2fs \
 	"
+
+EXTRA_IMAGEDEPENDS += " alsa-lib libgpiod i2c-tools"
