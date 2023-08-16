@@ -1,6 +1,8 @@
 # Generate SD Card image and eMMC image
 # - Using spl_tool to fix img header to boot from eMMC
 
+DEPENDS += " u-boot-tools-native dtc-native"
+
 do_vf2_sd (){
         cd ${IMGDEPLOYDIR}
         bmaptool copy ${PN}-${MACHINE}.wic.gz ${DEPLOY_DIR_IMAGE}/${MACHINE}-${PN}.img

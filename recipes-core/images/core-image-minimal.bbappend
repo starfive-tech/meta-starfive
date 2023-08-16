@@ -1,6 +1,8 @@
 require sd-image.inc
 
-DEPENDS += " opensbi starfive-tool-native u-boot-tools-native dtc-native"
+DEPENDS:starfive-visionfive2 += " opensbi starfive-tool-native"
+
+IMAGE_FEATURES += " allow-empty-password empty-root-password"
 
 IMAGE_INSTALL += " \
 	helloworld \
@@ -17,4 +19,4 @@ IMAGE_INSTALL += " \
 	e2fsprogs-resize2fs \
 	"
 
-EXTRA_IMAGEDEPENDS += " alsa-lib libgpiod i2c-tools"
+EXTRA_IMAGEDEPENDS:starfive-visionfive2 += " alsa-lib libgpiod i2c-tools"
