@@ -50,6 +50,7 @@ bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-networking
 bitbake-layers add-layer ../meta-openembedded/meta-gnome
 bitbake-layers add-layer ../meta-openembedded/meta-xfce
+bitbake-layers add-layer ../meta-openembedded/meta-webserver
 bitbake-layers add-layer ../meta-riscv
 bitbake-layers add-layer ../meta-starfive
 bitbake-layers add-layer ../meta-clang
@@ -76,7 +77,7 @@ USER_CLASSES ?= "buildstats buildhistory buildstats-summary"
 
 INHERIT += "uninative"
 
-DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam  systemd "
+DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam systemd "
 #DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam "
 DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
 VIRTUAL-RUNTIME_init_manager = "systemd"
@@ -178,9 +179,9 @@ echo "";
 PS3="Select your action : "
 options=("Build qspi-image" "Build dubhe-image-minimal" "Build qspi-ubifs-image" "Build qspi-nfs-image" "Quit")
 
-select opt in "${options[@]}" 
+select opt in "${options[@]}"
 do
-    case $opt in 
+    case $opt in
         "Build qspi-image")
 #            cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
 	    updatecfg ENABLE_INIT;
@@ -290,6 +291,48 @@ do
 done
 }
 
+jh8100(){
+# Menu script
+echo ""
+echo -e "${PURPLE}*******************************************************************"
+echo "*                                                                 *"
+echo "*                 StarFive JH8100 Build Menu                      *"
+echo "*                                                                 *"
+echo -e "*******************************************************************${NC}"
+echo "";
+echo -e "${YELLOW}Description : ";
+echo "";
+echo "This build script can build two types of image.";
+echo "";
+echo "1) core-image-minimal";
+echo "   - Minimal image with ext4 support.";
+echo "   - Generated output : ";
+echo "     starfive-jh8100-core-image-minimal.img";
+echo -e "2) Quit${NC}";
+echo "";
+
+PS3="Select your action : "
+options=("Build core-image-minimal" "Quit")
+
+select opt in "${options[@]}"
+do
+    case $opt in
+        "Build core-image-minimal")
+                cur_ter=$(tty);
+                output_min=$(MACHINE=starfive-jh8100 bitbake core-image-minimal | tee $cur_ter);
+                if [[ $output_min != *"ERROR"* ]]; then
+                        echo -e "\U0002705 ${GREEN}Build Complete${NC}"
+                else echo -e "\U000274C ${RED}Build Failed${NC}"
+                fi;;
+        "Quit")
+            break;;
+        *)
+            echo "Invalid option $REPLY. Kindly select choice between menu range."
+    esac
+    REPLY=
+done
+}
+
 # Menu script
 echo ""
 echo -e "${PURPLE}*******************************************************************"
@@ -300,18 +343,20 @@ echo -e "*******************************************************************${NC
 echo "";
 echo -e "${YELLOW}List below shows machine supported : ";
 echo "1) StarFive Dubhe";
-echo -e "2) Quit${NC}";
+echo "2) StarFive JH8100";
+echo -e "3) Quit${NC}";
 echo "";
 
 PS3="Select machine : "
-options=("StarFive Dubhe" "Quit")
-
+options=("StarFive Dubhe" "StarFive JH8100" "Quit")
 
 select opt in "${options[@]}"
 do
     case $opt in
         "StarFive Dubhe")
 		dubhe;;
+	"StarFive JH8100")
+		jh8100;;
 	"Quit")
             break;;
         *)
@@ -319,4 +364,3 @@ do
     esac
     REPLY=
 done
-
