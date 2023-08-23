@@ -1,0 +1,13 @@
+diff --git a/src/lj_arch.h b/src/lj_arch.h
+index 453414f3..09284829 100644
+--- a/src/lj_arch.h
++++ b/src/lj_arch.h
+@@ -447,7 +447,7 @@
+ #error "No support for RISC-V 32"
+
+ #elif LUAJIT_TARGET == LUAJIT_ARCH_RISCV64
+-#if defined(__riscv_float_abi_double)
++#if defined(__riscv_float_abi_double) | 1
+
+ #define LJ_ARCH_NAME           "riscv64"
+ #define LJ_ARCH_BITS           64
