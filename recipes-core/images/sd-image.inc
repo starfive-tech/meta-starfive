@@ -9,4 +9,10 @@ do_vf2_sd (){
         spl_tool -i -f ${DEPLOY_DIR_IMAGE}/${MACHINE}-${PN}.img
 }
 
+do_jh8100_fpga_image (){
+        cd ${IMGDEPLOYDIR}
+        bmaptool copy ${PN}-${MACHINE}.wic.gz ${DEPLOY_DIR_IMAGE}/${MACHINE}-${PN}.img
+}
+
 IMAGE_POSTPROCESS_COMMAND:starfive-visionfive2 += "do_vf2_sd;"
+IMAGE_POSTPROCESS_COMMAND:starfive-jh8100 += "do_jh8100_fpga_image;"
