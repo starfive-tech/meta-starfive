@@ -11,3 +11,16 @@ do_configure:prepend () {
 	rm -f ${S}/bind/bind.tar.gz
 	install ${S}/../bind.tar.gz ${S}/bind/
 }
+
+do_install:append() {
+	rm ${D}/usr/include/irs/resconf.h
+	rm -rf ${D}/usr/include/dns/
+	rm -rf ${D}/usr/include/isc/
+	rm -rf ${D}/usr/include/isccfg/
+	rm -f ${D}/usr/include/dst/dst.h
+	rm -f ${D}/usr/include/dst/gssapi.h
+	rm -f ${D}/usr/lib/libdns.so
+	rm -f ${D}/usr/lib/libirs.so
+	rm -f ${D}/usr/lib/libisccfg.so
+	rm -f ${D}/usr/lib/libisc.so
+}
