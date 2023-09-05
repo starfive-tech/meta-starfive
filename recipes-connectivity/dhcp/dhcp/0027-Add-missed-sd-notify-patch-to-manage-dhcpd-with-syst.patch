@@ -1,0 +1,93 @@
+From d1b1f91a7982be28acdfb580996c93aafcc76cc2 Mon Sep 17 00:00:00 2001
+From: Pavel Zhukov <pzhukov@redhat.com>
+Date: Thu, 7 Nov 2019 14:47:45 +0100
+Subject: [PATCH 27/28] Add missed sd notify patch to manage dhcpd with systemd
+
+---
+ configure.ac     | 11 +++++++++++
+ relay/dhcrelay.c | 12 ++++++++++++
+ server/dhcpd.c   | 12 ++++++++++++
+ 3 files changed, 35 insertions(+)
+
+Index: dhcp-4.4.3/configure.ac+lt
+===================================================================
+--- dhcp-4.4.3.orig/configure.ac+lt
++++ dhcp-4.4.3/configure.ac+lt
+@@ -983,6 +983,17 @@ if test x$ldap = xyes || test x$ldapcryp
+     AC_SUBST(LDAP_CFLAGS, [$LDAP_CFLAGS])
+ fi
+ 
++AC_ARG_WITH(systemd,
++        AC_HELP_STRING([--with-systemd],
++                       [enable sending status notifications to systemd daemon (default is no)]),
++        [systemd=$withval],
++        [systemd=no])
++
++if test x$systemd = xyes ; then
++   AC_CHECK_LIB(systemd, sd_notifyf, ,
++                AC_MSG_FAILURE([*** systemd library not present - do you need to install systemd-libs package?]))
++fi
++
+ # Append selected warning levels to CFLAGS before substitution (but after
+ # AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[]])],[],[]) & etc).
+ CFLAGS="$CFLAGS $STD_CWARNINGS"
+Index: dhcp-4.4.3/relay/dhcrelay.c
+===================================================================
+--- dhcp-4.4.3.orig/relay/dhcrelay.c
++++ dhcp-4.4.3/relay/dhcrelay.c
+@@ -32,6 +32,10 @@
+ #include <sys/time.h>
+ #include <isc/file.h>
+ 
++#ifdef HAVE_LIBSYSTEMD
++#include <systemd/sd-daemon.h>
++#endif
++
+ TIME default_lease_time = 43200; /* 12 hours... */
+ TIME max_lease_time = 86400; /* 24 hours... */
+ struct tree_cache *global_options[256];
+@@ -840,6 +844,14 @@ main(int argc, char **argv) {
+ 	signal(SIGTERM, dhcp_signal_handler);  /* kill */
+ #endif
+ 
++#ifdef HAVE_LIBSYSTEMD
++        /* We are ready to process incomming packets. Let's notify systemd */
++        sd_notifyf(0, "READY=1\n"
++                   "STATUS=Dispatching packets...\n"
++                   "MAINPID=%lu",
++                   (unsigned long) getpid());
++#endif
++
+ 	/* Start dispatching packets and timeouts... */
+ 	dispatch();
+ 
+Index: dhcp-4.4.3/server/dhcpd.c
+===================================================================
+--- dhcp-4.4.3.orig/server/dhcpd.c
++++ dhcp-4.4.3/server/dhcpd.c
+@@ -60,6 +60,10 @@ gid_t set_gid = 0;
+ struct class unknown_class;
+ struct class known_class;
+ 
++#ifdef HAVE_LIBSYSTEMD
++#include <systemd/sd-daemon.h>
++#endif
++
+ struct iaddr server_identifier;
+ int server_identifier_matched;
+ 
+@@ -1057,6 +1061,14 @@ main(int argc, char **argv) {
+ 	/* Log that we are about to start working */
+ 	log_info("Server starting service.");
+ 
++#ifdef HAVE_LIBSYSTEMD
++        /* We are ready to process incomming packets. Let's notify systemd */
++        sd_notifyf(0, "READY=1\n"
++                   "STATUS=Dispatching packets...\n"
++                   "MAINPID=%lu",
++                   (unsigned long) getpid());
++#endif
++
+ 	/*
+ 	 * Receive packets and dispatch them...
+ 	 * dispatch() will never return.

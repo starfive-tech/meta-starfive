@@ -1,0 +1,157 @@
+From cccec0344d68dac4100b6f260ee24e7c2da9dfda Mon Sep 17 00:00:00 2001
+From: Hongxu Jia <hongxu.jia@windriver.com>
+Date: Tue, 15 Aug 2017 15:08:22 +0800
+Subject: [PATCH 04/11] Fix out of tree builds
+
+Upstream-Status: Pending
+
+RP 2013/03/21
+
+Rebase to 4.3.6
+
+Signed-off-by: Hongxu Jia <hongxu.jia@windriver.com>
+---
+ client/Makefile.am  | 4 ++--
+ common/Makefile.am  | 3 ++-
+ dhcpctl/Makefile.am | 2 ++
+ omapip/Makefile.am  | 1 +
+ relay/Makefile.am   | 2 +-
+ server/Makefile.am  | 2 +-
+ 6 files changed, 9 insertions(+), 5 deletions(-)
+
+Index: dhcp-4.4.3/common/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/common/Makefile.am
++++ dhcp-4.4.3/common/Makefile.am
+@@ -1,8 +1,8 @@
+ AM_CPPFLAGS = -I$(top_srcdir) -DLOCALSTATEDIR='"@localstatedir@"'
+ AM_CFLAGS = $(LDAP_CFLAGS)
+ 
+-lib_LIBRARIES = libdhcp.a
+-libdhcp_a_SOURCES = alloc.c bpf.c comapi.c conflex.c ctrace.c dhcp4o6.c \
++lib_LTLIBRARIES = libdhcp.la
++libdhcp_la_SOURCES = alloc.c bpf.c comapi.c conflex.c ctrace.c dhcp4o6.c \
+ 		      discover.c dispatch.c dlpi.c dns.c ethernet.c execute.c \
+ 		      fddi.c icmp.c inet.c lpf.c memory.c nit.c ns_name.c \
+ 		      options.c packet.c parse.c print.c raw.c resolv.c \
+Index: dhcp-4.4.3/dhcpctl/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/dhcpctl/Makefile.am
++++ dhcp-4.4.3/dhcpctl/Makefile.am
+@@ -4,30 +4,30 @@ BINDLIBISCCFGDIR=@BINDLIBISCCFGDIR@
+ BINDLIBISCDIR=@BINDLIBISCDIR@
+ 
+ bin_PROGRAMS = omshell
+-lib_LIBRARIES = libdhcpctl.a
++lib_LTLIBRARIES = libdhcpctl.la
+ noinst_PROGRAMS = cltest cltest2
+ man_MANS = omshell.1 dhcpctl.3
+ EXTRA_DIST = $(man_MANS)
+ 
+ omshell_SOURCES = omshell.c
+-omshell_LDADD = libdhcpctl.a ../common/libdhcp.a ../omapip/libomapi.a \
+-		$(BINDLIBIRSDIR)/libirs.a \
+-		$(BINDLIBDNSDIR)/libdns.a \
+-	        $(BINDLIBISCCFGDIR)/libisccfg.a \
+-		$(BINDLIBISCDIR)/libisc.a
++omshell_LDADD = libdhcpctl.la ../common/libdhcp.la ../omapip/libomapi.la \
++		$(BINDLIBIRSDIR)/libirs.la \
++		$(BINDLIBDNSDIR)/libdns.la \
++	        $(BINDLIBISCCFGDIR)/libisccfg.la \
++		$(BINDLIBISCDIR)/libisc.la
+ 
+-libdhcpctl_a_SOURCES = dhcpctl.c callback.c remote.c
++libdhcpctl_la_SOURCES = dhcpctl.c callback.c remote.c
+ 
+ cltest_SOURCES = cltest.c
+-cltest_LDADD = libdhcpctl.a ../common/libdhcp.a ../omapip/libomapi.a \
+-	       $(BINDLIBIRSDIR)/libirs.a \
+-	       $(BINDLIBDNSDIR)/libdns.a \
+-	       $(BINDLIBISCCFGDIR)/libisccfg.a \
+-	       $(BINDLIBISCDIR)/libisc.a
++cltest_LDADD = libdhcpctl.la ../common/libdhcp.la ../omapip/libomapi.la \
++	       $(BINDLIBIRSDIR)/libirs.la \
++	       $(BINDLIBDNSDIR)/libdns.la \
++	       $(BINDLIBISCCFGDIR)/libisccfg.la \
++	       $(BINDLIBISCDIR)/libisc.la
+ 
+ cltest2_SOURCES = cltest2.c
+-cltest2_LDADD = libdhcpctl.a ../common/libdhcp.a ../omapip/libomapi.a \
+-	       $(BINDLIBIRSDIR)/libirs.a \
+-	       $(BINDLIBDNSDIR)/libdns.a \
+-	       $(BINDLIBISCCFGDIR)/libisccfg.a \
+-	       $(BINDLIBISCDIR)/libisc.a
++cltest2_LDADD = libdhcpctl.la ../common/libdhcp.la ../omapip/libomapi.la \
++	       $(BINDLIBIRSDIR)/libirs.la \
++	       $(BINDLIBDNSDIR)/libdns.la \
++	       $(BINDLIBISCCFGDIR)/libisccfg.la \
++	       $(BINDLIBISCDIR)/libisc.la
+Index: dhcp-4.4.3/server/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/server/Makefile.am
++++ dhcp-4.4.3/server/Makefile.am
+@@ -4,7 +4,7 @@
+ # production code. Sadly, we are not there yet.
+ SUBDIRS = . tests
+ 
+-AM_CPPFLAGS = -I.. -DLOCALSTATEDIR='"@localstatedir@"'
++AM_CPPFLAGS = -I$(top_srcdir) -DLOCALSTATEDIR='"@localstatedir@"' -I$(top_srcdir)/includes
+ 
+ dist_sysconf_DATA = dhcpd.conf.example
+ sbin_PROGRAMS = dhcpd
+Index: dhcp-4.4.3/client/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/client/Makefile.am
++++ dhcp-4.4.3/client/Makefile.am
+@@ -5,7 +5,7 @@
+ SUBDIRS = . tests
+ 
+ AM_CPPFLAGS = -DCLIENT_PATH='"PATH=$(sbindir):/sbin:/bin:/usr/sbin:/usr/bin"'
+-AM_CPPFLAGS += -DLOCALSTATEDIR='"$(localstatedir)"'
++AM_CPPFLAGS += -DLOCALSTATEDIR='"$(localstatedir)"' -I$(top_srcdir)/includes
+ 
+ dist_sysconf_DATA = dhclient.conf.example
+ sbin_PROGRAMS = dhclient
+Index: dhcp-4.4.3/omapip/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/omapip/Makefile.am
++++ dhcp-4.4.3/omapip/Makefile.am
+@@ -3,10 +3,10 @@ BINDLIBDNSDIR=@BINDLIBDNSDIR@
+ BINDLIBISCCFGDIR=@BINDLIBISCCFGDIR@
+ BINDLIBISCDIR=@BINDLIBISCDIR@
+ 
+-lib_LIBRARIES = libomapi.a
++lib_LTLIBRARIES = libomapi.la
+ noinst_PROGRAMS = svtest
+ 
+-libomapi_a_SOURCES = protocol.c buffer.c alloc.c result.c connection.c \
++libomapi_la_SOURCES = protocol.c buffer.c alloc.c result.c connection.c \
+ 		       errwarn.c listener.c dispatch.c generic.c support.c \
+ 		       handle.c message.c convert.c hash.c auth.c inet_addr.c \
+ 		       array.c trace.c toisc.c iscprint.c isclib.c
+@@ -15,8 +15,8 @@ man_MANS = omapi.3
+ EXTRA_DIST = $(man_MANS)
+ 
+ svtest_SOURCES = test.c
+-svtest_LDADD = libomapi.a \
+-	       $(BINDLIBIRSDIR)/libirs.a \
+-	       $(BINDLIBDNSDIR)/libdns.a \
+-	       $(BINDLIBISCCFGDIR)/libisccfg.a \
+-	       $(BINDLIBISCDIR)/libisc.a
++svtest_LDADD = libomapi.la \
++	       $(BINDLIBIRSDIR)/libirs.la \
++	       $(BINDLIBDNSDIR)/libdns.la \
++	       $(BINDLIBISCCFGDIR)/libisccfg.la \
++	       $(BINDLIBISCDIR)/libisc.la
+Index: dhcp-4.4.3/relay/Makefile.am
+===================================================================
+--- dhcp-4.4.3.orig/relay/Makefile.am
++++ dhcp-4.4.3/relay/Makefile.am
+@@ -1,6 +1,6 @@
+ SUBDIRS = . tests
+ 
+-AM_CPPFLAGS = -DLOCALSTATEDIR='"@localstatedir@"'
++AM_CPPFLAGS = -DLOCALSTATEDIR='"@localstatedir@"' -I$(top_srcdir)/includes
+ 
+ sbin_PROGRAMS = dhcrelay
+ dhcrelay_SOURCES = dhcrelay.c
