@@ -27,15 +27,13 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI:starfive-dubhe = " \
         git://git@192.168.110.45/${FORK}/linux.git;protocol=ssh;branch=${BRANCH} \
         file://cpio.cfg \
-        ${@oe.utils.conditional('ENABLE_EXT4','1','file://ext4.patch','',d)} \
-        ${@oe.utils.conditional('ENABLE_UBI','1','file://ubi.patch','',d)} \
-        ${@oe.utils.conditional('ENABLE_NFS','1','file://nfs.patch','',d)} \
+	file://add-dubhe-additional-dtb.patch \
         "
 SRC_URI:starfive-jh8100 = "git://git@192.168.110.45/${FORK}/linux.git;protocol=ssh;branch=${BRANCH}"
 
 
-INITRAMFS_IMAGE_BUNDLE:starfive-dubhe = "${@oe.utils.conditional('ENABLE_INIT','1','1','',d)}"
-INITRAMFS_IMAGE:starfive-dubhe = "${@oe.utils.conditional('ENABLE_INIT','1','dubhe-image-initramfs','',d)}"
+INITRAMFS_IMAGE_BUNDLE:starfive-dubhe = "1"
+INITRAMFS_IMAGE:starfive-dubhe = "dubhe-image-initramfs"
 
 KBUILD_DEFCONFIG:starfive-dubhe = "starfive_dubhe_defconfig"
 KBUILD_DEFCONFIG:starfive-jh8100 = "jh8100_defconfig"
@@ -44,4 +42,15 @@ COMPATIBLE_MACHINE = "(starfive-dubhe|starfive-jh8100)"
 
 FILES:${KERNEL_PACKAGE_NAME}-base += "/usr/*"
 
-do_compile[nostamp] = "1"
+BOOTARGS_EXT4 = "console=ttySIF0,115200 earlycon=sbi root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait ip=:::255.255.255.0::eth0:dhcp"
+BOOTARGS_UBI = "console=ttySIF0,115200 earlycon=sbi ip=:::255.255.255.0::eth0:dhcp root=ubi0:starfive-dubhe-rootfs ubi.mtd=1 rw rootfstype=ubifs rootwait"
+BOOTARGS_NFS = "console=ttySIF0,115200 earlycon=sbi root=/dev/nfs rw nfsroot=192.168.1.1:/filepath,rw,tcp,vers=3 ip=:::255.255.255.0::eth0:dhcp rootfstype=ext4 rootwait"
+
+do_configure:append:starfive-dubhe() {
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ext4.dts
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ubi.dts
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_nfs.dts
+	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_EXT4}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ext4.dts
+	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_UBI}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ubi.dts
+	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_NFS}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_nfs.dts
+}

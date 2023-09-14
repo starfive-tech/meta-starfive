@@ -29,7 +29,7 @@ do_qspi[depends] += " virtual/kernel:do_deploy"
 do_qspi () {
         dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=32 seek=0 count=128
         dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=32 seek=128 count=1
-        dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=32 seek=129 count=255
+        dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga_ubi.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=32 seek=129 count=255
         dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=32 seek=384 count=1048192
 	dd if=${IMGDEPLOYDIR}/qspi-ubifs-starfive-dubhe.ubi of=${DEPLOY_DIR_IMAGE}/QSPI-Ubifs-Image.bin bs=64KiB seek=512
 }
