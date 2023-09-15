@@ -1,0 +1,1278 @@
+From 29318f779da9c962af60d574b19159ecc10cfdd7 Mon Sep 17 00:00:00 2001
+From: Eric Tang <eric.tang@starfivetech.com>
+Date: Thu, 15 Jun 2023 09:30:16 +0800
+Subject: [PATCH 2/9] [neon2rvv] Model vxrm in LLVM intrinsics and add
+ optimization for removing redundant csrwi
+
+Signed-off-by: Eric Tang <eric.tang@starfivetech.com>
+---
+ clang/include/clang/Basic/riscv_vector.td     | 134 +++++-
+ llvm/include/llvm/IR/IntrinsicsRISCV.td       |  94 +++-
+ llvm/lib/Target/RISCV/CMakeLists.txt          |   1 +
+ .../Target/RISCV/MCTargetDesc/RISCVBaseInfo.h |   8 +
+ llvm/lib/Target/RISCV/RISCV.h                 |   3 +
+ .../Target/RISCV/RISCVInsertReadWriteCSR.cpp  | 115 +++++
+ llvm/lib/Target/RISCV/RISCVInstrFormats.td    |   3 +
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td       |   2 +
+ .../Target/RISCV/RISCVInstrInfoVPseudos.td    | 428 +++++++++++++++++-
+ llvm/lib/Target/RISCV/RISCVMCInstLower.cpp    |   2 +
+ llvm/lib/Target/RISCV/RISCVSystemOperands.td  |   2 +-
+ llvm/lib/Target/RISCV/RISCVTargetMachine.cpp  |   2 +
+ 12 files changed, 747 insertions(+), 47 deletions(-)
+ create mode 100644 llvm/lib/Target/RISCV/RISCVInsertReadWriteCSR.cpp
+
+diff --git a/clang/include/clang/Basic/riscv_vector.td b/clang/include/clang/Basic/riscv_vector.td
+index b23e26ecaa57..9d443be0403c 100644
+--- a/clang/include/clang/Basic/riscv_vector.td
++++ b/clang/include/clang/Basic/riscv_vector.td
+@@ -316,11 +316,21 @@ multiclass RVVSignedBinBuiltinSet
+                           [["vv", "v", "vvv"],
+                            ["vx", "v", "vve"]]>;
+ 
++multiclass RVVSignedBinBuiltinSetRoundingMode
++    : RVVOutOp1BuiltinSet<NAME, "csil",
++                          [["vv", "v", "vvvu"],
++                           ["vx", "v", "vveu"]]>;
++
+ multiclass RVVUnsignedBinBuiltinSet
+     : RVVOutOp1BuiltinSet<NAME, "csil",
+                           [["vv", "Uv", "UvUvUv"],
+                            ["vx", "Uv", "UvUvUe"]]>;
+ 
++multiclass RVVUnsignedBinBuiltinSetRoundingMode
++    : RVVOutOp1BuiltinSet<NAME, "csil",
++                          [["vv", "Uv", "UvUvUvu"],
++                           ["vx", "Uv", "UvUvUeu"]]>;
++
+ multiclass RVVIntBinBuiltinSet
+     : RVVSignedBinBuiltinSet,
+       RVVUnsignedBinBuiltinSet;
+@@ -335,11 +345,21 @@ multiclass RVVSignedShiftBuiltinSet
+                           [["vv", "v", "vvUv"],
+                            ["vx", "v", "vvz"]]>;
+ 
++multiclass RVVSignedShiftBuiltinSetRoundingMode
++    : RVVOutOp1BuiltinSet<NAME, "csil",
++                          [["vv", "v", "vvUvu"],
++                           ["vx", "v", "vvzu"]]>;
++
+ multiclass RVVUnsignedShiftBuiltinSet
+     : RVVOutOp1BuiltinSet<NAME, "csil",
+                           [["vv", "Uv", "UvUvUv"],
+                            ["vx", "Uv", "UvUvz"]]>;
+ 
++multiclass RVVUnsignedShiftBuiltinSetRoundingMode
++    : RVVOutOp1BuiltinSet<NAME, "csil",
++                          [["vv", "Uv", "UvUvUvu"],
++                           ["vx", "Uv", "UvUvzu"]]>;
++
+ multiclass RVVShiftBuiltinSet
+     : RVVSignedShiftBuiltinSet,
+       RVVUnsignedShiftBuiltinSet;
+@@ -349,10 +369,18 @@ let Log2LMUL = [-3, -2, -1, 0, 1, 2] in {
+       : RVVOutOp0Op1BuiltinSet<NAME, "csil",
+                                      [["wv", "v", "vwUv"],
+                                       ["wx", "v", "vwz"]]>;
++  multiclass RVVSignedNShiftBuiltinSetRoundingMode
++      : RVVOutOp0Op1BuiltinSet<NAME, "csil",
++                                     [["wv", "v", "vwUvu"],
++                                      ["wx", "v", "vwzu"]]>;
+   multiclass RVVUnsignedNShiftBuiltinSet
+       : RVVOutOp0Op1BuiltinSet<NAME, "csil",
+                                      [["wv", "Uv", "UvUwUv"],
+                                       ["wx", "Uv", "UvUwz"]]>;
++  multiclass RVVUnsignedNShiftBuiltinSetRoundingMode
++      : RVVOutOp0Op1BuiltinSet<NAME, "csil",
++                                     [["wv", "Uv", "UvUwUvu"],
++                                      ["wx", "Uv", "UvUwzu"]]>;
+ }
+ 
+ multiclass RVVCarryinBuiltinSet
+@@ -1928,6 +1956,17 @@ let HasMasked = false,
+ }
+ 
+ // 13. Vector Fixed-Point Arithmetic Instructions
++let HeaderCode =
++[{
++enum __RISCV_VXRM {
++  __RISCV_VXRM_RNU = 0,
++  __RISCV_VXRM_RNE = 1,
++  __RISCV_VXRM_RDN = 2,
++  __RISCV_VXRM_ROD = 3,
++};
++}] in
++def vxrm_enum : RVVHeader;
++
+ // 13.1. Vector Single-Width Saturating Add and Subtract
+ let UnMaskedPolicyScheme = HasPassthruOperand in {
+ defm vsaddu : RVVUnsignedBinBuiltinSet;
+@@ -1936,23 +1975,94 @@ defm vssubu : RVVUnsignedBinBuiltinSet;
+ defm vssub : RVVSignedBinBuiltinSet;
+ 
+ // 13.2. Vector Single-Width Averaging Add and Subtract
+-defm vaaddu : RVVUnsignedBinBuiltinSet;
+-defm vaadd : RVVSignedBinBuiltinSet;
+-defm vasubu : RVVUnsignedBinBuiltinSet;
+-defm vasub : RVVSignedBinBuiltinSet;
++let ManualCodegen = [{
++  {
++    // LLVM intrinsic
++    // Unmasked: (passthru, op0, op1, round_mode, vl)
++    // Masked:   (passthru, vector_in, vector_in/scalar_in, mask, vxrm, vl, policy)
++
++    SmallVector<llvm::Value*, 7> Operands;
++    bool HasMaskedOff = !(
++        (IsMasked && (PolicyAttrs & RVV_VTA) && (PolicyAttrs & RVV_VMA)) ||
++        (!IsMasked && PolicyAttrs & RVV_VTA));
++    unsigned Offset = IsMasked ?
++        (HasMaskedOff ? 2 : 1) : (HasMaskedOff ? 1 : 0);
++
++    if (!HasMaskedOff)
++      Operands.push_back(llvm::PoisonValue::get(ResultType));
++    else
++      Operands.push_back(Ops[Offset]);
++
++    Operands.push_back(Ops[Offset]); // op0
++    Operands.push_back(Ops[Offset + 1]); // op1
++
++    if (IsMasked)
++      Operands.push_back(Ops[0]); // mask
++
++    Operands.push_back(Ops[Offset + 2]); // vxrm
++    Operands.push_back(Ops[Offset + 3]); // vl
++
++    if (IsMasked)
++      Operands.push_back(ConstantInt::get(Ops.back()->getType(), PolicyAttrs));
++
++    IntrinsicTypes = {ResultType, Ops[Offset + 1]->getType(), Ops.back()->getType()};
++    llvm::Function *F = CGM.getIntrinsic(ID, IntrinsicTypes);
++    return Builder.CreateCall(F, Operands, "");
++  }
++}] in {
++  defm vaaddu : RVVUnsignedBinBuiltinSetRoundingMode;
++  defm vaadd : RVVSignedBinBuiltinSetRoundingMode;
++  defm vasubu : RVVUnsignedBinBuiltinSetRoundingMode;
++  defm vasub : RVVSignedBinBuiltinSetRoundingMode;
+ 
+ // 13.3. Vector Single-Width Fractional Multiply with Rounding and Saturation
+-let RequiredFeatures = ["FullMultiply"] in {
+-defm vsmul : RVVSignedBinBuiltinSet;
+-}
++  let RequiredFeatures = ["FullMultiply"] in {
++    defm vsmul : RVVSignedBinBuiltinSetRoundingMode;
++  }
+ 
+ // 13.4. Vector Single-Width Scaling Shift Instructions
+-defm vssrl : RVVUnsignedShiftBuiltinSet;
+-defm vssra : RVVSignedShiftBuiltinSet;
+-
++  defm vssrl : RVVUnsignedShiftBuiltinSetRoundingMode;
++  defm vssra : RVVSignedShiftBuiltinSetRoundingMode;
++}
++let ManualCodegen = [{
++  {
++    // LLVM intrinsic
++    // Unmasked: (passthru, op0, op1, round_mode, vl)
++    // Masked:   (passthru, vector_in, vector_in/scalar_in, mask, vxrm, vl, policy)
++
++    SmallVector<llvm::Value*, 7> Operands;
++    bool HasMaskedOff = !(
++        (IsMasked && (PolicyAttrs & RVV_VTA) && (PolicyAttrs & RVV_VMA)) ||
++        (!IsMasked && PolicyAttrs & RVV_VTA));
++    unsigned Offset = IsMasked ?
++        (HasMaskedOff ? 2 : 1) : (HasMaskedOff ? 1 : 0);
++
++    if (!HasMaskedOff)
++      Operands.push_back(llvm::PoisonValue::get(ResultType));
++    else
++      Operands.push_back(Ops[Offset - 1]);
++
++    Operands.push_back(Ops[Offset]); // op0
++    Operands.push_back(Ops[Offset + 1]); // op1
++
++    if (IsMasked)
++      Operands.push_back(Ops[0]); // mask
++
++    Operands.push_back(Ops[Offset + 2]); // vxrm
++    Operands.push_back(Ops[Offset + 3]); // vl
++
++    if (IsMasked)
++      Operands.push_back(ConstantInt::get(Ops.back()->getType(), PolicyAttrs));
++
++    IntrinsicTypes = {ResultType, Ops[Offset]->getType(), Ops[Offset + 1]->getType(), Ops.back()->getType()};
++    llvm::Function *F = CGM.getIntrinsic(ID, IntrinsicTypes);
++    return Builder.CreateCall(F, Operands, "");
++  }
++}] in {
+ // 13.5. Vector Narrowing Fixed-Point Clip Instructions
+-defm vnclipu : RVVUnsignedNShiftBuiltinSet;
+-defm vnclip : RVVSignedNShiftBuiltinSet;
++  defm vnclipu : RVVUnsignedNShiftBuiltinSetRoundingMode;
++  defm vnclip : RVVSignedNShiftBuiltinSetRoundingMode;
++}
+ 
+ // 14. Vector Floating-Point Instructions
+ // 14.2. Vector Single-Width Floating-Point Add/Subtract Instructions
+diff --git a/llvm/include/llvm/IR/IntrinsicsRISCV.td b/llvm/include/llvm/IR/IntrinsicsRISCV.td
+index e9c88f468076..7103bb5f5e39 100644
+--- a/llvm/include/llvm/IR/IntrinsicsRISCV.td
++++ b/llvm/include/llvm/IR/IntrinsicsRISCV.td
+@@ -586,6 +586,17 @@ let TargetPrefix = "riscv" in {
+     let ScalarOperand = 2;
+     let VLOperand = 3;
+   }
++  // For Saturating binary operations with rounding-mode operand
++  // The destination vector type is the same as first source vector.
++  // Input: (passthru, vector_in, vector_in/scalar_in, vxrm, vl)
++  class RISCVSaturatingBinaryAAXUnMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
++                     llvm_anyint_ty, LLVMMatchType<2>],
++                    [ImmArg<ArgIndex<3>>, IntrNoMem]>, RISCVVIntrinsic {
++    let ScalarOperand = 2;
++    let VLOperand = 4;
++  }
+   // For Saturating binary operations with mask.
+   // The destination vector type is the same as first source vector.
+   // Input: (maskedoff, vector_in, vector_in/scalar_in, mask, vl, policy)
+@@ -598,6 +609,18 @@ let TargetPrefix = "riscv" in {
+     let ScalarOperand = 2;
+     let VLOperand = 4;
+   }
++  // For Saturating binary operations with mask and rounding-mode operand
++  // The destination vector type is the same as first source vector.
++  // Input: (maskedoff, vector_in, vector_in/scalar_in, mask, vxrm, vl, policy)
++  class RISCVSaturatingBinaryAAXMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
++                     LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>, llvm_anyint_ty,
++                     LLVMMatchType<2>, LLVMMatchType<2>],
++                    [ImmArg<ArgIndex<4>>, ImmArg<ArgIndex<6>>, IntrNoMem]>, RISCVVIntrinsic {
++    let ScalarOperand = 2;
++    let VLOperand = 5;
++  }
+   // For Saturating binary operations.
+   // The destination vector type is the same as first source vector.
+   // The second source operand matches the destination type or is an XLen scalar.
+@@ -609,6 +632,15 @@ let TargetPrefix = "riscv" in {
+                     [IntrNoMem, IntrHasSideEffects]>, RISCVVIntrinsic {
+     let VLOperand = 3;
+   }
++
++  // Input: (passthru, vector_in, vector_in/scalar_in, vxrm, vl)
++  class RISCVSaturatingBinaryAAShiftUnMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
++                     llvm_anyint_ty, LLVMMatchType<2>],
++                    [ImmArg<ArgIndex<3>>, IntrNoMem]>, RISCVVIntrinsic {
++    let VLOperand = 4;
++  }
+   // For Saturating binary operations with mask.
+   // The destination vector type is the same as first source vector.
+   // The second source operand matches the destination type or is an XLen scalar.
+@@ -621,6 +653,17 @@ let TargetPrefix = "riscv" in {
+                     [ImmArg<ArgIndex<5>>, IntrNoMem, IntrHasSideEffects]>, RISCVVIntrinsic {
+     let VLOperand = 4;
+   }
++
++  // Input: (maskedoff, vector_in, vector_in/scalar_in, mask, vxrm, vl, policy)
++  class RISCVSaturatingBinaryAAShiftMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, LLVMMatchType<0>, llvm_any_ty,
++                     LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>, llvm_anyint_ty,
++                     LLVMMatchType<2>, LLVMMatchType<2>],
++                    [ImmArg<ArgIndex<4>>, ImmArg<ArgIndex<6>>, IntrNoMem]>, RISCVVIntrinsic {
++    let VLOperand = 5;
++  }
++
+   // For Saturating binary operations.
+   // The destination vector type is NOT the same as first source vector.
+   // The second source operand matches the destination type or is an XLen scalar.
+@@ -632,6 +675,16 @@ let TargetPrefix = "riscv" in {
+                     [IntrNoMem, IntrHasSideEffects]>, RISCVVIntrinsic {
+     let VLOperand = 3;
+   }
++
++  // Input: (passthru, vector_in, vector_in/scalar_in, vxrm, vl)
++  class RISCVSaturatingBinaryABShiftUnMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
++                     llvm_anyint_ty, LLVMMatchType<3>],
++                    [ImmArg<ArgIndex<3>>, IntrNoMem]>, RISCVVIntrinsic {
++    let VLOperand = 4;
++  }
++
+   // For Saturating binary operations with mask.
+   // The destination vector type is NOT the same as first source vector (with mask).
+   // The second source operand matches the destination type or is an XLen scalar.
+@@ -644,6 +697,17 @@ let TargetPrefix = "riscv" in {
+                     [ImmArg<ArgIndex<5>>, IntrNoMem, IntrHasSideEffects]>, RISCVVIntrinsic {
+     let VLOperand = 4;
+   }
++
++  // Input: (maskedoff, vector_in, vector_in/scalar_in, mask, vxrm, vl, policy)
++  class RISCVSaturatingBinaryABShiftMaskedRoundingMode
++        : Intrinsic<[llvm_anyvector_ty],
++                    [LLVMMatchType<0>, llvm_anyvector_ty, llvm_any_ty,
++                     LLVMScalarOrSameVectorWidth<0, llvm_i1_ty>, llvm_anyint_ty,
++                     LLVMMatchType<3>, LLVMMatchType<3>],
++                    [ImmArg<ArgIndex<4>>, ImmArg<ArgIndex<6>>, IntrNoMem]>, RISCVVIntrinsic {
++    let VLOperand = 5;
++  }
++
+   // Input: (vector_in, vector_in, scalar_in, vl, policy)
+   class RVVSlideUnMasked
+         : DefaultAttrsIntrinsic<[llvm_anyvector_ty],
+@@ -1074,14 +1138,26 @@ let TargetPrefix = "riscv" in {
+     def "int_riscv_" # NAME : RISCVSaturatingBinaryAAXUnMasked;
+     def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryAAXMasked;
+   }
++  multiclass RISCVSaturatingBinaryAAXRoundingMode {
++    def "int_riscv_" # NAME : RISCVSaturatingBinaryAAXUnMaskedRoundingMode;
++    def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryAAXMaskedRoundingMode;
++  }
+   multiclass RISCVSaturatingBinaryAAShift {
+     def "int_riscv_" # NAME : RISCVSaturatingBinaryAAShiftUnMasked;
+     def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryAAShiftMasked;
+   }
++  multiclass RISCVSaturatingBinaryAAShiftRoundingMode {
++    def "int_riscv_" # NAME : RISCVSaturatingBinaryAAShiftUnMaskedRoundingMode;
++    def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryAAShiftMaskedRoundingMode;
++  }
+   multiclass RISCVSaturatingBinaryABShift {
+     def "int_riscv_" # NAME : RISCVSaturatingBinaryABShiftUnMasked;
+     def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryABShiftMasked;
+   }
++  multiclass RISCVSaturatingBinaryABShiftRoundingMode {
++    def "int_riscv_" # NAME : RISCVSaturatingBinaryABShiftUnMaskedRoundingMode;
++    def "int_riscv_" # NAME # "_mask" : RISCVSaturatingBinaryABShiftMaskedRoundingMode;
++  }
+   multiclass RVVSlide {
+     def "int_riscv_" # NAME : RVVSlideUnMasked;
+     def "int_riscv_" # NAME # "_mask" : RVVSlideMasked;
+@@ -1350,18 +1426,18 @@ let TargetPrefix = "riscv" in {
+ 
+   def "int_riscv_vcompress" : RISCVCompress;
+ 
+-  defm vaaddu : RISCVSaturatingBinaryAAX;
+-  defm vaadd : RISCVSaturatingBinaryAAX;
+-  defm vasubu : RISCVSaturatingBinaryAAX;
+-  defm vasub : RISCVSaturatingBinaryAAX;
++  defm vaaddu : RISCVSaturatingBinaryAAXRoundingMode;
++  defm vaadd : RISCVSaturatingBinaryAAXRoundingMode;
++  defm vasubu : RISCVSaturatingBinaryAAXRoundingMode;
++  defm vasub : RISCVSaturatingBinaryAAXRoundingMode;
+ 
+-  defm vsmul : RISCVSaturatingBinaryAAX;
++  defm vsmul : RISCVSaturatingBinaryAAXRoundingMode;
+ 
+-  defm vssrl : RISCVSaturatingBinaryAAShift;
+-  defm vssra : RISCVSaturatingBinaryAAShift;
++  defm vssrl : RISCVSaturatingBinaryAAShiftRoundingMode;
++  defm vssra : RISCVSaturatingBinaryAAShiftRoundingMode;
+ 
+-  defm vnclipu : RISCVSaturatingBinaryABShift;
+-  defm vnclip : RISCVSaturatingBinaryABShift;
++  defm vnclipu : RISCVSaturatingBinaryABShiftRoundingMode;
++  defm vnclip : RISCVSaturatingBinaryABShiftRoundingMode;
+ 
+   defm vmfeq : RISCVCompare;
+   defm vmfne : RISCVCompare;
+diff --git a/llvm/lib/Target/RISCV/CMakeLists.txt b/llvm/lib/Target/RISCV/CMakeLists.txt
+index f909e0017e2b..db84f0504f21 100644
+--- a/llvm/lib/Target/RISCV/CMakeLists.txt
++++ b/llvm/lib/Target/RISCV/CMakeLists.txt
+@@ -27,6 +27,7 @@ add_llvm_target(RISCVCodeGen
+   RISCVFrameLowering.cpp
+   RISCVGatherScatterLowering.cpp
+   RISCVInsertVSETVLI.cpp
++  RISCVInsertReadWriteCSR.cpp
+   RISCVInstrInfo.cpp
+   RISCVISelDAGToDAG.cpp
+   RISCVISelLowering.cpp
+diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
+index 2cf2045c1719..eb43f4bf0a02 100644
+--- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
++++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
+@@ -102,6 +102,9 @@ enum {
+   // in bits 63:31. Used by the SExtWRemoval pass.
+   IsSignExtendingOpWShift = UsesMaskPolicyShift + 1,
+   IsSignExtendingOpWMask = 1ULL << IsSignExtendingOpWShift,
++
++  HasRoundModeOpShift = IsSignExtendingOpWShift + 1,
++  HasRoundModeOpMask = 1 << HasRoundModeOpShift,
+ };
+ 
+ // Match with the definitions in RISCVInstrFormats.td
+@@ -176,6 +179,11 @@ static inline bool usesMaskPolicy(uint64_t TSFlags) {
+   return TSFlags & UsesMaskPolicyMask;
+ }
+ 
++/// \returns true if there is a rounding mode operand for this instruction
++static inline bool hasRoundModeOp(uint64_t TSFlags) {
++  return TSFlags & HasRoundModeOpMask;
++}
++
+ static inline unsigned getMergeOpNum(const MCInstrDesc &Desc) {
+   assert(hasMergeOp(Desc.TSFlags));
+   assert(!Desc.isVariadic());
+diff --git a/llvm/lib/Target/RISCV/RISCV.h b/llvm/lib/Target/RISCV/RISCV.h
+index c42fb070aade..f629bd2faea9 100644
+--- a/llvm/lib/Target/RISCV/RISCV.h
++++ b/llvm/lib/Target/RISCV/RISCV.h
+@@ -68,6 +68,9 @@ void initializeRISCVExpandAtomicPseudoPass(PassRegistry &);
+ FunctionPass *createRISCVInsertVSETVLIPass();
+ void initializeRISCVInsertVSETVLIPass(PassRegistry &);
+ 
++FunctionPass *createRISCVInsertReadWriteCSRPass();
++void initializeRISCVInsertReadWriteCSRPass(PassRegistry &);
++
+ FunctionPass *createRISCVRedundantCopyEliminationPass();
+ void initializeRISCVRedundantCopyEliminationPass(PassRegistry &);
+ 
+diff --git a/llvm/lib/Target/RISCV/RISCVInsertReadWriteCSR.cpp b/llvm/lib/Target/RISCV/RISCVInsertReadWriteCSR.cpp
+new file mode 100644
+index 000000000000..9cc06adf658c
+--- /dev/null
++++ b/llvm/lib/Target/RISCV/RISCVInsertReadWriteCSR.cpp
+@@ -0,0 +1,115 @@
++//===-- RISCVInsertReadWriteCSR.cpp - Insert Read/Write of RISC-V CSR -----===//
++//
++// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++//
++//===----------------------------------------------------------------------===//
++// This file implements the machine function pass to insert read/write of CSR-s
++// of the RISC-V instructions.
++//
++// Currently the pass implements naive insertion of a write to vxrm before an
++// RVV fixed-point instruction.
++//
++//===----------------------------------------------------------------------===//
++
++#include "RISCV.h"
++#include "RISCVSubtarget.h"
++#include "llvm/CodeGen/MachineFunctionPass.h"
++using namespace llvm;
++
++#define DEBUG_TYPE "riscv-insert-read-write-csr"
++#define RISCV_INSERT_READ_WRITE_CSR_NAME "RISC-V Insert Read/Write CSR Pass"
++
++namespace {
++
++class RISCVInsertReadWriteCSR : public MachineFunctionPass {
++  const TargetInstrInfo *TII;
++
++public:
++  static char ID;
++
++  RISCVInsertReadWriteCSR() : MachineFunctionPass(ID) {
++    initializeRISCVInsertReadWriteCSRPass(*PassRegistry::getPassRegistry());
++  }
++
++  bool runOnMachineFunction(MachineFunction &MF) override;
++
++  void getAnalysisUsage(AnalysisUsage &AU) const override {
++    AU.setPreservesCFG();
++    MachineFunctionPass::getAnalysisUsage(AU);
++  }
++
++  StringRef getPassName() const override {
++    return RISCV_INSERT_READ_WRITE_CSR_NAME;
++  }
++
++private:
++  bool emitWriteVXRM(MachineBasicBlock &MBB);
++  std::optional<unsigned> getRoundModeIdx(const MachineInstr &MI);
++};
++
++} // end anonymous namespace
++
++char RISCVInsertReadWriteCSR::ID = 0;
++
++static unsigned PreVXRMValue = 4;
++
++INITIALIZE_PASS(RISCVInsertReadWriteCSR, DEBUG_TYPE,
++                RISCV_INSERT_READ_WRITE_CSR_NAME, false, false)
++
++// This function returns the index to the rounding mode immediate value if any,
++// otherwise the function will return None.
++std::optional<unsigned>
++RISCVInsertReadWriteCSR::getRoundModeIdx(const MachineInstr &MI) {
++  uint64_t TSFlags = MI.getDesc().TSFlags;
++  if (!RISCVII::hasRoundModeOp(TSFlags))
++    return std::nullopt;
++
++  // The operand order
++  // -------------------------------------
++  // | n-1 (if any)   | n-2  | n-3 | n-4 |
++  // | policy         | sew  | vl  | rm  |
++  // -------------------------------------
++  return MI.getNumExplicitOperands() - RISCVII::hasVecPolicyOp(TSFlags) - 3;
++}
++
++// This function inserts a write to vxrm when encountering an RVV fixed-point
++// instruction.
++bool RISCVInsertReadWriteCSR::emitWriteVXRM(MachineBasicBlock &MBB) {
++  bool Changed = false;
++  for (MachineInstr &MI : MBB) {
++    if (auto RoundModeIdx = getRoundModeIdx(MI)) {
++      unsigned VXRMImm = MI.getOperand(*RoundModeIdx).getImm();
++      if (VXRMImm == PreVXRMValue)
++          continue;
++      PreVXRMValue = VXRMImm;
++      Changed = true;
++      BuildMI(MBB, MI, MI.getDebugLoc(), TII->get(RISCV::WriteVXRMImm))
++          .addImm(VXRMImm);
++      MI.addOperand(MachineOperand::CreateReg(RISCV::VXRM, /*IsDef*/ false,
++                                              /*IsImp*/ true));
++    }
++  }
++  return Changed;
++}
++
++bool RISCVInsertReadWriteCSR::runOnMachineFunction(MachineFunction &MF) {
++  // Skip if the vector extension is not enabled.
++  const RISCVSubtarget &ST = MF.getSubtarget<RISCVSubtarget>();
++  if (!ST.hasVInstructions())
++    return false;
++
++  TII = ST.getInstrInfo();
++
++  bool Changed = false;
++
++  for (MachineBasicBlock &MBB : MF)
++    Changed |= emitWriteVXRM(MBB);
++
++  return Changed;
++}
++
++FunctionPass *llvm::createRISCVInsertReadWriteCSRPass() {
++  return new RISCVInsertReadWriteCSR();
++}
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+index 3a494a5e3b58..f2cd4ed8857f 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+@@ -211,6 +211,9 @@ class RVInst<dag outs, dag ins, string opcodestr, string argstr,
+   // in bits 63:31. Used by the SExtWRemoval pass.
+   bit IsSignExtendingOpW = 0;
+   let TSFlags{19} = IsSignExtendingOpW;
++
++  bit HasRoundModeOp = 0;
++  let TSFlags{20} =  HasRoundModeOp;
+ }
+ 
+ // Pseudo instructions
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index c699a94943d8..75fee3f962d0 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -1693,6 +1693,8 @@ def WriteFRM : WriteSysReg<SysRegFRM, [FRM]>;
+ def WriteFRMImm : WriteSysRegImm<SysRegFRM, [FRM]>;
+ def SwapFRMImm : SwapSysRegImm<SysRegFRM, [FRM]>;
+ 
++def WriteVXRMImm : WriteSysRegImm<SysRegVXRM, [VXRM]>;
++
+ let hasSideEffects = true in {
+ def ReadFFLAGS : ReadSysReg<SysRegFFLAGS, [FFLAGS]>;
+ def WriteFFLAGS : WriteSysReg<SysRegFFLAGS, [FFLAGS]>;
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfoVPseudos.td b/llvm/lib/Target/RISCV/RISCVInstrInfoVPseudos.td
+index 3f69b5e41cf1..ec7af31a23e2 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfoVPseudos.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfoVPseudos.td
+@@ -1139,6 +1139,65 @@ class VPseudoBinaryNoMaskTU<VReg RetClass,
+   let HasMergeOp = 1;
+ }
+ 
++class VPseudoBinaryNoMaskRoundingMode<VReg RetClass,
++                                      VReg Op1Class,
++                                      DAGOperand Op2Class,
++                                      string Constraint,
++                                      int DummyMask = 1> :
++        Pseudo<(outs RetClass:$rd),
++               (ins Op1Class:$rs2, Op2Class:$rs1, ixlenimm:$rm, AVL:$vl, ixlenimm:$sew), []>,
++        RISCVVPseudo {
++  let mayLoad = 0;
++  let mayStore = 0;
++  let hasSideEffects = 0;
++  let Constraints = Constraint;
++  let HasVLOp = 1;
++  let HasSEWOp = 1;
++  let HasDummyMask = DummyMask;
++  let HasRoundModeOp = 1;
++}
++
++class VPseudoBinaryNoMaskTURoundingMode<VReg RetClass,
++                                        VReg Op1Class,
++                                        DAGOperand Op2Class,
++                                        string Constraint> :
++        Pseudo<(outs RetClass:$rd),
++               (ins RetClass:$merge, Op1Class:$rs2, Op2Class:$rs1, ixlenimm:$rm,
++                    AVL:$vl, ixlenimm:$sew), []>,
++        RISCVVPseudo {
++  let mayLoad = 0;
++  let mayStore = 0;
++  let hasSideEffects = 0;
++  let Constraints = Join<[Constraint, "$rd = $merge"], ",">.ret;
++  let HasVLOp = 1;
++  let HasSEWOp = 1;
++  let HasDummyMask = 1;
++  let HasMergeOp = 1;
++  let HasRoundModeOp = 1;
++}
++
++class VPseudoBinaryMaskPolicyRoundingMode<VReg RetClass,
++                                          RegisterClass Op1Class,
++                                          DAGOperand Op2Class,
++                                          string Constraint> :
++        Pseudo<(outs GetVRegNoV0<RetClass>.R:$rd),
++                (ins GetVRegNoV0<RetClass>.R:$merge,
++                     Op1Class:$rs2, Op2Class:$rs1,
++                     VMaskOp:$vm, ixlenimm:$rm, AVL:$vl,
++                     ixlenimm:$sew, ixlenimm:$policy), []>,
++        RISCVVPseudo {
++  let mayLoad = 0;
++  let mayStore = 0;
++  let hasSideEffects = 0;
++  let Constraints = Join<[Constraint, "$rd = $merge"], ",">.ret;
++  let HasVLOp = 1;
++  let HasSEWOp = 1;
++  let HasMergeOp = 1;
++  let HasVecPolicyOp = 1;
++  let UsesMaskPolicy = 1;
++  let HasRoundModeOp = 1;
++}
++
+ // Special version of VPseudoBinaryNoMask where we pretend the first source is
+ // tied to the destination.
+ // This allows maskedoff and rs2 to be the same register.
+@@ -1923,6 +1982,24 @@ multiclass VPseudoBinary<VReg RetClass,
+   }
+ }
+ 
++multiclass VPseudoBinaryRoundingMode<VReg RetClass,
++                                     VReg Op1Class,
++                                     DAGOperand Op2Class,
++                                     LMULInfo MInfo,
++                                     string Constraint = ""> {
++  let VLMul = MInfo.value in {
++    def "_" # MInfo.MX :
++      VPseudoBinaryNoMaskRoundingMode<RetClass, Op1Class, Op2Class, Constraint>;
++    def "_" # MInfo.MX # "_TU" :
++      VPseudoBinaryNoMaskTURoundingMode<RetClass, Op1Class, Op2Class,
++                                        Constraint>;
++    def "_" # MInfo.MX # "_MASK" :
++      VPseudoBinaryMaskPolicyRoundingMode<RetClass, Op1Class, Op2Class,
++                                          Constraint>,
++                                          RISCVMaskedPseudo</*MaskOpIdx*/ 3>;
++  }
++}
++
+ multiclass VPseudoBinaryM<VReg RetClass,
+                           VReg Op1Class,
+                           DAGOperand Op2Class,
+@@ -1971,6 +2048,10 @@ multiclass VPseudoBinaryV_VV<LMULInfo m, string Constraint = ""> {
+   defm _VV : VPseudoBinary<m.vrclass, m.vrclass, m.vrclass, m, Constraint>;
+ }
+ 
++multiclass VPseudoBinaryV_VV_RM<LMULInfo m, string Constraint = ""> {
++  defm _VV : VPseudoBinaryRoundingMode<m.vrclass, m.vrclass, m.vrclass, m, Constraint>;
++}
++
+ // Similar to VPseudoBinaryV_VV, but uses MxListF.
+ multiclass VPseudoBinaryFV_VV<LMULInfo m, string Constraint = ""> {
+   defm _VV : VPseudoBinary<m.vrclass, m.vrclass, m.vrclass, m, Constraint>;
+@@ -2000,6 +2081,10 @@ multiclass VPseudoBinaryV_VX<LMULInfo m, string Constraint = ""> {
+   defm "_VX" : VPseudoBinary<m.vrclass, m.vrclass, GPR, m, Constraint>;
+ }
+ 
++multiclass VPseudoBinaryV_VX_RM<LMULInfo m, string Constraint = ""> {
++  defm "_VX" : VPseudoBinaryRoundingMode<m.vrclass, m.vrclass, GPR, m, Constraint>;
++}
++
+ multiclass VPseudoVSLD1_VX<string Constraint = ""> {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -2036,6 +2121,10 @@ multiclass VPseudoBinaryV_VI<Operand ImmType = simm5, LMULInfo m, string Constra
+   defm _VI : VPseudoBinary<m.vrclass, m.vrclass, ImmType, m, Constraint>;
+ }
+ 
++multiclass VPseudoBinaryV_VI_RM<Operand ImmType = simm5, LMULInfo m, string Constraint = ""> {
++  defm _VI : VPseudoBinaryRoundingMode<m.vrclass, m.vrclass, ImmType, m, Constraint>;
++}
++
+ multiclass VPseudoVALU_MM {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -2098,16 +2187,31 @@ multiclass VPseudoBinaryV_WV<LMULInfo m> {
+                            !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
+ }
+ 
++multiclass VPseudoBinaryV_WV_RM<LMULInfo m> {
++  defm _WV : VPseudoBinaryRoundingMode<m.vrclass, m.wvrclass, m.vrclass, m,
++                                       !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
++}
++
+ multiclass VPseudoBinaryV_WX<LMULInfo m> {
+   defm _WX : VPseudoBinary<m.vrclass, m.wvrclass, GPR, m,
+                            !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
+ }
+ 
++multiclass VPseudoBinaryV_WX_RM<LMULInfo m> {
++  defm _WX : VPseudoBinaryRoundingMode<m.vrclass, m.wvrclass, GPR, m,
++                                       !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
++}
++
+ multiclass VPseudoBinaryV_WI<LMULInfo m> {
+   defm _WI : VPseudoBinary<m.vrclass, m.wvrclass, uimm5, m,
+                            !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
+ }
+ 
++multiclass VPseudoBinaryV_WI_RM<LMULInfo m> {
++  defm _WI : VPseudoBinaryRoundingMode<m.vrclass, m.wvrclass, uimm5, m,
++                                       !if(!ge(m.octuple, 8), "@earlyclobber $rd", "")>;
++}
++
+ // For vadc and vsbc, the instruction encoding is reserved if the destination
+ // vector register is v0.
+ // For vadc and vsbc, CarryIn == 1 and CarryOut == 0
+@@ -2419,6 +2523,23 @@ multiclass VPseudoVSALU_VV_VX_VI<Operand ImmType = simm5, string Constraint = ""
+   }
+ }
+ 
++multiclass VPseudoVSALU_VV_VX_VI_RM<Operand ImmType = simm5, string Constraint = ""> {
++  foreach m = MxList in {
++    defvar mx = m.MX;
++    defvar WriteVSALUV_MX = !cast<SchedWrite>("WriteVSALUV_" # mx);
++    defvar WriteVSALUX_MX = !cast<SchedWrite>("WriteVSALUX_" # mx);
++    defvar WriteVSALUI_MX = !cast<SchedWrite>("WriteVSALUI_" # mx);
++    defvar ReadVSALUV_MX = !cast<SchedRead>("ReadVSALUV_" # mx);
++    defvar ReadVSALUX_MX = !cast<SchedRead>("ReadVSALUX_" # mx);
++
++    defm "" : VPseudoBinaryV_VV_RM<m, Constraint>,
++              Sched<[WriteVSALUV_MX, ReadVSALUV_MX, ReadVSALUV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VX_RM<m, Constraint>,
++              Sched<[WriteVSALUX_MX, ReadVSALUV_MX, ReadVSALUX_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VI_RM<ImmType, m, Constraint>,
++              Sched<[WriteVSALUI_MX, ReadVSALUV_MX, ReadVMask]>;
++  }
++}
+ 
+ multiclass VPseudoVSHT_VV_VX_VI<Operand ImmType = simm5, string Constraint = ""> {
+   foreach m = MxList in {
+@@ -2456,6 +2577,24 @@ multiclass VPseudoVSSHT_VV_VX_VI<Operand ImmType = simm5, string Constraint = ""
+   }
+ }
+ 
++multiclass VPseudoVSSHT_VV_VX_VI_RM<Operand ImmType = simm5, string Constraint = ""> {
++  foreach m = MxList in {
++    defvar mx = m.MX;
++    defvar WriteVSShiftV_MX = !cast<SchedWrite>("WriteVSShiftV_" # mx);
++    defvar WriteVSShiftX_MX = !cast<SchedWrite>("WriteVSShiftX_" # mx);
++    defvar WriteVSShiftI_MX = !cast<SchedWrite>("WriteVSShiftI_" # mx);
++    defvar ReadVSShiftV_MX = !cast<SchedRead>("ReadVSShiftV_" # mx);
++    defvar ReadVSShiftX_MX = !cast<SchedRead>("ReadVSShiftX_" # mx);
++
++    defm "" : VPseudoBinaryV_VV_RM<m, Constraint>,
++              Sched<[WriteVSShiftV_MX, ReadVSShiftV_MX, ReadVSShiftV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VX_RM<m, Constraint>,
++              Sched<[WriteVSShiftX_MX, ReadVSShiftV_MX, ReadVSShiftX_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VI_RM<ImmType, m, Constraint>,
++              Sched<[WriteVSShiftI_MX, ReadVSShiftV_MX, ReadVMask]>;
++  }
++}
++
+ multiclass VPseudoVALU_VV_VX_VI<Operand ImmType = simm5, string Constraint = ""> {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -2489,6 +2628,21 @@ multiclass VPseudoVSALU_VV_VX {
+   }
+ }
+ 
++multiclass VPseudoVSALU_VV_VX_RM {
++  foreach m = MxList in {
++    defvar mx = m.MX;
++    defvar WriteVSALUV_MX = !cast<SchedWrite>("WriteVSALUV_" # mx);
++    defvar WriteVSALUX_MX = !cast<SchedWrite>("WriteVSALUX_" # mx);
++    defvar ReadVSALUV_MX = !cast<SchedRead>("ReadVSALUV_" # mx);
++    defvar ReadVSALUX_MX = !cast<SchedRead>("ReadVSALUX_" # mx);
++
++    defm "" : VPseudoBinaryV_VV_RM<m>,
++              Sched<[WriteVSALUV_MX, ReadVSALUV_MX, ReadVSALUV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VX_RM<m>,
++              Sched<[WriteVSALUX_MX, ReadVSALUV_MX, ReadVSALUX_MX, ReadVMask]>;
++  }
++}
++
+ multiclass VPseudoVSMUL_VV_VX {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -2504,6 +2658,21 @@ multiclass VPseudoVSMUL_VV_VX {
+   }
+ }
+ 
++multiclass VPseudoVSMUL_VV_VX_RM {
++  foreach m = MxList in {
++    defvar mx = m.MX;
++    defvar WriteVSMulV_MX = !cast<SchedWrite>("WriteVSMulV_" # mx);
++    defvar WriteVSMulX_MX = !cast<SchedWrite>("WriteVSMulX_" # mx);
++    defvar ReadVSMulV_MX = !cast<SchedRead>("ReadVSMulV_" # mx);
++    defvar ReadVSMulX_MX = !cast<SchedRead>("ReadVSMulX_" # mx);
++
++    defm "" : VPseudoBinaryV_VV_RM<m>,
++              Sched<[WriteVSMulV_MX, ReadVSMulV_MX, ReadVSMulV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VX_RM<m>,
++              Sched<[WriteVSMulX_MX, ReadVSMulV_MX, ReadVSMulX_MX, ReadVMask]>;
++  }
++}
++
+ multiclass VPseudoVAALU_VV_VX {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -2519,6 +2688,21 @@ multiclass VPseudoVAALU_VV_VX {
+   }
+ }
+ 
++multiclass VPseudoVAALU_VV_VX_RM {
++  foreach m = MxList in {
++    defvar mx = m.MX;
++    defvar WriteVAALUV_MX = !cast<SchedWrite>("WriteVAALUV_" # mx);
++    defvar WriteVAALUX_MX = !cast<SchedWrite>("WriteVAALUX_" # mx);
++    defvar ReadVAALUV_MX = !cast<SchedRead>("ReadVAALUV_" # mx);
++    defvar ReadVAALUX_MX = !cast<SchedRead>("ReadVAALUX_" # mx);
++
++    defm "" : VPseudoBinaryV_VV_RM<m>,
++              Sched<[WriteVAALUV_MX, ReadVAALUV_MX, ReadVAALUV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_VX_RM<m>,
++              Sched<[WriteVAALUX_MX, ReadVAALUV_MX, ReadVAALUX_MX, ReadVMask]>;
++  }
++}
++
+ multiclass VPseudoVMINMAX_VV_VX {
+   foreach m = MxList in {
+     defvar mx = m.MX;
+@@ -3002,6 +3186,24 @@ multiclass VPseudoVNCLP_WV_WX_WI {
+   }
+ }
+ 
++multiclass VPseudoVNCLP_WV_WX_WI_RM {
++  foreach m = MxListW in {
++    defvar mx = m.MX;
++    defvar WriteVNClipV_MX = !cast<SchedWrite>("WriteVNClipV_" # mx);
++    defvar WriteVNClipX_MX = !cast<SchedWrite>("WriteVNClipX_" # mx);
++    defvar WriteVNClipI_MX = !cast<SchedWrite>("WriteVNClipI_" # mx);
++    defvar ReadVNClipV_MX = !cast<SchedRead>("ReadVNClipV_" # mx);
++    defvar ReadVNClipX_MX = !cast<SchedRead>("ReadVNClipX_" # mx);
++
++    defm "" : VPseudoBinaryV_WV_RM<m>,
++              Sched<[WriteVNClipV_MX, ReadVNClipV_MX, ReadVNClipV_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_WX_RM<m>,
++              Sched<[WriteVNClipX_MX, ReadVNClipV_MX, ReadVNClipX_MX, ReadVMask]>;
++    defm "" : VPseudoBinaryV_WI_RM<m>,
++              Sched<[WriteVNClipI_MX, ReadVNClipV_MX, ReadVMask]>;
++  }
++}
++
+ multiclass VPseudoVNSHT_WV_WX_WI {
+   foreach m = MxListW in {
+     defvar mx = m.MX;
+@@ -3881,6 +4083,48 @@ class VPatBinaryNoMaskTU<string intrinsic_name,
+                    (op2_type op2_kind:$rs2),
+                    GPR:$vl, sew)>;
+ 
++class VPatBinaryNoMaskTARoundingMode<string intrinsic_name,
++                                     string inst,
++                                     ValueType result_type,
++                                     ValueType op1_type,
++                                     ValueType op2_type,
++                                     int sew,
++                                     VReg op1_reg_class,
++                                     DAGOperand op2_kind> :
++  Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
++                   (result_type (undef)),
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (XLenVT timm:$round),
++                   VLOpFrag)),
++                   (!cast<Instruction>(inst)
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (XLenVT timm:$round),
++                   GPR:$vl, sew)>;
++
++class VPatBinaryNoMaskTURoundingMode<string intrinsic_name,
++                                     string inst,
++                                     ValueType result_type,
++                                     ValueType op1_type,
++                                     ValueType op2_type,
++                                     int sew,
++                                     VReg result_reg_class,
++                                     VReg op1_reg_class,
++                                     DAGOperand op2_kind> :
++  Pat<(result_type (!cast<Intrinsic>(intrinsic_name)
++                   (result_type result_reg_class:$merge),
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (XLenVT timm:$round),
++                   VLOpFrag)),
++                   (!cast<Instruction>(inst#"_TU")
++                   (result_type result_reg_class:$merge),
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (XLenVT timm:$round),
++                   GPR:$vl, sew)>;
++
+ // Same as above but source operands are swapped.
+ class VPatBinaryNoMaskSwapped<string intrinsic_name,
+                               string inst,
+@@ -3943,6 +4187,31 @@ class VPatBinaryMaskTA<string intrinsic_name,
+                    (op2_type op2_kind:$rs2),
+                    (mask_type V0), GPR:$vl, sew, (XLenVT timm:$policy))>;
+ 
++class VPatBinaryMaskTARoundingMode<string intrinsic_name,
++                                   string inst,
++                                   ValueType result_type,
++                                   ValueType op1_type,
++                                   ValueType op2_type,
++                                   ValueType mask_type,
++                                   int sew,
++                                   VReg result_reg_class,
++                                   VReg op1_reg_class,
++                                   DAGOperand op2_kind> :
++  Pat<(result_type (!cast<Intrinsic>(intrinsic_name#"_mask")
++                   (result_type result_reg_class:$merge),
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (mask_type V0),
++                   (XLenVT timm:$round),
++                   VLOpFrag, (XLenVT timm:$policy))),
++                   (!cast<Instruction>(inst#"_MASK")
++                   (result_type result_reg_class:$merge),
++                   (op1_type op1_reg_class:$rs1),
++                   (op2_type op2_kind:$rs2),
++                   (mask_type V0),
++                   (XLenVT timm:$round),
++                   GPR:$vl, sew, (XLenVT timm:$policy))>;
++
+ // Same as above but source operands are swapped.
+ class VPatBinaryMaskSwapped<string intrinsic_name,
+                             string inst,
+@@ -4261,6 +4530,26 @@ multiclass VPatBinaryTA<string intrinsic,
+                          op2_kind>;
+ }
+ 
++multiclass VPatBinaryTARoundingMode<string intrinsic,
++                                    string inst,
++                                    ValueType result_type,
++                                    ValueType op1_type,
++                                    ValueType op2_type,
++                                    ValueType mask_type,
++                                    int sew,
++                                    VReg result_reg_class,
++                                    VReg op1_reg_class,
++                                    DAGOperand op2_kind>
++{
++  def : VPatBinaryNoMaskTARoundingMode<intrinsic, inst, result_type, op1_type, op2_type,
++                                       sew, op1_reg_class, op2_kind>;
++  def : VPatBinaryNoMaskTURoundingMode<intrinsic, inst, result_type, op1_type, op2_type,
++                                       sew, result_reg_class, op1_reg_class, op2_kind>;
++  def : VPatBinaryMaskTARoundingMode<intrinsic, inst, result_type, op1_type, op2_type,
++                                     mask_type, sew, result_reg_class, op1_reg_class,
++                                     op2_kind>;
++}
++
+ multiclass VPatBinarySwapped<string intrinsic,
+                       string inst,
+                       ValueType result_type,
+@@ -4387,6 +4676,15 @@ multiclass VPatBinaryV_VV<string intrinsic, string instruction,
+                         vti.RegClass, vti.RegClass>;
+ }
+ 
++multiclass VPatBinaryV_VVRoundingMode<string intrinsic, string instruction,
++                                      list<VTypeInfo> vtilist> {
++  foreach vti = vtilist in
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction # "_VV_" # vti.LMul.MX,
++                                    vti.Vector, vti.Vector, vti.Vector,vti.Mask,
++                                    vti.Log2SEW, vti.RegClass,
++                                    vti.RegClass, vti.RegClass>;
++}
++
+ multiclass VPatBinaryV_VV_INT<string intrinsic, string instruction,
+                           list<VTypeInfo> vtilist> {
+   foreach vti = vtilist in {
+@@ -4428,6 +4726,17 @@ multiclass VPatBinaryV_VX<string intrinsic, string instruction,
+   }
+ }
+ 
++multiclass VPatBinaryV_VXRoundingMode<string intrinsic, string instruction,
++                                      list<VTypeInfo> vtilist> {
++  foreach vti = vtilist in {
++    defvar kind = "V"#vti.ScalarSuffix;
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction#"_"#kind#"_"#vti.LMul.MX,
++                                    vti.Vector, vti.Vector, vti.Scalar, vti.Mask,
++                                    vti.Log2SEW, vti.RegClass,
++                                    vti.RegClass, vti.ScalarRegClass>;
++  }
++}
++
+ multiclass VPatBinaryV_VX_INT<string intrinsic, string instruction,
+                           list<VTypeInfo> vtilist> {
+   foreach vti = vtilist in
+@@ -4446,6 +4755,15 @@ multiclass VPatBinaryV_VI<string intrinsic, string instruction,
+                         vti.RegClass, imm_type>;
+ }
+ 
++multiclass VPatBinaryV_VIRoundingMode<string intrinsic, string instruction,
++                                      list<VTypeInfo> vtilist, Operand imm_type> {
++  foreach vti = vtilist in
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction # "_VI_" # vti.LMul.MX,
++                                    vti.Vector, vti.Vector, XLenVT, vti.Mask,
++                                    vti.Log2SEW, vti.RegClass,
++                                    vti.RegClass, imm_type>;
++}
++
+ multiclass VPatBinaryM_MM<string intrinsic, string instruction> {
+   foreach mti = AllMasks in
+     def : VPatBinaryM<intrinsic, instruction # "_MM_" # mti.LMul.MX,
+@@ -4529,6 +4847,18 @@ multiclass VPatBinaryV_WV<string intrinsic, string instruction,
+   }
+ }
+ 
++multiclass VPatBinaryV_WVRoundingMode<string intrinsic, string instruction,
++                                      list<VTypeInfoToWide> vtilist> {
++  foreach VtiToWti = vtilist in {
++    defvar Vti = VtiToWti.Vti;
++    defvar Wti = VtiToWti.Wti;
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction # "_WV_" # Vti.LMul.MX,
++                                    Vti.Vector, Wti.Vector, Vti.Vector, Vti.Mask,
++                                    Vti.Log2SEW, Vti.RegClass,
++                                    Wti.RegClass, Vti.RegClass>;
++  }
++}
++
+ multiclass VPatBinaryV_WX<string intrinsic, string instruction,
+                           list<VTypeInfoToWide> vtilist> {
+   foreach VtiToWti = vtilist in {
+@@ -4542,6 +4872,19 @@ multiclass VPatBinaryV_WX<string intrinsic, string instruction,
+   }
+ }
+ 
++multiclass VPatBinaryV_WXRoundingMode<string intrinsic, string instruction,
++                          list<VTypeInfoToWide> vtilist> {
++  foreach VtiToWti = vtilist in {
++    defvar Vti = VtiToWti.Vti;
++    defvar Wti = VtiToWti.Wti;
++    defvar kind = "W"#Vti.ScalarSuffix;
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction#"_"#kind#"_"#Vti.LMul.MX,
++                                    Vti.Vector, Wti.Vector, Vti.Scalar, Vti.Mask,
++                                    Vti.Log2SEW, Vti.RegClass,
++                                    Wti.RegClass, Vti.ScalarRegClass>;
++  }
++}
++
+ multiclass VPatBinaryV_WI<string intrinsic, string instruction,
+                           list<VTypeInfoToWide> vtilist> {
+   foreach VtiToWti = vtilist in {
+@@ -4554,6 +4897,18 @@ multiclass VPatBinaryV_WI<string intrinsic, string instruction,
+   }
+ }
+ 
++multiclass VPatBinaryV_WIRoundingMode<string intrinsic, string instruction,
++                          list<VTypeInfoToWide> vtilist> {
++  foreach VtiToWti = vtilist in {
++    defvar Vti = VtiToWti.Vti;
++    defvar Wti = VtiToWti.Wti;
++    defm : VPatBinaryTARoundingMode<intrinsic, instruction # "_WI_" # Vti.LMul.MX,
++                                    Vti.Vector, Wti.Vector, XLenVT, Vti.Mask,
++                                    Vti.Log2SEW, Vti.RegClass,
++                                    Wti.RegClass, uimm5>;
++  }
++}
++
+ multiclass VPatBinaryV_VM<string intrinsic, string instruction,
+                           bit CarryOut = 0,
+                           list<VTypeInfo> vtilist = AllIntegerVectors> {
+@@ -4688,11 +5043,22 @@ multiclass VPatBinaryV_VV_VX_VI<string intrinsic, string instruction,
+       VPatBinaryV_VX<intrinsic, instruction, vtilist>,
+       VPatBinaryV_VI<intrinsic, instruction, vtilist, ImmType>;
+ 
++multiclass VPatBinaryV_VV_VX_VIRoundingMode<string intrinsic, string instruction,
++                                            list<VTypeInfo> vtilist, Operand ImmType = simm5>
++    : VPatBinaryV_VVRoundingMode<intrinsic, instruction, vtilist>,
++      VPatBinaryV_VXRoundingMode<intrinsic, instruction, vtilist>,
++      VPatBinaryV_VIRoundingMode<intrinsic, instruction, vtilist, ImmType>;
++
+ multiclass VPatBinaryV_VV_VX<string intrinsic, string instruction,
+                              list<VTypeInfo> vtilist>
+     : VPatBinaryV_VV<intrinsic, instruction, vtilist>,
+       VPatBinaryV_VX<intrinsic, instruction, vtilist>;
+ 
++multiclass VPatBinaryV_VV_VXRoundingMode<string intrinsic, string instruction,
++                             list<VTypeInfo> vtilist>
++    : VPatBinaryV_VVRoundingMode<intrinsic, instruction, vtilist>,
++      VPatBinaryV_VXRoundingMode<intrinsic, instruction, vtilist>;
++
+ multiclass VPatBinaryV_VX_VI<string intrinsic, string instruction,
+                              list<VTypeInfo> vtilist>
+     : VPatBinaryV_VX<intrinsic, instruction, vtilist>,
+@@ -4714,6 +5080,12 @@ multiclass VPatBinaryV_WV_WX_WI<string intrinsic, string instruction,
+       VPatBinaryV_WX<intrinsic, instruction, vtilist>,
+       VPatBinaryV_WI<intrinsic, instruction, vtilist>;
+ 
++multiclass VPatBinaryV_WV_WX_WIRoundingMode<string intrinsic, string instruction,
++                                            list<VTypeInfoToWide> vtilist>
++    : VPatBinaryV_WVRoundingMode<intrinsic, instruction, vtilist>,
++      VPatBinaryV_WXRoundingMode<intrinsic, instruction, vtilist>,
++      VPatBinaryV_WIRoundingMode<intrinsic, instruction, vtilist>;
++
+ multiclass VPatBinaryV_VM_XM_IM<string intrinsic, string instruction>
+     : VPatBinaryV_VM_TAIL<intrinsic, instruction>,
+       VPatBinaryV_XM_TAIL<intrinsic, instruction>,
+@@ -5382,34 +5754,34 @@ let Defs = [VXSAT], hasSideEffects = 1 in {
+ //===----------------------------------------------------------------------===//
+ // 12.2. Vector Single-Width Averaging Add and Subtract
+ //===----------------------------------------------------------------------===//
+-let Uses = [VXRM], hasSideEffects = 1 in {
+-  defm PseudoVAADDU : VPseudoVAALU_VV_VX;
+-  defm PseudoVAADD  : VPseudoVAALU_VV_VX;
+-  defm PseudoVASUBU : VPseudoVAALU_VV_VX;
+-  defm PseudoVASUB  : VPseudoVAALU_VV_VX;
++let hasSideEffects = 1 in {
++  defm PseudoVAADDU : VPseudoVAALU_VV_VX_RM;
++  defm PseudoVAADD  : VPseudoVAALU_VV_VX_RM;
++  defm PseudoVASUBU : VPseudoVAALU_VV_VX_RM;
++  defm PseudoVASUB  : VPseudoVAALU_VV_VX_RM;
+ }
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.3. Vector Single-Width Fractional Multiply with Rounding and Saturation
+ //===----------------------------------------------------------------------===//
+-let Uses = [VXRM], Defs = [VXSAT], hasSideEffects = 1 in {
+-  defm PseudoVSMUL : VPseudoVSMUL_VV_VX;
++let Defs = [VXSAT], hasSideEffects = 1 in {
++  defm PseudoVSMUL : VPseudoVSMUL_VV_VX_RM;
+ }
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.4. Vector Single-Width Scaling Shift Instructions
+ //===----------------------------------------------------------------------===//
+-let Uses = [VXRM], hasSideEffects = 1 in {
+-  defm PseudoVSSRL : VPseudoVSSHT_VV_VX_VI<uimm5>;
+-  defm PseudoVSSRA : VPseudoVSSHT_VV_VX_VI<uimm5>;
++let hasSideEffects = 1 in {
++  defm PseudoVSSRL : VPseudoVSSHT_VV_VX_VI_RM<uimm5>;
++  defm PseudoVSSRA : VPseudoVSSHT_VV_VX_VI_RM<uimm5>;
+ }
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.5. Vector Narrowing Fixed-Point Clip Instructions
+ //===----------------------------------------------------------------------===//
+-let Uses = [VXRM], Defs = [VXSAT], hasSideEffects = 1 in {
+-  defm PseudoVNCLIP  : VPseudoVNCLP_WV_WX_WI;
+-  defm PseudoVNCLIPU : VPseudoVNCLP_WV_WX_WI;
++let Defs = [VXSAT], hasSideEffects = 1 in {
++  defm PseudoVNCLIP  : VPseudoVNCLP_WV_WX_WI_RM;
++  defm PseudoVNCLIPU : VPseudoVNCLP_WV_WX_WI_RM;
+ }
+ 
+ } // Predicates = [HasVInstructions]
+@@ -6040,30 +6412,36 @@ defm : VPatBinaryV_VV_VX<"int_riscv_vssub", "PseudoVSSUB", AllIntegerVectors>;
+ //===----------------------------------------------------------------------===//
+ // 12.2. Vector Single-Width Averaging Add and Subtract
+ //===----------------------------------------------------------------------===//
+-defm : VPatBinaryV_VV_VX<"int_riscv_vaaddu", "PseudoVAADDU", AllIntegerVectors>;
+-defm : VPatBinaryV_VV_VX<"int_riscv_vaadd", "PseudoVAADD", AllIntegerVectors>;
+-defm : VPatBinaryV_VV_VX<"int_riscv_vasubu", "PseudoVASUBU", AllIntegerVectors>;
+-defm : VPatBinaryV_VV_VX<"int_riscv_vasub", "PseudoVASUB", AllIntegerVectors>;
++defm : VPatBinaryV_VV_VXRoundingMode<"int_riscv_vaaddu", "PseudoVAADDU",
++                                     AllIntegerVectors>;
++defm : VPatBinaryV_VV_VXRoundingMode<"int_riscv_vasubu", "PseudoVASUBU",
++                                     AllIntegerVectors>;
++defm : VPatBinaryV_VV_VXRoundingMode<"int_riscv_vasub", "PseudoVASUB",
++                                     AllIntegerVectors>;
++defm : VPatBinaryV_VV_VXRoundingMode<"int_riscv_vaadd", "PseudoVAADD",
++                                     AllIntegerVectors>;
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.3. Vector Single-Width Fractional Multiply with Rounding and Saturation
+ //===----------------------------------------------------------------------===//
+-defm : VPatBinaryV_VV_VX<"int_riscv_vsmul", "PseudoVSMUL", AllIntegerVectors>;
++defm : VPatBinaryV_VV_VXRoundingMode<"int_riscv_vsmul", "PseudoVSMUL",
++                                     AllIntegerVectors>;
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.4. Vector Single-Width Scaling Shift Instructions
+ //===----------------------------------------------------------------------===//
+-defm : VPatBinaryV_VV_VX_VI<"int_riscv_vssrl", "PseudoVSSRL", AllIntegerVectors,
+-                            uimm5>;
+-defm : VPatBinaryV_VV_VX_VI<"int_riscv_vssra", "PseudoVSSRA", AllIntegerVectors,
+-                            uimm5>;
++defm : VPatBinaryV_VV_VX_VIRoundingMode<"int_riscv_vssrl", "PseudoVSSRL",
++                                        AllIntegerVectors, uimm5>;
++defm : VPatBinaryV_VV_VX_VIRoundingMode<"int_riscv_vssra", "PseudoVSSRA",
++                                        AllIntegerVectors, uimm5>;
+ 
+ //===----------------------------------------------------------------------===//
+ // 12.5. Vector Narrowing Fixed-Point Clip Instructions
+ //===----------------------------------------------------------------------===//
+-defm : VPatBinaryV_WV_WX_WI<"int_riscv_vnclipu", "PseudoVNCLIPU", AllWidenableIntVectors>;
+-defm : VPatBinaryV_WV_WX_WI<"int_riscv_vnclip", "PseudoVNCLIP", AllWidenableIntVectors>;
+-
++defm : VPatBinaryV_WV_WX_WIRoundingMode<"int_riscv_vnclipu", "PseudoVNCLIPU",
++                                        AllWidenableIntVectors>;
++defm : VPatBinaryV_WV_WX_WIRoundingMode<"int_riscv_vnclip", "PseudoVNCLIP",
++                                        AllWidenableIntVectors>;
+ } // Predicates = [HasVInstructions]
+ 
+ //===----------------------------------------------------------------------===//
+diff --git a/llvm/lib/Target/RISCV/RISCVMCInstLower.cpp b/llvm/lib/Target/RISCV/RISCVMCInstLower.cpp
+index 281918259cdb..7455df64c38a 100644
+--- a/llvm/lib/Target/RISCV/RISCVMCInstLower.cpp
++++ b/llvm/lib/Target/RISCV/RISCVMCInstLower.cpp
+@@ -159,6 +159,8 @@ static bool lowerRISCVVMachineInstrToMCInst(const MachineInstr *MI,
+     --NumOps;
+   if (RISCVII::hasVLOp(TSFlags))
+     --NumOps;
++  if (RISCVII::hasRoundModeOp(TSFlags))
++    --NumOps;
+   if (RISCVII::hasSEWOp(TSFlags))
+     --NumOps;
+ 
+diff --git a/llvm/lib/Target/RISCV/RISCVSystemOperands.td b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+index b9aa25b321b0..ced58fbb2a6d 100644
+--- a/llvm/lib/Target/RISCV/RISCVSystemOperands.td
++++ b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+@@ -350,7 +350,7 @@ def : SysReg<"dscratch1", 0x7B3>;
+ //===----------------------------------------------------------------------===//
+ def : SysReg<"vstart", 0x008>;
+ def : SysReg<"vxsat", 0x009>;
+-def : SysReg<"vxrm", 0x00A>;
++def SysRegVXRM : SysReg<"vxrm", 0x00A>;
+ def : SysReg<"vcsr", 0x00F>;
+ def : SysReg<"vl", 0xC20>;
+ def : SysReg<"vtype", 0xC21>;
+diff --git a/llvm/lib/Target/RISCV/RISCVTargetMachine.cpp b/llvm/lib/Target/RISCV/RISCVTargetMachine.cpp
+index cc881406666c..28908e88f39f 100644
+--- a/llvm/lib/Target/RISCV/RISCVTargetMachine.cpp
++++ b/llvm/lib/Target/RISCV/RISCVTargetMachine.cpp
+@@ -81,6 +81,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
+   initializeRISCVPreRAExpandPseudoPass(*PR);
+   initializeRISCVExpandPseudoPass(*PR);
+   initializeRISCVInsertVSETVLIPass(*PR);
++  initializeRISCVInsertReadWriteCSRPass(*PR);
+   initializeRISCVDAGToDAGISelPass(*PR);
+ }
+ 
+@@ -354,6 +355,7 @@ void RISCVPassConfig::addPreRegAlloc() {
+   if (TM->getOptLevel() != CodeGenOpt::None)
+     addPass(createRISCVMergeBaseOffsetOptPass());
+   addPass(createRISCVInsertVSETVLIPass());
++  addPass(createRISCVInsertReadWriteCSRPass());
+ }
+ 
+ void RISCVPassConfig::addPostRegAlloc() {
+-- 
+2.25.1
+

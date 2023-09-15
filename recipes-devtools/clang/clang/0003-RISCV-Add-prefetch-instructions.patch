@@ -1,0 +1,147 @@
+From 4cd4084046f2dd3d57eb6bee0e88baecd66e49df Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 25 Jun 2023 19:36:20 -0700
+Subject: [PATCH 3/9] [RISCV] Add prefetch instructions
+
+---
+ .../Target/RISCV/AsmParser/RISCVAsmParser.cpp | 10 +++++++
+ .../Target/RISCV/MCTargetDesc/RISCVBaseInfo.h |  2 ++
+ llvm/lib/Target/RISCV/RISCVInstrFormats.td    | 16 +++++++++++
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td       | 27 +++++++++++++++++++
+ 4 files changed, 55 insertions(+)
+
+diff --git a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+index 9752e398bd99..d577d83bf14e 100644
+--- a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
++++ b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
+@@ -566,6 +566,7 @@ public:
+ 
+   bool isUImm2() { return IsUImm<2>(); }
+   bool isUImm3() { return IsUImm<3>(); }
++  bool isUImm4() { return IsUImm<4>(); }
+   bool isUImm5() { return IsUImm<5>(); }
+   bool isUImm7() { return IsUImm<7>(); }
+ 
+@@ -597,6 +598,15 @@ public:
+     return IsConstantImm && isInt<6>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
+   }
+ 
++  bool isSImm8() const {
++    if (!isImm())
++      return false;
++    RISCVMCExpr::VariantKind VK = RISCVMCExpr::VK_RISCV_None;
++    int64_t Imm;
++    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
++    return IsConstantImm && isInt<8>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
++  }
++
+   bool isSImm6NonZero() const {
+     if (!isImm())
+       return false;
+diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
+index eb43f4bf0a02..a832f51bd517 100644
+--- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
++++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
+@@ -244,11 +244,13 @@ enum OperandType : unsigned {
+   OPERAND_UIMM2 = OPERAND_FIRST_RISCV_IMM,
+   OPERAND_UIMM3,
+   OPERAND_UIMM4,
++  OPERAND_UIMM4_PREF,
+   OPERAND_UIMM5,
+   OPERAND_UIMM7,
+   OPERAND_UIMM7_LSB00,
+   OPERAND_UIMM8_LSB00,
+   OPERAND_UIMM8_LSB000,
++  OPERAND_SIMM8,
+   OPERAND_UIMM12,
+   OPERAND_ZERO,
+   OPERAND_SIMM5,
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+index f2cd4ed8857f..e913edc47ec2 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+@@ -361,6 +361,22 @@ class RVInstI<bits<3> funct3, RISCVOpcode opcode, dag outs, dag ins,
+   let Opcode = opcode.Value;
+ }
+ 
++class RVInstPref<RISCVOpcode opcode, dag outs, dag ins,
++                   string opcodestr, string argstr>
++    : RVInst<outs, ins, opcodestr, argstr, [], InstFormatI> {
++
++  bits<8> imm8;
++  bits<4> imm4;
++  bits<5> rs1;
++
++  let Inst{31-24} = imm8;
++  let Inst{23-20} = imm4;
++  let Inst{19-15} = rs1;
++  let Inst{14-12} = 2;
++  let Inst{11-7} = 0;
++  let Opcode = opcode.Value;
++}
++
+ class RVInstIShift<bits<5> imm11_7, bits<3> funct3, RISCVOpcode opcode,
+                    dag outs, dag ins, string opcodestr, string argstr>
+     : RVInst<outs, ins, opcodestr, argstr, [], InstFormatI> {
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index 75fee3f962d0..5849327ca255 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -205,6 +205,18 @@ def uimm3 : Operand<XLenVT> {
+   let OperandNamespace = "RISCVOp";
+ }
+ 
++def uimm4_pref : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isUInt<4>(Imm);}]> {
++  let ParserMatchClass = UImmAsmOperand<4>;
++  let DecoderMethod = "decodeUImmOperand<4>";
++  let MCOperandPredicate = [{
++    int64_t Imm;
++    if (MCOp.evaluateAsConstantImm(Imm))
++      return isUInt<4>(Imm) && (imm == 0 || imm == 1 || imm == 2 || imm == 4 || imm == 8);
++  }];
++  let OperandType = "OPERAND_UIMM4_PREF";
++  let OperandNamespace = "RISCVOp";
++}
++
+ def uimm5 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isUInt<5>(Imm);}]> {
+   let ParserMatchClass = UImmAsmOperand<5>;
+   let DecoderMethod = "decodeUImmOperand<5>";
+@@ -212,6 +224,14 @@ def uimm5 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isUInt<5>(Imm);}]> {
+   let OperandNamespace = "RISCVOp";
+ }
+ 
++def simm8 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<8>(Imm);}]> {
++  let ParserMatchClass = SImmAsmOperand<8>;
++  let EncoderMethod = "getImmOpValue";
++  let DecoderMethod = "decodeSImmOperand<8>";
++  let OperandType = "OPERAND_SIMM8";
++  let OperandNamespace = "RISCVOp";
++}
++
+ def InsnDirectiveOpcode : AsmOperandClass {
+   let Name = "InsnDirectiveOpcode";
+   let ParserMethod = "parseInsnDirectiveOpcode";
+@@ -560,6 +580,12 @@ class CSR_ir<bits<3> funct3, string opcodestr>
+     : RVInstI<funct3, OPC_SYSTEM, (outs GPR:$rd), (ins csr_sysreg:$imm12, GPR:$rs1),
+               opcodestr, "$rd, $imm12, $rs1">, Sched<[WriteCSR, ReadCSR]>;
+ 
++let hasNoSchedulingInfo = 1,
++    hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
++class PREF_iir<string opcodestr>
++    : RVInstPref<OPC_OP_IMM, (outs), (ins uimm4_pref:$imm4, simm8:$imm8, GPR:$rs1),
++              opcodestr, "$imm4, ${imm8}(${rs1})">;
++
+ let hasNoSchedulingInfo = 1,
+     hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+ class CSR_ii<bits<3> funct3, string opcodestr>
+@@ -670,6 +696,7 @@ def SLT  : ALU_rr<0b0000000, 0b010, "slt">,
+ def SLTU : ALU_rr<0b0000000, 0b011, "sltu">,
+            Sched<[WriteIALU, ReadIALU, ReadIALU]>;
+ }
++def PREF : PREF_iir<"pref">;
+ def XOR  : ALU_rr<0b0000000, 0b100, "xor", /*Commutable*/1>,
+            Sched<[WriteIALU, ReadIALU, ReadIALU]>;
+ def SRL  : ALU_rr<0b0000000, 0b101, "srl">,
+-- 
+2.25.1
+

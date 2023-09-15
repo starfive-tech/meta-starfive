@@ -1,4 +1,4 @@
-From 728e023a8d2dc85402fbe1295e87023fdb7c4c1b Mon Sep 17 00:00:00 2001
+From f16083f3436f1286941547b3036787f128c9d8a4 Mon Sep 17 00:00:00 2001
 From: Ovidiu Panait <ovidiu.panait@windriver.com>
 Date: Fri, 31 Jan 2020 10:56:11 +0200
 Subject: [PATCH] clang,llvm: cmake: Fix configure for packages using
@@ -22,58 +22,58 @@ This is due to the fact that currently the cmake scripts look for target
 binaries in sysroot. Work around this by not exporting the target binaries in
 Exports-* cmake files.
 
-Upstream-Status: Innapropriate [oe-specific]
+Upstream-Status: Inappropriate [oe-specific]
 
 Signed-off-by: Ovidiu Panait <ovidiu.panait@windriver.com>
 ---
  clang/cmake/modules/AddClang.cmake | 2 --
  llvm/cmake/modules/AddLLVM.cmake   | 6 ------
- llvm/cmake/modules/TableGen.cmake  | 7 -------
- 3 files changed, 15 deletions(-)
+ llvm/cmake/modules/TableGen.cmake  | 6 ------
+ 3 files changed, 14 deletions(-)
 
 diff --git a/clang/cmake/modules/AddClang.cmake b/clang/cmake/modules/AddClang.cmake
-index 9bbbfc032b7d..7ee5170bbc71 100644
+index 75b0080f6715..ddf446a13eca 100644
 --- a/clang/cmake/modules/AddClang.cmake
 +++ b/clang/cmake/modules/AddClang.cmake
-@@ -159,7 +159,6 @@ macro(add_clang_tool name)
-   if (CLANG_BUILD_TOOLS)
-     get_target_export_arg(${name} Clang export_to_clangtargets)
-     install(TARGETS ${name}
--      ${export_to_clangtargets}
-       RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-       COMPONENT ${name})
+@@ -168,7 +168,6 @@ macro(add_clang_tool name)
+     if (CLANG_BUILD_TOOLS)
+       get_target_export_arg(${name} Clang export_to_clangtargets)
+       install(TARGETS ${name}
+-        ${export_to_clangtargets}
+         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+         COMPONENT ${name})
  
-@@ -168,7 +167,6 @@ macro(add_clang_tool name)
-                                DEPENDS ${name}
-                                COMPONENT ${name})
+@@ -177,7 +176,6 @@ macro(add_clang_tool name)
+                                  DEPENDS ${name}
+                                  COMPONENT ${name})
+       endif()
+-      set_property(GLOBAL APPEND PROPERTY CLANG_EXPORTS ${name})
      endif()
--    set_property(GLOBAL APPEND PROPERTY CLANG_EXPORTS ${name})
    endif()
  endmacro()
- 
 diff --git a/llvm/cmake/modules/AddLLVM.cmake b/llvm/cmake/modules/AddLLVM.cmake
-index 37bc98f9e021..d34083fa52ec 100644
+index 94fc83db9344..5155b0222d87 100644
 --- a/llvm/cmake/modules/AddLLVM.cmake
 +++ b/llvm/cmake/modules/AddLLVM.cmake
-@@ -1251,7 +1251,6 @@ macro(add_llvm_tool name)
-     if( LLVM_BUILD_TOOLS )
-       get_target_export_arg(${name} LLVM export_to_llvmexports)
-       install(TARGETS ${name}
--              ${export_to_llvmexports}
-               RUNTIME DESTINATION ${LLVM_TOOLS_INSTALL_DIR}
-               COMPONENT ${name})
+@@ -1335,7 +1335,6 @@ macro(llvm_add_tool project name)
+       if( LLVM_BUILD_TOOLS )
+         get_target_export_arg(${name} LLVM export_to_llvmexports)
+         install(TARGETS ${name}
+-                ${export_to_llvmexports}
+                 RUNTIME DESTINATION ${${project}_TOOLS_INSTALL_DIR}
+                 COMPONENT ${name})
  
-@@ -1262,9 +1261,6 @@ macro(add_llvm_tool name)
+@@ -1346,9 +1345,6 @@ macro(llvm_add_tool project name)
+         endif()
        endif()
      endif()
+-    if( LLVM_BUILD_TOOLS )
+-      set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${name})
+-    endif()
+     set_target_properties(${name} PROPERTIES FOLDER "Tools")
    endif()
--  if( LLVM_BUILD_TOOLS )
--    set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${name})
--  endif()
-   set_target_properties(${name} PROPERTIES FOLDER "Tools")
- endmacro(add_llvm_tool name)
- 
-@@ -1304,7 +1300,6 @@ macro(add_llvm_utility name)
+ endmacro(llvm_add_tool project name)
+@@ -1393,7 +1389,6 @@ macro(add_llvm_utility name)
      if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
        get_target_export_arg(${name} LLVM export_to_llvmexports)
        install(TARGETS ${name}
@@ -81,7 +81,7 @@ index 37bc98f9e021..d34083fa52ec 100644
                RUNTIME DESTINATION ${LLVM_UTILS_INSTALL_DIR}
                COMPONENT ${name})
  
-@@ -1313,7 +1308,6 @@ macro(add_llvm_utility name)
+@@ -1402,7 +1397,6 @@ macro(add_llvm_utility name)
                                   DEPENDS ${name}
                                   COMPONENT ${name})
        endif()
@@ -90,27 +90,26 @@ index 37bc98f9e021..d34083fa52ec 100644
        set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS_BUILDTREE_ONLY ${name})
      endif()
 diff --git a/llvm/cmake/modules/TableGen.cmake b/llvm/cmake/modules/TableGen.cmake
-index 59fd0d3b0733..3b9ac56ed37f 100644
+index 70c2edb8c833..e012fea08982 100644
 --- a/llvm/cmake/modules/TableGen.cmake
 +++ b/llvm/cmake/modules/TableGen.cmake
-@@ -183,14 +183,8 @@ macro(add_tablegen target project)
-   endif()
+@@ -189,12 +189,7 @@ macro(add_tablegen target project)
  
-   if ((${project} STREQUAL LLVM OR ${project} STREQUAL MLIR) AND NOT LLVM_INSTALL_TOOLCHAIN_ONLY AND LLVM_BUILD_UTILS)
--    set(export_to_llvmexports)
--    if(${target} IN_LIST LLVM_DISTRIBUTION_COMPONENTS OR
--        NOT LLVM_DISTRIBUTION_COMPONENTS)
--      set(export_to_llvmexports EXPORT LLVMExports)
+   if (ADD_TABLEGEN_DESTINATION AND NOT LLVM_INSTALL_TOOLCHAIN_ONLY AND
+       (LLVM_BUILD_UTILS OR ${target} IN_LIST LLVM_DISTRIBUTION_COMPONENTS))
+-    set(export_arg)
+-    if(ADD_TABLEGEN_EXPORT)
+-      get_target_export_arg(${target} ${ADD_TABLEGEN_EXPORT} export_arg)
 -    endif()
- 
      install(TARGETS ${target}
--            ${export_to_llvmexports}
+-            ${export_arg}
              COMPONENT ${target}
-             RUNTIME DESTINATION ${LLVM_TOOLS_INSTALL_DIR})
+             RUNTIME DESTINATION "${ADD_TABLEGEN_DESTINATION}")
      if(NOT LLVM_ENABLE_IDE)
-@@ -199,5 +193,4 @@ macro(add_tablegen target project)
-                                COMPONENT ${target})
-     endif()
+@@ -205,6 +200,5 @@ macro(add_tablegen target project)
    endif()
--  set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${target})
+   if(ADD_TABLEGEN_EXPORT)
+     string(TOUPPER ${ADD_TABLEGEN_EXPORT} export_upper)
+-    set_property(GLOBAL APPEND PROPERTY ${export_upper}_EXPORTS ${target})
+   endif()
  endmacro()

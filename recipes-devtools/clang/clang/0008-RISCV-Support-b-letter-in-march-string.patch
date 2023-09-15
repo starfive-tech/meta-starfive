@@ -1,0 +1,60 @@
+From 7f3eaa0f7b494f9091b1916f208d78ba681b19a3 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Fri, 15 Apr 2022 02:16:43 -0700
+Subject: [PATCH 8/9] [RISCV] Support "b" letter in march string
+
+---
+ llvm/lib/Support/RISCVISAInfo.cpp      |  9 ++++++++-
+ llvm/lib/Target/RISCV/RISCVFeatures.td | 12 ++++++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/Support/RISCVISAInfo.cpp b/llvm/lib/Support/RISCVISAInfo.cpp
+index 7cb1147d4265..8b3dcc91746b 100644
+--- a/llvm/lib/Support/RISCVISAInfo.cpp
++++ b/llvm/lib/Support/RISCVISAInfo.cpp
+@@ -64,6 +64,7 @@ static const RISCVSupportedExtension SupportedExtensions[] = {
+     {"zbb", RISCVExtensionVersion{1, 0}},
+     {"zbc", RISCVExtensionVersion{1, 0}},
+     {"zbs", RISCVExtensionVersion{1, 0}},
++    {"b", RISCVExtensionVersion{1, 0}},
+ 
+     {"zbkb", RISCVExtensionVersion{1, 0}},
+     {"zbkc", RISCVExtensionVersion{1, 0}},
+@@ -707,7 +708,13 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
+                                "unsupported standard user-level extension '%c'",
+                                C);
+     }
+-    ISAInfo->addExtension(std::string(1, C), Major, Minor);
++    if (C == 'b') {
++      ISAInfo->addExtension("zba", Major, Minor);
++      ISAInfo->addExtension("zbb", Major, Minor);
++      ISAInfo->addExtension("zbc", Major, Minor);
++      ISAInfo->addExtension("zbs", Major, Minor);
++    } else
++      ISAInfo->addExtension(std::string(1, C), Major, Minor);
+ 
+     // Consume full extension name and version, including any optional '_'
+     // between this extension and the next
+diff --git a/llvm/lib/Target/RISCV/RISCVFeatures.td b/llvm/lib/Target/RISCV/RISCVFeatures.td
+index be8834fd4c2f..c0443eddeb90 100644
+--- a/llvm/lib/Target/RISCV/RISCVFeatures.td
++++ b/llvm/lib/Target/RISCV/RISCVFeatures.td
+@@ -547,3 +547,15 @@ def FeatureTaggedGlobals : SubtargetFeature<"tagged-globals",
+     "AllowTaggedGlobals",
+     "true", "Use an instruction sequence for taking the address of a global "
+     "that allows a memory tag in the upper address bits">;
++
++def FeatureStdExtB
++    : SubtargetFeature<"b", "HasStdExtB", "true",
++                       "'B' (Bit Manipulation Instructions)",
++                       [FeatureStdExtZba,
++                        FeatureStdExtZbb,
++                        FeatureStdExtZbc,
++                        FeatureStdExtZbs]>;
++def HasStdExtB : Predicate<"Subtarget->hasStdExtB()">,
++                           AssemblerPredicate<(all_of FeatureStdExtB),
++                           "'B' (Bit Manipulation Instructions)">;
++
+-- 
+2.25.1
+

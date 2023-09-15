@@ -1,0 +1,151 @@
+From 51248b6c65c8809f27e84a56e43b00c88d473280 Mon Sep 17 00:00:00 2001
+From: Eric Tang <eric.tang@starfivetech.com>
+Date: Fri, 2 Jun 2023 09:07:44 +0800
+Subject: [PATCH 1/9] [neon2rvv] support type convert between fixed vector and
+ scalable vector
+
+  disable the default vectorize options on O1,O2,O3,Oz...
+
+Signed-off-by: Eric Tang <eric.tang@starfivetech.com>
+---
+ clang/include/clang/Basic/BuiltinsRISCV.def | 49 ++++++++++++++++++++
+ clang/lib/CodeGen/CGBuiltin.cpp             | 51 +++++++++++++++++++++
+ clang/lib/Driver/ToolChains/Clang.cpp       |  1 +
+ 3 files changed, 101 insertions(+)
+
+diff --git a/clang/include/clang/Basic/BuiltinsRISCV.def b/clang/include/clang/Basic/BuiltinsRISCV.def
+index c26e3b807370..cbeb29245aec 100644
+--- a/clang/include/clang/Basic/BuiltinsRISCV.def
++++ b/clang/include/clang/Basic/BuiltinsRISCV.def
+@@ -79,5 +79,54 @@ TARGET_BUILTIN(__builtin_riscv_sm4ks, "LiLiLiIUc", "nc", "zksed")
+ TARGET_BUILTIN(__builtin_riscv_sm3p0, "LiLi", "nc", "zksh")
+ TARGET_BUILTIN(__builtin_riscv_sm3p1, "LiLi", "nc", "zksh")
+ 
++// Scalable Vector type <-> Fixed Vector type
++
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i8m1, "q8ScV8Sc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i8m2, "q16ScV16Sc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i16m1, "q4SsV4Ss", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i16m2, "q8SsV8Ss", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i32m1, "q2SiV2Si", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i32m2, "q4SiV4Si", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i64m1, "q1LSiV1LSi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_i64m2, "q2LSiV2LSi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u8m1, "q8UcV8Uc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u8m2, "q16UcV16Uc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u16m1, "q4UsV4Us", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u16m2, "q8UsV8Us", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u32m1, "q2UiV2Ui", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u32m2, "q4UiV4Ui", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u64m1, "q1LUiV1LUi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_u64m2, "q2LUiV2LUi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f16m1, "q4hV4h", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f16m2, "q8hV8h", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f32m1, "q2fV2f", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f32m2, "q4fV4f", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f64m1, "q1dV1d", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_from_f64m2, "q2dV2d", "nc", "v,64bit")
++
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i8m1, "V8Scq8Sc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i8m2, "V16Scq16Sc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i16m1, "V4Ssq4Ss", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i16m2, "V8Ssq8Ss", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i32m1, "V2Siq2Si", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i32m2, "V4Siq4Si", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i64m1, "V1LSiq1LSi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_i64m2, "V2LSiq2LSi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u8m1, "V8Ucq8Uc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u8m2, "V16Ucq16Uc", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u16m1, "V4Usq4Us", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u16m2, "V8Usq8Us", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u32m1, "V2Uiq2Ui", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u32m2, "V4Uiq4Ui", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u64m1, "V1LUiq1LUi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_u64m2, "V2LUiq2LUi", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f16m1, "V4hq4h", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f16m2, "V8hq8h", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f32m1, "V2fq2f", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f32m2, "V4fq4f", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f64m1, "V1dq1d", "nc", "v,64bit")
++TARGET_BUILTIN(__builtin_rvv_type_cast_to_f64m2, "V2dq2d", "nc", "v,64bit")
++
++
+ #undef BUILTIN
+ #undef TARGET_BUILTIN
+diff --git a/clang/lib/CodeGen/CGBuiltin.cpp b/clang/lib/CodeGen/CGBuiltin.cpp
+index f72e04a425d9..1e276bac4e54 100644
+--- a/clang/lib/CodeGen/CGBuiltin.cpp
++++ b/clang/lib/CodeGen/CGBuiltin.cpp
+@@ -19666,6 +19666,57 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
+     ID = Intrinsic::riscv_sm3p1;
+     IntrinsicTypes = {ResultType};
+     break;
++  //scalable vector type <-> fixed vector types
++  case RISCV::BI__builtin_rvv_type_cast_from_i8m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_i8m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_i16m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_i16m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_i32m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_i32m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_i64m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_i64m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_u8m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_u8m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_u16m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_u16m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_u32m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_u32m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_u64m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_u64m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_f16m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_f16m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_f32m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_f32m2:
++  case RISCV::BI__builtin_rvv_type_cast_from_f64m1:
++  case RISCV::BI__builtin_rvv_type_cast_from_f64m2:
++  {
++    return Builder.CreateInsertVector(ResultType, UndefValue::get(ResultType), Ops[0], Builder.getInt64(0));
++  }
++  case RISCV::BI__builtin_rvv_type_cast_to_i8m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_i8m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_i16m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_i16m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_i32m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_i32m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_i64m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_i64m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_u8m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_u8m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_u16m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_u16m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_u32m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_u32m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_u64m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_u64m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_f16m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_f16m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_f32m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_f32m2:
++  case RISCV::BI__builtin_rvv_type_cast_to_f64m1:
++  case RISCV::BI__builtin_rvv_type_cast_to_f64m2:
++  {
++    return Builder.CreateExtractVector(ResultType, Ops[0], Builder.getInt64(0));
++  }
+ 
+   // Vector builtins are handled from here.
+ #include "clang/Basic/riscv_vector_builtin_cg.inc"
+diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
+index 77554aa2c462..d207a636e07f 100644
+--- a/clang/lib/Driver/ToolChains/Clang.cpp
++++ b/clang/lib/Driver/ToolChains/Clang.cpp
+@@ -635,6 +635,7 @@ static void addCoveragePrefixMapArg(const Driver &D, const ArgList &Args,
+ /// For -Oz the loop vectorizer is disabled, while the slp vectorizer is
+ /// enabled.
+ static bool shouldEnableVectorizerAtOLevel(const ArgList &Args, bool isSlpVec) {
++  return false;
+   if (Arg *A = Args.getLastArg(options::OPT_O_Group)) {
+     if (A->getOption().matches(options::OPT_O4) ||
+         A->getOption().matches(options::OPT_Ofast))
+-- 
+2.25.1
+

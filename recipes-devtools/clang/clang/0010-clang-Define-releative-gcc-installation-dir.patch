@@ -1,4 +1,4 @@
-From 6e17f402773f9408a62c8d03a39db5af6f637653 Mon Sep 17 00:00:00 2001
+From d1fdcd76fc759e644d697c967ddfbeae279aa7ac Mon Sep 17 00:00:00 2001
 From: Khem Raj <raj.khem@gmail.com>
 Date: Sat, 20 Mar 2021 16:09:16 -0700
 Subject: [PATCH] clang: Define / releative gcc installation dir
@@ -8,16 +8,18 @@ Without this its not able to find the paths for libgcc
 and other standard headers and libraries from gcc
 installation in OE
 
+Upstream-Status: Pending
+
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 ---
  clang/lib/Driver/ToolChains/Gnu.cpp | 14 +++++++-------
  1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
-index 633daa58590d..d22eaf698eb8 100644
+index cc9ed4f6b8ac..846163329d92 100644
 --- a/clang/lib/Driver/ToolChains/Gnu.cpp
 +++ b/clang/lib/Driver/ToolChains/Gnu.cpp
-@@ -2517,19 +2517,19 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
+@@ -2681,19 +2681,19 @@ void Generic_GCC::GCCInstallationDetector::ScanLibDirForGCCTriple(
      // Whether this library suffix is relevant for the triple.
      bool Active;
    } Suffixes[] = {

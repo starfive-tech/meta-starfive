@@ -1,0 +1,38 @@
+From a108ed8c2f32b4c5929b3bd72f1b4d1830ddcd4a Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 26 Jun 2023 03:04:07 -0700
+Subject: [PATCH 9/9] [RISCV] Align default march with dubhe gcc toolchain
+
+---
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index 4c34c09d5589..dddf8d7cd168 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -220,9 +220,7 @@ StringRef riscv::getRISCVABI(const ArgList &Args, const llvm::Triple &Triple) {
+     else
+       return "ilp32d";
+   } else {
+-    if (Triple.getOS() == llvm::Triple::UnknownOS)
+-      return "lp64";
+-    else
++      //align default march with dubhe gcc toolchain
+       return "lp64d";
+   }
+ }
+@@ -299,9 +297,7 @@ StringRef riscv::getRISCVArch(const llvm::opt::ArgList &Args,
+     else
+       return "rv32imafdc";
+   } else {
+-    if (Triple.getOS() == llvm::Triple::UnknownOS)
+-      return "rv64imac";
+-    else
++      //align default march with dubhe gcc toolchain
+       return "rv64imafdc";
+   }
+ }
+-- 
+2.25.1
+

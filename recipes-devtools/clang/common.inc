@@ -1,21 +1,15 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/clang:"
+FILESEXTRAPATHS =. "${FILE_DIRNAME}/clang:"
 
-SRCREV = "35bd94a4b791787e7f3938e10ce80f409831dd7e"
-BRANCH = "release/16.x"
+LIC_FILES_CHKSUM = "file://llvm/LICENSE.TXT;md5=${LLVMMD5SUM} \
+                    file://clang/LICENSE.TXT;md5=${CLANGMD5SUM} \
+"
+LICENSE = "Apache-2.0-with-LLVM-exception"
 
+BASEURI ??= "${LLVM_GIT}/llvm-project;protocol=${LLVM_GIT_PROTOCOL};branch=${BRANCH}"
 SRC_URI = "\
     ${BASEURI} \
     file://llvm-config \
     file://libunwind.pc.in \
-    file://0001-neon2rvv-support-type-convert-between-fixed-vector-a.patch \
-    file://0002-neon2rvv-Model-vxrm-in-LLVM-intrinsics-and-add-optim.patch \
-    file://0003-RISCV-Add-prefetch-instructions.patch \
-    file://0004-RISCV-Add-customer-cache-instructions.patch \
-    file://0005-RISCV-Add-multilib-v-b-support-for-baremetal-toolcha.patch \
-    file://0006-RISCV-Change-baremetal-multilib-directory-name-to-al.patch \
-    file://0007-Driver-Set-clang-default-dwarf-version-to-4.patch \
-    file://0008-RISCV-Support-b-letter-in-march-string.patch \
-    file://0009-RISCV-Align-default-march-with-dubhe-gcc-toolchain.patch \
     file://0001-libcxxabi-Find-libunwind-headers-when-LIBCXXABI_LIBU.patch \
     file://0002-compiler-rt-support-a-new-embedded-linux-target.patch \
     file://0003-compiler-rt-Simplify-cross-compilation.-Don-t-use-na.patch \
@@ -54,3 +48,13 @@ SRC_URI = "\
     file://0036-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
     file://0037-clang-Call-printName-to-get-name-of-Decl.patch \
     "
+# Fallback to no-PIE if not set
+GCCPIE ??= ""
+
+S = "${TMPDIR}/work-shared/llvm-project-source-${PV}-${PR}/git"
+B = "${WORKDIR}/llvm-project-source-${PV}/build.${HOST_SYS}.${TARGET_SYS}"
+
+# We need to ensure that for the shared work directory, the do_patch signatures match
+# The real WORKDIR location isn't a dependency for the shared workdir.
+src_patches[vardepsexclude] = "WORKDIR"
+should_apply[vardepsexclude] += "PN"
