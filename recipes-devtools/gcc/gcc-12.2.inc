@@ -610,6 +610,7 @@ SRC_URI = "${BASEURI} \
        file://0545-add-multilib-config-for-baremetal.patch \
        file://0546-add-dubhe-pipeline-model.patch \
        file://0547-RISCV-default-enable-align-functions-16-and-align-lo.patch \
+       file://0548-ira-Increase-the-cost-of-inner-loop-spill.patch \
 "
 
 SRC_URI[sha256sum] = "e549cf9cf3594a00e27b6589d4322d70e0720cdd213f39beb4181e06926230ff"
