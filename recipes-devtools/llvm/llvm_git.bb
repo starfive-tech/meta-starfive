@@ -16,7 +16,7 @@ inherit cmake pkgconfig
 
 PROVIDES += "llvm${PV}"
 
-PV = "14.0.0"
+PV = "16.0.5"
 
 MAJOR_VERSION = "${@oe.utils.trim_version("${PV}", 1)}"
 
