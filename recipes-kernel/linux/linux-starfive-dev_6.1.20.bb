@@ -10,7 +10,7 @@ BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "starfive-6.1-dubhe"
-SRCREV:starfive-dubhe = "0a9c9aa4208378d4da0cf13c6c5a3a92da370b26"
+SRCREV:starfive-dubhe = "1e3b15b8f416e8d26af7bff467d8debc3f1f5fd9"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "starfive-6.1-dev-jh8100-bmc"
@@ -47,10 +47,26 @@ BOOTARGS_UBI = "console=ttySIF0,115200 earlycon=sbi ip=:::255.255.255.0::eth0:dh
 BOOTARGS_NFS = "console=ttySIF0,115200 earlycon=sbi root=/dev/nfs rw nfsroot=192.168.1.1:/filepath,rw,tcp,vers=3 ip=:::255.255.255.0::eth0:dhcp rootfstype=ext4 rootwait"
 
 do_configure:append:starfive-dubhe() {
-	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ext4.dts
-	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ubi.dts
-	cp ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_nfs.dts
-	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_EXT4}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ext4.dts
-	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_UBI}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_ubi.dts
-	sed -i "s+bootargs.*+bootargs = \"${BOOTARGS_NFS}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe_fpga_nfs.dts
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga_ext4.dts
+        cp ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga_ubi.dts
+        cp ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga_nfs.dts
+
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga_ext4.dts
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga_ubi.dts
+	cp ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga_nfs.dts
+
+	for dts_file in ${S}/arch/riscv/boot/dts/starfive/dubhe*0_fpga_*.dts; do
+		if [ "$dts_file" = "${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga_dual.dts" ]; then
+			continue
+		fi
+		echo -e "/ {" >> "$dts_file"
+		echo -e "\tchosen {" >> "$dts_file"
+		echo -e "\t\tbootargs" >> "$dts_file"
+		echo -e "\t};" >> "$dts_file"
+		echo -e "};" >> "$dts_file"
+	done
+
+	sed -i "s+bootargs+bootargs = \"${BOOTARGS_EXT4}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe*0_fpga_ext4.dts
+	sed -i "s+bootargs+bootargs = \"${BOOTARGS_UBI}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe*0_fpga_ubi.dts
+	sed -i "s+bootargs+bootargs = \"${BOOTARGS_NFS}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe*0_fpga_nfs.dts
 }
