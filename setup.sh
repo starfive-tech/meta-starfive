@@ -213,7 +213,7 @@ do
             fi;;
         "Build qspi-nfs-image")
 #           cd ../build || { echo "Run setup.sh before building images."; cd meta-starfive; break; };
-	    sed -n 10p ../meta-starfive/recipes-kernel/linux/files/nfs.patch;
+	    sed -n 47p ../meta-starfive/recipes-kernel/linux/linux-starfive-dev_6.1.20.bb;
 	    read -p "Kindly confirm boot argument such as nfs path and ip address before build (/meta-starfive/recipes-kernel/linux/files/nfs.patch). Proceed to build?[Y/n]:" RES;
 	    case $RES in
 		[Yy])
