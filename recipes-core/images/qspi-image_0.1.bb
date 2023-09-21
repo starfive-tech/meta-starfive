@@ -16,8 +16,11 @@ do_image[depends] += " opensbi:do_deploy"
 do_image[depends] += " virtual/kernel:do_deploy"
 
 IMAGE_CMD:qspi () {
-	dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=0 count=128
-	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=128 count=1
-	dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=129 count=255
-	dd if=${DEPLOY_DIR_IMAGE}/fw_payload_initramfs.bin of=${DEPLOY_DIR_IMAGE}/QSPI-Image.bin bs=32 seek=384
+	dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-initramfs-image.bin bs=32 seek=0 count=128
+	dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-initramfs-image.bin bs=32 seek=128 count=1
+	dd if=${DEPLOY_DIR_IMAGE}/dubhe90_fpga.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-initramfs-image.bin bs=32 seek=129 count=255
+	dd if=${DEPLOY_DIR_IMAGE}/fw_payload_initramfs.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-initramfs-image.bin bs=32 seek=384
+
+	cp ${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-initramfs-image.bin ${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-initramfs-image.bin
+        dd if=${DEPLOY_DIR_IMAGE}/dubhe80_fpga.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-initramfs-image.bin bs=32 seek=129 count=255
 }

@@ -34,10 +34,13 @@ do_qspi[depends] += " opensbi:do_deploy"
 do_qspi[depends] += " virtual/kernel:do_deploy"
 
 do_qspi (){
-	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=0 count=128
-        dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=128 count=1
-        dd if=${DEPLOY_DIR_IMAGE}/dubhe_fpga_nfs.dtb of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=129 count=255
-        dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/QSPI-NFS-Image.bin bs=32 seek=384
+	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=0 count=128
+        dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=128 count=1
+        dd if=${DEPLOY_DIR_IMAGE}/dubhe90_fpga_nfs.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=129 count=255
+        dd if=${DEPLOY_DIR_IMAGE}/fw_payload.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=384
+
+	cp ${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin ${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-nfs-image.bin
+        dd if=${DEPLOY_DIR_IMAGE}/dubhe80_fpga_nfs.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-nfs-image.bin bs=32 seek=129 count=255
 }
 
 IMAGE_POSTPROCESS_COMMAND += "do_qspi;"
