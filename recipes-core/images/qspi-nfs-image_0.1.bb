@@ -8,15 +8,10 @@ DEPENDS += "opensbi deploy-bootfiles quilt quilt-native"
 
 LIC_FILES_CHKSUM = ""
 
+IMAGE_FSTYPTES += "qspi_nfs"
+
 require qspi-nfs-essential.inc
 
-#DEPENDS = "opensbi deploy-bootfiles"
-#IMAGE_INSTALL += "tools-sdk dev-pkgs"
-#IMAGE_INSTALL += "packagegroup-common-essential"
-#IMAGE_INSTALL += "packagegroup-network-essential"
-#IMAGE_INSTALL += "packagegroup-core-ssh-openssh"
-
-#export IMAGE_BASENAME = "${PN}"
 export IMAGE_BASENAME = "nfs-rootfs"
 
 # NFS workaround
@@ -29,11 +24,13 @@ export IMAGE_BASENAME = "nfs-rootfs"
 #	rm ${IMAGE_ROOTFS}/var/log; mkdir -p ${IMAGE_ROOTFS}/var/log; touch ${IMAGE_ROOTFS}/var/log/lighttpd
 #}
 
-do_qspi[depends] += " deploy-bootfiles:do_deploy"
-do_qspi[depends] += " opensbi:do_deploy"
-do_qspi[depends] += " virtual/kernel:do_deploy"
+do_image_qspi_nfs[depends] += " \
+	deploy-bootfiles:do_deploy \
+	opensbi:do_deploy \
+	virtual/kernel:do_deploy \
+	"
 
-do_qspi (){
+IMAGE_CMD:qspi_nfs (){
 	dd if=${DEPLOY_DIR_IMAGE}/bootcode_min.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=0 count=128
         dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=128 count=1
         dd if=${DEPLOY_DIR_IMAGE}/dubhe90_fpga_nfs.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin bs=32 seek=129 count=255
@@ -42,5 +39,3 @@ do_qspi (){
 	cp ${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-nfs-image.bin ${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-nfs-image.bin
         dd if=${DEPLOY_DIR_IMAGE}/dubhe80_fpga_nfs.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-nfs-image.bin bs=32 seek=129 count=255
 }
-
-IMAGE_POSTPROCESS_COMMAND += "do_qspi;"

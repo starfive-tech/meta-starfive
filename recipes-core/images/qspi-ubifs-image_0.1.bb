@@ -8,7 +8,7 @@ DEPENDS += "opensbi deploy-bootfiles quilt quilt-native"
 
 LIC_FILES_CHKSUM = ""
 
-IMAGE_FSTYPES = "ubi ubifs"
+IMAGE_FSTYPES = "ubi ubifs qspi_ubifs"
 MKUBIFS_ARGS = "-m 1 -e 65408 -c 26876"
 UBINIZE_ARGS = " -p 64KiB -m 1"
 
@@ -22,11 +22,15 @@ IMAGE_INSTALL += "helloworld"
 IMAGE_FEATURES:remove = "dbg-pkgs"
 
 export IMAGE_BASENAME = "qspi-ubifs"
-do_qspi[depends] += " deploy-bootfiles:do_deploy"
-do_qspi[depends] += " opensbi:do_deploy"
-do_qspi[depends] += " virtual/kernel:do_deploy"
+do_image_qspi_ubifs[depends] += " \
+	deploy-bootfiles:do_deploy \
+	opensbi:do_deploy \
+	virtual/kernel:do_deploy \
+	"
 
-do_qspi () {
+IMAGE_TYPEDEP:qspi_ubifs = "ubi"
+
+IMAGE_CMD:qspi_ubifs () {
         dd if=${DEPLOY_DIR_IMAGE}/bootcode.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-ubifs-image.bin bs=32 seek=0 count=128
         dd if=${DEPLOY_DIR_IMAGE}/bootjump.bin of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-ubifs-image.bin bs=32 seek=128 count=1
         dd if=${DEPLOY_DIR_IMAGE}/dubhe90_fpga_ubi.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-90-qspi-ubifs-image.bin bs=32 seek=129 count=255
@@ -37,4 +41,3 @@ do_qspi () {
         dd if=${DEPLOY_DIR_IMAGE}/dubhe80_fpga_ubi.dtb of=${DEPLOY_DIR_IMAGE}/starfive-dubhe-80-qspi-ubifs-image.bin bs=32 seek=129 count=255
 }
 
-IMAGE_POSTPROCESS_COMMAND += "do_qspi;"

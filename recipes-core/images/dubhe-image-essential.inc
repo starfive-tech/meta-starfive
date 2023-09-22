@@ -1,8 +1,6 @@
 # Image Root Filesystem Configuration
 
 IMAGE_FSTYPES += "ext4 wic wic.gz wic.bmap"
-#MKUBIFS_ARGS = "-m 4096 -e 262144 -c 4096"
-#UBINIZE_ARGS = "-p 278528 -m 4096 -s 4096"
 
 IMAGE_ROOTFS_SIZE ?= "8192"
 #IMAGE_ROOTFS_EXTRA_SPACE = "0"
