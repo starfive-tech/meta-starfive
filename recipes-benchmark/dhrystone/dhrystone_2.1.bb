@@ -6,7 +6,7 @@ INHIBIT_PACKAGE_STRIP = "1"
 
 BRANCH = "master"
 SRC_URI = "git://github.com/sifive/benchmark-dhrystone.git;protocol=ssh;branch=${BRANCH} \
-           file://0001-dhrystone-Edit-compiler-flags.patch \
+           file://dhrystone-edit-compiler-flags.patch \
            "
 SRCREV = "0ddff533cc9052c524990d5ace4560372053314b"
 
