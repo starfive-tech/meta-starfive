@@ -59,11 +59,11 @@ do_configure:append:starfive-dubhe() {
 		if [ "$dts_file" = "${S}/arch/riscv/boot/dts/starfive/dubhe90_fpga_dual.dts" ]; then
 			continue
 		fi
-		echo -e "/ {" >> "$dts_file"
-		echo -e "\tchosen {" >> "$dts_file"
-		echo -e "\t\tbootargs" >> "$dts_file"
-		echo -e "\t};" >> "$dts_file"
-		echo -e "};" >> "$dts_file"
+		echo "/ {" >> "$dts_file"
+		echo "    chosen {" >> "$dts_file"
+		echo "        bootargs" >> "$dts_file"
+		echo "    };" >> "$dts_file"
+		echo "};" >> "$dts_file"
 	done
 
 	sed -i "s+bootargs+bootargs = \"${BOOTARGS_EXT4}\";+g" ${S}/arch/riscv/boot/dts/starfive/dubhe*0_fpga_ext4.dts
