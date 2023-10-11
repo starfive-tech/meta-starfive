@@ -12,4 +12,4 @@ IMAGE_INSTALL += " \
 	parted \
         "
 
-EXTRA_IMAGEDEPENDS:starfive-visionfive2 += " alsa-lib libgpiod i2c-tools"
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"

@@ -23,6 +23,8 @@ IMAGE_INSTALL = "\
 	nodejs-npm \
 	"
 
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
+
 IMAGE_LINGUAS = " "
 
 LICENSE = "MIT"

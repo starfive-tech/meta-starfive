@@ -17,6 +17,8 @@ PACKAGE_INSTALL = "\
 	packagegroup-starfive-dubhe-essentials \
 	"
 
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
+
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""
 

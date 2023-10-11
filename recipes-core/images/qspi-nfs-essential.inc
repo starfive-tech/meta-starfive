@@ -13,3 +13,5 @@ IMAGE_INSTALL += "\
 	packagegroup-starfive-dubhe-essentials \
 	mtd-utils \
 	"
+
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"

@@ -18,3 +18,5 @@ IMAGE_INSTALL += "\
 	devmem2 \
 	e2fsprogs \
 	"
+
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"

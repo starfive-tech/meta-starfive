@@ -22,6 +22,8 @@ IMAGE_INSTALL += "\
 	packagegroup-starfive-dubhe-essentials \
 	"
 
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
+
 IMAGE_FEATURES:remove = "dbg-pkgs"
 
 export IMAGE_BASENAME = "qspi-ubifs"
