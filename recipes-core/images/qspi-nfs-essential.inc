@@ -8,4 +8,8 @@ IMAGE_ROOTFS_SIZE ?= "8192"
 IMAGE_FEATURES += "allow-empty-password empty-root-password"
 IMAGE_FEATURES:remove = "dbg-pkgs"
 
-IMAGE_INSTALL += "mtd-utils helloworld coremark dhrystone perf util-linux"
+IMAGE_INSTALL += "\
+	packagegroup-starfive-essentials \
+	packagegroup-starfive-dubhe-essentials \
+	mtd-utils \
+	"

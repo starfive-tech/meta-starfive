@@ -4,10 +4,18 @@ the Minimal RAM-based Initial Root Filesystem (initramfs), which finds the \
 first 'init' program more efficiently."
 
 INITRAMFS_SCRIPTS ?= "\
-                      initramfs-boot packagegroup-core-boot \
-                     "
-PACKAGE_INSTALL = "${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} base-passwd ${ROOTFS_BOOTSTRAP_INSTALL} helloworld coremark dhrystone perf gdb gdbserver util-linux ethtool atftp iperf3 openssh dhcpcd kvmtool tmux"
+	initramfs-boot \
+	packagegroup-core-boot \
+	"
 
+PACKAGE_INSTALL = "\
+	${INITRAMFS_SCRIPTS} \
+	${VIRTUAL-RUNTIME_base-utils} \
+	base-passwd \
+	${ROOTFS_BOOTSTRAP_INSTALL} \
+	packagegroup-starfive-essentials \
+	packagegroup-starfive-dubhe-essentials \
+	"
 
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""

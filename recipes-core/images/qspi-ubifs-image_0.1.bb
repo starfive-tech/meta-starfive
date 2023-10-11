@@ -17,12 +17,15 @@ IMAGE_ROOTFS_SIZE ?= "8192"
 IMAGE_FEATURES += "allow-empty-password empty-root-password"
 
 #IMAGE_INSTALL += "mtd-utils mtd-utils-ubifs kernel-modules"
-IMAGE_INSTALL += "helloworld"
+IMAGE_INSTALL += "\
+	packagegroup-starfive-essentials \
+	packagegroup-starfive-dubhe-essentials \
+	"
 
 IMAGE_FEATURES:remove = "dbg-pkgs"
 
 export IMAGE_BASENAME = "qspi-ubifs"
-do_image_qspi_ubifs[depends] += " \
+do_image_qspi_ubifs[depends] += "\
 	deploy-bootfiles:do_deploy \
 	opensbi:do_deploy \
 	virtual/kernel:do_deploy \

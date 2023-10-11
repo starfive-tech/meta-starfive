@@ -24,7 +24,7 @@ export IMAGE_BASENAME = "nfs-rootfs"
 #	rm ${IMAGE_ROOTFS}/var/log; mkdir -p ${IMAGE_ROOTFS}/var/log; touch ${IMAGE_ROOTFS}/var/log/lighttpd
 #}
 
-do_image_qspi_nfs[depends] += " \
+do_image_qspi_nfs[depends] += "\
 	deploy-bootfiles:do_deploy \
 	opensbi:do_deploy \
 	virtual/kernel:do_deploy \

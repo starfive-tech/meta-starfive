@@ -14,7 +14,7 @@ require dubhe-image-essential.inc
 
 export IMAGE_BASENAME = "console-image-minimal"
 
-do_image_qspi_ext4[depends] += " \
+do_image_qspi_ext4[depends] += "\
 	deploy-bootfiles:do_deploy \
 	opensbi:do_deploy \
 	virtual/kernel:do_deploy \
