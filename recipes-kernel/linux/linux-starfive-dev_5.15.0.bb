@@ -19,6 +19,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI:starfive-visionfive2 = " \
 	git://github.com/${FORK}/linux.git;protocol=https;branch=${BRANCH} \
+	file://0001-riscv-fix-building-external-modules.patch \
 	file://vf2.cfg \
 	"
 
