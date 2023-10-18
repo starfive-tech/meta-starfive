@@ -44,7 +44,7 @@ FILES:${KERNEL_PACKAGE_NAME}-base += "/usr/*"
 
 BOOTARGS_EXT4 = "console=ttySIF0,115200 earlycon=sbi root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait ip=:::255.255.255.0::eth0:dhcp"
 BOOTARGS_UBI = "console=ttySIF0,115200 earlycon=sbi ip=:::255.255.255.0::eth0:dhcp root=ubi0:starfive-dubhe-rootfs ubi.mtd=1 rw rootfstype=ubifs rootwait"
-BOOTARGS_NFS = "console=ttySIF0,115200 earlycon=sbi root=/dev/nfs rw nfsroot=192.168.1.1:/filepath,rw,tcp,vers=3 ip=:::255.255.255.0::eth0:dhcp rootfstype=ext4 rootwait"
+BOOTARGS_NFS = "console=ttySIF0,115200 earlycon=sbi root=/dev/nfs rw nfsroot=192.168.1.1:/filepath,rw,tcp,vers=3,rsize=1048576,wsize=1048576 ip=:::255.255.255.0::eth0:dhcp rootfstype=ext4 rootwait"
 
 do_configure:append:starfive-dubhe() {
 	cp ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga.dts ${S}/arch/riscv/boot/dts/starfive/dubhe80_fpga_ext4.dts
