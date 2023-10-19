@@ -1,5 +1,7 @@
 require xserver-xorg.inc
 
+FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}_${PV}:"
+
 SRC_URI += "file://0001-xf86pciBus.c-use-Intel-ddx-only-for-pre-gen4-hardwar.patch \
            file://pkgconfig.patch \
            file://0001-test-xtest-Initialize-array-with-braces.patch \
