@@ -1,26 +1,24 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/clang:"
 
-MAJOR_VER = "15"
-MINOR_VER = "0"
-PATCH_VER = "0"
-
-SRCREV = "d6cf181a8df6a7925660b2332e3ab7dbcfd08145"
-BRANCH = "main"
+SRCREV = "35bd94a4b791787e7f3938e10ce80f409831dd7e"
+BRANCH = "release/16.x"
 
 SRC_URI = "\
     ${BASEURI} \
     file://llvm-config \
     file://libunwind.pc.in \
-    file://0001-Merge-four-Custom-CSR-cache-instruction.patch \
-    file://0002-add-pref-instruction.patch \
-    file://0003-add-multilib-v-b-support-for-baremetal-toolchain.patch \
-    file://0004-set-default-march-to-rv64imafcd_zba_zbb_zbc_zbs-and-.patch \
-    file://0005-support-b-letter-in-march-string.patch \
-    file://0006-set-clang-default-dwarf-version-to-4.patch \
-    file://0007-set-clang-default-march-to-rv64gc.patch \
-    file://0008-change-baremetal-multilib-directory-name-to-align-wi.patch \
-    file://0001-libcxxabi-Find-libunwind-headers-when.patch \
+    file://0001-neon2rvv-support-type-convert-between-fixed-vector-a.patch \
+    file://0002-neon2rvv-Model-vxrm-in-LLVM-intrinsics-and-add-optim.patch \
+    file://0003-RISCV-Add-prefetch-instructions.patch \
+    file://0004-RISCV-Add-customer-cache-instructions.patch \
+    file://0005-RISCV-Add-multilib-v-b-support-for-baremetal-toolcha.patch \
+    file://0006-RISCV-Change-baremetal-multilib-directory-name-to-al.patch \
+    file://0007-Driver-Set-clang-default-dwarf-version-to-4.patch \
+    file://0008-RISCV-Support-b-letter-in-march-string.patch \
+    file://0009-RISCV-Align-default-march-with-dubhe-gcc-toolchain.patch \
+    file://0001-libcxxabi-Find-libunwind-headers-when-LIBCXXABI_LIBU.patch \
     file://0002-compiler-rt-support-a-new-embedded-linux-target.patch \
+    file://0003-compiler-rt-Simplify-cross-compilation.-Don-t-use-na.patch \
     file://0004-llvm-TargetLibraryInfo-Undefine-libc-functions-if-th.patch \
     file://0005-llvm-allow-env-override-of-exe-and-libdir-path.patch \
     file://0006-clang-driver-Check-sysroot-for-ldso-path.patch \
@@ -39,16 +37,20 @@ SRC_URI = "\
     file://0019-For-x86_64-set-Yocto-based-GCC-install-search-path.patch \
     file://0020-llvm-Do-not-use-find_library-for-ncurses.patch \
     file://0021-llvm-Insert-anchor-for-adding-OE-distro-vendor-names.patch \
-    file://0022-compiler-rt-Use-mcr-based-barrier-on-armv6.patch \
-    file://0023-compiler-rt-Do-not-use-backtrace-APIs-on-non-glibc-l.patch \
-    file://0024-clang-Fix-x86-triple-for-non-debian-multiarch-linux-.patch \
-    file://0025-compiler-rt-Link-scudo-with-SANITIZER_CXX_ABI_LIBRAR.patch \
-    file://0026-compiler-rt-Link-scudo-standalone-with-libatomic-on-.patch \
-    file://0027-libunwind-Added-unw_backtrace-method.patch \
-    file://0029-clang-Do-not-use-install-relative-libc-headers.patch \
-    file://0030-clang-Fix-how-driver-finds-GCC-installation-path-on-.patch \
-    file://0032-Correct-library-search-path-for-OpenEmbedded-Host.patch \
-    file://0033-lldb-Link-with-libatomic-on-x86.patch \
-    file://0034-clang-exclude-openembedded-distributions-from-settin.patch \
-    file://0035-compiler-rt-Enable-__int128-for-ppc32.patch \
+    file://0022-compiler-rt-Do-not-use-backtrace-APIs-on-non-glibc-l.patch \
+    file://0023-clang-Fix-x86-triple-for-non-debian-multiarch-linux-.patch \
+    file://0024-libunwind-Added-unw_backtrace-method.patch \
+    file://0025-clang-Do-not-use-install-relative-libc-headers.patch \
+    file://0026-clang-Fix-how-driver-finds-GCC-installation-path-on-.patch \
+    file://0027-Fix-lib-paths-for-OpenEmbedded-Host.patch \
+    file://0028-Correct-library-search-path-for-OpenEmbedded-Host.patch \
+    file://0029-lldb-Link-with-libatomic-on-x86.patch \
+    file://0030-clang-exclude-openembedded-distributions-from-settin.patch \
+    file://0031-compiler-rt-Enable-__int128-for-ppc32.patch \
+    file://0032-llvm-Do-not-use-cmake-infra-to-detect-libzstd.patch \
+    file://0033-build-Enable-64bit-off_t-on-32bit-glibc-systems.patch \
+    file://0034-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
+    file://0035-compiler-rt-Fix-stat-struct-s-size-for-O32-ABI.patch \
+    file://0036-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
+    file://0037-clang-Call-printName-to-get-name-of-Decl.patch \
     "

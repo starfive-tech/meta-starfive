@@ -1,3 +1,0 @@
-MAJOR_VER = "15"
-MINOR_VER = "0"
-PATCH_VER = "0"

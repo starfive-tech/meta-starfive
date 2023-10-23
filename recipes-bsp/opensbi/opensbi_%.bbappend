@@ -16,3 +16,10 @@ do_deploy:append:starfive-visionfive2() {
         cd ${DEPLOYDIR}
         mkimage -f visionfive2-uboot-fit-image.its -A riscv -O u-boot -T firmware visionfive2_fw_payload.img
 }
+
+do_deploy:append:starfive-dubhe(){
+	oe_runmake clean
+	oe_runmake PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= PLATFORM_DEFCONFIG=starfive_defconfig FW_PAYLOAD_PATH=${DEPLOY_DIR_IMAGE}/Image-initramfs-starfive-dubhe.bin
+	install -m 755 ${B}/build/platform/generic/firmware/fw_payload.bin ${DEPLOYDIR}/fw_payload_initramfs.bin
+	install -m 755 ${B}/build/platform/generic/firmware/fw_payload.elf ${DEPLOYDIR}/fw_payload_initramfs.elf
+}

@@ -14,7 +14,6 @@ IMAGE_FEATURES = ""
 
 export IMAGE_BASENAME = "dubhe-image-initramfs"
 IMAGE_NAME_SUFFIX ?= ""
-#IMAGE_LINGUAS = ""
 IMAGE_LINGUAS = "en-us"
 GLIBC_GENERATE_LOCALES = "en_US.UTF-8"
 

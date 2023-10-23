@@ -1,0 +1,25 @@
+From a10e0f315a96f4b7f2458f377fd9a8de9288f829 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 1 May 2022 05:51:37 -0700
+Subject: [PATCH 7/9] [Driver] Set clang default dwarf version to 4
+
+---
+ clang/include/clang/Driver/ToolChain.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/clang/include/clang/Driver/ToolChain.h b/clang/include/clang/Driver/ToolChain.h
+index f75f35dc9e65..a70ae2b17833 100644
+--- a/clang/include/clang/Driver/ToolChain.h
++++ b/clang/include/clang/Driver/ToolChain.h
+@@ -547,7 +547,7 @@ public:
+ 
+   // Return the DWARF version to emit, in the absence of arguments
+   // to the contrary.
+-  virtual unsigned GetDefaultDwarfVersion() const { return 5; }
++  virtual unsigned GetDefaultDwarfVersion() const { return 4; }
+ 
+   // Some toolchains may have different restrictions on the DWARF version and
+   // may need to adjust it. E.g. NVPTX may need to enforce DWARF2 even when host
+-- 
+2.25.1
+

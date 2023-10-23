@@ -1,0 +1,61 @@
+From 6c56523d3583772c5e4e9102e42ed41abe902dff Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 9 Oct 2022 00:19:02 -0700
+Subject: [PATCH 6/9] [RISCV] Change baremetal multilib directory name to align
+ with gcc 12.1
+
+---
+ clang/lib/Driver/ToolChains/Gnu.cpp | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
+index c1737fe56635..06aec80f366a 100644
+--- a/clang/lib/Driver/ToolChains/Gnu.cpp
++++ b/clang/lib/Driver/ToolChains/Gnu.cpp
+@@ -1696,7 +1696,11 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+       {"rv32i", "ilp32"},     {"rv32im", "ilp32"},     {"rv32iac", "ilp32"},
+       {"rv32imac", "ilp32"},  {"rv32imafc", "ilp32f"}, {"rv64imac", "lp64"},
+       {"rv64imafdc", "lp64d"}, {"rv64imafdc_zba_zbb_zbc_zbs", "lp64d"},
+-      {"rv64imafdcv_zba_zbb_zbc_zbs", "lp64d"}, {"rv64imafdcv", "lp64d"},};
++      {"rv64imafdc_zicsr_zifencei", "lp64d"}, 
++      {"rv64imafdc_zicsr_zifencei_zba_zbb_zbc_zbs", "lp64d"},
++      {"rv64imafdcv_zicsr_zifencei_zve32f_zve32x_zve64d_zve64f_zve64x_zvl128b_zvl32b_zvl64b", "lp64d"}, 
++      {"rv64imafdcv_zicsr_zifencei_zba_zbb_zbc_zbs_zve32f_zve32x_zve64d_zve64f_zve64x_zvl128b_zvl32b_zvl64b", "lp64d"},
++      };   
+ 
+   std::vector<Multilib> Ms;
+   for (auto Element : RISCVMultilibSet) {
+@@ -1722,8 +1726,10 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+   llvm::StringSet<> Added_ABIs;
+   StringRef ABIName = tools::riscv::getRISCVABI(Args, TargetTriple);
+   StringRef MArch = tools::riscv::getRISCVArch(Args, TargetTriple);
++
+   std::string Ext, Extra;
+-  for (auto I = MArch.begin(), E = MArch.end(); I != E; ) {
++  Ext = "rv";
++  for (auto I = MArch.begin() + 2, E = MArch.end(); I != E; ) {
+     char c = *I;
+     switch (c) {
+       default: 
+@@ -1732,12 +1738,18 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+ 
+       case 'g':
+       Ext += "imafd";
++      Extra += "_zicsr_zifencei";
+       break;
+       
+       case 'b':
+       Extra += "_zba_zbb_zbc_zbs";
+       break;
+ 
++      case 'v':
++      Ext += c;
++      Extra += "_zve32f_zve32x_zve64d_zve64f_zve64x_zvl128b_zvl32b_zvl64b";
++      break;      
++
+       case '_':
+       for (;I != E; I++)
+         Ext += *I;
+-- 
+2.25.1
+

@@ -1,0 +1,44 @@
+From 0582802db83d7cce8d3528aa8c2fd952c6537f59 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Mon, 26 Jun 2023 20:27:50 -0700
+Subject: [PATCH 1/1] ira: Increase the cost of inner loop spill
+
+---
+ gcc/ira-costs.cc | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/gcc/ira-costs.cc b/gcc/ira-costs.cc
+index 964c94a06ef..d2040f04be7 100644
+--- a/gcc/ira-costs.cc
++++ b/gcc/ira-costs.cc
+@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "ira-int.h"
+ #include "addresses.h"
+ #include "reload.h"
++#include "cfgloop.h"
+ 
+ /* The flags is set up every time when we calculate pseudo register
+    classes through function ira_set_pseudo_classes.  */
+@@ -1624,10 +1625,19 @@ static void
+ process_bb_for_costs (basic_block bb)
+ {
+   rtx_insn *insn;
++  int depth;
+ 
+   frequency = REG_FREQ_FROM_BB (bb);
+   if (frequency == 0)
+     frequency = 1;
++  if (bb->loop_father)
++    {
++      depth = loop_depth(bb->loop_father);
++      depth = depth > 5 ? 5 : depth;
++      while (depth--)
++        frequency *= 5;
++    }
++
+   FOR_BB_INSNS (bb, insn)
+     insn = scan_one_insn (insn);
+ }
+-- 
+2.25.1
+

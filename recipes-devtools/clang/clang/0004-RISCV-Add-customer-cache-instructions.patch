@@ -1,0 +1,67 @@
+From bcd728e619143e082767170bfd7b255e521923db Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Fri, 29 Oct 2021 10:16:06 +0800
+Subject: [PATCH 4/9] [RISCV] Add customer cache instructions
+
+---
+ llvm/lib/Target/RISCV/RISCVInstrFormats.td | 12 ++++++++++++
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td    | 13 +++++++++++++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+index e913edc47ec2..d3953227b0cd 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+@@ -377,6 +377,18 @@ class RVInstPref<RISCVOpcode opcode, dag outs, dag ins,
+   let Opcode = opcode.Value;
+ }
+ 
++class RVInstCache<bits<12> cache, RISCVOpcode opcode, dag outs, dag ins,
++                   string opcodestr, string argstr>
++    : RVInst<outs, ins, opcodestr, argstr, [], InstFormatI> {
++  bits<5> rs1;
++
++  let Inst{31-20} = cache;
++  let Inst{19-15} = rs1;
++  let Inst{14-12} = 0;
++  let Inst{11-7} = 0;
++  let Opcode = opcode.Value;
++}
++
+ class RVInstIShift<bits<5> imm11_7, bits<3> funct3, RISCVOpcode opcode,
+                    dag outs, dag ins, string opcodestr, string argstr>
+     : RVInst<outs, ins, opcodestr, argstr, [], InstFormatI> {
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index 5849327ca255..6bd3de20b807 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -586,6 +586,12 @@ class PREF_iir<string opcodestr>
+     : RVInstPref<OPC_OP_IMM, (outs), (ins uimm4_pref:$imm4, simm8:$imm8, GPR:$rs1),
+               opcodestr, "$imm4, ${imm8}(${rs1})">;
+ 
++let hasNoSchedulingInfo = 1,
++    hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
++class CSR_cache<bits<12> cache, string opcodestr>
++    : RVInstCache<cache, OPC_SYSTEM, (outs), (ins GPR:$rs1),
++              opcodestr, "$rs1">, Sched<[WriteCSR, ReadCSR]>;
++
+ let hasNoSchedulingInfo = 1,
+     hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
+ class CSR_ii<bits<3> funct3, string opcodestr>
+@@ -773,6 +779,13 @@ def WRS_STO : RVInstI<0b000, OPC_SYSTEM, (outs), (ins), "wrs.sto", "">,
+ 
+ } // hasSideEffects = 1, mayLoad = 0, mayStore = 0
+ 
++/* Custom instruction and CSRs */
++def CFLUSH_D_L1   : CSR_cache<0b111111000000, "cflush.d.l1">;
++def CDISCARD_D_L1 : CSR_cache<0b111111000010, "cdiscard.d.l1">;
++def CFLUSH_D_L2   : CSR_cache<0b111111000100, "cflush.d.l2">;
++def CDISCARD_D_L2 : CSR_cache<0b111111000110, "cdiscard.d.l2">;
++/* End */
++
+ def CSRRW : CSR_ir<0b001, "csrrw">;
+ def CSRRS : CSR_ir<0b010, "csrrs">;
+ def CSRRC : CSR_ir<0b011, "csrrc">;
+-- 
+2.25.1
+
