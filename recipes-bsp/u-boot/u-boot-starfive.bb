@@ -22,7 +22,7 @@ BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_bmc"
 SRCREV:starfive-jh8100 = "163e8d28c905711d76cbd5d78dafbd6e24b3f21d"
 
 SRC_URI:starfive-dubhe = "\
-	git://git@192.168.110.45/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
+	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
 	"
 
 SRC_URI:starfive-visionfive2 = "\
