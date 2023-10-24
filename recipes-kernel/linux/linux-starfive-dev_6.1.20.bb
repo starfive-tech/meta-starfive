@@ -10,7 +10,7 @@ BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "starfive-6.1-dubhe"
-SRCREV:starfive-dubhe = "1e3b15b8f416e8d26af7bff467d8debc3f1f5fd9"
+SRCREV:starfive-dubhe = "c888e193d4662be1943b79172f0f5780dab87b72"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "starfive-6.1-dev-jh8100-bmc"
