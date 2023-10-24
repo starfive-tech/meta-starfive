@@ -34,7 +34,7 @@ Now, we will be creating a workspace and retrieve the latest layers needed for o
 
 ```
 $ mkdir starfive-yocto && cd starfive-yocto
-$ repo init -u https://github.com/starfive-tech/meta-starfive -b starfive-honister -m tools/manifests/starfive.xml
+$ repo init -u https://github.com/starfive-tech/meta-starfive -b starfive-kirkstone -m tools/manifests/starfive.xml
 $ repo sync
 $ repo start work --all
 ```

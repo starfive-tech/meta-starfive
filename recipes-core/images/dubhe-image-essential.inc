@@ -8,4 +8,15 @@ IMAGE_ROOTFS_SIZE ?= "8192"
 IMAGE_FEATURES += "allow-empty-password empty-root-password"
 IMAGE_FEATURES:remove = "dbg-pkgs"
 
-IMAGE_INSTALL += "mtd-utils helloworld coremark dhrystone perf util-linux btrfs-tools parted lrzsz devmem2 iperf3 e2fsprogs ethtool"
+IMAGE_INSTALL += "\
+	packagegroup-starfive-essentials \
+	packagegroup-starfive-dubhe-essentials \
+	mtd-utils \
+	btrfs-tools \
+	parted \
+	lrzsz \
+	devmem2 \
+	e2fsprogs \
+	"
+
+TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
