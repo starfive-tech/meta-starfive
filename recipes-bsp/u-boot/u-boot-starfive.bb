@@ -19,7 +19,7 @@ SRCREV:starfive-visionfive2 = "b6e2b0e85c774a18ae668223a6e5f7d335895243"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_bmc"
-SRCREV:starfive-jh8100 = "163e8d28c905711d76cbd5d78dafbd6e24b3f21d"
+SRCREV:starfive-jh8100 = "94b4b620567e8b87fe9002b5b623043830aff8a8"
 
 SRC_URI:starfive-dubhe = "\
 	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
