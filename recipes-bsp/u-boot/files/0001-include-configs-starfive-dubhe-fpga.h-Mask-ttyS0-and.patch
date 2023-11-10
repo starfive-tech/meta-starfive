@@ -1,0 +1,40 @@
+From b221223fa390b9266e72dd62295bbaada51e51c3 Mon Sep 17 00:00:00 2001
+From: Ji Sheng Teoh <jisheng.teoh@starfivetech.com>
+Date: Fri, 10 Nov 2023 14:50:42 +0800
+Subject: [PATCH] include: configs: starfive-dubhe-fpga.h: Mask ttyS0 and
+ ttyhvc0
+
+Systemd getty-generator will automatic enable ttyS0 and ttyhvc0 console
+during startup, which causes multiple undesirable login prompts.
+This patch mask both ttyS0 and ttyhvc0 getty service in kernel bootarg
+cmdline, since only ttySIF0 console is used.
+
+Signed-off-by: Ji Sheng Teoh <jisheng.teoh@starfivetech.com>
+---
+ include/configs/starfive-dubhe-fpga.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/include/configs/starfive-dubhe-fpga.h b/include/configs/starfive-dubhe-fpga.h
+index 05ac969383..c77a199404 100644
+--- a/include/configs/starfive-dubhe-fpga.h
++++ b/include/configs/starfive-dubhe-fpga.h
+@@ -14,12 +14,15 @@
+ 		"console=ttySIF0,115200 earlycon=sbi\0"		\
+ 	"set_ip=setenv bootargs ${bootargs} ip=${ipaddr}:${serverip}:"		\
+ 		"${gatewayip}:${netmask}:${hostname}:eth0:off\0"	\
++	"mask_tty=setenv bootargs ${bootargs} "					\
++		"systemd.mask=serial-getty@ttyS0.service "	\
++		"systemd.mask=serial-getty@hvc0.service\0"	\
+ 	"bootargs_nfs=setenv bootargs root=/dev/nfs rw rootwait "			\
+ 		"nfsroot=${serverip}:${rootpath},rw,tcp,v3,"		\
+ 		"hard,sec=sys,local_lock=none,"				\
+ 		"rsize=65536,wsize=65536,"				\
+ 		"timeo=600,retrans=5\0"				\
+-	"nfs_boot=run bootargs_nfs set_tty set_ip;"			\
++	"nfs_boot=run bootargs_nfs set_tty set_ip mask_tty;"			\
+ 		   "run tftp_boot;\0"
+ 
+ #endif /* __CONFIG_H */
+-- 
+2.25.1
+

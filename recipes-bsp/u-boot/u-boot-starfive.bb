@@ -11,7 +11,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2023.10"
-SRCREV:starfive-dubhe = "85c7554283547d5ab9dca94427a74a691132cebf"
+SRCREV:starfive-dubhe = "88c4bf23b45f807c9c4173ef24dc84c3e75b67bc"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel"
@@ -22,7 +22,8 @@ BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_bmc"
 SRCREV:starfive-jh8100 = "163e8d28c905711d76cbd5d78dafbd6e24b3f21d"
 
 SRC_URI:starfive-dubhe = "\
-	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
+	git://git@192.168.110.45/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
+	file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
 	"
 
 SRC_URI:starfive-visionfive2 = "\
