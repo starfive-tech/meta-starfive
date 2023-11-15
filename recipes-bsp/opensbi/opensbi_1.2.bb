@@ -8,32 +8,12 @@ require opensbi-payloads.inc
 
 inherit autotools-brokensep deploy
 
-FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "starfive-v1.2-dubhe"
-SRCREV:starfive-dubhe = "a10e0837f215fb4ed25f195f2c511a41deb9c324"
-
-FORK:starfive-jh8100 = "starfive-tech"
-BRANCH:starfive-jh8100 = "fpga-starfive-v1.2-jh8100"
-SRCREV:starfive-jh8100 = "06c3d05b7f5f1e0aa24141e4de487313b620cea9"
-
-SRC_URI:starfive-dubhe = "\
-	git://github.com/${FORK}/opensbi.git;protocol=https;branch=${BRANCH} \
-	"
-
-SRC_URI:starfive-jh8100 = "\
-	git://git@192.168.110.45/${FORK}/opensbi.git;protocol=ssh;branch=${BRANCH} \
-	"
-
-SRC_URI:remove:nezha = "\
-	file://0001-lib-utils-fdt-Require-match-data-to-be-const.patch \
-	file://0002-lib-utils-timer-Add-a-separate-compatible-for-the-D1.patch \
-	"
+SRCREV = "6b5188ca14e59ce7bf71afe4e7d3d557c3d31bf8"
+SRC_URI = "git://github.com/riscv/opensbi.git;branch=master;protocol=https"
 
 S = "${WORKDIR}/git"
 
-EXTRA_OEMAKE:starfive-dubhe = "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= FW_OPTIONS=0 FW_TEXT_START=0x80100000 PLATFORM_DEFCONFIG=starfive_defconfig"
-EXTRA_OEMAKE:starfive-jh8100 = "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= FW_OPTIONS=0 FW_TEXT_START=0x40000000 PLATFORM_DEFCONFIG=starfive_defconfig"
-
+EXTRA_OEMAKE += "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG_TARGET= "
 # If RISCV_SBI_PAYLOAD is set then include it as a payload
 EXTRA_OEMAKE:append = " ${@riscv_get_extra_oemake_image(d)}"
 EXTRA_OEMAKE:append = " ${@riscv_get_extra_oemake_fdt(d)}"

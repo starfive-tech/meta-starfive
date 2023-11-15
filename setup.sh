@@ -51,7 +51,6 @@ bitbake-layers add-layer ../meta-openembedded/meta-networking
 bitbake-layers add-layer ../meta-openembedded/meta-gnome
 bitbake-layers add-layer ../meta-openembedded/meta-xfce
 bitbake-layers add-layer ../meta-openembedded/meta-webserver
-bitbake-layers add-layer ../meta-riscv
 bitbake-layers add-layer ../meta-starfive
 bitbake-layers add-layer ../meta-clang
 
