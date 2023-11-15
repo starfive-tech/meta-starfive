@@ -1,8 +1,10 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/openocd:"
+require recipes-devtools/openocd/openocd_git.bb
+
+#FILESEXTRAPATHS:prepend := "${THISDIR}/openocd:"
 
 LIC_FILES_CHKSUM = "file://COPYING;md5=599d2d1ee7fc84c0467b3d19801db870"
 
-PV = "riscv22"
+PV = "riscv"
 
 SRC_URI = " \
     git://github.com/riscv/riscv-openocd.git;protocol=https;branch=riscv;name=openocd \
@@ -34,3 +36,5 @@ do_deploy() {
 }
 
 addtask deploy before do_build after do_install
+
+COMPATIBLE_HOST = "(x86_64.*|i.86.*|riscv32|riscv64).*-linux"

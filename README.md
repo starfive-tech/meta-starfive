@@ -1,7 +1,7 @@
 # StarFive Linux Software Development Kit (SDK)
 
 The StarFive Dubhe Linux SDK is based on Yocto Project. It enables the creation of Linux distributions for any embedded project, as well as easy migration from a different architecture platform. 
-The meta-starfive layer is built on top of meta-riscv to provide additional modifications such as Linux Kernel, and toolchains like GCC and LLVM.
+The meta-starfive layer provides additional modifications such as Linux Kernel, and toolchains like GCC and LLVM.
 
 
 ## Supported Features

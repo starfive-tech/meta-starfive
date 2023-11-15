@@ -2,13 +2,11 @@
 
 <manifest>
   <remote name="openembedded" fetch="https://github.com/openembedded/" />
-  <remote name="riscv" fetch="https://github.com/riscv/" />
   <default remote="openembedded" revision="master" />
   <remote name="starfive" fetch="https://github.com/starfive-tech" />
   <remote name="kraj" fetch="https://github.com/kraj" />
   <remote name="yoctoproject" fetch="https://github.com/yoctoproject" />
 
-  <project name="meta-riscv" remote="riscv" path="meta-riscv" revision="kirkstone" />
   <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="kirkstone" />
   <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-kirkstone" />
   <project name="meta-clang" remote="kraj" path="meta-clang" revision="kirkstone" />

@@ -19,10 +19,11 @@ SRCREV:starfive-visionfive2 = "b6e2b0e85c774a18ae668223a6e5f7d335895243"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_bmc"
-SRCREV:starfive-jh8100 = "163e8d28c905711d76cbd5d78dafbd6e24b3f21d"
+SRCREV:starfive-jh8100 = "94b4b620567e8b87fe9002b5b623043830aff8a8"
 
 SRC_URI:starfive-dubhe = "\
 	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
+	file://run_qemu_virt.dtb \
 	"
 
 SRC_URI:starfive-visionfive2 = "\
@@ -37,6 +38,7 @@ SRC_URI:starfive-visionfive2 = "\
 SRC_URI:starfive-jh8100 = "\
 	git://git@192.168.110.45/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
 	file://tftp-mmc-boot.txt \
+	file://run_qemu_virt.dtb \
 	"
 
 DEPENDS:append:starfive-dubhe = " u-boot-tools-native bmap-tools-native opensbi"
@@ -80,11 +82,13 @@ do_deploy:append:starfive-visionfive2() {
 do_deploy:append:starfive-dubhe() {
     install -m 644 ${WORKDIR}/build/u-boot.itb ${DEPLOYDIR}/u-boot.itb
     rm ${WORKDIR}/build/fw_dynamic.bin
+    install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
 }
 
 do_deploy:append:starfive-jh8100() {
     install -m 644 ${WORKDIR}/build/u-boot.itb ${DEPLOYDIR}/u-boot.itb
     rm ${WORKDIR}/build/fw_dynamic.bin
+    install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
 }
 
 TOOLCHAIN = "gcc"
