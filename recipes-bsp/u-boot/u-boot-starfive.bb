@@ -18,8 +18,8 @@ BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel"
 SRCREV:starfive-visionfive2 = "b6e2b0e85c774a18ae668223a6e5f7d335895243"
 
 FORK:starfive-jh8100 = "starfive-tech"
-BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_bmc"
-SRCREV:starfive-jh8100 = "94b4b620567e8b87fe9002b5b623043830aff8a8"
+BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01-bmc-30Nov"
+SRCREV:starfive-jh8100 = "c1a4c841e01fbcd3f6d5e894e726e9f50abc6938"
 
 SRC_URI:starfive-dubhe = "\
 	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
@@ -40,11 +40,14 @@ SRC_URI:starfive-jh8100 = "\
 	git://git@192.168.110.45/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
 	file://tftp-mmc-boot.txt \
 	file://run_qemu_virt.dtb \
+	file://bootloader.bin.normal.out \
+	file://firmware_merak.bin.normal.out \
+	file://uboot.env \
 	"
 
 DEPENDS:append:starfive-dubhe = " u-boot-tools-native bmap-tools-native opensbi"
 DEPENDS:append:starfive-visionfive2 = " u-boot-tools-native starfive-tool-native"
-DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmap-tools-native opensbi"
+DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmap-tools-native opensbi starfive-tool"
 
 # Overwrite this for your server
 TFTP_SERVER_IP ?= "127.0.0.1"
@@ -87,9 +90,23 @@ do_deploy:append:starfive-dubhe() {
 }
 
 do_deploy:append:starfive-jh8100() {
+    install -m 644 ${WORKDIR}/uboot.env ${DEPLOYDIR}/uboot.env
+    install -m 644 ${WORKDIR}/bootloader.bin.normal.out ${DEPLOYDIR}/bootloader.bin.normal.out
+    install -m 644 ${WORKDIR}/firmware_merak.bin.normal.out ${DEPLOYDIR}/firmware_merak.bin.normal.out
     install -m 644 ${WORKDIR}/build/u-boot.itb ${DEPLOYDIR}/u-boot.itb
     rm ${WORKDIR}/build/fw_dynamic.bin
     install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
+
+    ${DEPLOY_DIR_IMAGE}/jh8100_cst/mkbif ${DEPLOYDIR}/${SPL_BINARYNAME}
+
+    dd if=${WORKDIR}/bootloader.bin.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img count=1 bs=512k conv=sync
+    dd if=${WORKDIR}/bootloader.bin.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img seek=1 count=1 bs=512k conv=sync
+
+    dd if=${WORKDIR}/firmware_merak.bin.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img seek=2 count=1 bs=512k conv=sync
+    dd if=${WORKDIR}/firmware_merak.bin.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img seek=3 count=1 bs=512k conv=sync
+
+    dd if=${DEPLOYDIR}/${SPL_BINARYNAME}.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img seek=4 count=1 bs=512k conv=sync
+    dd if=${DEPLOYDIR}/${SPL_BINARYNAME}.normal.out of=${DEPLOY_DIR_IMAGE}/scp_raw.img seek=5 count=1 bs=512k conv=sync
 }
 
 TOOLCHAIN = "gcc"
