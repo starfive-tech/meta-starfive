@@ -10,6 +10,7 @@ IMAGE_INSTALL += " \
 	systemd-analyze \
 	e2fsprogs-resize2fs \
 	parted \
+	i3c-tools \
         "
 
 TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
