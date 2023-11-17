@@ -1,5 +1,3 @@
-require recipes-devtools/openocd/openocd_git.bb
-
 #FILESEXTRAPATHS:prepend := "${THISDIR}/openocd:"
 
 LIC_FILES_CHKSUM = "file://COPYING;md5=599d2d1ee7fc84c0467b3d19801db870"

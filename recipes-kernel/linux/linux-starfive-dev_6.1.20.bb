@@ -13,8 +13,8 @@ BRANCH:starfive-dubhe = "starfive-6.1-dubhe"
 SRCREV:starfive-dubhe = "c888e193d4662be1943b79172f0f5780dab87b72"
 
 FORK:starfive-jh8100 = "starfive-tech"
-BRANCH:starfive-jh8100 = "starfive-6.1-dev-jh8100-bmc"
-SRCREV:starfive-jh8100 ="602adfee5440add362c13535b9f7d4d2647e2526"
+BRANCH:starfive-jh8100 = "starfive-6.1-dev-jh8100-bmc-30Nov"
+SRCREV:starfive-jh8100 = "d3c89a346ad56faa46713019ba82ade5ace25651"
 
 LINUX_VERSION ?= "6.1.20"
 LINUX_VERSION:starfive-dubhe = "6.1.20"

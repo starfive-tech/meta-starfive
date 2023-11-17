@@ -21,6 +21,7 @@ IMAGE_INSTALL = "\
 	packagegroup-starfive-essentials \
 	nodejs \
 	nodejs-npm \
+	i3c-tools \
 	"
 
 TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
