@@ -9,15 +9,15 @@ SRCREV = "${AUTOREV}"
 BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "starfive-6.1-dubhe"
-SRCREV:starfive-dubhe = "c888e193d4662be1943b79172f0f5780dab87b72"
+BRANCH:starfive-dubhe = "starfive-6.1.65-dubhe"
+SRCREV:starfive-dubhe = "3bcfa57b279e7d79d2bee2069f54b1e5e4c90105"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "starfive-6.1-dev-jh8100-bmc-30Nov"
 SRCREV:starfive-jh8100 = "d3c89a346ad56faa46713019ba82ade5ace25651"
 
 LINUX_VERSION ?= "6.1.20"
-LINUX_VERSION:starfive-dubhe = "6.1.20"
+LINUX_VERSION:starfive-dubhe = "6.1.65"
 LINUX_VERSION:starfive-jh8100 = "6.1.20"
 
 LINUX_VERSION_EXTENSTION:append:starfive-dubhe = "-starlight"
@@ -25,7 +25,7 @@ LINUX_VERSION_EXTENSTION:append:starfive-dubhe = "-starlight"
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI:starfive-dubhe = " \
-        git://github.com/${FORK}/linux.git;protocol=https;branch=${BRANCH} \
+        git://git@192.168.110.45/${FORK}/linux.git;protocol=ssh;branch=${BRANCH} \
         file://cpio.cfg \
         "
 
