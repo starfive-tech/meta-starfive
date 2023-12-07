@@ -1,0 +1,32 @@
+From d67a092d2163ef9d5e7672feab11873edf2ebbea Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Tue, 24 Oct 2023 23:55:08 -0700
+Subject: [PATCH 5/6] add print parameter dis_style_immediate
+
+---
+ opcodes/riscv-dis.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/opcodes/riscv-dis.c b/opcodes/riscv-dis.c
+index 0c9eb0bce8..35c5ccbefb 100644
+--- a/opcodes/riscv-dis.c
++++ b/opcodes/riscv-dis.c
+@@ -518,11 +518,13 @@ print_insn_args (const char *oparg, insn_t l, bfd_vma pc, disassemble_info *info
+ 	  break;
+ 
+ 	case '#':
+-	  print (info->stream, "0x%x", (int)EXTRACT_OPERAND (PREF_TYPE, l));
++	  print (info->stream, dis_style_immediate, "0x%x",
++		 (int)EXTRACT_OPERAND (PREF_TYPE, l));
+ 	  break;
+ 
+ 	case '+':
+-	  print (info->stream, "0x%x", (int)EXTRACT_OPERAND (PREF_OFFSET, l));
++	  print (info->stream, dis_style_immediate, "0x%x",
++		 (int)EXTRACT_OPERAND (PREF_OFFSET, l));
+ 
+ 	case 'S':
+ 	case 'U':
+-- 
+2.25.1
+
