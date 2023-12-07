@@ -13,8 +13,6 @@ IMAGE_INSTALL += " \
 
 IMAGE_INSTALL:starfive-dubhe += "\
 	packagegroup-starfive-dubhe-essentials \
-	packagegroup-starfive-dubhe-ltp \
-	mtd-utils \
 	"
 
 IMAGE_INSTALL:starfive-jh8100 += "\
