@@ -1,6 +1,7 @@
 require sd-image.inc
 
-DEPENDS:starfive-visionfive2 += " opensbi starfive-tool-native"
+DEPENDS:starfive-visionfive2 += "opensbi starfive-tool-native"
+DEPENDS:starfive-jh8100 += "u-boot-starfive"
 
 IMAGE_FEATURES += " allow-empty-password empty-root-password"
 
