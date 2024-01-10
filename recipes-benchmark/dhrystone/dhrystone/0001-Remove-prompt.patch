@@ -1,0 +1,40 @@
+From 006a56ac03292e38992cb946b0bbf7b357bd3b44 Mon Sep 17 00:00:00 2001
+From: "weiheng.cheng" <weiheng.cheng@starfivetech.com>
+Date: Fri, 24 Nov 2023 16:39:40 +0800
+Subject: [PATCH 1/1] Remove prompt Remove prompt for number of runs when
+ DHRY_ITERS has been defined.
+
+Rebase patch using existing commit:
+https://github.com/sifive/benchmark-dhrystone/commit/bb3afcb3abd83f1541db9a0dbe47e1b284da7772
+Credit to @jstraus59
+
+Signed-off-by: weiheng.cheng <weiheng.cheng@starfivetech.com>
+---
+ dhry_1.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/dhry_1.c b/dhry_1.c
+index 1157d2d..88b69e4 100644
+--- a/dhry_1.c
++++ b/dhry_1.c
+@@ -121,6 +121,9 @@ main ()
+     printf ("Program compiled without 'register' attribute\n");
+     printf ("\n");
+   }
++#ifdef DHRY_ITERS
++  Number_Of_Runs = DHRY_ITERS;
++#else
+   printf ("Please give the number of runs through the benchmark: ");
+   {
+     int n;
+@@ -128,6 +131,7 @@ main ()
+     Number_Of_Runs = n;
+   }
+   printf ("\n");
++#endif
+ 
+   printf ("Execution starts, %d runs through Dhrystone\n", Number_Of_Runs);
+ 
+-- 
+2.25.1
+

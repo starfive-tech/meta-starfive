@@ -1,7 +1,7 @@
-From f8e87829b8008dbaed49d7e33821086a10054b41 Mon Sep 17 00:00:00 2001
+From 8714abac9e6a17edff6555e2bcba515dbff0ff88 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Wed, 2 Nov 2022 19:17:52 -0700
-Subject: [PATCH 5/7] fix incorrect short size
+Subject: [PATCH 4/6] fix incorrect short size
 
 ---
  gdb/features/riscv/vpu.c | 2 +-

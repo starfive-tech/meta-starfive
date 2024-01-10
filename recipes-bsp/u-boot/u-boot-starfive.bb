@@ -11,7 +11,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2023.10"
-SRCREV:starfive-dubhe = "88c4bf23b45f807c9c4173ef24dc84c3e75b67bc"
+SRCREV:starfive-dubhe = "cef715ce412e97f17acab08529540c9fa317a923"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel"

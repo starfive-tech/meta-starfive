@@ -1,7 +1,7 @@
-From 6793d19defcc4baba2879006e5e2ce89396e3afc Mon Sep 17 00:00:00 2001
+From 2c77a52638cc7d7711b31b6e175478f9d5180d8f Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Tue, 1 Nov 2022 19:50:38 -0700
-Subject: [PATCH 4/7] add intial rvv support to display rvv registers
+Subject: [PATCH 3/6] add intial rvv support to display rvv registers
 
 ---
  gdb/arch/riscv.c             |  12 ++-
@@ -17,7 +17,7 @@ Subject: [PATCH 4/7] add intial rvv support to display rvv registers
  create mode 100644 gdb/features/riscv/vpu.c
 
 diff --git a/gdb/arch/riscv.c b/gdb/arch/riscv.c
-index 030c2cfdd9..03fcf7360f 100644
+index 6f6fcb081e..813bbb1a82 100644
 --- a/gdb/arch/riscv.c
 +++ b/gdb/arch/riscv.c
 @@ -25,6 +25,8 @@
@@ -126,7 +126,7 @@ index 0000000000..fe45f37b4c
 +  return regnum;
 +}
 diff --git a/gdb/nat/riscv-linux-tdesc.c b/gdb/nat/riscv-linux-tdesc.c
-index 07b49c0f16..b349035d9a 100644
+index d676233cc3..b1c27b1f7e 100644
 --- a/gdb/nat/riscv-linux-tdesc.c
 +++ b/gdb/nat/riscv-linux-tdesc.c
 @@ -23,7 +23,7 @@
@@ -197,7 +197,7 @@ index 07b49c0f16..b349035d9a 100644
    return features;
  }
 diff --git a/gdb/nat/riscv-linux-tdesc.h b/gdb/nat/riscv-linux-tdesc.h
-index 4f476aed5c..092ee7d29b 100644
+index 8e8da41026..2f8d69e4a6 100644
 --- a/gdb/nat/riscv-linux-tdesc.h
 +++ b/gdb/nat/riscv-linux-tdesc.h
 @@ -21,6 +21,24 @@
@@ -226,7 +226,7 @@ index 4f476aed5c..092ee7d29b 100644
     corresponding features object.  */
  struct riscv_gdbarch_features riscv_linux_read_features (int tid);
 diff --git a/gdb/riscv-linux-nat.c b/gdb/riscv-linux-nat.c
-index 7063494148..0e24cbcb86 100644
+index 8be4a5ac3e..92dc1df3c1 100644
 --- a/gdb/riscv-linux-nat.c
 +++ b/gdb/riscv-linux-nat.c
 @@ -34,6 +34,10 @@
@@ -397,7 +397,7 @@ index 7063494148..0e24cbcb86 100644
       now.  */
  }
 diff --git a/gdb/riscv-tdep.c b/gdb/riscv-tdep.c
-index 886996ce5b..44ce340f39 100644
+index 576d7d96d9..be0b109b49 100644
 --- a/gdb/riscv-tdep.c
 +++ b/gdb/riscv-tdep.c
 @@ -619,16 +619,21 @@ struct riscv_vector_feature : public riscv_register_feature
@@ -477,8 +477,8 @@ index 886996ce5b..44ce340f39 100644
  
  static const char *
  riscv_register_name (struct gdbarch *gdbarch, int regnum)
-@@ -902,6 +930,14 @@ riscv_register_name (struct gdbarch *gdbarch, int regnum)
- 	return NULL;
+@@ -903,6 +931,14 @@ riscv_register_name (struct gdbarch *gdbarch, int regnum)
+       return riscv_freg_feature.register_name (regnum);
      }
  
 +  if (regnum >= RISCV_V0_REGNUM && regnum <= RISCV_LAST_REGNUM)
@@ -492,7 +492,7 @@ index 886996ce5b..44ce340f39 100644
    /* Some targets (QEMU) are reporting these three registers twice, once
       in the FPU feature, and once in the CSR feature.  Both of these read
       the same underlying state inside the target, but naming the register
-@@ -3545,6 +3581,7 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
+@@ -3648,6 +3684,7 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
  {
    int isa_xlen = riscv_isa_xlen (gdbarch);
    int isa_flen = riscv_isa_flen (gdbarch);
@@ -500,7 +500,7 @@ index 886996ce5b..44ce340f39 100644
    int abi_xlen = riscv_abi_xlen (gdbarch);
    int abi_flen = riscv_abi_flen (gdbarch);
    std::string target_options;
-@@ -3560,6 +3597,8 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
+@@ -3663,6 +3700,8 @@ riscv_gcc_target_options (struct gdbarch *gdbarch)
      target_options += "imafc";
    else
      target_options += "imac";
@@ -510,10 +510,10 @@ index 886996ce5b..44ce340f39 100644
    target_options += " -mabi=";
    if (abi_xlen == 8)
 diff --git a/gdb/riscv-tdep.h b/gdb/riscv-tdep.h
-index ac4b4b7144..913c5f1724 100644
+index 4c3afb08e0..b4764b84ff 100644
 --- a/gdb/riscv-tdep.h
 +++ b/gdb/riscv-tdep.h
-@@ -139,6 +139,11 @@ extern int riscv_abi_xlen (struct gdbarch *gdbarch);
+@@ -145,6 +145,11 @@ extern int riscv_abi_xlen (struct gdbarch *gdbarch);
     with RISCV_ISA_FLEN.  */
  extern int riscv_abi_flen (struct gdbarch *gdbarch);
  
@@ -526,7 +526,7 @@ index ac4b4b7144..913c5f1724 100644
     target only has 16 x-registers, which includes a reduced number of
     argument registers.  */
 diff --git a/gdbserver/linux-riscv-low.cc b/gdbserver/linux-riscv-low.cc
-index 6b2902e422..54444f9883 100644
+index 129bc3b138..89f7e41fd5 100644
 --- a/gdbserver/linux-riscv-low.cc
 +++ b/gdbserver/linux-riscv-low.cc
 @@ -30,6 +30,17 @@
@@ -609,10 +609,10 @@ index 6b2902e422..54444f9883 100644
  };
  
 diff --git a/include/elf/common.h b/include/elf/common.h
-index 70d63e3299..2662e767ba 100644
+index 16587f6fb0..d9058fd40a 100644
 --- a/include/elf/common.h
 +++ b/include/elf/common.h
-@@ -690,6 +690,10 @@
+@@ -695,6 +695,10 @@
  					/*   note name must be "LINUX".  */
  #define NT_ARM_PAC_ENABLED_KEYS	0x40a	/* AArch64 pointer authentication
  					   enabled keys (prctl()) */

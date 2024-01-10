@@ -1,0 +1,25 @@
+From 9987c0f86ef0a6c3957cdc500cbd9e8b62b3f445 Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Wed, 25 Oct 2023 00:32:11 -0700
+Subject: [PATCH 6/6] fix gbbranch_tdep func call error
+
+---
+ gdb/riscv-tdep.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gdb/riscv-tdep.c b/gdb/riscv-tdep.c
+index be0b109b49..1fcc180a74 100644
+--- a/gdb/riscv-tdep.c
++++ b/gdb/riscv-tdep.c
+@@ -753,7 +753,7 @@ riscv_isa_xlen (struct gdbarch *gdbarch)
+ int
+ riscv_isa_vlen (struct gdbarch *gdbarch)
+ {
+-  riscv_gdbarch_tdep *tdep = (riscv_gdbarch_tdep *) gdbarch_tdep (gdbarch);
++  riscv_gdbarch_tdep *tdep = gdbarch_tdep<riscv_gdbarch_tdep> (gdbarch);
+   return tdep->isa_features.vlen;
+ }
+ 
+-- 
+2.25.1
+

@@ -1,8 +1,7 @@
-From afbb66c244b1ae0aaaa90d88d3cd484f741c614f Mon Sep 17 00:00:00 2001
+From e258cfb37d7c61b4a97e4ca8f1178485a3f91940 Mon Sep 17 00:00:00 2001
 From: Khem Raj <raj.khem@gmail.com>
 Date: Sat, 30 Apr 2016 18:32:14 -0700
-Subject: [PATCH 03/11] ppc/ptrace: Define pt_regs uapi_pt_regs on !GLIBC
- systems
+Subject: [PATCH] ppc/ptrace: Define pt_regs uapi_pt_regs on !GLIBC systems
 
 Upstream-Status: Pending
 
@@ -13,7 +12,7 @@ Signed-off-by: Khem Raj <raj.khem@gmail.com>
  2 files changed, 12 insertions(+)
 
 diff --git a/gdb/nat/ppc-linux.h b/gdb/nat/ppc-linux.h
-index d937a65b69c..1fd54b4a0e0 100644
+index c84f9146bbd..8c8580c95e1 100644
 --- a/gdb/nat/ppc-linux.h
 +++ b/gdb/nat/ppc-linux.h
 @@ -18,7 +18,13 @@
@@ -31,7 +30,7 @@ index d937a65b69c..1fd54b4a0e0 100644
  
  /* This sometimes isn't defined.  */
 diff --git a/gdbserver/linux-ppc-low.cc b/gdbserver/linux-ppc-low.cc
-index 337d555aee7..5d518f37268 100644
+index fdf74727e39..f64afd09b7a 100644
 --- a/gdbserver/linux-ppc-low.cc
 +++ b/gdbserver/linux-ppc-low.cc
 @@ -23,7 +23,13 @@
@@ -48,6 +47,3 @@ index 337d555aee7..5d518f37268 100644
  
  #include "arch/ppc-linux-common.h"
  #include "arch/ppc-linux-tdesc.h"
--- 
-2.29.2
-
