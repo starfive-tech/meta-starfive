@@ -25,12 +25,12 @@ LINUX_VERSION_EXTENSTION:append:starfive-dubhe = "-starlight"
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI:starfive-dubhe = " \
-        git://git@192.168.110.45/${FORK}/linux.git;protocol=ssh;branch=${BRANCH} \
+        git://github.com/${FORK}/linux.git;protocol=https;branch=${BRANCH} \
         file://cpio.cfg \
         "
 
 SRC_URI:starfive-jh8100 = "\
-	git://git@192.168.110.45/${FORK}/linux.git;protocol=ssh;branch=${BRANCH} \
+	git://github.com/${FORK}/linux.git;protocol=https;branch=${BRANCH} \
 	"
 
 INITRAMFS_IMAGE_BUNDLE:starfive-dubhe = "1"
