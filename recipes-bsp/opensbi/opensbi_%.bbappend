@@ -11,7 +11,7 @@ BRANCH:starfive-jh8100 = "fpga-starfive-v1.2-jh8100-bmc-30Nov"
 SRCREV:starfive-jh8100 = "7cbdf359bb9d2f4c79c736fa92952a06a7740657"
 
 SRC_URI:starfive-dubhe = "\
-	git://git@192.168.110.45/${FORK}/opensbi.git;protocol=ssh;branch=${BRANCH} \
+	git://github.com/${FORK}/opensbi.git;protocol=https;branch=${BRANCH} \
 	"
 
 SRC_URI:starfive-visionfive2 = "\
@@ -20,7 +20,7 @@ SRC_URI:starfive-visionfive2 = "\
 	"
 
 SRC_URI:starfive-jh8100 = "\
-        git://git@192.168.110.45/${FORK}/opensbi.git;protocol=ssh;branch=${BRANCH} \
+        git://github.com/${FORK}/opensbi.git;protocol=https;branch=${BRANCH} \
         "
 
 SRC_URI:remove:nezha = "\
