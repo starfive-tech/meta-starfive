@@ -13,24 +13,26 @@ DEPENDS = "libffi libxml2 zlib zstd libedit ninja-native llvm-native"
 RDEPENDS:${PN}:append:class-target = " ncurses-terminfo"
 
 inherit cmake pkgconfig
+# could be 'rcX' or 'git' or empty ( for release )
+VER_SUFFIX = ""
 
-PV = "17.0.0"
+PV .= "${VER_SUFFIX}"
 
 MAJOR_VERSION = "${@oe.utils.trim_version("${PV}", 1)}"
 
 LLVM_RELEASE = "${PV}"
 
-BRANCH = "release/${MAJOR_VERSION}.x"
-SRCREV = "092b6c5ee3707ea10b9f10d0a674e8d12395369b"
-SRC_URI = "git://github.com/llvm/llvm-project.git;branch=${BRANCH};protocol=https \
+SRC_URI = "https://github.com/llvm/llvm-project/releases/download/llvmorg-${PV}/llvm-project-${PV}.src.tar.xz \
            file://0007-llvm-allow-env-override-of-exe-path.patch;striplevel=2 \
            file://0001-AsmMatcherEmitter-sort-ClassInfo-lists-by-name-as-we.patch;striplevel=2 \
+           file://0002-llvm-Fix-CVE-2024-0151.patch;striplevel=2 \
            file://llvm-config \
            "
+SRC_URI[sha256sum] = "74446ab6943f686391954cbda0d77ae92e8a60c432eff437b8666e121d748ec4"
+UPSTREAM_CHECK_URI = "https://github.com/llvm/llvm-project"
+UPSTREAM_CHECK_REGEX = "llvmorg-(?P<pver>\d+(\.\d+)+)"
 
-UPSTREAM_CHECK_GITTAGREGEX = "llvmorg-(?P<pver>\d+(\.\d+)+)"
-
-S = "${WORKDIR}/git/llvm"
+S = "${WORKDIR}/llvm-project-${PV}.src/llvm"
 
 LLVM_INSTALL_DIR = "${WORKDIR}/llvm-install"
 
@@ -75,6 +77,7 @@ EXTRA_OECMAKE += "-DLLVM_ENABLE_ASSERTIONS=OFF \
                   -DFFI_INCLUDE_DIR=$(pkg-config --variable=includedir libffi) \
                   -DLLVM_OPTIMIZED_TABLEGEN=ON \
                   -DLLVM_TARGETS_TO_BUILD='${LLVM_TARGETS}' \
+                  -DLLVM_VERSION_SUFFIX='${VER_SUFFIX}' \
                   -DLLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN=ON \
                   -DCMAKE_BUILD_TYPE=Release \
                  "
@@ -93,6 +96,10 @@ EXTRA_OECMAKE:append:class-nativesdk = "\
 
 # patch out build host paths for reproducibility
 do_compile:prepend:class-target() {
+        sed -i -e "s,${WORKDIR},,g" ${B}/tools/llvm-config/BuildVariables.inc
+}
+
+do_compile:prepend:class-nativesdk() {
         sed -i -e "s,${WORKDIR},,g" ${B}/tools/llvm-config/BuildVariables.inc
 }
 
@@ -144,6 +151,7 @@ FILES:${PN}-bugpointpasses = "\
 
 FILES:${PN}-libllvm = "\
     ${libdir}/libLLVM-${MAJOR_VERSION}.so \
+    ${libdir}/libLLVM.so.${MAJOR_VER}.${MINOR_VER} \
 "
 
 FILES:${PN}-liblto += "\

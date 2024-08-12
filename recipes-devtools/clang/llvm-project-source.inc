@@ -25,6 +25,8 @@ TARGET_OS = "linux"
 baselib = "lib"
 PACKAGE_ARCH = "all"
 
+B = "${WORKDIR}/build"
+
 # space separated list of additional distro vendor values we want to support e.g.
 # "yoe webos" or "-yoe -webos" '-' is optional
 CLANG_EXTRA_OE_VENDORS ?= "${TARGET_VENDOR} ${SDK_VENDOR}"
@@ -34,7 +36,8 @@ CLANG_EXTRA_OE_VENDORS ?= "${TARGET_VENDOR} ${SDK_VENDOR}"
 CLANG_EXTRA_OE_DISTRO ?= "poky:poky"
 # Match with MULTILIB_GLOBAL_VARIANTS
 MULTILIB_VARIANTS = "lib32 lib64 libx32"
-python add_distro_vendor() {
+
+python do_preconfigure() {
     import subprocess
     case = ""
     triple = ""
@@ -92,5 +95,5 @@ python add_distro_vendor() {
 }
 
 do_patch[vardepsexclude] = "MULTILIBS"
-do_patch[postfuncs] += "add_distro_vendor"
-do_create_spdx[depends] += "${PN}:do_patch"
+addtask do_preconfigure after do_patch
+do_create_spdx[depends] += "${PN}:do_preconfigure"

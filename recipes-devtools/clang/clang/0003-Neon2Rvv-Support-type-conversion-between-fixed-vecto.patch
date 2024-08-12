@@ -1,12 +1,9 @@
-From da348addac39388d474b73ea596077087c29b228 Mon Sep 17 00:00:00 2001
+From acfd9b54816b5c9cefaf9582d43a92aa157f7b55 Mon Sep 17 00:00:00 2001
 From: Eric Tang <eric.tang@starfivetech.com>
 Date: Fri, 2 Jun 2023 09:07:44 +0800
-Subject: [PATCH 2/8] [neon2rvv] support type convert between fixed vector and
- scalable vector
+Subject: [PATCH 3/7] [Neon2Rvv] Support type conversion between fixed vector
+ and scalable vector
 
-  disable the default vectorize options on O1,O2,O3,Oz...
-
-Signed-off-by: Eric Tang <eric.tang@starfivetech.com>
 ---
  clang/include/clang/Basic/BuiltinsRISCV.def | 49 ++++++++++++++++++++
  clang/lib/CodeGen/CGBuiltin.cpp             | 51 +++++++++++++++++++++
@@ -14,12 +11,12 @@ Signed-off-by: Eric Tang <eric.tang@starfivetech.com>
  3 files changed, 101 insertions(+)
 
 diff --git a/clang/include/clang/Basic/BuiltinsRISCV.def b/clang/include/clang/Basic/BuiltinsRISCV.def
-index 50e912c2c1c7..a08e81dd4820 100644
+index 1528b18c82ea..0e90a58cba95 100644
 --- a/clang/include/clang/Basic/BuiltinsRISCV.def
 +++ b/clang/include/clang/Basic/BuiltinsRISCV.def
 @@ -89,5 +89,54 @@ TARGET_BUILTIN(__builtin_riscv_sm3p1, "UiUi", "nc", "zksh")
- TARGET_BUILTIN(__builtin_riscv_ntl_load, "v.", "t", "experimental-zihintntl")
- TARGET_BUILTIN(__builtin_riscv_ntl_store, "v.", "t", "experimental-zihintntl")
+ TARGET_BUILTIN(__builtin_riscv_ntl_load, "v.", "t", "zihintntl")
+ TARGET_BUILTIN(__builtin_riscv_ntl_store, "v.", "t", "zihintntl")
  
 +// Scalable Vector type <-> Fixed Vector type
 +
@@ -73,10 +70,10 @@ index 50e912c2c1c7..a08e81dd4820 100644
  #undef BUILTIN
  #undef TARGET_BUILTIN
 diff --git a/clang/lib/CodeGen/CGBuiltin.cpp b/clang/lib/CodeGen/CGBuiltin.cpp
-index 30f5f4e7061c..aa6f59802ef3 100644
+index 44ddd2428b10..aafb551fb4ca 100644
 --- a/clang/lib/CodeGen/CGBuiltin.cpp
 +++ b/clang/lib/CodeGen/CGBuiltin.cpp
-@@ -20358,6 +20358,57 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
+@@ -21261,6 +21261,57 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
    case RISCV::BI__builtin_riscv_sm3p1:
      ID = Intrinsic::riscv_sm3p1;
      break;
@@ -135,10 +132,10 @@ index 30f5f4e7061c..aa6f59802ef3 100644
    // Zihintntl
    case RISCV::BI__builtin_riscv_ntl_load: {
 diff --git a/clang/lib/Driver/ToolChains/Clang.cpp b/clang/lib/Driver/ToolChains/Clang.cpp
-index 47ec36b3a8ff..393a310f669f 100644
+index aa344b3465ab..2ca8aca70a23 100644
 --- a/clang/lib/Driver/ToolChains/Clang.cpp
 +++ b/clang/lib/Driver/ToolChains/Clang.cpp
-@@ -645,6 +645,7 @@ static void addCoveragePrefixMapArg(const Driver &D, const ArgList &Args,
+@@ -518,6 +518,7 @@ static void addCoveragePrefixMapArg(const Driver &D, const ArgList &Args,
  /// For -Oz the loop vectorizer is disabled, while the slp vectorizer is
  /// enabled.
  static bool shouldEnableVectorizerAtOLevel(const ArgList &Args, bool isSlpVec) {

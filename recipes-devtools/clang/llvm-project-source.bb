@@ -1,7 +1,6 @@
 # Copyright (C) 2018 Khem Raj <raj.khem@gmail.com>
 # Released under the MIT license (see COPYING.MIT for the terms)
 
-FILESEXTRAPATHS:prepend := "${THISDIR}/clang:"
 SUMMARY = "This is the canonical git mirror of the LLVM subversion repository."
 HOMEPAGE = "https://github.com/llvm/llvm-project"
 

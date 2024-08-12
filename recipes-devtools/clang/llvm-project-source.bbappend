@@ -1,20 +1,18 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/clang:"
 
-SRCREV = "092b6c5ee3707ea10b9f10d0a674e8d12395369b"
-BRANCH = "release/17.x"
+SRCREV = "768118d1ad38bf13c545828f67bd6b474d61fc55"
+BRANCH = "release/18.x"
 
+BASEURI ??= "${LLVM_GIT}/llvm-project.git;protocol=${LLVM_GIT_PROTOCOL};branch=${BRANCH}"
 SRC_URI = "\
     ${BASEURI} \
-    file://llvm-config \
-    file://libunwind.pc.in \
-    file://0001-Handle-seteq-setne-conditions-for-CZERO_NEZ-CZERO_EQ.patch \
-    file://0002-neon2rvv-support-type-convert-between-fixed-vector-a.patch \
-    file://0003-Add-an-optional-for-optimizing-Insert-Read-Write-CSR.patch \
-    file://0004-RISCV-Add-prefetch-instructions.patch \
-    file://0005-RISCV-Add-customer-cache-instructions.patch \
-    file://0006-RISCV-Add-multilib-v-b-support-for-baremetal-toolcha.patch \
-    file://0007-RISCV-Change-baremetal-multilib-directory-name-to-al.patch \
-    file://0008-RISCV-Support-b-letter-in-march-string.patch \
+    file://0001-RISCV-MC-Add-support-for-Starfive-private-pref-instr.patch \
+    file://0002-RISCV-MC-Add-support-for-Starfive-private-CSR-instru.patch \
+    file://0003-Neon2Rvv-Support-type-conversion-between-fixed-vecto.patch \
+    file://0004-RISCV-Support-old-b-letter-represents-for-B-extensio.patch \
+    file://0005-RISCV-Keep-old-register-definitions-because-Dubhe-fo.patch \
+    file://0006-RISCV-Align-bare-metal-multilib-directories-with-gcc.patch \
+    file://0007-RISCV-Align-default-march-string-with-GCC.patch \
     file://0001-libcxxabi-Find-libunwind-headers-when-LIBCXXABI_LIBU.patch \
     file://0002-compiler-rt-support-a-new-embedded-linux-target.patch \
     file://0003-compiler-rt-Simplify-cross-compilation.-Don-t-use-na.patch \
@@ -48,4 +46,6 @@ SRC_URI = "\
     file://0032-compiler-rt-Fix-stat-struct-s-size-for-O32-ABI.patch \
     file://0033-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
     file://0034-ToolChains-Gnu.cpp-ARMLibDirs-search-also-in-lib32.patch \
+    file://0035-compiler-rt-Fix-cmake-check-for-_Float16-and-__bf16.patch \
+    file://0036-llvm-Add-libunwind.pc.in-and-llvm-config-scripts.patch \
     "
