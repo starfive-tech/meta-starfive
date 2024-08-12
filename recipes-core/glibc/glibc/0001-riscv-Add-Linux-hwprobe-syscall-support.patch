@@ -1,0 +1,199 @@
+From abbc0c928273a83552465725853f025d407a75a6 Mon Sep 17 00:00:00 2001
+From: Evan Green <evan@rivosinc.com>
+Date: Tue, 27 Feb 2024 14:56:37 -0800
+Subject: [PATCH 01/16] riscv: Add Linux hwprobe syscall support
+
+Add awareness and a thin wrapper function around a new Linux system call
+that allows callers to get architecture and microarchitecture
+information about the CPUs from the kernel. This can be used to
+do things like dynamically choose a memcpy implementation.
+
+Signed-off-by: Evan Green <evan@rivosinc.com>
+Signed-off-by: Palmer Dabbelt <palmer@rivosinc.com>
+---
+ sysdeps/unix/sysv/linux/riscv/Makefile        | 12 ++-
+ sysdeps/unix/sysv/linux/riscv/Versions        |  3 +
+ sysdeps/unix/sysv/linux/riscv/hwprobe.c       | 36 +++++++++
+ .../unix/sysv/linux/riscv/rv32/libc.abilist   |  1 +
+ .../unix/sysv/linux/riscv/rv64/libc.abilist   |  1 +
+ sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h   | 74 +++++++++++++++++++
+ 6 files changed, 125 insertions(+), 2 deletions(-)
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/hwprobe.c
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
+
+diff --git a/sysdeps/unix/sysv/linux/riscv/Makefile b/sysdeps/unix/sysv/linux/riscv/Makefile
+index 4b6eacb32f..04abf226ad 100644
+--- a/sysdeps/unix/sysv/linux/riscv/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/Makefile
+@@ -1,6 +1,14 @@
+ ifeq ($(subdir),misc)
+-sysdep_headers += sys/cachectl.h
+-sysdep_routines += flush-icache
++sysdep_headers += \
++  sys/cachectl.h \
++  sys/hwprobe.h \
++  # sysdep_headers
++
++sysdep_routines += \
++  flush-icache \
++  hwprobe \
++  # sysdep_routines
++
+ endif
+ 
+ ifeq ($(subdir),stdlib)
+diff --git a/sysdeps/unix/sysv/linux/riscv/Versions b/sysdeps/unix/sysv/linux/riscv/Versions
+index 5625d2a0b8..8183e9feb6 100644
+--- a/sysdeps/unix/sysv/linux/riscv/Versions
++++ b/sysdeps/unix/sysv/linux/riscv/Versions
+@@ -8,4 +8,7 @@ libc {
+   GLIBC_2.27 {
+     __riscv_flush_icache;
+   }
++  GLIBC_2.40 {
++    __riscv_hwprobe;
++  }
+ }
+diff --git a/sysdeps/unix/sysv/linux/riscv/hwprobe.c b/sysdeps/unix/sysv/linux/riscv/hwprobe.c
+new file mode 100644
+index 0000000000..28a448175b
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/hwprobe.c
+@@ -0,0 +1,36 @@
++/* RISC-V hardware feature probing support on Linux
++   Copyright (C) 2024 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sys/syscall.h>
++#include <sys/hwprobe.h>
++#include <sysdep.h>
++#include <sysdep-vdso.h>
++
++int __riscv_hwprobe (struct riscv_hwprobe *pairs, size_t pair_count,
++		     size_t cpu_count, unsigned long int *cpus,
++		     unsigned int flags)
++{
++  int r;
++
++  r = INTERNAL_SYSCALL_CALL (riscv_hwprobe, pairs, pair_count,
++                             cpu_count, cpus, flags);
++
++  /* Negate negative errno values to match pthreads API. */
++  return -r;
++}
+diff --git a/sysdeps/unix/sysv/linux/riscv/rv32/libc.abilist b/sysdeps/unix/sysv/linux/riscv/rv32/libc.abilist
+index f90c94bc35..6397a9cb91 100644
+--- a/sysdeps/unix/sysv/linux/riscv/rv32/libc.abilist
++++ b/sysdeps/unix/sysv/linux/riscv/rv32/libc.abilist
+@@ -2511,3 +2511,4 @@ GLIBC_2.39 stdc_trailing_zeros_ui F
+ GLIBC_2.39 stdc_trailing_zeros_ul F
+ GLIBC_2.39 stdc_trailing_zeros_ull F
+ GLIBC_2.39 stdc_trailing_zeros_us F
++GLIBC_2.40 __riscv_hwprobe F
+diff --git a/sysdeps/unix/sysv/linux/riscv/rv64/libc.abilist b/sysdeps/unix/sysv/linux/riscv/rv64/libc.abilist
+index e04ff93bd2..71bbf94f66 100644
+--- a/sysdeps/unix/sysv/linux/riscv/rv64/libc.abilist
++++ b/sysdeps/unix/sysv/linux/riscv/rv64/libc.abilist
+@@ -2711,3 +2711,4 @@ GLIBC_2.39 stdc_trailing_zeros_ui F
+ GLIBC_2.39 stdc_trailing_zeros_ul F
+ GLIBC_2.39 stdc_trailing_zeros_ull F
+ GLIBC_2.39 stdc_trailing_zeros_us F
++GLIBC_2.40 __riscv_hwprobe F
+diff --git a/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h b/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
+new file mode 100644
+index 0000000000..5592b9e100
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
+@@ -0,0 +1,74 @@
++/* RISC-V architecture probe interface
++   Copyright (C) 2024 Free Software Foundation, Inc.
++
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#ifndef _SYS_HWPROBE_H
++#define _SYS_HWPROBE_H 1
++
++#include <features.h>
++#include <stddef.h>
++#ifdef __has_include
++# if __has_include (<asm/hwprobe.h>)
++#  include <asm/hwprobe.h>
++# endif
++#endif
++
++/* Define a (probably stale) version of the interface if the Linux headers
++   aren't present.  */
++#ifndef RISCV_HWPROBE_KEY_MVENDORID
++struct riscv_hwprobe {
++	signed long long int key;
++	unsigned long long int value;
++};
++
++#define RISCV_HWPROBE_KEY_MVENDORID 0
++#define RISCV_HWPROBE_KEY_MARCHID 1
++#define RISCV_HWPROBE_KEY_MIMPID 2
++#define RISCV_HWPROBE_KEY_BASE_BEHAVIOR 3
++#define  RISCV_HWPROBE_BASE_BEHAVIOR_IMA (1 << 0)
++#define RISCV_HWPROBE_KEY_IMA_EXT_0 4
++#define  RISCV_HWPROBE_IMA_FD (1 << 0)
++#define  RISCV_HWPROBE_IMA_C (1 << 1)
++#define  RISCV_HWPROBE_IMA_V (1 << 2)
++#define  RISCV_HWPROBE_EXT_ZBA (1 << 3)
++#define  RISCV_HWPROBE_EXT_ZBB (1 << 4)
++#define  RISCV_HWPROBE_EXT_ZBS (1 << 5)
++#define  RISCV_HWPROBE_EXT_ZICBOZ (1 << 6)
++#define RISCV_HWPROBE_KEY_CPUPERF_0 5
++#define  RISCV_HWPROBE_MISALIGNED_UNKNOWN (0 << 0)
++#define  RISCV_HWPROBE_MISALIGNED_EMULATED (1 << 0)
++#define  RISCV_HWPROBE_MISALIGNED_SLOW (2 << 0)
++#define  RISCV_HWPROBE_MISALIGNED_FAST (3 << 0)
++#define  RISCV_HWPROBE_MISALIGNED_UNSUPPORTED (4 << 0)
++#define  RISCV_HWPROBE_MISALIGNED_MASK (7 << 0)
++#define RISCV_HWPROBE_KEY_ZICBOZ_BLOCK_SIZE 6
++
++#endif /* RISCV_HWPROBE_KEY_MVENDORID */
++
++__BEGIN_DECLS
++
++extern int __riscv_hwprobe (struct riscv_hwprobe *__pairs, size_t __pair_count,
++			    size_t __cpu_count, unsigned long int *__cpus,
++			    unsigned int __flags)
++     __nonnull ((1)) __wur
++     __fortified_attr_access (__read_write__, 1, 2)
++     __fortified_attr_access (__read_only__, 4, 3);
++
++__END_DECLS
++
++#endif /* sys/hwprobe.h */
+-- 
+2.25.1
+

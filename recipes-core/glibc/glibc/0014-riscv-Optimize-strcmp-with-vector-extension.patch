@@ -1,0 +1,269 @@
+From 54d2b0d035b15592ed210fdc5b7fca1a205260cf Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sat, 29 Jun 2024 19:36:51 -0700
+Subject: [PATCH 14/16] riscv: Optimize strcmp with vector extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ sysdeps/riscv/multiarch/strcmp_generic.S      | 97 +++++++++++++++++++
+ sysdeps/riscv/multiarch/strcmp_vector.S       | 44 +++++++++
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |  6 +-
+ .../linux/riscv/multiarch/ifunc-impl-list.c   |  5 +
+ .../unix/sysv/linux/riscv/multiarch/strcmp.c  | 56 +++++++++++
+ 5 files changed, 206 insertions(+), 2 deletions(-)
+ create mode 100644 sysdeps/riscv/multiarch/strcmp_generic.S
+ create mode 100644 sysdeps/riscv/multiarch/strcmp_vector.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/multiarch/strcmp.c
+
+diff --git a/sysdeps/riscv/multiarch/strcmp_generic.S b/sysdeps/riscv/multiarch/strcmp_generic.S
+new file mode 100644
+index 0000000000..57a2a370a9
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/strcmp_generic.S
+@@ -0,0 +1,97 @@
++/* The assembly function for strcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++#define N 3
++
++	.p2align 6
++ENTRY (__strcmp_generic)
++  or    a4, a0, a1
++  li    t2, -1
++  and   a4, a4, 7
++  beqz  a4, .Lenter
++  j .Lmisaligned
++
++  .macro check_one_word i n
++    ld a2, \i*8(a0)
++    ld a3, \i*8(a1)
++
++    orc.b t0, a2
++
++    bne   t0, t2, .Lnull\i
++    .if \i+1-\n
++      bne   a2, a3, .Lmismatch
++    .else
++      beq   a2, a3, .Lloop
++      # fall through to .Lmismatch
++    .endif
++  .endm
++
++  .macro foundnull i n
++    .ifne \i
++      .Lnull\i:
++      add   a0, a0, \i*8
++      add   a1, a1, \i*8
++      .ifeq \i-1
++        .Lnull0:
++      .endif
++      bne   a2, a3, .Lmisaligned
++      li    a0, 0
++      ret
++    .endif
++  .endm
++.p2align 3
++.Lloop:
++  add   a0, a0, N*8
++  add   a1, a1, N*8
++
++.Lenter:
++  # examine full words at a time, favoring strings of a couple dozen chars
++  check_one_word 0 N
++  check_one_word 1 N
++  check_one_word 2 N
++  # backwards branch to .Lloop contained above
++
++.Lmismatch:
++  rev8 a4, a2
++  rev8 a5, a3
++  bgeu a4, a5, 1f
++  li a0, -1
++  ret
++1:
++  li a0, 1
++  ret
++
++.Lmisaligned:
++  # misaligned
++  lbu   a2, 0(a0)
++  lbu   a3, 0(a1)
++  add   a0, a0, 1
++  add   a1, a1, 1
++  bne   a2, a3, 1f
++  bnez  a2, .Lmisaligned
++1:
++  sub   a0, a2, a3
++  ret
++
++  # cases in which a null byte was detected
++  foundnull 0 N
++  foundnull 1 N
++  foundnull 2 N
++
++END (__strcmp_generic)
+diff --git a/sysdeps/riscv/multiarch/strcmp_vector.S b/sysdeps/riscv/multiarch/strcmp_vector.S
+new file mode 100644
+index 0000000000..41d0cabdcd
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/strcmp_vector.S
+@@ -0,0 +1,44 @@
++/* The assembly function for strcmp.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (__strcmp_vector)
++
++   vsetvli	a3,zero,e8,m8,tu,mu
++.L_strcmp_loop:
++   vle8ff.v	v0,(a0)
++   vmseq.vx	v16,v0,zero
++   vle8ff.v	v8,(a1)
++   vmsne.vv	v17,v0,v8
++   vmor.mm v16,v16,v17
++   vfirst.m	a4,v16
++   bgez a4, .L_strcmp_loop_exit
++   add a0,a0,a3
++   add a1,a1,a3
++   j .L_strcmp_loop
++
++.L_strcmp_loop_exit:
++   add a0,a0,a4
++   add a1,a1,a4
++   lbu a4,0(a0)
++   lbu a5,0(a1)
++   sub a0,a4,a5
++   ret
++END (__strcmp_vector)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+index a5dcb5f72e..e30569d1b6 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -16,7 +16,9 @@ sysdep_routines += \
+   strlen \
+   strlen_generic \
+   strlen_vector \
++  strcmp \
++  strcmp_generic \
++  strcmp_vector \
+   # sysdep_routines
+-
+ CFLAGS-memcpy_noalignment.c += -mno-strict-align
+-endif
++endif
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index 3c56861cf2..d70a51732a 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -69,5 +69,10 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+ 			      __strlen_vector)
+ 	      IFUNC_IMPL_ADD (array, i, strlen, 1, __strlen_generic))
+ 
++  IFUNC_IMPL (i, name, strcmp,
++	      IFUNC_IMPL_ADD (array, i, strcmp, support_vector,
++			      __strcmp_vector)
++	      IFUNC_IMPL_ADD (array, i, strcmp, 1, __strcmp_generic))
++
+   return 0;
+ }
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/strcmp.c b/sysdeps/unix/sysv/linux/riscv/multiarch/strcmp.c
+new file mode 100644
+index 0000000000..fff0d90002
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/strcmp.c
+@@ -0,0 +1,56 @@
++/* Multiple versions of strcmp.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++/* Redefine memmov so that the compiler won't complain about the type
++   mismatch with the IFUNC selector in strong_alias, below.  */
++# undef strcmp
++# define strcmp __redirect_strcmp
++# include <stdint.h>
++# include <string.h>
++# include <ifunc-init.h>
++# include <riscv-ifunc.h>
++# include <sys/hwprobe.h>
++
++extern __typeof (__redirect_strcmp) __libc_strcmp;
++
++extern __typeof (__redirect_strcmp) __strcmp_generic attribute_hidden;
++extern __typeof (__redirect_strcmp) __strcmp_vector attribute_hidden;
++
++static inline __typeof (__redirect_strcmp) *
++select_strcmp_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
++{
++  unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_IMA_EXT_0, &v) == 0
++      && (v & RISCV_HWPROBE_IMA_V))
++    return __strcmp_vector;
++  return __strcmp_generic;
++}
++
++riscv_libc_ifunc (__libc_strcmp, select_strcmp_ifunc);
++
++# undef strcmp
++strong_alias (__libc_strcmp, strcmp);
++# ifdef SHARED
++__hidden_ver1 (strcmp, __GI_strcmp, __redirect_strcmp)
++__attribute__ ((visibility ("hidden"))) __attribute_copy__ (strcmp);
++# endif
++#else
++# include <string/strcmp.c>
++#endif
+\ No newline at end of file
+-- 
+2.25.1
+

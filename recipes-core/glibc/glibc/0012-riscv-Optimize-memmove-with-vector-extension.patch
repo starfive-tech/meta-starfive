@@ -1,0 +1,388 @@
+From a6cbb8ac627f0d6bf4805f151c3637dd4b5c3552 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sat, 29 Jun 2024 19:24:29 -0700
+Subject: [PATCH 12/16] riscv: Optimize memmove with vector extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ sysdeps/riscv/multiarch/memmove_generic.S     | 216 ++++++++++++++++++
+ sysdeps/riscv/multiarch/memmove_vector.S      |  48 ++++
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |   2 +
+ .../linux/riscv/multiarch/ifunc-impl-list.c   |   5 +
+ .../unix/sysv/linux/riscv/multiarch/memmove.c |  56 +++++
+ 5 files changed, 327 insertions(+)
+ create mode 100644 sysdeps/riscv/multiarch/memmove_generic.S
+ create mode 100644 sysdeps/riscv/multiarch/memmove_vector.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/multiarch/memmove.c
+
+diff --git a/sysdeps/riscv/multiarch/memmove_generic.S b/sysdeps/riscv/multiarch/memmove_generic.S
+new file mode 100644
+index 0000000000..33c53a0d38
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memmove_generic.S
+@@ -0,0 +1,216 @@
++/* The assembly function for memmove.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.extern __memcpy_generic
++	.p2align 6
++ENTRY (__memmove_generic)
++    beq     a0, a1, .L_ret_fwd
++    /* abs(dst - src) */
++    sub     a3, a0, a1
++    srai    a4, a3, 63
++    xor     a3, a3, a4
++    subw    a3, a3, a4
++
++    bltu    a3, a2, .L_overlap
++    j       __memcpy_generic
++.L_overlap:
++    bltu    a1, a0, .L_backward
++    mv      a5, a0
++    li      a3, 8
++    bltu    a2, a3, .L_byte_fwd
++    neg     a4, a0
++    andi    a4, a4, 0x7
++    beqz    a4, .L_32B_fwd
++.L_byte_head_fwd:
++    sub     a2, a2, a4
++    add     a4, a5, a4
++0:
++    lb      a3, 0(a1)
++    sb      a3, 0(a5)
++    addi    a5, a5, 1
++    addi    a1, a1, 1
++    bltu    a5, a4, 0b
++.L_32B_fwd:
++    andi    t5, a1, 0x7
++    bnez    t5, .L_merge_fwd
++    andi    a4, a2, -32
++    andi    a2, a2, (32 - 1)
++    beqz    a4, .L_8B_fwd
++    add     a4, a4, a5
++    .p2align 3
++0:
++    ld      a3, 0(a1)
++    sd      a3, 0(a5)
++    ld      a3, 8(a1)
++    sd      a3, 8(a5)
++    ld      a3, 16(a1)
++    sd      a3, 16(a5)
++    ld      a3, 24(a1)
++    sd      a3, 24(a5)
++    addi    a5, a5, 32
++    addi    a1, a1, 32
++    bltu    a5, a4, 0b
++    beqz    a2, .L_ret_fwd
++.L_8B_fwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_fwd
++.L_pc_fwd:
++    auipc   a3, 0
++    add     a1, a1, a4
++    add     a5, a5, a4
++    sub     a3, a3, a4
++    .equ    offset_fwd, .L_jmp_end_fwd - .L_pc_fwd
++    jalr    x0, a3, %lo(offset_fwd)
++    ld      a3, -24(a1)
++    sd      a3, -24(a5)
++    ld      a3, -16(a1)
++    sd      a3, -16(a5)
++    ld      a3, -8(a1)
++    sd      a3, -8(a5)
++.L_jmp_end_fwd:
++.L_byte_tail_fwd:
++    andi    a2, a2, (8 - 1)
++.L_byte_fwd:
++    beqz    a2, .L_ret_fwd
++    add     a2, a2, a5
++0:
++    lb      a3, 0(a1)
++    sb      a3, 0(a5)
++    addi    a5, a5, 1
++    addi    a1, a1, 1
++    bltu    a5, a2, 0b
++.L_ret_fwd:
++    ret
++
++.L_merge_fwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_fwd
++    add     a4, a4, a5
++    andi    a1, a1, -8
++    ld      t2, 0(a1)
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    srl     t1, t2, t3
++    .p2align 3
++1:
++    ld      t2, 8(a1)
++    sll     a3, t2, t4
++    or      a3, a3, t1
++    sd      a3, 0(a5)
++    srl     t1, t2, t3
++
++    addi    a5, a5, 8
++    addi    a1, a1, 8
++    bltu    a5, a4, 1b
++    add     a1, a1, t5
++    j       .L_byte_tail_fwd
++
++.L_backward:
++    add     a1, a1, a2
++    add     a5, a0, a2
++    li      a3, 8
++    bltu    a2, a3, .L_byte_bwd
++    andi    a4, a5, 0x7
++    beqz    a4, .L_32B_bwd
++.L_byte_head_bwd:
++    sub     a2, a2, a4
++    sub     a4, a5, a4
++0:
++    addi    a5, a5, -1
++    addi    a1, a1, -1
++    lb      a3, 0(a1)
++    sb      a3, 0(a5)
++    bltu    a4, a5, 0b
++.L_32B_bwd:
++    andi    t5, a1, 0x7
++    bnez    t5, .L_merge_bwd
++    andi    a4, a2, -32
++    andi    a2, a2, (32 - 1)
++    beqz    a4, .L_8B_bwd
++    sub     a4, a5, a4
++    .p2align 3
++0:
++    addi    a5, a5, -32
++    addi    a1, a1, -32
++    ld      a3, 24(a1)
++    sd      a3, 24(a5)
++    ld      a3, 16(a1)
++    sd      a3, 16(a5)
++    ld      a3, 8(a1)
++    sd      a3, 8(a5)
++    ld      a3, 0(a1)
++    sd      a3, 0(a5)
++    bltu    a4, a5, 0b
++    beqz    a2, .L_ret_bwd
++.L_8B_bwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_bwd
++.L_pc_bwd:
++    auipc   a3, 0
++    sub     a1, a1, a4
++    sub     a5, a5, a4
++    srli    a4, a4, 1
++    sub     a3, a3, a4
++    .equ    offset_bwd, .L_jmp_end_bwd - .L_pc_bwd
++    jalr    x0, a3, %lo(offset_bwd)
++    ld      a3, 16(a1)
++    sd      a3, 16(a5)
++    ld      a3, 8(a1)
++    sd      a3, 8(a5)
++    ld      a3, 0(a1)
++    sd      a3, 0(a5)
++.L_jmp_end_bwd:
++.L_byte_tail_bwd:
++    andi    a2, a2, (8 - 1)
++.L_byte_bwd:
++    beqz    a2, .L_ret_bwd
++0:
++    addi    a5, a5, -1
++    addi    a1, a1, -1
++    lb      a3, 0(a1)
++    sb      a3, 0(a5)
++    bltu    a0, a5, 0b
++.L_ret_bwd:
++    ret
++
++.L_merge_bwd:
++    andi    a4, a2, -8
++    beqz    a4, .L_byte_tail_bwd
++    sub     a4, a5, a4
++    andi    a1, a1, -8
++    ld      t2, 0(a1)
++    slli    t3, t5, 3
++    neg     t4, t3
++    andi    t4, t4, (64 - 1)
++    sll     t1, t2, t4
++    .p2align 3
++1:
++    ld      t2, -8(a1)
++    srl     a3, t2, t3
++    or      a3, a3, t1
++    sd      a3, -8(a5)
++    sll     t1, t2, t4
++    addi    a5, a5, -8
++    addi    a1, a1, -8
++    bltu    a4, a5, 1b
++    add     a1, a1, t5
++    j       .L_byte_tail_bwd
++END (__memmove_generic)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/multiarch/memmove_vector.S b/sysdeps/riscv/multiarch/memmove_vector.S
+new file mode 100644
+index 0000000000..3b02df48b6
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memmove_vector.S
+@@ -0,0 +1,48 @@
++/* The assembly function for memmov.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (__memmove_vector)
++	add	a4,a0,zero
++	bgeu	a1,a0,.L_forward_copy_loop
++	add	a5,a1,a2
++	add	a6,a0,a2
++	bltu	a0,a5,.L_backward_copy_loop
++
++.L_forward_copy_loop:
++	vsetvli	a3,a2,e8,m8,tu,mu
++	vle8.v	v0,(a1)
++	sub	a2,a2,a3
++	add	a1,a1,a3
++	vse8.v	v0,(a4)
++	add	a4,a4,a3
++	bltu	zero,a2,.L_forward_copy_loop
++	ret
++
++.L_backward_copy_loop:
++	vsetvli	a3,a2,e8,m8,tu,mu
++	sub	a5,a5,a3
++	vle8.v	v0,(a5)
++	sub	a2,a2,a3
++	sub	a6,a6,a3
++	vse8.v	v0,(a6)
++	bltu	zero,a2,.L_backward_copy_loop
++	ret
++END (__memmove_vector)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+index 27fa1b34fe..59b9382a26 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -8,6 +8,8 @@ sysdep_routines += \
+   memchr_vector \
+   memcmp_generic \
+   memcmp_vector \
++  memmove_generic \
++  memmove_vector \
+   # sysdep_routines
+ 
+ CFLAGS-memcpy_noalignment.c += -mno-strict-align
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index ce69bdb8dc..217712fb07 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -59,5 +59,10 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+ 			      __memcmp_vector)
+ 	      IFUNC_IMPL_ADD (array, i, memcmp, 1, __memcmp_generic))
+ 
++  IFUNC_IMPL (i, name, memmove,
++	      IFUNC_IMPL_ADD (array, i, memmove, support_vector,
++			      __memmove_vector)
++	      IFUNC_IMPL_ADD (array, i, memmove, 1, __memmove_generic))
++
+   return 0;
+ }
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/memmove.c b/sysdeps/unix/sysv/linux/riscv/multiarch/memmove.c
+new file mode 100644
+index 0000000000..5ae2b77737
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/memmove.c
+@@ -0,0 +1,56 @@
++/* Multiple versions of memmove.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++/* Redefine memmov so that the compiler won't complain about the type
++   mismatch with the IFUNC selector in strong_alias, below.  */
++# undef memmove
++# define memmove __redirect_memmove
++# include <stdint.h>
++# include <string.h>
++# include <ifunc-init.h>
++# include <riscv-ifunc.h>
++# include <sys/hwprobe.h>
++
++extern __typeof (__redirect_memmove) __libc_memmove;
++
++extern __typeof (__redirect_memmove) __memmove_generic attribute_hidden;
++extern __typeof (__redirect_memmove) __memmove_vector attribute_hidden;
++
++static inline __typeof (__redirect_memmove) *
++select_memmove_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
++{
++  unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_IMA_EXT_0, &v) == 0
++      && (v & RISCV_HWPROBE_IMA_V))
++    return __memmove_vector;
++  return __memmove_generic;
++}
++
++riscv_libc_ifunc (__libc_memmove, select_memmove_ifunc);
++
++# undef memmove
++strong_alias (__libc_memmove, memmove);
++# ifdef SHARED
++__hidden_ver1 (memmove, __GI_memmove, __redirect_memmove)
++__attribute__ ((visibility ("hidden"))) __attribute_copy__ (memmove);
++# endif
++#else
++# include <string/memmove.c>
++#endif
+-- 
+2.25.1
+

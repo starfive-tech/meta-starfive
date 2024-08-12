@@ -1,0 +1,275 @@
+From f295f435223dcf4959a90bc4126028623463f5db Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sat, 29 Jun 2024 19:41:43 -0700
+Subject: [PATCH 15/16] riscv: Optimize memset with vector extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ sysdeps/riscv/multiarch/memset_generic.S      | 115 ++++++++++++++++++
+ sysdeps/riscv/multiarch/memset_vector.S       |  34 ++++++
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |   3 +
+ .../linux/riscv/multiarch/ifunc-impl-list.c   |   5 +
+ .../unix/sysv/linux/riscv/multiarch/memset.c  |  56 +++++++++
+ 5 files changed, 213 insertions(+)
+ create mode 100644 sysdeps/riscv/multiarch/memset_generic.S
+ create mode 100644 sysdeps/riscv/multiarch/memset_vector.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/multiarch/memset.c
+
+diff --git a/sysdeps/riscv/multiarch/memset_generic.S b/sysdeps/riscv/multiarch/memset_generic.S
+new file mode 100644
+index 0000000000..151473c240
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memset_generic.S
+@@ -0,0 +1,115 @@
++/* The assembly function for memset.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++    .p2align 6
++ENTRY (__memset_generic)
++    mv      a5, a0
++    andi    a1, a1, 0xff
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8
++    neg     a4, a5
++    andi    a4, a4, 0x7
++    beqz    a4, .L_dst_aligned
++    j       .L_pc_0
++.L_0_to_8:
++    mv      a4, a2
++
++.L_pc_0:
++    auipc   a3, 0
++    slli    t0, a4, 2
++    sub     a3, a3, t0
++    .equ    offset_0, .L_jmp_end_0 - .L_pc_0
++    jalr    x0, a3, %lo(offset_0)
++    sb      a1, 7(a5)
++    sb      a1, 6(a5)
++    sb      a1, 5(a5)
++    sb      a1, 4(a5)
++    sb      a1, 3(a5)
++    sb      a1, 2(a5)
++    sb      a1, 1(a5)
++    sb      a1, 0(a5)
++.L_jmp_end_0:
++    sub     a2, a2, a4          /* update cnt */
++    beqz    a2, .L_ret
++    add     a5, a5, a4
++
++.L_dst_aligned:
++    slli    a3, a1, 8
++    or      a1, a1, a3
++    slli    a3, a1, 16
++    or      a1, a1, a3
++    slli    a3, a1, 32
++    or      a1, a1, a3
++
++    andi    a4, a2, -64
++    beqz    a4, .L_tail
++    add     a4, a4, a5
++    .p2align 3
++.L_loop:
++    sd      a1, 0(a5)
++    sd      a1, 8(a5)
++    sd      a1, 16(a5)
++    sd      a1, 24(a5)
++    sd      a1, 32(a5)
++    sd      a1, 40(a5)
++    sd      a1, 48(a5)
++    sd      a1, 56(a5)
++    addi    a5, a5, 64
++    bltu    a5, a4, .L_loop
++    andi    a2, a2, (64-1)      /* update cnt */
++    beqz    a2, .L_ret
++
++.L_tail:
++    andi    a4, a2, -8
++.L_pc:
++    auipc   a3, 0
++    srli    t0, a4, 2
++    sub     a3, a3, t0
++    .equ    offset, .L_jmp_end - .L_pc
++    jalr    x0, a3, %lo(offset)
++    sd      a1, 6*8(a5)
++    sd      a1, 5*8(a5)
++    sd      a1, 4*8(a5)
++    sd      a1, 3*8(a5)
++    sd      a1, 2*8(a5)
++    sd      a1, 1*8(a5)
++    sd      a1, 0*8(a5)
++.L_jmp_end:
++    add     a5, a5, a4
++    andi    a4, a2, (8 - 1)     /* update cnt */
++
++.L_tail_byte:
++.L_pc_2:
++    auipc   a3, 0
++    slli    a4, a4, 2
++    sub     a3, a3, a4
++    .equ    offset_2, .L_jmp_end_2 - .L_pc_2
++    jalr    x0, a3, %lo(offset_2)
++    sb      a1, 6(a5)
++    sb      a1, 5(a5)
++    sb      a1, 4(a5)
++    sb      a1, 3(a5)
++    sb      a1, 2(a5)
++    sb      a1, 1(a5)
++    sb      a1, 0(a5)
++.L_jmp_end_2:
++.L_ret:
++    ret
++END (__memset_generic)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/multiarch/memset_vector.S b/sysdeps/riscv/multiarch/memset_vector.S
+new file mode 100644
+index 0000000000..89b351dcbb
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memset_vector.S
+@@ -0,0 +1,34 @@
++/* The assembly function for memset.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++	.p2align 6
++ENTRY (__memset_vector)
++  zext.b	a1,a1
++  add	a5,a0,zero
++  vsetvli	a3,a2,e8,m8,tu,mu
++  vmv.v.x	v0,a1
++.L_memset_loop:
++  vse8.v	v0,(a5)
++  sub	a2,a2,a3
++  add	a5,a5,a3
++  vsetvli	a3,a2,e8,m8,tu,mu
++  bltu	zero,a2,.L_memset_loop
++  ret
++END (__memset_vector)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+index e30569d1b6..37f1e3df54 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -13,6 +13,9 @@ sysdep_routines += \
+   memmove \
+   memmove_generic \
+   memmove_vector \
++  memset \
++  memset_generic \
++  memset_vector \
+   strlen \
+   strlen_generic \
+   strlen_vector \
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index d70a51732a..421e6db145 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -74,5 +74,10 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+ 			      __strcmp_vector)
+ 	      IFUNC_IMPL_ADD (array, i, strcmp, 1, __strcmp_generic))
+ 
++  IFUNC_IMPL (i, name, memset,
++	      IFUNC_IMPL_ADD (array, i, memset, support_vector,
++			      __memset_vector)
++	      IFUNC_IMPL_ADD (array, i, memset, 1, __memset_generic))
++
+   return 0;
+ }
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/memset.c b/sysdeps/unix/sysv/linux/riscv/multiarch/memset.c
+new file mode 100644
+index 0000000000..e2019379de
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/memset.c
+@@ -0,0 +1,56 @@
++/* Multiple versions of memset.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++/* Redefine memmov so that the compiler won't complain about the type
++   mismatch with the IFUNC selector in strong_alias, below.  */
++# undef memset
++# define memset __redirect_memset
++# include <stdint.h>
++# include <string.h>
++# include <ifunc-init.h>
++# include <riscv-ifunc.h>
++# include <sys/hwprobe.h>
++
++extern __typeof (__redirect_memset) __libc_memset;
++
++extern __typeof (__redirect_memset) __memset_generic attribute_hidden;
++extern __typeof (__redirect_memset) __memset_vector attribute_hidden;
++
++static inline __typeof (__redirect_memset) *
++select_memset_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
++{
++  unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_IMA_EXT_0, &v) == 0
++      && (v & RISCV_HWPROBE_IMA_V))
++    return __memset_vector;
++  return __memset_generic;
++}
++
++riscv_libc_ifunc (__libc_memset, select_memset_ifunc);
++
++# undef memset
++strong_alias (__libc_memset, memset);
++# ifdef SHARED
++__hidden_ver1 (memset, __GI_memset, __redirect_memset)
++__attribute__ ((visibility ("hidden"))) __attribute_copy__ (memset);
++# endif
++#else
++# include <string/memset.c>
++#endif
+\ No newline at end of file
+-- 
+2.25.1
+
