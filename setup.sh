@@ -46,8 +46,8 @@ echo "Adding layers"
 bitbake-layers add-layer ../meta-openembedded/meta-oe
 bitbake-layers add-layer ../meta-openembedded/meta-python
 bitbake-layers add-layer ../meta-openembedded/meta-multimedia
-bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-networking
+bitbake-layers add-layer ../meta-openembedded/meta-filesystems
 bitbake-layers add-layer ../meta-openembedded/meta-gnome
 bitbake-layers add-layer ../meta-openembedded/meta-xfce
 bitbake-layers add-layer ../meta-openembedded/meta-webserver
@@ -76,7 +76,7 @@ USER_CLASSES ?= "buildstats buildhistory buildstats-summary"
 
 INHERIT += "uninative"
 
-DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam systemd "
+DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam systemd usrmerge"
 #DISTRO_FEATURES:append = " largefile opengl ptest multiarch wayland pam "
 DISTRO_FEATURES_BACKFILL_CONSIDERED += "sysvinit"
 VIRTUAL-RUNTIME_init_manager = "systemd"
