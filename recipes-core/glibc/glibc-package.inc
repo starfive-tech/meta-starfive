@@ -39,10 +39,10 @@ FILES:sln = "${base_sbindir}/sln"
 FILES:${PN}-pic = "${libdir}/*_pic.a ${libdir}/*_pic.map ${libdir}/libc_pic/*.o"
 FILES:libsotruss = "${libdir}/audit/sotruss-lib.so"
 FILES_SOLIBSDEV = "${libdir}/lib*${SOLIBSDEV}"
-FILES:${PN}-dev += "${libdir}/libpthread.a ${libdir}/libdl.a ${libdir}/libutil.a ${libdir}/libanl.a ${libdir}/*_nonshared.a ${base_libdir}/*_nonshared.a ${base_libdir}/*.o ${datadir}/aclocal"
+FILES:${PN}-dev += "${libdir}/libpthread.a ${libdir}/libdl.a ${libdir}/libutil.a ${libdir}/libanl.a ${libdir}/*_nonshared.a ${base_libdir}/*_nonshared.a ${base_libdir}/*.o ${datadir}/aclocal ${libdir}/gcc/${TARGET_SYS}/*/finclude"
 RDEPENDS:${PN}-dev = "linux-libc-headers-dev"
 FILES:${PN}-staticdev += "${libdir}/*.a ${base_libdir}/*.a"
-FILES:nscd = "${sbindir}/nscd* ${sysconfdir}/init.d/nscd ${systemd_system_unitdir}/nscd* ${sysconfdir}/tmpfiles.d/nscd.conf \
+FILES:nscd = "${sbindir}/nscd* ${sysconfdir}/init.d/nscd ${systemd_system_unitdir}/nscd* ${nonarch_libdir}/tmpfiles.d/nscd.conf \
               ${sysconfdir}/nscd.conf ${sysconfdir}/default/volatiles/98_nscd ${localstatedir}/db/nscd"
 FILES:${PN}-mtrace = "${bindir}/mtrace"
 FILES:tzcode = "${bindir}/tzselect ${sbindir}/zic ${bindir}/zdump"
@@ -87,7 +87,7 @@ do_install() {
 		rmdir --ignore-fail-on-non-empty ${D}${libexecdir}
 	fi
 
-	oe_multilib_header bits/syscall.h bits/long-double.h bits/floatn.h bits/endianness.h bits/struct_rwlock.h
+	oe_multilib_header bits/syscall.h bits/long-double.h bits/floatn.h bits/endianness.h bits/struct_rwlock.h bits/math-vector.h
 
 	if [ -f ${D}${bindir}/mtrace ]; then
 		sed -i -e '1s,#!.*perl,#! ${USRBINPATH}/env perl,' -e '2s,exec.*perl,exec ${USRBINPATH}/env perl,' ${D}${bindir}/mtrace
@@ -132,9 +132,9 @@ def get_libc_fpu_setting(bb, d):
 
 do_install:append:class-target() {
 	if ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'true', 'false', d)}; then
-		install -d ${D}${sysconfdir}/tmpfiles.d
+		install -d ${D}${nonarch_libdir}/tmpfiles.d
 		echo "d /run/nscd 755 root root -" \
-			> ${D}${sysconfdir}/tmpfiles.d/nscd.conf
+			> ${D}${nonarch_libdir}/tmpfiles.d/nscd.conf
 	fi
 
 	if ${@bb.utils.contains('DISTRO_FEATURES', 'sysvinit', 'true', 'false', d)}; then
@@ -169,6 +169,12 @@ do_install_armmultilib () {
 	oe_multilib_header sys/elf.h sys/procfs.h sys/ptrace.h sys/ucontext.h sys/user.h
 }
 
+do_install_armmultilib:append:class-target() {
+    gcc_version=$($CC -dumpversion)
+    mkdir -p ${D}${libdir}/gcc/${TARGET_SYS}/${gcc_version}/finclude
+    mv ${D}${includedir}/finclude/math-vector-fortran.h ${D}${libdir}/gcc/${TARGET_SYS}/${gcc_version}/finclude/
+    rmdir --ignore-fail-on-non-empty ${D}${includedir}/finclude
+}
 
 LOCALESTASH = "${WORKDIR}/stashed-locale"
 bashscripts = "mtrace sotruss xtrace"
@@ -280,7 +286,7 @@ python populate_packages:prepend () {
 pkg_postinst:nscd () {
 	if [ -z "$D" ]; then
 		if command -v systemd-tmpfiles >/dev/null; then
-			systemd-tmpfiles --create ${sysconfdir}/tmpfiles.d/nscd.conf
+			systemd-tmpfiles --create ${nonarch_libdir}/tmpfiles.d/nscd.conf
 		elif [ -e ${sysconfdir}/init.d/populate-volatile.sh ]; then
 			${sysconfdir}/init.d/populate-volatile.sh update
 		fi

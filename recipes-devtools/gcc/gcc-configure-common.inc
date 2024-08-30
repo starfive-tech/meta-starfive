@@ -6,7 +6,7 @@ require gcc-shared-source.inc
 # These can be overridden by the version specific .inc file.
 
 # gcc 3.x expects 'f77', 4.0 expects 'f95', 4.1 and 4.2 expect 'fortran'
-FORTRAN ?= ",f77"
+FORTRAN ?= ",fortran"
 LANGUAGES ?= "c,c++${FORTRAN}"
 
 EXTRA_OECONF_BASE ?= ""
@@ -21,13 +21,19 @@ SYMVERS_CONF ?= "--enable-symvers=gnu"
 
 EXTRA_OECONF = "\
     ${@['--enable-clocale=generic', ''][d.getVar('USE_NLS') != 'no']} \
+    --with-gnu-ld \
     --enable-shared \
     --enable-languages=${LANGUAGES} \
     --enable-threads=${GCCTHREADS} \
     ${GCCMULTILIB} \
+    ${GCCPIE} \
+    --enable-c99 \
     --enable-long-long \
+    ${SYMVERS_CONF} \
+    --enable-libstdcxx-pch \
     --program-prefix=${TARGET_PREFIX} \
     --without-local-prefix \
+    --disable-install-libiberty \
     ${EXTRA_OECONF_BASE} \
     ${EXTRA_OECONF_GCC_FLOAT} \
     ${EXTRA_OECONF_PATHS} \
@@ -35,19 +41,6 @@ EXTRA_OECONF = "\
     ${@get_gcc_ppc_plt_settings(bb, d)} \
     ${@get_gcc_multiarch_setting(bb, d)} \
 "
-
-EXTRA_OECONF += "\
-    --disable-libmudflap \
-    --disable-libssp \
-    --disable-libquadmath \
-    --disable-libquadmath-support \
-    --disable-libsanitizer \
-    --with-gmp \
-    --with-mpfr \
-    --with-mpc \
-    --with-isl \
-    --enable-tls \
-    "
 
 # glibc version is a minimum controlling whether features are enabled. 
 # Doesn't need to track glibc exactly
@@ -126,4 +119,3 @@ do_configure () {
 
 	oe_runconf
 }
-

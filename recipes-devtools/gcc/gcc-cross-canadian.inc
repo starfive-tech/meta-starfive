@@ -3,7 +3,7 @@ inherit cross-canadian
 SUMMARY = "GNU cc and gcc C compilers (cross-canadian for ${TARGET_ARCH} target)"
 PN = "gcc-cross-canadian-${TRANSLATED_TARGET_ARCH}"
 
-DEPENDS = "virtual/${TARGET_PREFIX}gcc virtual/${HOST_PREFIX}gcc-crosssdk virtual/${HOST_PREFIX}binutils-crosssdk virtual/nativesdk-libc nativesdk-gettext flex-native virtual/libc"
+DEPENDS = "virtual/${TARGET_PREFIX}gcc virtual/${HOST_PREFIX}gcc virtual/${HOST_PREFIX}binutils virtual/nativesdk-libc nativesdk-gettext flex-native virtual/libc"
 
 GCCMULTILIB = "--enable-multilib"
 
@@ -12,6 +12,7 @@ require gcc-configure-common.inc
 EXTRA_OECONF += "--with-plugin-ld=ld"
 EXTRA_OECONF_PATHS = "\
     --with-gxx-include-dir=/not/exist${target_includedir}/c++/${BINV} \
+    --with-gxx-libcxx-include-dir=/not/exist${target_includedir}/c++/v1 \
     --with-build-time-tools=${STAGING_DIR_NATIVE}${prefix_native}/${TARGET_SYS}/bin \
     --with-sysroot=/not/exist \
     --with-build-sysroot=${STAGING_DIR_TARGET} \
@@ -63,6 +64,9 @@ do_configure () {
 }
 
 do_compile () {
+	remove_sysroot_paths_from_configargs '/host'
+	remove_sysroot_paths_from_checksum_options '${STAGING_DIR_HOST}' '/host'
+
 	oe_runmake all-host configure-target-libgcc
 	(cd ${B}/${TARGET_SYS}/libgcc; oe_runmake enable-execute-stack.c unwind.h md-unwind-support.h sfp-machine.h gthr-default.h)
 }
@@ -171,19 +175,19 @@ do_install () {
 			done
 		done
 	done
+
+	cleanup_installed_include_fixed
 }
 
 ELFUTILS = "nativesdk-elfutils"
-DEPENDS += "nativesdk-gmp nativesdk-mpfr nativesdk-libmpc ${ELFUTILS} nativesdk-zlib nativesdk-zstd nativesdk-isl"
-RDEPENDS:${PN} += "nativesdk-mpfr nativesdk-libmpc ${ELFUTILS} nativesdk-isl"
+DEPENDS += "nativesdk-gmp nativesdk-mpfr nativesdk-libmpc ${ELFUTILS} nativesdk-zlib nativesdk-zstd"
+RDEPENDS:${PN} += "nativesdk-mpfr nativesdk-libmpc ${ELFUTILS}"
 
 SYSTEMHEADERS = "${target_includedir}/"
 SYSTEMLIBS = "${target_base_libdir}/"
 SYSTEMLIBS1 = "${target_libdir}/"
 
-EXTRA_OECONF += "--enable-poison-system-directories \
-	--with-isl=${STAGING_DIR_HOST}${SDKPATHNATIVE}${prefix_nativesdk} \
-	"
+EXTRA_OECONF += "--enable-poison-system-directories"
 
 # gcc 4.7 needs -isystem
 export ARCH_FLAGS_FOR_TARGET = "--sysroot=${STAGING_DIR_TARGET} -isystem=${target_includedir}"

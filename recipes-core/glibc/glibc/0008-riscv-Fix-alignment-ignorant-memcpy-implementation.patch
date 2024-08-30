@@ -1,0 +1,538 @@
+From 53cb1b0173fefdfd742ab542476d8e51f2d22e4e Mon Sep 17 00:00:00 2001
+From: Adhemerval Zanella <adhemerval.zanella@linaro.org>
+Date: Tue, 5 Mar 2024 14:02:57 -0300
+Subject: [PATCH 08/16] riscv: Fix alignment-ignorant memcpy implementation
+
+The memcpy optimization (commit 587a1290a1af7bee6db) has a series
+of mistakes:
+
+  - The implementation is wrong: the chunk size calculation is wrong
+    leading to invalid memory access.
+
+  - It adds ifunc supports as default, so --disable-multi-arch does
+    not work as expected for riscv.
+
+  - It mixes Linux files (memcpy ifunc selection which requires the
+    vDSO/syscall mechanism)  with generic support (the memcpy
+    optimization itself).
+
+  - There is no __libc_ifunc_impl_list, which makes testing only
+    check the selected implementation instead of all supported
+    by the system.
+
+This patch also simplifies the required bits to enable ifunc: there
+is no need to memcopy.h; nor to add Linux-specific files.
+
+The __memcpy_noalignment tail handling now uses a branchless strategy
+similar to aarch64 (overlap 32-bits copies for sizes 4..7 and byte
+copies for size 1..3).
+
+Checked on riscv64 and riscv32 by explicitly enabling the function
+on __libc_ifunc_impl_list on qemu-system.
+
+Changes from v1:
+* Implement the memcpy in assembly to correctly handle RISCV
+  strict-alignment.
+Reviewed-by: Evan Green <evan@rivosinc.com>
+Acked-by: Palmer Dabbelt <palmer@rivosinc.com>
+---
+ sysdeps/riscv/memcpy_noalignment.S            | 136 ---------------
+ .../multiarch}/memcpy-generic.c               |   8 +-
+ sysdeps/riscv/multiarch/memcpy_noalignment.S  | 162 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/riscv/Makefile        |   9 -
+ sysdeps/unix/sysv/linux/riscv/hwprobe.c       |   1 +
+ .../sysv/linux/riscv/include/sys/hwprobe.h    |   8 +
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |   9 +
+ .../linux/riscv/multiarch/ifunc-impl-list.c}  |  33 +++-
+ .../sysv/linux/riscv/multiarch}/memcpy.c      |  16 +-
+ 9 files changed, 215 insertions(+), 167 deletions(-)
+ delete mode 100644 sysdeps/riscv/memcpy_noalignment.S
+ rename sysdeps/{unix/sysv/linux/riscv => riscv/multiarch}/memcpy-generic.c (87%)
+ create mode 100644 sysdeps/riscv/multiarch/memcpy_noalignment.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/include/sys/hwprobe.h
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+ rename sysdeps/{riscv/memcopy.h => unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c} (51%)
+ rename sysdeps/{riscv => unix/sysv/linux/riscv/multiarch}/memcpy.c (90%)
+
+diff --git a/sysdeps/riscv/memcpy_noalignment.S b/sysdeps/riscv/memcpy_noalignment.S
+deleted file mode 100644
+index 621f8d028f..0000000000
+--- a/sysdeps/riscv/memcpy_noalignment.S
++++ /dev/null
+@@ -1,136 +0,0 @@
+-/* memcpy for RISC-V, ignoring buffer alignment
+-   Copyright (C) 2024 Free Software Foundation, Inc.
+-   This file is part of the GNU C Library.
+-
+-   The GNU C Library is free software; you can redistribute it and/or
+-   modify it under the terms of the GNU Lesser General Public
+-   License as published by the Free Software Foundation; either
+-   version 2.1 of the License, or (at your option) any later version.
+-
+-   The GNU C Library is distributed in the hope that it will be useful,
+-   but WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with the GNU C Library.  If not, see
+-   <https://www.gnu.org/licenses/>.  */
+-
+-#include <sysdep.h>
+-#include <sys/asm.h>
+-
+-/* void *memcpy(void *, const void *, size_t) */
+-ENTRY (__memcpy_noalignment)
+-	move t6, a0  /* Preserve return value */
+-
+-	/* Bail if 0 */
+-	beqz a2, 7f
+-
+-	/* Jump to byte copy if size < SZREG */
+-	li a4, SZREG
+-	bltu a2, a4, 5f
+-
+-	/* Round down to the nearest "page" size */
+-	andi a4, a2, ~((16*SZREG)-1)
+-	beqz a4, 2f
+-	add a3, a1, a4
+-
+-	/* Copy the first word to get dest word aligned */
+-	andi a5, t6, SZREG-1
+-	beqz a5, 1f
+-	REG_L a6, (a1)
+-	REG_S a6, (t6)
+-
+-	/* Align dst up to a word, move src and size as well. */
+-	addi t6, t6, SZREG-1
+-	andi t6, t6, ~(SZREG-1)
+-	sub a5, t6, a0
+-	add a1, a1, a5
+-	sub a2, a2, a5
+-
+-	/* Recompute page count */
+-	andi a4, a2, ~((16*SZREG)-1)
+-	beqz a4, 2f
+-
+-1:
+-	/* Copy "pages" (chunks of 16 registers) */
+-	REG_L a4,       0(a1)
+-	REG_L a5,   SZREG(a1)
+-	REG_L a6, 2*SZREG(a1)
+-	REG_L a7, 3*SZREG(a1)
+-	REG_L t0, 4*SZREG(a1)
+-	REG_L t1, 5*SZREG(a1)
+-	REG_L t2, 6*SZREG(a1)
+-	REG_L t3, 7*SZREG(a1)
+-	REG_L t4, 8*SZREG(a1)
+-	REG_L t5, 9*SZREG(a1)
+-	REG_S a4,       0(t6)
+-	REG_S a5,   SZREG(t6)
+-	REG_S a6, 2*SZREG(t6)
+-	REG_S a7, 3*SZREG(t6)
+-	REG_S t0, 4*SZREG(t6)
+-	REG_S t1, 5*SZREG(t6)
+-	REG_S t2, 6*SZREG(t6)
+-	REG_S t3, 7*SZREG(t6)
+-	REG_S t4, 8*SZREG(t6)
+-	REG_S t5, 9*SZREG(t6)
+-	REG_L a4, 10*SZREG(a1)
+-	REG_L a5, 11*SZREG(a1)
+-	REG_L a6, 12*SZREG(a1)
+-	REG_L a7, 13*SZREG(a1)
+-	REG_L t0, 14*SZREG(a1)
+-	REG_L t1, 15*SZREG(a1)
+-	addi a1, a1, 16*SZREG
+-	REG_S a4, 10*SZREG(t6)
+-	REG_S a5, 11*SZREG(t6)
+-	REG_S a6, 12*SZREG(t6)
+-	REG_S a7, 13*SZREG(t6)
+-	REG_S t0, 14*SZREG(t6)
+-	REG_S t1, 15*SZREG(t6)
+-	addi t6, t6, 16*SZREG
+-	bltu a1, a3, 1b
+-	andi a2, a2, (16*SZREG)-1  /* Update count */
+-
+-2:
+-	/* Remainder is smaller than a page, compute native word count */
+-	beqz a2, 7f
+-	andi a5, a2, ~(SZREG-1)
+-	andi a2, a2, (SZREG-1)
+-	add a3, a1, a5
+-	/* Jump directly to last word if no words. */
+-	beqz a5, 4f
+-
+-3:
+-	/* Use single native register copy */
+-	REG_L a4, 0(a1)
+-	addi a1, a1, SZREG
+-	REG_S a4, 0(t6)
+-	addi t6, t6, SZREG
+-	bltu a1, a3, 3b
+-
+-	/* Jump directly out if no more bytes */
+-	beqz a2, 7f
+-
+-4:
+-	/* Copy the last word unaligned */
+-	add a3, a1, a2
+-	add a4, t6, a2
+-	REG_L a5, -SZREG(a3)
+-	REG_S a5, -SZREG(a4)
+-	ret
+-
+-5:
+-	/* Copy bytes when the total copy is <SZREG */
+-	add a3, a1, a2
+-
+-6:
+-	lb a4, 0(a1)
+-	addi a1, a1, 1
+-	sb a4, 0(t6)
+-	addi t6, t6, 1
+-	bltu a1, a3, 6b
+-
+-7:
+-	ret
+-
+-END (__memcpy_noalignment)
+diff --git a/sysdeps/unix/sysv/linux/riscv/memcpy-generic.c b/sysdeps/riscv/multiarch/memcpy-generic.c
+similarity index 87%
+rename from sysdeps/unix/sysv/linux/riscv/memcpy-generic.c
+rename to sysdeps/riscv/multiarch/memcpy-generic.c
+index f06f4bda15..4235d33859 100644
+--- a/sysdeps/unix/sysv/linux/riscv/memcpy-generic.c
++++ b/sysdeps/riscv/multiarch/memcpy-generic.c
+@@ -18,7 +18,9 @@
+ 
+ #include <string.h>
+ 
+-extern __typeof (memcpy) __memcpy_generic;
+-hidden_proto (__memcpy_generic)
+-
++#if IS_IN(libc)
++# define MEMCPY __memcpy_generic
++# undef libc_hidden_builtin_def
++# define libc_hidden_builtin_def(x)
++#endif
+ #include <string/memcpy.c>
+diff --git a/sysdeps/riscv/multiarch/memcpy_noalignment.S b/sysdeps/riscv/multiarch/memcpy_noalignment.S
+new file mode 100644
+index 0000000000..fa39be21d6
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memcpy_noalignment.S
+@@ -0,0 +1,162 @@
++/* memcpy for RISC-V, ignoring buffer alignment
++   Copyright (C) 2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++#include <sys/asm.h>
++
++/* memcpy optimization for CPUs with fast unaligned support
++   (RISCV_HWPROBE_MISALIGNED_FAST).
++
++   Copies are split into 3 main cases: small copies up to SZREG, copies up to
++   BLOCK_SIZE (128 for 64 bits, 64 for 32 bits), and copies larger than BLOCK_SIZE.
++
++   Large copies use a software pipelined loop processing BLOCK_SIZE bytes per
++   iteration.  The destination pointer is SZREG-byte aligned to minimize store
++   unaligned accesses.
++
++   The tail is handled with branchless copies.  */
++
++#define BLOCK_SIZE (16 * SZREG)
++
++	.attribute unaligned_access, 1
++ENTRY (__memcpy_noalignment)
++	beq	a2, zero, L(ret)
++
++	/* if LEN < SZREG jump to tail handling.  */
++	li	a5, SZREG-1
++	mv	a6, a0
++	bleu	a2, a5, L(tail)
++
++	/* Copy the first word, align DEST to word, and adjust DEST/SRC/LEN
++	   based on the amount adjusted to align DEST.  */
++	REG_L	a3, 0(a1)
++	andi	a5, a0, SZREG-1
++	addi	a2, a2, -SZREG
++	li	a4, SZREG
++	sub	a4, a4, a5
++	REG_S	a3, 0(a0)
++	add	a2, a5, a2
++
++	/* If LEN < BLOCK_SIZE jump to word copy.  */
++	li	a3, BLOCK_SIZE-1
++	add	a5, a0, a4
++	add	a1, a1, a4
++	bleu	a2, a3, L(word_copy_adjust)
++	addi	a7, a2, -BLOCK_SIZE
++	andi	a7, a7, -BLOCK_SIZE
++	addi	a7, a7, BLOCK_SIZE
++	add	a3, a5, a7
++	mv	a4, a1
++L(block_copy):
++	REG_L	a6,          0(a4)
++	REG_L	t0,      SZREG(a4)
++	REG_L	t1,  (2*SZREG)(a4)
++	REG_L	t2,  (3*SZREG)(a4)
++	REG_L	t3,  (4*SZREG)(a4)
++	REG_L	t4,  (5*SZREG)(a4)
++	REG_L	t5,  (6*SZREG)(a4)
++	REG_L	t6,  (7*SZREG)(a4)
++	REG_S	a6,          0(a5)
++	REG_S	t0,      SZREG(a5)
++	REG_S	t1,  (2*SZREG)(a5)
++	REG_S	t2,  (3*SZREG)(a5)
++	REG_S	t3,  (4*SZREG)(a5)
++	REG_S	t4,  (5*SZREG)(a5)
++	REG_S	t5,  (6*SZREG)(a5)
++	REG_S	t6,  (7*SZREG)(a5)
++	REG_L	a6,  (8*SZREG)(a4)
++	REG_L	t0,  (9*SZREG)(a4)
++	REG_L	t1, (10*SZREG)(a4)
++	REG_L	t2, (11*SZREG)(a4)
++	REG_L	t3, (12*SZREG)(a4)
++	REG_L	t4, (13*SZREG)(a4)
++	REG_L	t5, (14*SZREG)(a4)
++	REG_L	t6, (15*SZREG)(a4)
++	addi	a4, a4, BLOCK_SIZE
++	REG_S	a6,  (8*SZREG)(a5)
++	REG_S	t0,  (9*SZREG)(a5)
++	REG_S	t1, (10*SZREG)(a5)
++	REG_S	t2, (11*SZREG)(a5)
++	REG_S	t3, (12*SZREG)(a5)
++	REG_S	t4, (13*SZREG)(a5)
++	REG_S	t5, (14*SZREG)(a5)
++	REG_S	t6, (15*SZREG)(a5)
++	addi	a5, a5, BLOCK_SIZE
++	bne	a5, a3, L(block_copy)
++	add	a1, a1, a7
++	andi	a2, a2, BLOCK_SIZE-1
++
++	/* 0 <= a2/LEN  < BLOCK_SIZE.  */
++L(word_copy):
++	li	a5, SZREG-1
++	/* if LEN < SZREG jump to tail handling.  */
++	bleu	a2, a5, L(tail_adjust)
++	addi	a7, a2, -SZREG
++	andi	a7, a7, -SZREG
++	addi	a7, a7, SZREG
++	add	a6, a3, a7
++	mv	a5, a1
++L(word_copy_loop):
++	REG_L	a4, 0(a5)
++	addi	a3, a3, SZREG
++	addi	a5, a5, SZREG
++	REG_S	a4, -SZREG(a3)
++	bne	a3, a6, L(word_copy_loop)
++	add	a1, a1, a7
++	andi	a2, a2, SZREG-1
++
++	/* Copy the last word unaligned.  */
++	add	a3, a1, a2
++	add	a4, a6, a2
++	REG_L	t0, -SZREG(a3)
++	REG_S	t0, -SZREG(a4)
++	ret
++
++L(tail):
++	/* Copy 4-7 bytes.  */
++	andi	a5, a2, 4
++	add	a3, a1, a2
++	add	a4, a6, a2
++	beq	a5, zero, L(copy_0_3)
++	lw	t0, 0(a1)
++	lw	t1, -4(a3)
++	sw	t0, 0(a6)
++	sw	t1, -4(a4)
++	ret
++
++	/* Copy 0-3 bytes.  */
++L(copy_0_3):
++	beq	a2, zero, L(ret)
++	srli    a2, a2, 1
++	add     t4, a1, a2
++	add     t5, a6, a2
++	lbu     t0, 0(a1)
++	lbu     t1, -1(a3)
++	lbu     t2, 0(t4)
++	sb      t0, 0(a6)
++	sb      t1, -1(a4)
++	sb      t2, 0(t5)
++L(ret):
++	ret
++L(tail_adjust):
++	mv	a6, a3
++	j	L(tail)
++L(word_copy_adjust):
++	mv	a3, a5
++	j	L(word_copy)
++END (__memcpy_noalignment)
+diff --git a/sysdeps/unix/sysv/linux/riscv/Makefile b/sysdeps/unix/sysv/linux/riscv/Makefile
+index 398ff7418b..04abf226ad 100644
+--- a/sysdeps/unix/sysv/linux/riscv/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/Makefile
+@@ -15,15 +15,6 @@ ifeq ($(subdir),stdlib)
+ gen-as-const-headers += ucontext_i.sym
+ endif
+ 
+-ifeq ($(subdir),string)
+-sysdep_routines += \
+-  memcpy \
+-  memcpy-generic \
+-  memcpy_noalignment \
+-  # sysdep_routines
+-
+-endif
+-
+ abi-variants := ilp32 ilp32d lp64 lp64d
+ 
+ ifeq (,$(filter $(default-abi),$(abi-variants)))
+diff --git a/sysdeps/unix/sysv/linux/riscv/hwprobe.c b/sysdeps/unix/sysv/linux/riscv/hwprobe.c
+index e64c159eb3..9159045478 100644
+--- a/sysdeps/unix/sysv/linux/riscv/hwprobe.c
++++ b/sysdeps/unix/sysv/linux/riscv/hwprobe.c
+@@ -34,3 +34,4 @@ int __riscv_hwprobe (struct riscv_hwprobe *pairs, size_t pair_count,
+   /* Negate negative errno values to match pthreads API. */
+   return -r;
+ }
++libc_hidden_def (__riscv_hwprobe)
+diff --git a/sysdeps/unix/sysv/linux/riscv/include/sys/hwprobe.h b/sysdeps/unix/sysv/linux/riscv/include/sys/hwprobe.h
+new file mode 100644
+index 0000000000..cce91c1b53
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/include/sys/hwprobe.h
+@@ -0,0 +1,8 @@
++#ifndef _SYS_HWPROBE_H
++# include_next <sys/hwprobe.h>
++
++#ifndef _ISOMAC
++libc_hidden_proto (__riscv_hwprobe)
++#endif
++
++#endif
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+new file mode 100644
+index 0000000000..fcef5659d4
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -0,0 +1,9 @@
++ifeq ($(subdir),string)
++sysdep_routines += \
++  memcpy \
++  memcpy-generic \
++  memcpy_noalignment \
++  # sysdep_routines
++
++CFLAGS-memcpy_noalignment.c += -mno-strict-align
++endif
+diff --git a/sysdeps/riscv/memcopy.h b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+similarity index 51%
+rename from sysdeps/riscv/memcopy.h
+rename to sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index 27675964b0..9f806d7a9e 100644
+--- a/sysdeps/riscv/memcopy.h
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -1,4 +1,4 @@
+-/* memcopy.h -- definitions for memory copy functions. RISC-V version.
++/* Enumerate available IFUNC implementations of a function.  RISCV version.
+    Copyright (C) 2024 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+@@ -16,11 +16,28 @@
+    License along with the GNU C Library; if not, see
+    <https://www.gnu.org/licenses/>.  */
+ 
+-#include <sysdeps/generic/memcopy.h>
++#include <ifunc-impl-list.h>
++#include <string.h>
++#include <sys/hwprobe.h>
+ 
+-/* Redefine the generic memcpy implementation to __memcpy_generic, so
+-   the memcpy ifunc can select between generic and special versions.
+-   In rtld, don't bother with all the ifunciness. */
+-#if IS_IN (libc)
+-#define MEMCPY __memcpy_generic
+-#endif
++size_t
++__libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
++			size_t max)
++{
++  size_t i = max;
++
++  bool fast_unaligned = false;
++
++  struct riscv_hwprobe pair = { .key = RISCV_HWPROBE_KEY_CPUPERF_0 };
++  if (__riscv_hwprobe (&pair, 1, 0, NULL, 0) == 0
++      && (pair.value & RISCV_HWPROBE_MISALIGNED_MASK)
++          == RISCV_HWPROBE_MISALIGNED_FAST)
++    fast_unaligned = true;
++
++  IFUNC_IMPL (i, name, memcpy,
++	      IFUNC_IMPL_ADD (array, i, memcpy, fast_unaligned,
++			      __memcpy_noalignment)
++	      IFUNC_IMPL_ADD (array, i, memcpy, 1, __memcpy_generic))
++
++  return 0;
++}
+diff --git a/sysdeps/riscv/memcpy.c b/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
+similarity index 90%
+rename from sysdeps/riscv/memcpy.c
+rename to sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
+index 20f9548c44..51d8ace858 100644
+--- a/sysdeps/riscv/memcpy.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
+@@ -28,8 +28,6 @@
+ # include <riscv-ifunc.h>
+ # include <sys/hwprobe.h>
+ 
+-# define INIT_ARCH()
+-
+ extern __typeof (__redirect_memcpy) __libc_memcpy;
+ 
+ extern __typeof (__redirect_memcpy) __memcpy_generic attribute_hidden;
+@@ -38,14 +36,9 @@ extern __typeof (__redirect_memcpy) __memcpy_noalignment attribute_hidden;
+ static inline __typeof (__redirect_memcpy) *
+ select_memcpy_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
+ {
+-  unsigned long long int value;
+-
+-  INIT_ARCH ();
+-
+-  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_CPUPERF_0, &value) != 0)
+-    return __memcpy_generic;
+-
+-  if ((value & RISCV_HWPROBE_MISALIGNED_MASK) == RISCV_HWPROBE_MISALIGNED_FAST)
++  unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_CPUPERF_0, &v) == 0
++      && (v & RISCV_HWPROBE_MISALIGNED_MASK) == RISCV_HWPROBE_MISALIGNED_FAST)
+     return __memcpy_noalignment;
+ 
+   return __memcpy_generic;
+@@ -59,5 +52,6 @@ strong_alias (__libc_memcpy, memcpy);
+ __hidden_ver1 (memcpy, __GI_memcpy, __redirect_memcpy)
+   __attribute__ ((visibility ("hidden"))) __attribute_copy__ (memcpy);
+ # endif
+-
++#else
++# include <string/memcpy.c>
+ #endif
+-- 
+2.25.1
+

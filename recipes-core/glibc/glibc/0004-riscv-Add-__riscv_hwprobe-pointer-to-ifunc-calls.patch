@@ -1,0 +1,76 @@
+From 0a43393bf0c214bf282ef7780493b397b1d7334f Mon Sep 17 00:00:00 2001
+From: Evan Green <evan@rivosinc.com>
+Date: Tue, 27 Feb 2024 14:56:40 -0800
+Subject: [PATCH 04/16] riscv: Add __riscv_hwprobe pointer to ifunc calls
+
+The new __riscv_hwprobe() function is designed to be used by ifunc
+selector functions. This presents a challenge for applications and
+libraries, as ifunc selectors are invoked before all relocations have
+been performed, so an external call to __riscv_hwprobe() from an ifunc
+selector won't work. To address this, pass a pointer to the
+__riscv_hwprobe() function into ifunc selectors as the second
+argument (alongside dl_hwcap, which was already being passed).
+
+Include a typedef as well for convenience, so that ifunc users don't
+have to go through contortions to call this routine. Users will need to
+remember to check the second argument for NULL, to account for older
+glibcs that don't pass the function.
+
+Signed-off-by: Evan Green <evan@rivosinc.com>
+Signed-off-by: Palmer Dabbelt <palmer@rivosinc.com>
+---
+ sysdeps/riscv/dl-irel.h                     |  9 +++++----
+ sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h | 10 ++++++++++
+ 2 files changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/sysdeps/riscv/dl-irel.h b/sysdeps/riscv/dl-irel.h
+index e6ab51ccd4..61b3511c96 100644
+--- a/sysdeps/riscv/dl-irel.h
++++ b/sysdeps/riscv/dl-irel.h
+@@ -24,6 +24,7 @@
+ #include <unistd.h>
+ #include <ldsodefs.h>
+ #include <sysdep.h>
++#include <sys/hwprobe.h>
+ 
+ #define ELF_MACHINE_IRELA	1
+ 
+@@ -31,10 +32,10 @@ static inline ElfW(Addr)
+ __attribute ((always_inline))
+ elf_ifunc_invoke (ElfW(Addr) addr)
+ {
+-  /* The second argument is a void pointer to preserve the extension
+-     fexibility.  */
+-  return ((ElfW(Addr) (*) (uint64_t, void *)) (addr))
+-	 (GLRO(dl_hwcap), NULL);
++  /* The third argument is a void pointer to preserve the extension
++     flexibility.  */
++  return ((ElfW(Addr) (*) (uint64_t, void *, void *)) (addr))
++	 (GLRO(dl_hwcap), __riscv_hwprobe, NULL);
+ }
+ 
+ static inline void
+diff --git a/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h b/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
+index 5592b9e100..34a2e3dbc2 100644
+--- a/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
++++ b/sysdeps/unix/sysv/linux/riscv/sys/hwprobe.h
+@@ -69,6 +69,16 @@ extern int __riscv_hwprobe (struct riscv_hwprobe *__pairs, size_t __pair_count,
+      __fortified_attr_access (__read_write__, 1, 2)
+      __fortified_attr_access (__read_only__, 4, 3);
+ 
++/* A pointer to the __riscv_hwprobe vDSO function is passed as the second
++   argument to ifunc selector routines. Include a function pointer type for
++   convenience in calling the function in those settings. */
++typedef int (*__riscv_hwprobe_t) (struct riscv_hwprobe *__pairs, size_t __pair_count,
++				  size_t __cpu_count, unsigned long int *__cpus,
++				  unsigned int __flags)
++     __nonnull ((1)) __wur
++     __fortified_attr_access (__read_write__, 1, 2)
++     __fortified_attr_access (__read_only__, 4, 3);
++
+ __END_DECLS
+ 
+ #endif /* sys/hwprobe.h */
+-- 
+2.25.1
+

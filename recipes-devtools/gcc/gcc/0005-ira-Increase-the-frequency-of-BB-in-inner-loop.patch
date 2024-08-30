@@ -1,0 +1,51 @@
+From 50cfd85c812479436ef7e6f4c7e084993d8293fc Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Thu, 27 Jun 2024 16:21:20 -0700
+Subject: [PATCH 5/5] ira: Increase the frequency of BB in inner loop
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ gcc/ira-costs.cc | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ira-costs.cc b/gcc/ira-costs.cc
+index c86c5a16563..455367d046c 100644
+--- a/gcc/ira-costs.cc
++++ b/gcc/ira-costs.cc
+@@ -36,7 +36,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "addresses.h"
+ #include "reload.h"
+ #include "print-rtl.h"
+-
++#include "cfgloop.h"
+ /* The flags is set up every time when we calculate pseudo register
+    classes through function ira_set_pseudo_classes.  */
+ static bool pseudo_classes_defined_p = false;
+@@ -1740,10 +1740,24 @@ static void
+ process_bb_for_costs (basic_block bb)
+ {
+   rtx_insn *insn;
++  int depth;
+ 
+   frequency = REG_FREQ_FROM_BB (bb);
+   if (frequency == 0)
+     frequency = 1;
++  /* Sometimes the register allocator spills registers in inner loop,
++     which degrades performance a lot. So here, we increase the BB
++     frequency of inner loop and therefore increase the spill cost
++     for the BB in innner loop. */
++  if (bb->loop_father)
++    {
++      depth = loop_depth(bb->loop_father);
++	  /* Prevent from cost overflow when loops are deeply nested. */
++      depth = depth > 5 ? 5 : depth;
++      while (depth--)
++        frequency *= 3;
++    }
++
+   FOR_BB_INSNS (bb, insn)
+     insn = scan_one_insn (insn);
+ }
+-- 
+2.25.1
+

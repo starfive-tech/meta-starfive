@@ -1,0 +1,102 @@
+From 1c082bbc4a852e6c21e3e8f5383894e5582a9d7c Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Wed, 19 Jun 2024 14:21:09 +0800
+Subject: [PATCH 2/2] gas: riscv: Add customer CSR instructions
+
+---
+ gas/testsuite/gas/riscv/csr-custom.d | 18 ++++++++++++++++++
+ gas/testsuite/gas/riscv/csr-custom.s |  9 +++++++++
+ include/opcode/riscv-opc.h           | 12 ++++++++++++
+ opcodes/riscv-opc.c                  |  4 ++++
+ 4 files changed, 43 insertions(+)
+ create mode 100644 gas/testsuite/gas/riscv/csr-custom.d
+ create mode 100644 gas/testsuite/gas/riscv/csr-custom.s
+
+diff --git a/gas/testsuite/gas/riscv/csr-custom.d b/gas/testsuite/gas/riscv/csr-custom.d
+new file mode 100644
+index 00000000000..708efe17a43
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/csr-custom.d
+@@ -0,0 +1,18 @@
++#as: -march=rv64i_zicsr
++#source: csr-custom.s
++#objdump: -d
++
++.*:[ 	]+file format .*
++
++
++Disassembly of section .text:
++
++0+000 <target>:
++[ 	]+0:[ 	]+fc050073[ 	]+cflush.d.l1[ 	]+a0
++[ 	]+4:[ 	]+fc450073[ 	]+cflush.d.l2[ 	]+a0
++[ 	]+8:[ 	]+fc250073[ 	]+cdiscard.d.l1[ 	]+a0
++[ 	]+c:[ 	]+fc650073[ 	]+cdiscard.d.l2[ 	]+a0
++[ 	]+10:[ 	]+fc600073[ 	]+cdiscard.d.l2[ 	]+zero
++[ 	]+14:[ 	]+fc200073[ 	]+cdiscard.d.l1[ 	]+zero
++[ 	]+18:[ 	]+fc400073[ 	]+cflush.d.l2[ 	]+zero
++[ 	]+1c:[ 	]+fc000073[ 	]+cflush.d.l1[ 	]+zero
+\ No newline at end of file
+diff --git a/gas/testsuite/gas/riscv/csr-custom.s b/gas/testsuite/gas/riscv/csr-custom.s
+new file mode 100644
+index 00000000000..8b5cc4126b2
+--- /dev/null
++++ b/gas/testsuite/gas/riscv/csr-custom.s
+@@ -0,0 +1,9 @@
++target:
++	cflush.d.l1	a0
++	cflush.d.l2	a0
++	cdiscard.d.l1	a0
++	cdiscard.d.l2	a0
++	cdiscard.d.l2	x0
++	cdiscard.d.l1	x0
++	cflush.d.l2	x0
++	cflush.d.l1	x0
+diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
+index 9583d075e60..df2ea9fcee5 100644
+--- a/include/opcode/riscv-opc.h
++++ b/include/opcode/riscv-opc.h
+@@ -256,6 +256,14 @@
+ #define MATCH_WFI 0x10500073
+ #define MASK_WFI  0xffffffff
+ #define MASK_CUSTOMER_PREF 0x7fff
++#define MATCH_CFLUSH_D_L1    0xfc000073
++#define MASK_CFLUSH_D_L1     0xfff07fff
++#define MATCH_CDISCARD_D_L1  0xfc200073
++#define MASK_CDISCARD_D_L1   0xfff07fff
++#define MATCH_CFLUSH_D_L2    0xfc400073
++#define MASK_CFLUSH_D_L2     0xfff07fff
++#define MATCH_CDISCARD_D_L2  0xfc600073
++#define MASK_CDISCARD_D_L2   0xfff07fff
+ #define MATCH_CSRRW 0x1073
+ #define MASK_CSRRW  0x707f
+ #define MATCH_CSRRS 0x2073
+@@ -3592,6 +3600,10 @@ DECLARE_INSN(dret, MATCH_DRET, MASK_DRET)
+ DECLARE_INSN(sfence_vm, MATCH_SFENCE_VM, MASK_SFENCE_VM)
+ DECLARE_INSN(sfence_vma, MATCH_SFENCE_VMA, MASK_SFENCE_VMA)
+ DECLARE_INSN(wfi, MATCH_WFI, MASK_WFI)
++DECLARE_INSN(cflush_d_l1, MATCH_CFLUSH_D_L1, MASK_CFLUSH_D_L1)
++DECLARE_INSN(cdiscard_d_l1, MATCH_CDISCARD_D_L1, MASK_CDISCARD_D_L1)
++DECLARE_INSN(cflush_d_l2, MATCH_CFLUSH_D_L2, MASK_CFLUSH_D_L2)
++DECLARE_INSN(cdiscard_d_l2, MATCH_CDISCARD_D_L2, MASK_CDISCARD_D_L2)
+ DECLARE_INSN(csrrw, MATCH_CSRRW, MASK_CSRRW)
+ DECLARE_INSN(csrrs, MATCH_CSRRS, MASK_CSRRS)
+ DECLARE_INSN(csrrc, MATCH_CSRRC, MASK_CSRRC)
+diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
+index eb52e5dd8e3..81d19fc2655 100644
+--- a/opcodes/riscv-opc.c
++++ b/opcodes/riscv-opc.c
+@@ -2014,6 +2014,10 @@ const struct riscv_opcode riscv_opcodes[] =
+ {"csrrci",     0, INSN_CLASS_ZICSR, "d,E,Z", MATCH_CSRRCI, MASK_CSRRCI, match_opcode, 0 },
+ {"csrrc",      0, INSN_CLASS_ZICSR, "d,E,s", MATCH_CSRRC, MASK_CSRRC, match_opcode, 0 },
+ {"csrrc",      0, INSN_CLASS_ZICSR, "d,E,Z", MATCH_CSRRCI, MASK_CSRRCI, match_opcode, INSN_ALIAS },
++{"cflush.d.l1",   0, INSN_CLASS_ZICSR,   "s", 	MATCH_CFLUSH_D_L1, MASK_CFLUSH_D_L1, match_opcode, 0 },
++{"cdiscard.d.l1", 0, INSN_CLASS_ZICSR,   "s",   MATCH_CDISCARD_D_L1, MASK_CDISCARD_D_L1, match_opcode, 0 },
++{"cflush.d.l2",   0, INSN_CLASS_ZICSR,   "s",   MATCH_CFLUSH_D_L2, MASK_CFLUSH_D_L2, match_opcode, 0 },
++{"cdiscard.d.l2", 0, INSN_CLASS_ZICSR,   "s",   MATCH_CDISCARD_D_L2, MASK_CDISCARD_D_L2, match_opcode, 0 },
+ {"uret",       0, INSN_CLASS_I, "",    MATCH_URET, MASK_URET, match_opcode, 0 },
+ {"sret",       0, INSN_CLASS_I, "",    MATCH_SRET, MASK_SRET, match_opcode, 0 },
+ {"hret",       0, INSN_CLASS_I, "",    MATCH_HRET, MASK_HRET, match_opcode, 0 },
+-- 
+2.25.1
+

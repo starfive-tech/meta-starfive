@@ -1,0 +1,39 @@
+From e7b455e8aae27e3b5dc1105beafcf2a266bdd865 Mon Sep 17 00:00:00 2001
+From: Evan Green <evan@rivosinc.com>
+Date: Tue, 27 Feb 2024 14:56:38 -0800
+Subject: [PATCH 02/16] linux: Introduce INTERNAL_VSYSCALL
+
+Add an INTERNAL_VSYSCALL() macro that makes a vDSO call, falling back to
+a regular syscall, but without setting errno. Instead, the return value
+is plumbed straight out of the macro.
+
+Signed-off-by: Evan Green <evan@rivosinc.com>
+Signed-off-by: Palmer Dabbelt <palmer@rivosinc.com>
+---
+ sysdeps/unix/sysv/linux/sysdep-vdso.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/sysdeps/unix/sysv/linux/sysdep-vdso.h b/sysdeps/unix/sysv/linux/sysdep-vdso.h
+index 189319ad98..2f53ada6e5 100644
+--- a/sysdeps/unix/sysv/linux/sysdep-vdso.h
++++ b/sysdeps/unix/sysv/linux/sysdep-vdso.h
+@@ -53,4 +53,16 @@
+     sc_ret;								      \
+   })
+ 
++#define INTERNAL_VSYSCALL(name, nr, args...)				      \
++  ({									      \
++    long int sc_ret = -ENOSYS;						      \
++									      \
++    __typeof (GLRO(dl_vdso_##name)) vdsop = GLRO(dl_vdso_##name);	      \
++    if (vdsop != NULL)							      \
++	sc_ret = INTERNAL_VSYSCALL_CALL (vdsop, nr, ##args);		      \
++    if (sc_ret == -ENOSYS)						      \
++	sc_ret = INTERNAL_SYSCALL_CALL (name, ##args);			      \
++    sc_ret;								      \
++  })
++
+ #endif /* SYSDEP_VDSO_LINUX_H  */
+-- 
+2.25.1
+

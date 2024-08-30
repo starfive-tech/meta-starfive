@@ -1,0 +1,31 @@
+From 7433bfc90507136a9c7d714eaa88f68dbb72292d Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 23 Jun 2024 15:48:21 -0700
+Subject: [PATCH 7/7] [RISCV] Align default march string with GCC
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ clang/lib/Driver/ToolChains/Arch/RISCV.cpp | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+index a46b44f9ad2b..a01d29728fa4 100644
+--- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
++++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
+@@ -317,12 +317,7 @@ StringRef riscv::getRISCVArch(const llvm::opt::ArgList &Args,
+     else
+       return "rv32imafdc";
+   } else {
+-    if (Triple.getOS() == llvm::Triple::UnknownOS)
+-      return "rv64imac";
+-    else if (Triple.isAndroid())
+-      return "rv64imafdcv_zba_zbb_zbs";
+-    else
+-      return "rv64imafdc";
++    return "rv64imafdc_zba_zbb_zbc_zbs";
+   }
+ }
+ 
+-- 
+2.25.1
+

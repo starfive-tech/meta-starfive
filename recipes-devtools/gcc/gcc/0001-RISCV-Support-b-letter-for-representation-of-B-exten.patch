@@ -1,0 +1,77 @@
+From 649c700eb1f0c5220de76856d811f3752ff6c5b6 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 23 Jun 2024 20:29:32 -0700
+Subject: [PATCH 1/5] RISCV: Support 'b' letter for representation of B
+ extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ gcc/common/config/riscv/riscv-common.cc | 17 +++++++++++++++--
+ gcc/config/riscv/riscv.opt              |  2 ++
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/common/config/riscv/riscv-common.cc b/gcc/common/config/riscv/riscv-common.cc
+index 43b7549e3ec..086fe0b4f6d 100644
+--- a/gcc/common/config/riscv/riscv-common.cc
++++ b/gcc/common/config/riscv/riscv-common.cc
+@@ -75,6 +75,10 @@ struct riscv_implied_info_t
+ /* Implied ISA info, must end with NULL sentinel.  */
+ static const riscv_implied_info_t riscv_implied_info[] =
+ {
++  {"b", "zbb"},
++  {"b", "zbs"},
++  {"b", "zba"},
++  {"b", "zbc"},
+   {"d", "f"},
+   {"f", "zicsr"},
+   {"d", "zicsr"},
+@@ -253,6 +257,7 @@ static const struct riscv_ext_version riscv_ext_version_table[] =
+   {"za128rs", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zawrs", ISA_SPEC_CLASS_NONE, 1, 0},
+ 
++  {"b", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zba", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbb", ISA_SPEC_CLASS_NONE, 1, 0},
+   {"zbc", ISA_SPEC_CLASS_NONE, 1, 0},
+@@ -1206,8 +1211,15 @@ riscv_subset_list::parse_single_std_ext (const char *p, bool exact_single_p)
+ 
+   p = parsing_subset_version (subset, p, &major_version, &minor_version,
+ 			      /* std_ext_p= */ true, &explicit_version_p);
+-
+-  add (subset, major_version, minor_version, explicit_version_p, false);
++  if (subset[0] == 'b')
++    {
++      add ("zba", major_version, minor_version, explicit_version_p, false);
++      add ("zbb", major_version, minor_version, explicit_version_p, false);
++      add ("zbc", major_version, minor_version, explicit_version_p, false);
++      add ("zbs", major_version, minor_version, explicit_version_p, false);
++    }
++  else
++    add (subset, major_version, minor_version, explicit_version_p, false);
+   return p;
+ }
+ 
+@@ -1615,6 +1627,7 @@ static const riscv_ext_flag_table_t riscv_ext_flag_table[] =
+   {"za128rs", &gcc_options::x_riscv_za_subext, MASK_ZA128RS},
+   {"zawrs", &gcc_options::x_riscv_za_subext, MASK_ZAWRS},
+ 
++  {"b",      &gcc_options::x_target_flags, MASK_BITMANIP},
+   {"zba",    &gcc_options::x_riscv_zb_subext, MASK_ZBA},
+   {"zbb",    &gcc_options::x_riscv_zb_subext, MASK_ZBB},
+   {"zbc",    &gcc_options::x_riscv_zb_subext, MASK_ZBC},
+diff --git a/gcc/config/riscv/riscv.opt b/gcc/config/riscv/riscv.opt
+index b14888e9816..687588ff783 100644
+--- a/gcc/config/riscv/riscv.opt
++++ b/gcc/config/riscv/riscv.opt
+@@ -178,6 +178,8 @@ Mask(VECTOR)
+ 
+ Mask(FULL_V)
+ 
++Mask(BITMANIP)
++
+ mriscv-attribute
+ Target Var(riscv_emit_attribute_p) Init(-1)
+ Emit RISC-V ELF attribute.
+-- 
+2.25.1
+

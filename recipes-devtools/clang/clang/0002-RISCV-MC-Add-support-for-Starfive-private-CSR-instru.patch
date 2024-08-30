@@ -1,0 +1,112 @@
+From 1d8da6f5917d1226eaedadf452f99367904edabf Mon Sep 17 00:00:00 2001
+From: "yilun.xie" <yilun.xie@starfivetech.com>
+Date: Thu, 20 Jun 2024 14:40:25 +0800
+Subject: [PATCH 2/7] [RISCV][MC] Add support for Starfive private CSR
+ instructions
+
+---
+ llvm/lib/Target/RISCV/RISCVInstrFormats.td | 12 +++++++
+ llvm/lib/Target/RISCV/RISCVInstrInfo.td    | 11 +++++++
+ llvm/test/MC/RISCV/StarFiveCSR-valid.s     | 38 ++++++++++++++++++++++
+ 3 files changed, 61 insertions(+)
+ create mode 100644 llvm/test/MC/RISCV/StarFiveCSR-valid.s
+
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+index 96fbd33838f1..4b162f8f4379 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
+@@ -401,6 +401,18 @@ class RVInstPref<RISCVOpcode opcode, dag outs, dag ins,
+   let Inst{6-0} = opcode.Value;
+ }
+ 
++class RVInstCache<bits<12> cache, RISCVOpcode opcode, dag outs, dag ins,
++                   string opcodestr, string argstr>
++    : RVInst<outs, ins, opcodestr, argstr, [], InstFormatI> {
++  bits<5> rs1;
++
++  let Inst{31-20} = cache;
++  let Inst{19-15} = rs1;
++  let Inst{14-12} = 0;
++  let Inst{11-7} = 0;
++  let Inst{6-0} = opcode.Value;
++}
++
+ class RVInstIShift<bits<5> imm11_7, bits<3> funct3, RISCVOpcode opcode,
+                    dag outs, dag ins, string opcodestr, string argstr>
+     : RVInstIBase<funct3, opcode, outs, ins, opcodestr, argstr> {
+diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+index 7563d595e78f..28827ac07868 100644
+--- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
++++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
+@@ -593,6 +593,12 @@ class ShiftW_ri<bits<7> imm11_5, bits<3> funct3, string opcodestr>
+                     "$rd, $rs1, $shamt">,
+       Sched<[WriteShiftImm32, ReadShiftImm32]>;
+ 
++let hasNoSchedulingInfo = 1,
++    hasSideEffects = 1, mayLoad = 0, mayStore = 0 in
++class CSR_cache<bits<12> cache, string opcodestr>
++    : RVInstCache<cache, OPC_SYSTEM, (outs), (ins GPR:$rs1),
++              opcodestr, "$rs1">, Sched<[WriteCSR, ReadCSR]>;
++
+ let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+ class ALUW_rr<bits<7> funct7, bits<3> funct3, string opcodestr,
+               bit Commutable = 0>
+@@ -761,6 +767,11 @@ def CSRRWI : CSR_ii<0b101, "csrrwi">;
+ def CSRRSI : CSR_ii<0b110, "csrrsi">;
+ def CSRRCI : CSR_ii<0b111, "csrrci">;
+ 
++def CFLUSH_D_L1   : CSR_cache<0b111111000000, "cflush.d.l1">;
++def CDISCARD_D_L1 : CSR_cache<0b111111000010, "cdiscard.d.l1">;
++def CFLUSH_D_L2   : CSR_cache<0b111111000100, "cflush.d.l2">;
++def CDISCARD_D_L2 : CSR_cache<0b111111000110, "cdiscard.d.l2">;
++
+ /// RV64I instructions
+ 
+ let Predicates = [IsRV64] in {
+diff --git a/llvm/test/MC/RISCV/StarFiveCSR-valid.s b/llvm/test/MC/RISCV/StarFiveCSR-valid.s
+new file mode 100644
+index 000000000000..4913eab88581
+--- /dev/null
++++ b/llvm/test/MC/RISCV/StarFiveCSR-valid.s
+@@ -0,0 +1,38 @@
++# StarFive private CSR related instructions, haven't extension name yet:
++# RUN: llvm-mc %s -triple=riscv64 -mattr=+zicsr -show-encoding \
++# RUN:     | FileCheck -check-prefixes=CHECK-ASM,CHECK-ASM-AND-OBJ %s
++# RUN: llvm-mc -filetype=obj -triple=riscv64 -mattr=+zicsr < %s \
++# RUN:     | llvm-objdump --mattr=+zicsr --no-print-imm-hex -d -r - \
++# RUN:     | FileCheck --check-prefix=CHECK-ASM-AND-OBJ %s
++
++# CHECK-ASM-AND-OBJ: cflush.d.l1 a0
++# CHECK-ASM: encoding: [0x73,0x00,0x05,0xfc]
++cflush.d.l1 a0
++
++# CHECK-ASM-AND-OBJ: cflush.d.l2 a0
++# CHECK-ASM: encoding: [0x73,0x00,0x45,0xfc]
++cflush.d.l2 a0
++
++# CHECK-ASM-AND-OBJ: cdiscard.d.l1 a0
++# CHECK-ASM: encoding: [0x73,0x00,0x25,0xfc]
++cdiscard.d.l1 a0
++
++# CHECK-ASM-AND-OBJ: cdiscard.d.l2 a0
++# CHECK-ASM: encoding: [0x73,0x00,0x65,0xfc]
++cdiscard.d.l2 a0
++
++# CHECK-ASM-AND-OBJ: cdiscard.d.l2 zero
++# CHECK-ASM: encoding: [0x73,0x00,0x60,0xfc]
++cdiscard.d.l2 x0
++
++# CHECK-ASM-AND-OBJ: cdiscard.d.l1 zero
++# CHECK-ASM: encoding: [0x73,0x00,0x20,0xfc]
++cdiscard.d.l1 x0
++
++# CHECK-ASM-AND-OBJ: cflush.d.l2 zero
++# CHECK-ASM: encoding: [0x73,0x00,0x40,0xfc]
++cflush.d.l2 x0
++
++# CHECK-ASM-AND-OBJ: cflush.d.l1 zero
++# CHECK-ASM: encoding: [0x73,0x00,0x00,0xfc]
++cflush.d.l1 x0
+-- 
+2.25.1
+

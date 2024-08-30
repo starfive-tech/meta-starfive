@@ -45,9 +45,9 @@ SRC_URI:starfive-jh8100 = "\
 	file://uboot.env \
 	"
 
-DEPENDS:append:starfive-dubhe = " u-boot-tools-native bmap-tools-native opensbi"
+DEPENDS:append:starfive-dubhe = " u-boot-tools-native bmaptool-native opensbi"
 DEPENDS:append:starfive-visionfive2 = " u-boot-tools-native starfive-tool-native"
-DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmap-tools-native opensbi spltool-native"
+DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmaptool-native opensbi spltool-native"
 
 # Overwrite this for your server
 TFTP_SERVER_IP ?= "127.0.0.1"

@@ -7,9 +7,9 @@
   <remote name="kraj" fetch="https://github.com/kraj" />
   <remote name="yoctoproject" fetch="https://github.com/yoctoproject" />
 
-  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="kirkstone" />
-  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-kirkstone" />
-  <project name="meta-clang" remote="kraj" path="meta-clang" revision="kirkstone" />
-  <project name="poky" remote="yoctoproject" path="poky" revision="kirkstone" />
+  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="scarthgap" />
+  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-scarthgap" />
+  <project name="meta-clang" remote="kraj" path="meta-clang" revision="scarthgap" />
+  <project name="poky" remote="yoctoproject" path="poky" revision="scarthgap" />
 
 </manifest>

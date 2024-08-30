@@ -1,0 +1,61 @@
+From 7770769a54be19da4eab0438968615f1231a71a0 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Fri, 15 Apr 2022 02:16:43 -0700
+Subject: [PATCH 4/7] [RISCV] Support old b letter represents for B extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ llvm/lib/Support/RISCVISAInfo.cpp      |  9 ++++++++-
+ llvm/lib/Target/RISCV/RISCVFeatures.td | 12 ++++++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/llvm/lib/Support/RISCVISAInfo.cpp b/llvm/lib/Support/RISCVISAInfo.cpp
+index db2e4ca92ae4..55779db57439 100644
+--- a/llvm/lib/Support/RISCVISAInfo.cpp
++++ b/llvm/lib/Support/RISCVISAInfo.cpp
+@@ -46,6 +46,7 @@ static const char *RISCVGImplications[] = {
+ // NOTE: This table should be sorted alphabetically by extension name.
+ static const RISCVSupportedExtension SupportedExtensions[] = {
+     {"a", {2, 1}},
++    {"b", {1, 0}},
+     {"c", {2, 0}},
+     {"d", {2, 2}},
+     {"e", {2, 0}},
+@@ -858,7 +859,13 @@ RISCVISAInfo::parseArchString(StringRef Arch, bool EnableExperimentalExtension,
+                                "unsupported standard user-level extension '%c'",
+                                C);
+     }
+-    ISAInfo->addExtension(StringRef(&C, 1), {Major, Minor});
++    if (C == 'b') {
++      ISAInfo->addExtension("zba", {Major, Minor});
++      ISAInfo->addExtension("zbb", {Major, Minor});
++      ISAInfo->addExtension("zbc", {Major, Minor});
++      ISAInfo->addExtension("zbs", {Major, Minor});
++    } else
++      ISAInfo->addExtension(StringRef(&C, 1), {Major, Minor});
+ 
+     // Consume full extension name and version, including any optional '_'
+     // between this extension and the next
+diff --git a/llvm/lib/Target/RISCV/RISCVFeatures.td b/llvm/lib/Target/RISCV/RISCVFeatures.td
+index 1bb6b6a561f4..0d47e8799f9b 100644
+--- a/llvm/lib/Target/RISCV/RISCVFeatures.td
++++ b/llvm/lib/Target/RISCV/RISCVFeatures.td
+@@ -1090,3 +1090,15 @@ def FeatureTaggedGlobals : SubtargetFeature<"tagged-globals",
+     "AllowTaggedGlobals",
+     "true", "Use an instruction sequence for taking the address of a global "
+     "that allows a memory tag in the upper address bits">;
++
++def FeatureStdExtB
++    : SubtargetFeature<"b", "HasStdExtB", "true",
++                       "'B' (Bit Manipulation Instructions)",
++                       [FeatureStdExtZba,
++                        FeatureStdExtZbb,
++                        FeatureStdExtZbc,
++                        FeatureStdExtZbs]>;
++def HasStdExtB : Predicate<"Subtarget->hasStdExtB()">,
++                           AssemblerPredicate<(all_of FeatureStdExtB),
++                           "'B' (Bit Manipulation Instructions)">;
++
+-- 
+2.25.1
+

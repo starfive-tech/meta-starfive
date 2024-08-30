@@ -11,7 +11,7 @@ IMAGE_INSTALL += " \
 	gdbserver \
 	util-linux \
 	ethtool \
-	bmap-tools \
+	bmaptool \
 	systemd-analyze \
 	e2fsprogs-resize2fs \
 	mesa-pvr \

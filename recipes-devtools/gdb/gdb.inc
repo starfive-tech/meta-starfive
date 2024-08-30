@@ -10,11 +10,7 @@ SRC_URI = "${GNU_MIRROR}/gdb/gdb-${PV}.tar.xz \
            file://0003-Dont-disable-libreadline.a-when-using-disable-static.patch \
            file://0004-use-asm-sgidefs.h.patch \
            file://0005-Change-order-of-CFLAGS.patch \
-           file://0006-resolve-restrict-keyword-conflict.patch \
            file://0007-Fix-invalid-sigprocmask-call.patch \
            file://0008-Define-alignof-using-_Alignof-when-using-C11-or-newe.patch \
-           file://add-missing-ldflags.patch \
            "
-SRC_URI[sha256sum] = "fd5bebb7be1833abdb6e023c2f498a354498281df9d05523d8915babeb893f0a"
-
-TOOLCHAIN = "gcc"
+SRC_URI[sha256sum] = "2d4dd8061d8ded12b6c63f55e45344881e8226105f4d2a9b234040efa5ce7772"

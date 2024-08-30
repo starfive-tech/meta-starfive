@@ -87,7 +87,7 @@ IMAGE_CMD:qspi() {
 # Generate SD image using bmaptool
 IMAGE_CMD:qspi_sd() {
 	cd ${IMGDEPLOYDIR}
-	bmaptool copy ${PN}-${MACHINE}.wic.gz ${DEPLOY_DIR_IMAGE}/Image-sd-${MACHINE}.img
+	bmaptool copy ${PN}-${MACHINE}.rootfs.wic.gz ${DEPLOY_DIR_IMAGE}/Image-sd-${MACHINE}.img
 }
 
 # Set image naming as such: Image-<boot_mode>-<machine>
@@ -105,7 +105,7 @@ do_create_output_folder:starfive-dubhe() {
         cp ${DEPLOY_DIR_IMAGE}/${MACHINE}-qspi-firmware.bin ${DEPLOY_DIR_IMAGE}/Dubhe-80
         cp ${DEPLOY_DIR_IMAGE}/Image ${DEPLOY_DIR_IMAGE}/Dubhe-80
         cp ${DEPLOY_DIR_IMAGE}/Image-initramfs-${MACHINE}.bin ${DEPLOY_DIR_IMAGE}/Dubhe-80
-        cp ${DEPLOY_DIR_IMAGE}/${IMAGE_BASENAME}-${MACHINE}.tar.gz ${DEPLOY_DIR_IMAGE}/Dubhe-80/Image-nfs-${MACHINE}.tar.gz
+        cp ${DEPLOY_DIR_IMAGE}/${PN}-${MACHINE}.rootfs.tar.gz ${DEPLOY_DIR_IMAGE}/Dubhe-80/Image-nfs-${MACHINE}.tar.gz
         cp ${DEPLOY_DIR_IMAGE}/Image-sd-${MACHINE}.img ${DEPLOY_DIR_IMAGE}/Dubhe-80
 
         cp -r ${DEPLOY_DIR_IMAGE}/Dubhe-80 ${DEPLOY_DIR_IMAGE}/Dubhe-90

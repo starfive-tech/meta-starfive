@@ -7,7 +7,7 @@ DEPENDS += " opensbi u-boot-tools-native dtc-native"
 IMAGE_INSTALL = "\
 	packagegroup-core-boot \
 	${CORE_IMAGE_EXTRA_INSTALL} \
-	bmap-tools \
+	bmaptool \
 	systemd-analyze \
 	e2fsprogs-resize2fs \
 	parted \
