@@ -10,22 +10,23 @@ LIC_FILES_CHKSUM="\
     file://bfd/COPYING;md5=d32239bcb673463ab874e80d47fae504\
     "
 
-# When upgrading to 2.42, please make sure there is no trailing .0, so
+# When upgrading to next major release, ensure that there is no trailing .0, so
 # that upstream version check can work correctly.
-PV = "2.42"
-CVE_VERSION = "2.42"
-SRCBRANCH ?= "binutils-2_42-branch"
+PV = "2.43"
+CVE_VERSION = "2.43"
+SRCBRANCH ?= "binutils-2_43-branch"
 
 UPSTREAM_CHECK_GITTAGREGEX = "binutils-(?P<pver>\d+_(\d_?)*)"
 
 CVE_STATUS[CVE-2023-25584] = "cpe-incorrect: Applies only for version 2.40 and earlier"
 
-SRCREV ?= "c7f28aad0c99d1d2fec4e52ebfa3735d90ceb8e9"
+SRCREV ?= "57f3676f3e5266829a91880d61143ab9ecd617bd"
 BINUTILS_GIT_URI ?= "git://sourceware.org/git/binutils-gdb.git;branch=${SRCBRANCH};protocol=https"
 SRC_URI = "\
      ${BINUTILS_GIT_URI} \
-     file://0001-gas-riscv-Add-customer-pref-instruction.patch \
-     file://0002-gas-riscv-Add-customer-CSR-instructions.patch \
+     file://starfive/0001-gas-riscv-Add-customer-pref-instruction.patch \
+     file://starfive/0002-gas-riscv-Add-customer-CSR-instructions.patch \
+     file://starfive/0003-add-xstcmo-option-to-manage-StarFive-Technology-proc.patch \
      file://0004-Point-scripts-location-to-libdir.patch \
      file://0005-don-t-let-the-distro-compiler-point-to-the-wrong-ins.patch \
      file://0006-warn-for-uses-of-system-directories-when-cross-linki.patch \
@@ -37,6 +38,5 @@ SRC_URI = "\
      file://0012-Only-generate-an-RPATH-entry-if-LD_RUN_PATH-is-not-e.patch \
      file://0013-Define-alignof-using-_Alignof-when-using-C11-or-newe.patch \
      file://0014-Remove-duplicate-pe-dll.o-entry-deom-targ_extra_ofil.patch \
-     file://0015-gprofng-change-use-of-bignum-to-bigint.patch \
 "
 S  = "${WORKDIR}/git"

@@ -1,7 +1,7 @@
-From 1c082bbc4a852e6c21e3e8f5383894e5582a9d7c Mon Sep 17 00:00:00 2001
+From 36365d433681426de04772362e264862bc756d8e Mon Sep 17 00:00:00 2001
 From: "yilun.xie" <yilun.xie@starfivetech.com>
 Date: Wed, 19 Jun 2024 14:21:09 +0800
-Subject: [PATCH 2/2] gas: riscv: Add customer CSR instructions
+Subject: [PATCH 2/3] gas: riscv: Add customer CSR instructions
 
 ---
  gas/testsuite/gas/riscv/csr-custom.d | 18 ++++++++++++++++++
@@ -53,10 +53,10 @@ index 00000000000..8b5cc4126b2
 +	cflush.d.l2	x0
 +	cflush.d.l1	x0
 diff --git a/include/opcode/riscv-opc.h b/include/opcode/riscv-opc.h
-index 9583d075e60..df2ea9fcee5 100644
+index 48fc2b8f52f..66187de6b8a 100644
 --- a/include/opcode/riscv-opc.h
 +++ b/include/opcode/riscv-opc.h
-@@ -256,6 +256,14 @@
+@@ -296,6 +296,14 @@
  #define MATCH_WFI 0x10500073
  #define MASK_WFI  0xffffffff
  #define MASK_CUSTOMER_PREF 0x7fff
@@ -71,7 +71,7 @@ index 9583d075e60..df2ea9fcee5 100644
  #define MATCH_CSRRW 0x1073
  #define MASK_CSRRW  0x707f
  #define MATCH_CSRRS 0x2073
-@@ -3592,6 +3600,10 @@ DECLARE_INSN(dret, MATCH_DRET, MASK_DRET)
+@@ -3754,6 +3762,10 @@ DECLARE_INSN(dret, MATCH_DRET, MASK_DRET)
  DECLARE_INSN(sfence_vm, MATCH_SFENCE_VM, MASK_SFENCE_VM)
  DECLARE_INSN(sfence_vma, MATCH_SFENCE_VMA, MASK_SFENCE_VMA)
  DECLARE_INSN(wfi, MATCH_WFI, MASK_WFI)
@@ -83,10 +83,10 @@ index 9583d075e60..df2ea9fcee5 100644
  DECLARE_INSN(csrrs, MATCH_CSRRS, MASK_CSRRS)
  DECLARE_INSN(csrrc, MATCH_CSRRC, MASK_CSRRC)
 diff --git a/opcodes/riscv-opc.c b/opcodes/riscv-opc.c
-index eb52e5dd8e3..81d19fc2655 100644
+index 621a5ff8abc..7953fda2f86 100644
 --- a/opcodes/riscv-opc.c
 +++ b/opcodes/riscv-opc.c
-@@ -2014,6 +2014,10 @@ const struct riscv_opcode riscv_opcodes[] =
+@@ -2156,6 +2156,10 @@ const struct riscv_opcode riscv_opcodes[] =
  {"csrrci",     0, INSN_CLASS_ZICSR, "d,E,Z", MATCH_CSRRCI, MASK_CSRRCI, match_opcode, 0 },
  {"csrrc",      0, INSN_CLASS_ZICSR, "d,E,s", MATCH_CSRRC, MASK_CSRRC, match_opcode, 0 },
  {"csrrc",      0, INSN_CLASS_ZICSR, "d,E,Z", MATCH_CSRRCI, MASK_CSRRCI, match_opcode, INSN_ALIAS },
