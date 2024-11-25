@@ -1,7 +1,7 @@
-From d805b70b4d61f702e18a866489306db16e75cc94 Mon Sep 17 00:00:00 2001
+From 52a81240c0198943f2613c55ac23cf55338b4061 Mon Sep 17 00:00:00 2001
 From: "yilun.xie" <yilun.xie@starfivetech.com>
 Date: Wed, 19 Jun 2024 16:56:30 +0800
-Subject: [PATCH 2/2] gas: riscv: Add customer CSR instructions
+Subject: [PATCH 2/3] gas: riscv: Add customer CSR instructions
 
 ---
  gas/testsuite/gas/riscv/csr-custom.d | 18 ++++++++++++++++++
