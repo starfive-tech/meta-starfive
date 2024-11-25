@@ -1,0 +1,143 @@
+From 872880a3d4f83ccee0a41478cbf19b3184bb9fad Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sat, 29 Jun 2024 19:09:55 -0700
+Subject: [PATCH 09/17] riscv: Add vector version memcpy
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ sysdeps/riscv/multiarch/memcpy_vector.S       | 46 +++++++++++++++++++
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |  1 +
+ .../linux/riscv/multiarch/ifunc-impl-list.c   | 16 +++++--
+ .../unix/sysv/linux/riscv/multiarch/memcpy.c  |  6 ++-
+ 4 files changed, 65 insertions(+), 4 deletions(-)
+ create mode 100644 sysdeps/riscv/multiarch/memcpy_vector.S
+
+diff --git a/sysdeps/riscv/multiarch/memcpy_vector.S b/sysdeps/riscv/multiarch/memcpy_vector.S
+new file mode 100644
+index 0000000000..1669c3e2e3
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memcpy_vector.S
+@@ -0,0 +1,46 @@
++/* The assembly function for memcpy.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memcpy.  */
++	.p2align 6
++ENTRY (__memcpy_vector)
++	mv	a3, a0
++	sltiu	a4, a2, 16
++	bnez	a4, .loop_cpy
++	andi	a5, a0, 15
++	li	a6, 16
++	beqz	a5, .loop_cpy
++	sub	a5, a6, a5
++	vsetvli	t0, a5, e8, m8
++	vle8.v	v0, (a1)
++	add	a1, a1, t0
++	sub	a2, a2, t0
++	vse8.v	v0, (a3)
++	add	a3, a3, t0
++.loop_cpy:
++	vsetvli	t0, a2, e8, m8
++	vle8.v	v0, (a1)
++	add	a1, a1, t0
++	sub	a2, a2, t0
++	vse8.v	v0, (a3)
++	add	a3, a3, t0
++	bnez	a2, .loop_cpy
++	ret
++END (__memcpy_vector)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+index fcef5659d4..8d3df8edcf 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -3,6 +3,7 @@ sysdep_routines += \
+   memcpy \
+   memcpy-generic \
+   memcpy_noalignment \
++  memcpy_vector \
+   # sysdep_routines
+ 
+ CFLAGS-memcpy_noalignment.c += -mno-strict-align
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index 9f806d7a9e..c0ec1eb1b5 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -27,14 +27,24 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+   size_t i = max;
+ 
+   bool fast_unaligned = false;
++  bool support_vector = false;
+ 
+-  struct riscv_hwprobe pair = { .key = RISCV_HWPROBE_KEY_CPUPERF_0 };
+-  if (__riscv_hwprobe (&pair, 1, 0, NULL, 0) == 0
+-      && (pair.value & RISCV_HWPROBE_MISALIGNED_MASK)
++  struct riscv_hwprobe pair_unaligned = { .key = RISCV_HWPROBE_KEY_CPUPERF_0 };
++  struct riscv_hwprobe pair_vector = { .key = RISCV_HWPROBE_KEY_IMA_EXT_0 };
++
++  if (__riscv_hwprobe (&pair_unaligned, 1, 0, NULL, 0) == 0
++      && (pair_unaligned.value & RISCV_HWPROBE_MISALIGNED_MASK)
+           == RISCV_HWPROBE_MISALIGNED_FAST)
+     fast_unaligned = true;
+ 
++ if (__riscv_hwprobe (&pair_vector, 1, 0, NULL, 0) == 0
++      && (pair_vector.value & RISCV_HWPROBE_IMA_V)
++          == RISCV_HWPROBE_MISALIGNED_FAST)
++    support_vector = true;
++
+   IFUNC_IMPL (i, name, memcpy,
++	      IFUNC_IMPL_ADD (array, i, memcpy, support_vector,
++            __memcpy_vector)
+ 	      IFUNC_IMPL_ADD (array, i, memcpy, fast_unaligned,
+ 			      __memcpy_noalignment)
+ 	      IFUNC_IMPL_ADD (array, i, memcpy, 1, __memcpy_generic))
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c b/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
+index 51d8ace858..5e1287a738 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/memcpy.c
+@@ -32,11 +32,15 @@ extern __typeof (__redirect_memcpy) __libc_memcpy;
+ 
+ extern __typeof (__redirect_memcpy) __memcpy_generic attribute_hidden;
+ extern __typeof (__redirect_memcpy) __memcpy_noalignment attribute_hidden;
++extern __typeof (__redirect_memcpy) __memcpy_vector attribute_hidden;
+ 
+ static inline __typeof (__redirect_memcpy) *
+ select_memcpy_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
+ {
+   unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_IMA_EXT_0, &v) == 0
++      && (v & RISCV_HWPROBE_IMA_V))
++    return __memcpy_vector;
+   if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_CPUPERF_0, &v) == 0
+       && (v & RISCV_HWPROBE_MISALIGNED_MASK) == RISCV_HWPROBE_MISALIGNED_FAST)
+     return __memcpy_noalignment;
+@@ -50,7 +54,7 @@ riscv_libc_ifunc (__libc_memcpy, select_memcpy_ifunc);
+ strong_alias (__libc_memcpy, memcpy);
+ # ifdef SHARED
+ __hidden_ver1 (memcpy, __GI_memcpy, __redirect_memcpy)
+-  __attribute__ ((visibility ("hidden"))) __attribute_copy__ (memcpy);
++__attribute__ ((visibility ("hidden"))) __attribute_copy__ (memcpy);
+ # endif
+ #else
+ # include <string/memcpy.c>
+-- 
+2.25.1
+

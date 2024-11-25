@@ -1,0 +1,322 @@
+From 3151ea8375914573d1bd6e9ddcc9de198d58129f Mon Sep 17 00:00:00 2001
+From: Evan Green <evan@rivosinc.com>
+Date: Tue, 27 Feb 2024 14:56:43 -0800
+Subject: [PATCH 07/17] riscv: Add and use alignment-ignorant memcpy
+
+For CPU implementations that can perform unaligned accesses with little
+or no performance penalty, create a memcpy implementation that does not
+bother aligning buffers. It will use a block of integer registers, a
+single integer register, and fall back to bytewise copy for the
+remainder.
+
+Signed-off-by: Evan Green <evan@rivosinc.com>
+Reviewed-by: Palmer Dabbelt <palmer@rivosinc.com>
+Signed-off-by: Palmer Dabbelt <palmer@rivosinc.com>
+---
+ sysdeps/riscv/memcopy.h                       |  26 ++++
+ sysdeps/riscv/memcpy.c                        |  63 ++++++++
+ sysdeps/riscv/memcpy_noalignment.S            | 136 ++++++++++++++++++
+ sysdeps/unix/sysv/linux/riscv/Makefile        |   9 ++
+ .../unix/sysv/linux/riscv/memcpy-generic.c    |  24 ++++
+ 5 files changed, 258 insertions(+)
+ create mode 100644 sysdeps/riscv/memcopy.h
+ create mode 100644 sysdeps/riscv/memcpy.c
+ create mode 100644 sysdeps/riscv/memcpy_noalignment.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/memcpy-generic.c
+
+diff --git a/sysdeps/riscv/memcopy.h b/sysdeps/riscv/memcopy.h
+new file mode 100644
+index 0000000000..27675964b0
+--- /dev/null
++++ b/sysdeps/riscv/memcopy.h
+@@ -0,0 +1,26 @@
++/* memcopy.h -- definitions for memory copy functions. RISC-V version.
++   Copyright (C) 2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sysdeps/generic/memcopy.h>
++
++/* Redefine the generic memcpy implementation to __memcpy_generic, so
++   the memcpy ifunc can select between generic and special versions.
++   In rtld, don't bother with all the ifunciness. */
++#if IS_IN (libc)
++#define MEMCPY __memcpy_generic
++#endif
+diff --git a/sysdeps/riscv/memcpy.c b/sysdeps/riscv/memcpy.c
+new file mode 100644
+index 0000000000..20f9548c44
+--- /dev/null
++++ b/sysdeps/riscv/memcpy.c
+@@ -0,0 +1,63 @@
++/* Multiple versions of memcpy.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++/* Redefine memcpy so that the compiler won't complain about the type
++   mismatch with the IFUNC selector in strong_alias, below.  */
++# undef memcpy
++# define memcpy __redirect_memcpy
++# include <stdint.h>
++# include <string.h>
++# include <ifunc-init.h>
++# include <riscv-ifunc.h>
++# include <sys/hwprobe.h>
++
++# define INIT_ARCH()
++
++extern __typeof (__redirect_memcpy) __libc_memcpy;
++
++extern __typeof (__redirect_memcpy) __memcpy_generic attribute_hidden;
++extern __typeof (__redirect_memcpy) __memcpy_noalignment attribute_hidden;
++
++static inline __typeof (__redirect_memcpy) *
++select_memcpy_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
++{
++  unsigned long long int value;
++
++  INIT_ARCH ();
++
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_CPUPERF_0, &value) != 0)
++    return __memcpy_generic;
++
++  if ((value & RISCV_HWPROBE_MISALIGNED_MASK) == RISCV_HWPROBE_MISALIGNED_FAST)
++    return __memcpy_noalignment;
++
++  return __memcpy_generic;
++}
++
++riscv_libc_ifunc (__libc_memcpy, select_memcpy_ifunc);
++
++# undef memcpy
++strong_alias (__libc_memcpy, memcpy);
++# ifdef SHARED
++__hidden_ver1 (memcpy, __GI_memcpy, __redirect_memcpy)
++  __attribute__ ((visibility ("hidden"))) __attribute_copy__ (memcpy);
++# endif
++
++#endif
+diff --git a/sysdeps/riscv/memcpy_noalignment.S b/sysdeps/riscv/memcpy_noalignment.S
+new file mode 100644
+index 0000000000..621f8d028f
+--- /dev/null
++++ b/sysdeps/riscv/memcpy_noalignment.S
+@@ -0,0 +1,136 @@
++/* memcpy for RISC-V, ignoring buffer alignment
++   Copyright (C) 2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++#include <sys/asm.h>
++
++/* void *memcpy(void *, const void *, size_t) */
++ENTRY (__memcpy_noalignment)
++	move t6, a0  /* Preserve return value */
++
++	/* Bail if 0 */
++	beqz a2, 7f
++
++	/* Jump to byte copy if size < SZREG */
++	li a4, SZREG
++	bltu a2, a4, 5f
++
++	/* Round down to the nearest "page" size */
++	andi a4, a2, ~((16*SZREG)-1)
++	beqz a4, 2f
++	add a3, a1, a4
++
++	/* Copy the first word to get dest word aligned */
++	andi a5, t6, SZREG-1
++	beqz a5, 1f
++	REG_L a6, (a1)
++	REG_S a6, (t6)
++
++	/* Align dst up to a word, move src and size as well. */
++	addi t6, t6, SZREG-1
++	andi t6, t6, ~(SZREG-1)
++	sub a5, t6, a0
++	add a1, a1, a5
++	sub a2, a2, a5
++
++	/* Recompute page count */
++	andi a4, a2, ~((16*SZREG)-1)
++	beqz a4, 2f
++
++1:
++	/* Copy "pages" (chunks of 16 registers) */
++	REG_L a4,       0(a1)
++	REG_L a5,   SZREG(a1)
++	REG_L a6, 2*SZREG(a1)
++	REG_L a7, 3*SZREG(a1)
++	REG_L t0, 4*SZREG(a1)
++	REG_L t1, 5*SZREG(a1)
++	REG_L t2, 6*SZREG(a1)
++	REG_L t3, 7*SZREG(a1)
++	REG_L t4, 8*SZREG(a1)
++	REG_L t5, 9*SZREG(a1)
++	REG_S a4,       0(t6)
++	REG_S a5,   SZREG(t6)
++	REG_S a6, 2*SZREG(t6)
++	REG_S a7, 3*SZREG(t6)
++	REG_S t0, 4*SZREG(t6)
++	REG_S t1, 5*SZREG(t6)
++	REG_S t2, 6*SZREG(t6)
++	REG_S t3, 7*SZREG(t6)
++	REG_S t4, 8*SZREG(t6)
++	REG_S t5, 9*SZREG(t6)
++	REG_L a4, 10*SZREG(a1)
++	REG_L a5, 11*SZREG(a1)
++	REG_L a6, 12*SZREG(a1)
++	REG_L a7, 13*SZREG(a1)
++	REG_L t0, 14*SZREG(a1)
++	REG_L t1, 15*SZREG(a1)
++	addi a1, a1, 16*SZREG
++	REG_S a4, 10*SZREG(t6)
++	REG_S a5, 11*SZREG(t6)
++	REG_S a6, 12*SZREG(t6)
++	REG_S a7, 13*SZREG(t6)
++	REG_S t0, 14*SZREG(t6)
++	REG_S t1, 15*SZREG(t6)
++	addi t6, t6, 16*SZREG
++	bltu a1, a3, 1b
++	andi a2, a2, (16*SZREG)-1  /* Update count */
++
++2:
++	/* Remainder is smaller than a page, compute native word count */
++	beqz a2, 7f
++	andi a5, a2, ~(SZREG-1)
++	andi a2, a2, (SZREG-1)
++	add a3, a1, a5
++	/* Jump directly to last word if no words. */
++	beqz a5, 4f
++
++3:
++	/* Use single native register copy */
++	REG_L a4, 0(a1)
++	addi a1, a1, SZREG
++	REG_S a4, 0(t6)
++	addi t6, t6, SZREG
++	bltu a1, a3, 3b
++
++	/* Jump directly out if no more bytes */
++	beqz a2, 7f
++
++4:
++	/* Copy the last word unaligned */
++	add a3, a1, a2
++	add a4, t6, a2
++	REG_L a5, -SZREG(a3)
++	REG_S a5, -SZREG(a4)
++	ret
++
++5:
++	/* Copy bytes when the total copy is <SZREG */
++	add a3, a1, a2
++
++6:
++	lb a4, 0(a1)
++	addi a1, a1, 1
++	sb a4, 0(t6)
++	addi t6, t6, 1
++	bltu a1, a3, 6b
++
++7:
++	ret
++
++END (__memcpy_noalignment)
+diff --git a/sysdeps/unix/sysv/linux/riscv/Makefile b/sysdeps/unix/sysv/linux/riscv/Makefile
+index 04abf226ad..398ff7418b 100644
+--- a/sysdeps/unix/sysv/linux/riscv/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/Makefile
+@@ -15,6 +15,15 @@ ifeq ($(subdir),stdlib)
+ gen-as-const-headers += ucontext_i.sym
+ endif
+ 
++ifeq ($(subdir),string)
++sysdep_routines += \
++  memcpy \
++  memcpy-generic \
++  memcpy_noalignment \
++  # sysdep_routines
++
++endif
++
+ abi-variants := ilp32 ilp32d lp64 lp64d
+ 
+ ifeq (,$(filter $(default-abi),$(abi-variants)))
+diff --git a/sysdeps/unix/sysv/linux/riscv/memcpy-generic.c b/sysdeps/unix/sysv/linux/riscv/memcpy-generic.c
+new file mode 100644
+index 0000000000..f06f4bda15
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/memcpy-generic.c
+@@ -0,0 +1,24 @@
++/* Re-include the default memcpy implementation.
++   Copyright (C) 2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#include <string.h>
++
++extern __typeof (memcpy) __memcpy_generic;
++hidden_proto (__memcpy_generic)
++
++#include <string/memcpy.c>
+-- 
+2.25.1
+
