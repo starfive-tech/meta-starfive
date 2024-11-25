@@ -1,18 +1,18 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/clang:"
 
-SRCREV = "768118d1ad38bf13c545828f67bd6b474d61fc55"
+SRCREV = "3b5b5c1ec4a3095ab096dd780e84d7ab81f3d7ff"
 BRANCH = "release/18.x"
 
 BASEURI ??= "${LLVM_GIT}/llvm-project.git;protocol=${LLVM_GIT_PROTOCOL};branch=${BRANCH}"
 SRC_URI = "\
     ${BASEURI} \
-    file://0001-RISCV-MC-Add-support-for-Starfive-private-pref-instr.patch \
-    file://0002-RISCV-MC-Add-support-for-Starfive-private-CSR-instru.patch \
-    file://0003-Neon2Rvv-Support-type-conversion-between-fixed-vecto.patch \
-    file://0004-RISCV-Support-old-b-letter-represents-for-B-extensio.patch \
-    file://0005-RISCV-Keep-old-register-definitions-because-Dubhe-fo.patch \
-    file://0006-RISCV-Align-bare-metal-multilib-directories-with-gcc.patch \
-    file://0007-RISCV-Align-default-march-string-with-GCC.patch \
+    file://starfive/0001-Add-support-for-Starfive-private-pref-instruction.patch \
+    file://starfive/0002-Add-support-for-Starfive-private-CSR-instructions.patch \
+    file://starfive/0003-Support-type-conversion-between-fixed-vector-and-sca.patch \
+    file://starfive/0004-Support-old-b-letter-represents-for-B-extension.patch \
+    file://starfive/0005-Keep-old-register-definitions-because-Dubhe-follow-o.patch \
+    file://starfive/0006-Align-bare-metal-multilib-directories-with-gcc.patch \
+    file://starfive/0007-Align-default-march-string-with-GCC.patch \
     file://0001-libcxxabi-Find-libunwind-headers-when-LIBCXXABI_LIBU.patch \
     file://0002-compiler-rt-support-a-new-embedded-linux-target.patch \
     file://0003-compiler-rt-Simplify-cross-compilation.-Don-t-use-na.patch \

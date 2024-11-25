@@ -1,8 +1,8 @@
-From acfd9b54816b5c9cefaf9582d43a92aa157f7b55 Mon Sep 17 00:00:00 2001
+From fdd2056b2cc23c0c547fbdfbb2bcf041db2586bf Mon Sep 17 00:00:00 2001
 From: Eric Tang <eric.tang@starfivetech.com>
 Date: Fri, 2 Jun 2023 09:07:44 +0800
-Subject: [PATCH 3/7] [Neon2Rvv] Support type conversion between fixed vector
- and scalable vector
+Subject: [PATCH 3/7] Support type conversion between fixed vector and scalable
+ vector
 
 ---
  clang/include/clang/Basic/BuiltinsRISCV.def | 49 ++++++++++++++++++++

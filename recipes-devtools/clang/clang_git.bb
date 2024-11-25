@@ -27,14 +27,9 @@ inherit cmake cmake-native pkgconfig python3native python3targetconfig
 
 OECMAKE_FIND_ROOT_PATH_MODE_PROGRAM = "BOTH"
 
-def get_clang_experimental_arch(bb, d, arch_var):
-    import re
-    a = d.getVar(arch_var, True)
-    return ""
-
 def get_clang_arch(bb, d, arch_var):
     import re
-    a = d.getVar(arch_var, True)
+    a = d.getVar(arch_var)
     if   re.match('(i.86|athlon|x86.64)$', a):         return 'X86'
     elif re.match('arm$', a):                          return 'ARM'
     elif re.match('armeb$', a):                        return 'ARM'
@@ -55,10 +50,7 @@ def get_clang_host_arch(bb, d):
 def get_clang_target_arch(bb, d):
     return get_clang_arch(bb, d, 'TARGET_ARCH')
 
-def get_clang_experimental_target_arch(bb, d):
-    return get_clang_experimental_arch(bb, d, 'TARGET_ARCH')
-
-PACKAGECONFIG_CLANG_COMMON = "eh libedit rtti shared-libs \
+PACKAGECONFIG_CLANG_COMMON = "build-id eh libedit rtti shared-libs \
                               ${@bb.utils.contains('TC_CXX_RUNTIME', 'llvm', 'compiler-rt libcplusplus libomp unwindlib', '', d)} \
                               "
 
@@ -75,6 +67,7 @@ PACKAGECONFIG:class-nativesdk = "clangd \
                                  "
 
 PACKAGECONFIG[bootstrap] = "-DCLANG_ENABLE_BOOTSTRAP=On -DCLANG_BOOTSTRAP_PASSTHROUGH='${PASSTHROUGH}' -DBOOTSTRAP_LLVM_ENABLE_LTO=Thin -DBOOTSTRAP_LLVM_ENABLE_LLD=ON,,,"
+PACKAGECONFIG[build-id] = "-DENABLE_LINKER_BUILD_ID=ON,-DENABLE_LINKER_BUILD_ID=OFF,,"
 PACKAGECONFIG[clangd] = "-DCLANG_ENABLE_CLANGD=ON,-DCLANG_ENABLE_CLANGD=OFF,,"
 PACKAGECONFIG[compiler-rt] = "-DCLANG_DEFAULT_RTLIB=compiler-rt,,"
 PACKAGECONFIG[eh] = "-DLLVM_ENABLE_EH=ON,-DLLVM_ENABLE_EH=OFF,,"
@@ -120,7 +113,6 @@ LLVM_BUILD_TOOLS;LLVM_USE_HOST_TOOLS;LLVM_CONFIG_PATH;\
 LLVM_TARGETS_TO_BUILD ?= "AMDGPU;AArch64;ARM;BPF;Mips;PowerPC;RISCV;X86;LoongArch"
 
 LLVM_EXPERIMENTAL_TARGETS_TO_BUILD ?= ""
-LLVM_EXPERIMENTAL_TARGETS_TO_BUILD:append = ";${@get_clang_experimental_target_arch(bb, d)}"
 
 HF = ""
 HF:class-target = "${@ bb.utils.contains('TUNE_CCARGS_MFLOAT', 'hard', 'hf', '', d)}"
@@ -141,6 +133,7 @@ SOLIBSDEV:mingw32 = ".pyd"
 #CMAKE_VERBOSE = "VERBOSE=1"
 
 EXTRA_OECMAKE += "-DLLVM_ENABLE_ASSERTIONS=OFF \
+                  -DLLVM_APPEND_VC_REV=OFF \
                   -DLLVM_ENABLE_PER_TARGET_RUNTIME_DIR=OFF \
                   -DLLVM_ENABLE_EXPENSIVE_CHECKS=OFF \
                   -DLLVM_ENABLE_PIC=ON \
@@ -211,12 +204,21 @@ RRECOMMENDS:${PN} = "binutils"
 RRECOMMENDS:${PN}:append:class-target = " libcxx-dev"
 
 # patch out build host paths for reproducibility
-do_compile:prepend:class-target() {
-    sed -i -e "s,${STAGING_DIR_NATIVE},,g" \
-        -e "s,${STAGING_DIR_TARGET},,g" \
-        -e "s,${S},,g"  \
+reproducible_build_variables() {
+    sed -i -e "s,${DEBUG_PREFIX_MAP},,g" \
+        -e "s,--sysroot=${RECIPE_SYSROOT},,g" \
+        -e "s,${STAGING_DIR_HOST},,g" \
+        -e "s,${S}/llvm,,g"  \
         -e "s,${B},,g" \
         ${B}/tools/llvm-config/BuildVariables.inc
+}
+
+do_configure:append:class-target() {
+    reproducible_build_variables
+}
+
+do_configure:append:class-nativesdk() {
+    reproducible_build_variables
 }
 
 do_install:append() {
@@ -284,6 +286,9 @@ do_install:append:class-nativesdk () {
     ln -sf llvm-config ${D}${bindir}/llvm-config${PV}
     rm -rf ${D}${datadir}/llvm/cmake
     rm -rf ${D}${datadir}/llvm
+
+    #reproducibility
+    sed -i -e 's,${B},,g' ${D}${libdir}/cmake/llvm/LLVMConfig.cmake
 }
 
 PACKAGES =+ "${PN}-libllvm ${PN}-lldb-python ${PN}-libclang-cpp ${PN}-tidy ${PN}-format ${PN}-tools \
@@ -307,7 +312,7 @@ RDEPENDS:${PN}-tools += "\
 
 RRECOMMENDS:${PN}-tidy += "${PN}-tools"
 
-FILES:llvm-linker-tools = "${libdir}/LLVMgold* ${libdir}/LLVMPolly*"
+FILES:llvm-linker-tools = "${libdir}/LLVMgold* ${libdir}/libLTO.so.* ${libdir}/LLVMPolly*"
 
 FILES:${PN}-libclang-cpp = "${libdir}/libclang-cpp.so.*"
 
@@ -403,6 +408,7 @@ FILES:${PN}-dev += "\
   ${nonarch_libdir}/libear \
   ${nonarch_libdir}/${BPN}/*.la \
 "
+FILES:${PN}-doc += "${datadir}/clang-doc"
 
 FILES:${PN}-staticdev += "${nonarch_libdir}/${BPN}/*.a"
 

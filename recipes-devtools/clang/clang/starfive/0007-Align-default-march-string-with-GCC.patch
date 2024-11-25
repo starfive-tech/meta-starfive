@@ -1,7 +1,7 @@
-From 7433bfc90507136a9c7d714eaa88f68dbb72292d Mon Sep 17 00:00:00 2001
+From 46261c09a104038ca0c57f3b2e5fe40558d97044 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sun, 23 Jun 2024 15:48:21 -0700
-Subject: [PATCH 7/7] [RISCV] Align default march string with GCC
+Subject: [PATCH 7/7] Align default march string with GCC
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---

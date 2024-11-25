@@ -1,7 +1,7 @@
-From bb7bc0c9edc8f8cfcb1ae317429631bdd8f79ae6 Mon Sep 17 00:00:00 2001
+From 407942e2a83d2fe191c463959723b46c86d20b9e Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sun, 23 Jun 2024 23:09:17 -0700
-Subject: [PATCH 6/7] [RISCV] Align bare-metal multilib directories with gcc
+Subject: [PATCH 6/7] Align bare-metal multilib directories with gcc
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---

@@ -1,8 +1,7 @@
-From 1d8da6f5917d1226eaedadf452f99367904edabf Mon Sep 17 00:00:00 2001
+From ba01e8e1e9917c0a90514f1e5fae4b56c73672c5 Mon Sep 17 00:00:00 2001
 From: "yilun.xie" <yilun.xie@starfivetech.com>
 Date: Thu, 20 Jun 2024 14:40:25 +0800
-Subject: [PATCH 2/7] [RISCV][MC] Add support for Starfive private CSR
- instructions
+Subject: [PATCH 2/7] Add support for Starfive private CSR instructions
 
 ---
  llvm/lib/Target/RISCV/RISCVInstrFormats.td | 12 +++++++

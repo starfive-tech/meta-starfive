@@ -1,8 +1,7 @@
-From 0dffb7ebf887ef347ee2ea221f87ac2c1c90d1e4 Mon Sep 17 00:00:00 2001
+From 27afa655b86b88f96c2b5903545776c0daab291f Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Fri, 22 Dec 2023 02:23:33 -0800
-Subject: [PATCH 1/7] [RISCV][MC] Add support for Starfive private pref
- instruction
+Subject: [PATCH 1/7] Add support for Starfive private pref instruction
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---

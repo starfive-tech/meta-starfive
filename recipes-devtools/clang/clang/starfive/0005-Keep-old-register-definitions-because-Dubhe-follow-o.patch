@@ -1,8 +1,8 @@
-From 050162d4c94d291fb2fe628e0ac897eb4380d931 Mon Sep 17 00:00:00 2001
+From c1020e53ee366027a97a7a1cc19a1dabd2334f05 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Thu, 20 Jun 2024 21:59:22 -0700
-Subject: [PATCH 5/7] [RISCV] Keep old register definitions because Dubhe
- follow old spec
+Subject: [PATCH 5/7] Keep old register definitions because Dubhe follow old
+ spec
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---

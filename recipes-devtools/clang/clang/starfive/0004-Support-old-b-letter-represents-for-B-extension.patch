@@ -1,7 +1,7 @@
-From 7770769a54be19da4eab0438968615f1231a71a0 Mon Sep 17 00:00:00 2001
+From 1afcf0ef5eba865a537107ccee7db4754a07ac8e Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Fri, 15 Apr 2022 02:16:43 -0700
-Subject: [PATCH 4/7] [RISCV] Support old b letter represents for B extension
+Subject: [PATCH 4/7] Support old b letter represents for B extension
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---
