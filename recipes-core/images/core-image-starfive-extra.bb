@@ -5,24 +5,24 @@ require sd-image.inc
 DEPENDS += " opensbi u-boot-tools-native dtc-native"
 
 IMAGE_INSTALL = "\
-	packagegroup-core-boot \
-	${CORE_IMAGE_EXTRA_INSTALL} \
-	bmaptool \
-	systemd-analyze \
-	e2fsprogs-resize2fs \
-	parted \
-	ldd \
-	file \
-	git \
-	texinfo \
-	libcheck \
-	packagegroup-core-buildessential \
-	packagegroup-starfive-c \
-	packagegroup-starfive-essentials \
-	nodejs \
-	nodejs-npm \
-	i3c-tools \
-	"
+    packagegroup-core-boot \
+    ${CORE_IMAGE_EXTRA_INSTALL} \
+    bmaptool \
+    systemd-analyze \
+    e2fsprogs-resize2fs \
+    parted \
+    ldd \
+    file \
+    git \
+    texinfo \
+    libcheck \
+    packagegroup-core-buildessential \
+    packagegroup-starfive-c \
+    packagegroup-starfive-essentials \
+    nodejs \
+    nodejs-npm \
+    i3c-tools \
+    "
 
 TOOLCHAIN_TARGET_TASK += "packagegroup-starfive-toolchain"
 
