@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM:starfive-jh8100 = "file://Licenses/README;md5=2ca5f2c35c8cc335f
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2023.10"
-SRCREV:starfive-dubhe = "d9b70aaf1a76ce48374e83c323bdd4ed98871f56"
+BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2024.10"
+SRCREV:starfive-dubhe = "34023eeb776ca3ba40fb3b53b73305a22d802898"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel-v3.9.3"
@@ -22,32 +22,34 @@ BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_rebase_v2_2.0.8"
 SRCREV:starfive-jh8100 = "442d4f8d5bc53f52b88d1d410709f3441d4f94af"
 
 SRC_URI:starfive-dubhe = "\
-	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
-	file://run_qemu_virt.dtb \
-	file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
-	"
+    git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
+    file://run_qemu_virt.dtb \
+    file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
+    "
 
 SRC_URI:starfive-visionfive2 = "\
-	git://github.com/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
-	file://vf2_uEnv.txt \
-	file://vf2_nvme_uEnv.txt \
-	file://tftp-mmc-boot.txt \
-	file://visionfive2-fit-image.its \
-	file://uboot_disable_logo.patch \
-	"
+    git://github.com/${FORK}/u-boot.git;protocol=ssh;branch=${BRANCH} \
+    file://vf2_uEnv.txt \
+    file://vf2_nvme_uEnv.txt \
+    file://tftp-mmc-boot.txt \
+    file://visionfive2-fit-image.its \
+    file://uboot_disable_logo.patch \
+    "
 
 SRC_URI:starfive-jh8100 = "\
-	git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
-	file://tftp-mmc-boot.txt \
-	file://run_qemu_virt.dtb \
-	file://jh8100-fpga.bin.normal.out \
-	file://firmware.bin.normal.out \
-	file://uboot.env \
-	"
+    git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
+    file://tftp-mmc-boot.txt \
+    file://run_qemu_virt.dtb \
+    file://jh8100-fpga.bin.normal.out \
+    file://firmware.bin.normal.out \
+    file://uboot.env \
+    "
 
 DEPENDS:append:starfive-dubhe = " u-boot-tools-native bmaptool-native opensbi"
 DEPENDS:append:starfive-visionfive2 = " u-boot-tools-native starfive-tool-native"
 DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmaptool-native opensbi spltool-native"
+
+do_compile[depends] += "linux-starfive-dev:do_compile"
 
 # Overwrite this for your server
 TFTP_SERVER_IP ?= "127.0.0.1"
@@ -55,7 +57,7 @@ TFTP_SERVER_IP ?= "127.0.0.1"
 do_configure:prepend:starfive-visionfive2() {
     sed -i -e 's,@SERVERIP@,${TFTP_SERVER_IP},g' ${WORKDIR}/tftp-mmc-boot.txt
     mkimage -O linux -T script -C none -n "U-Boot boot script" \
-	-d ${WORKDIR}/tftp-mmc-boot.txt ${WORKDIR}/${UBOOT_ENV_BINARY}
+        -d ${WORKDIR}/tftp-mmc-boot.txt ${WORKDIR}/${UBOOT_ENV_BINARY}
 }
 
 do_configure:prepend:starfive-jh8100() {
@@ -66,6 +68,7 @@ do_configure:prepend:starfive-jh8100() {
 
 do_compile:prepend:starfive-dubhe() {
     export OPENSBI=${DEPLOY_DIR_IMAGE}/fw_dynamic.bin
+    cp ${DEPLOY_DIR_IMAGE}/kernel_fit/* ${S}
 }
 
 do_compile:prepend:starfive-jh8100() {
@@ -83,6 +86,7 @@ do_deploy:append:starfive-visionfive2() {
 
 do_deploy:append:starfive-dubhe() {
     install -m 644 ${B}/u-boot.itb ${DEPLOYDIR}/u-boot.itb
+    install -m 644 ${B}/kernel.itb ${DEPLOYDIR}/kernel.itb
     install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
 }
 
