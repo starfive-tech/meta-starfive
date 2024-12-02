@@ -99,20 +99,13 @@ IMAGE_CMD:qspi_sd() {
 do_create_output_folder() {
 }
 do_create_output_folder:starfive-dubhe() {
-        rm -rf ${DEPLOY_DIR_IMAGE}/Dubhe-*0
+        rm -rf ${DEPLOY_DIR_IMAGE}/Dubhe
 
-        mkdir -p ${DEPLOY_DIR_IMAGE}/Dubhe-80
-        cp ${DEPLOY_DIR_IMAGE}/${MACHINE}-qspi-firmware.bin ${DEPLOY_DIR_IMAGE}/Dubhe-80
-        cp ${DEPLOY_DIR_IMAGE}/Image ${DEPLOY_DIR_IMAGE}/Dubhe-80
-        cp ${DEPLOY_DIR_IMAGE}/Image-initramfs-${MACHINE}.bin ${DEPLOY_DIR_IMAGE}/Dubhe-80
-        cp ${DEPLOY_DIR_IMAGE}/${PN}-${MACHINE}.rootfs.tar.gz ${DEPLOY_DIR_IMAGE}/Dubhe-80/Image-nfs-${MACHINE}.tar.gz
-        cp ${DEPLOY_DIR_IMAGE}/Image-sd-${MACHINE}.img ${DEPLOY_DIR_IMAGE}/Dubhe-80
-
-        cp -r ${DEPLOY_DIR_IMAGE}/Dubhe-80 ${DEPLOY_DIR_IMAGE}/Dubhe-90
-        cp -r ${DEPLOY_DIR_IMAGE}/Dubhe-80 ${DEPLOY_DIR_IMAGE}/Dubhe-70
-
-	cp ${DEPLOY_DIR_IMAGE}/dubhe70_fpga.dtb ${DEPLOY_DIR_IMAGE}/Dubhe-70/dubhe_fpga.dtb
-        cp ${DEPLOY_DIR_IMAGE}/dubhe80_fpga.dtb ${DEPLOY_DIR_IMAGE}/Dubhe-80/dubhe_fpga.dtb
-        cp ${DEPLOY_DIR_IMAGE}/dubhe90_fpga.dtb ${DEPLOY_DIR_IMAGE}/Dubhe-90/dubhe_fpga.dtb
+        mkdir -p ${DEPLOY_DIR_IMAGE}/Dubhe
+        cp ${DEPLOY_DIR_IMAGE}/${MACHINE}-qspi-firmware.bin ${DEPLOY_DIR_IMAGE}/Dubhe
+        cp ${DEPLOY_DIR_IMAGE}/kernel.itb ${DEPLOY_DIR_IMAGE}/Dubhe
+        cp ${DEPLOY_DIR_IMAGE}/Image-initramfs-${MACHINE}.bin ${DEPLOY_DIR_IMAGE}/Dubhe
+        cp ${DEPLOY_DIR_IMAGE}/${PN}-${MACHINE}.rootfs.tar.gz ${DEPLOY_DIR_IMAGE}/Dubhe/Image-nfs-${MACHINE}.tar.gz
+        cp ${DEPLOY_DIR_IMAGE}/Image-sd-${MACHINE}.img ${DEPLOY_DIR_IMAGE}/Dubhe
 }
 addtask do_create_output_folder before do_populate_lic_deploy after do_image_complete
