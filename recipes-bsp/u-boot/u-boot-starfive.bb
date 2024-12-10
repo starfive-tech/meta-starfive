@@ -51,6 +51,11 @@ DEPENDS:append:starfive-jh8100 = " u-boot-tools-native bmaptool-native opensbi s
 
 do_compile[depends] += "linux-starfive-dev:do_compile"
 
+python __anonymous() {
+    if d.getVar('MACHINE') == "starfive-dubhe":
+        d.appendVarFlag('do_compile', 'depends', ' opensbi:do_deploy')
+}
+
 # Overwrite this for your server
 TFTP_SERVER_IP ?= "127.0.0.1"
 
