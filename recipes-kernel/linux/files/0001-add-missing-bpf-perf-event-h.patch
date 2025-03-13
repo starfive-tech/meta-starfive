@@ -1,0 +1,10 @@
+diff --git a/arch/um/include/asm/Kbuild b/arch/um/include/asm/Kbuild
+index 18f902da8e99..2e1007ff13b9 100644
+--- a/arch/um/include/asm/Kbuild
++++ b/arch/um/include/asm/Kbuild
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++generic-y += bpf_perf_event.h
+ generic-y += bug.h
+ generic-y += compat.h
+ generic-y += current.h

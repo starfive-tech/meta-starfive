@@ -118,7 +118,10 @@ EXTRA_OEMAKE += "\
 # perf's build system by default ignores any -j argument, but does
 # honour a JOBS variable.
 EXTRA_OEMAKE:append:task-configure = " JOBS=1"
-
+# the architectures that need this file can be found in
+#    tools/include/uapi/asm/bpf_perf_event.h
+# We are only listing supported arches at the moment
+PERF_BPF_EVENT_SRC ?= '${@bb.utils.contains_any("ARCH", [ "riscv", "arm64" ], "arch/${ARCH}/include/uapi/asm/bpf_perf_event.h", "", d)}'
 PERF_SRC ?= "Makefile \
              tools/arch \
              tools/build \
@@ -129,6 +132,7 @@ PERF_SRC ?= "Makefile \
              tools/scripts \
              scripts/ \
              arch/arm64/tools \
+             ${PERF_BPF_EVENT_SRC} \
              arch/${ARCH}/Makefile \
 "
 
@@ -354,7 +358,7 @@ RDEPENDS:${PN} += "elfutils bash"
 RDEPENDS:${PN}-archive =+ "bash"
 RDEPENDS:${PN}-python =+ "bash python3 python3-modules ${@bb.utils.contains('PACKAGECONFIG', 'audit', 'audit-python', '', d)}"
 RDEPENDS:${PN}-perl =+ "bash perl perl-modules"
-RDEPENDS:${PN}-tests =+ "python3 bash"
+RDEPENDS:${PN}-tests =+ "perl python3 bash"
 
 RSUGGESTS_SCRIPTING = "${@bb.utils.contains('PACKAGECONFIG', 'scripting', '${PN}-perl ${PN}-python', '',d)}"
 RSUGGESTS:${PN} += "${PN}-archive ${PN}-tests ${RSUGGESTS_SCRIPTING}"
