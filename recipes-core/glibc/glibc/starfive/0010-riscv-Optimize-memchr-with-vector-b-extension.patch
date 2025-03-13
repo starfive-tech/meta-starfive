@@ -1,0 +1,258 @@
+From 81d5474f78f99fa9fa9366a10b1e5f0f768c3163 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sat, 29 Jun 2024 19:11:08 -0700
+Subject: [PATCH 10/17] riscv: Optimize memchr with vector & b extension
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ sysdeps/riscv/multiarch/memchr_generic.S      | 92 +++++++++++++++++++
+ sysdeps/riscv/multiarch/memchr_vector.S       | 42 +++++++++
+ .../unix/sysv/linux/riscv/multiarch/Makefile  |  2 +
+ .../linux/riscv/multiarch/ifunc-impl-list.c   |  5 +
+ .../unix/sysv/linux/riscv/multiarch/memchr.c  | 56 +++++++++++
+ 5 files changed, 197 insertions(+)
+ create mode 100644 sysdeps/riscv/multiarch/memchr_generic.S
+ create mode 100644 sysdeps/riscv/multiarch/memchr_vector.S
+ create mode 100644 sysdeps/unix/sysv/linux/riscv/multiarch/memchr.c
+
+diff --git a/sysdeps/riscv/multiarch/memchr_generic.S b/sysdeps/riscv/multiarch/memchr_generic.S
+new file mode 100644
+index 0000000000..a9a943e2f1
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memchr_generic.S
+@@ -0,0 +1,92 @@
++/* The assembly function for memchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++.option arch, +zbb
++
++	.p2align 6
++ENTRY (__memchr_generic)
++    beqz    a2, .L_not_find
++    li      a4, 9
++    bltu    a2, a4, .L_0_to_8
++    neg     a4, a0
++    andi    a4, a4, 0x7
++    beqz    a4, .L_dst_aligned
++.L_0_to_8:
++    min     a4, a4, a2
++.L_head:
++    sub     a2, a2, a4
++0:
++    lbu     a3, 0(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
++    addi    a0, a0, 1
++    bnez    a4, 0b
++    beqz    a2, .L_not_find
++
++.L_dst_aligned:
++    andi    a4, a2, (16-1)
++    srli    a2, a2, 4
++    beqz    a2, .L_tail
++    
++    slli    a3, a1, 8
++    or      a1, a1, a3
++    slli    a3, a1, 16
++    or      a1, a1, a3
++    slli    a3, a1, 32
++    or      a1, a1, a3
++    li      a5, -1
++    .p2align 3
++.L_loop:
++    ld      a3, 0(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find
++    addi    a0, a0, 8
++    
++    ld      a3, 0(a0)
++    xor     a3, a3, a1
++    orc.b   a3, a3
++    bne     a3, a5, .L_find
++    
++    addi    a2, a2, -1
++    add     a0, a0, 8
++    bnez    a2, .L_loop
++    beqz    a4, .L_not_find
++
++.L_tail:
++    andi    a1, a1, 0xff
++0:
++    lbu     a3, 0(a0)
++    beq     a1, a3, .L_find_byte
++    addi    a4, a4, -1
++    addi    a0, a0, 1
++    bnez    a4, 0b
++
++.L_not_find:
++    li      a0, 0
++    ret
++.L_find:
++    not     a3, a3
++    ctz     a3, a3
++    srli    a3, a3, 3
++    add     a0, a0, a3
++.L_find_byte:
++    ret
++END (__memchr_generic)
+\ No newline at end of file
+diff --git a/sysdeps/riscv/multiarch/memchr_vector.S b/sysdeps/riscv/multiarch/memchr_vector.S
+new file mode 100644
+index 0000000000..a0bc0315c3
+--- /dev/null
++++ b/sysdeps/riscv/multiarch/memchr_vector.S
+@@ -0,0 +1,42 @@
++/* The assembly function for memchr.  RISC-V version.
++   Copyright (C) 2018 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library.  If not, see
++   <http://www.gnu.org/licenses/>.  */
++
++#include <sysdep.h>
++
++/* For __riscv_vector this file defines memchr.  */
++	.p2align 6
++ENTRY (__memchr_vector)
++   zext.b	a1,a1
++.L_memchr_loop:
++   vsetvli	a3,a2,e8,m8,tu,mu
++   vle8ff.v	v0,(a0)
++   vmseq.vx	v8,v0,a1
++   csrr	a3,vl
++   vfirst.m	a4,v8
++   sub	a2,a2,a3
++   bgez	a4,.L_found
++   add	a0,a0,a3
++   bltu	zero,a2,.L_memchr_loop
++.L_found:
++   bltz	a4,.L_not_found
++   add	a0,a0,a4
++   ret
++.L_not_found:
++   add	a0,zero,zero
++   ret
++END (__memchr_vector)
+\ No newline at end of file
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+index 8d3df8edcf..7d17cabdf9 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/Makefile
+@@ -4,6 +4,8 @@ sysdep_routines += \
+   memcpy-generic \
+   memcpy_noalignment \
+   memcpy_vector \
++  memchr_generic \
++  memchr_vector \
+   # sysdep_routines
+ 
+ CFLAGS-memcpy_noalignment.c += -mno-strict-align
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+index c0ec1eb1b5..2561ae7e1a 100644
+--- a/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/ifunc-impl-list.c
+@@ -49,5 +49,10 @@ __libc_ifunc_impl_list (const char *name, struct libc_ifunc_impl *array,
+ 			      __memcpy_noalignment)
+ 	      IFUNC_IMPL_ADD (array, i, memcpy, 1, __memcpy_generic))
+ 
++  IFUNC_IMPL (i, name, memchr,
++	      IFUNC_IMPL_ADD (array, i, memchr, support_vector,
++			      __memchr_vector)
++	      IFUNC_IMPL_ADD (array, i, memchr, 1, __memchr_generic))
++
+   return 0;
+ }
+diff --git a/sysdeps/unix/sysv/linux/riscv/multiarch/memchr.c b/sysdeps/unix/sysv/linux/riscv/multiarch/memchr.c
+new file mode 100644
+index 0000000000..5c1a97cc45
+--- /dev/null
++++ b/sysdeps/unix/sysv/linux/riscv/multiarch/memchr.c
+@@ -0,0 +1,56 @@
++/* Multiple versions of memchr.
++   All versions must be listed in ifunc-impl-list.c.
++   Copyright (C) 2017-2024 Free Software Foundation, Inc.
++   This file is part of the GNU C Library.
++
++   The GNU C Library is free software; you can redistribute it and/or
++   modify it under the terms of the GNU Lesser General Public
++   License as published by the Free Software Foundation; either
++   version 2.1 of the License, or (at your option) any later version.
++
++   The GNU C Library is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++   Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public
++   License along with the GNU C Library; if not, see
++   <https://www.gnu.org/licenses/>.  */
++
++#if IS_IN (libc)
++/* Redefine memchr so that the compiler won't complain about the type
++   mismatch with the IFUNC selector in strong_alias, below.  */
++# undef memchr
++# define memchr __redirect_memchr
++# include <stdint.h>
++# include <string.h>
++# include <ifunc-init.h>
++# include <riscv-ifunc.h>
++# include <sys/hwprobe.h>
++
++extern __typeof (__redirect_memchr) __libc_memchr;
++
++extern __typeof (__redirect_memchr) __memchr_generic attribute_hidden;
++extern __typeof (__redirect_memchr) __memchr_vector attribute_hidden;
++
++static inline __typeof (__redirect_memchr) *
++select_memchr_ifunc (uint64_t dl_hwcap, __riscv_hwprobe_t hwprobe_func)
++{
++  unsigned long long int v;
++  if (__riscv_hwprobe_one (hwprobe_func, RISCV_HWPROBE_KEY_IMA_EXT_0, &v) == 0
++      && (v & RISCV_HWPROBE_IMA_V))
++    return __memchr_vector;
++  return __memchr_generic;
++}
++
++riscv_libc_ifunc (__libc_memchr, select_memchr_ifunc);
++
++# undef memchr
++strong_alias (__libc_memchr, memchr);
++# ifdef SHARED
++__hidden_ver1 (memchr, __GI_memchr, __redirect_memchr)
++__attribute__ ((visibility ("hidden"))) __attribute_copy__ (memchr);
++# endif
++#else
++# include <string/memchr.c>
++#endif
+-- 
+2.25.1
+

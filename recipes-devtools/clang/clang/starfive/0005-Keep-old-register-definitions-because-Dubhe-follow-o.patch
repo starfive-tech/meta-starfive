@@ -1,0 +1,51 @@
+From c1020e53ee366027a97a7a1cc19a1dabd2334f05 Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Thu, 20 Jun 2024 21:59:22 -0700
+Subject: [PATCH 5/7] Keep old register definitions because Dubhe follow old
+ spec
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ llvm/lib/Target/RISCV/RISCVSystemOperands.td | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/llvm/lib/Target/RISCV/RISCVSystemOperands.td b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+index 43475e825b46..c66bc37f0786 100644
+--- a/llvm/lib/Target/RISCV/RISCVSystemOperands.td
++++ b/llvm/lib/Target/RISCV/RISCVSystemOperands.td
+@@ -66,6 +66,23 @@ def lookupSysRegByDeprecatedName : SearchIndex {
+   let Key = [ "DeprecatedName" ];
+ }
+ 
++//===----------------------------------------------------------------------===//
++// User Trap Setup
++//===----------------------------------------------------------------------===//
++def : SysReg<"ustatus", 0x000>;
++def : SysReg<"uie", 0x004>;
++def : SysReg<"utvec", 0x005>;
++
++//===----------------------------------------------------------------------===//
++// User Trap Handling
++//===----------------------------------------------------------------------===//
++def : SysReg<"uscratch", 0x040>;
++def : SysReg<"uepc", 0x041>;
++def : SysReg<"ucause", 0x042>;
++let DeprecatedName = "ubadaddr" in
++def : SysReg<"utval", 0x043>;
++def : SysReg<"uip", 0x044>;
++
+ // The following CSR encodings match those given in Tables 2.2,
+ // 2.3, 2.4, 2.5 and 2.6 in the RISC-V Instruction Set Manual
+ // Volume II: Privileged Architecture.
+@@ -103,6 +120,8 @@ foreach i = 3...31 in
+ // Supervisor Trap Setup
+ //===----------------------------------------------------------------------===//
+ def : SysReg<"sstatus", 0x100>;
++def : SysReg<"sedeleg", 0x102>;
++def : SysReg<"sideleg", 0x103>;
+ def : SysReg<"sie", 0x104>;
+ def : SysReg<"stvec", 0x105>;
+ def : SysReg<"scounteren", 0x106>;
+-- 
+2.25.1
+

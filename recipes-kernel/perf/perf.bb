@@ -69,6 +69,14 @@ SPDX_S = "${S}/tools/perf"
 # supported kernel.
 LDFLAGS="-ldl -lutil"
 
+# Perf's build system adds its own optimization flags for most TUs,
+# overriding the flags included here. But for some, perf does not add
+# any -O option, so ensure the distro's chosen optimization gets used
+# for those. Also include ${DEBUG_PREFIX_MAP} which ensures perf is
+# built with appropriate -f*-prefix-map options,
+# avoiding the 'buildpaths' QA warning.
+TARGET_CC_ARCH += "${SELECTED_OPTIMIZATION} ${DEBUG_PREFIX_MAP}"
+
 EXTRA_OEMAKE = '\
     V=1 \
     -C ${S}/tools/perf \
@@ -120,6 +128,7 @@ PERF_SRC ?= "Makefile \
              tools/perf \
              tools/scripts \
              scripts/ \
+             arch/arm64/tools \
              arch/${ARCH}/Makefile \
 "
 
@@ -161,7 +170,8 @@ python copy_perf_source_from_kernel() {
         src = oe.path.join(src_dir, s)
         dest = oe.path.join(dest_dir, s)
         if not os.path.exists(src):
-            bb.fatal("Path does not exist: %s. Maybe PERF_SRC does not match the kernel version." % src)
+            bb.warn("Path does not exist: %s. Maybe PERF_SRC lists more files than what your kernel version provides and needs." % src)
+            continue
         if os.path.isdir(src):
             oe.path.copyhardlinktree(src, dest)
         else:
@@ -206,14 +216,18 @@ do_configure:prepend () {
     if [ -e "${S}/tools/perf/Makefile.perf" ]; then
         sed -i -e 's,\ .config-detected, $(OUTPUT)/config-detected,g' \
             ${S}/tools/perf/Makefile.perf
+        # Variant with linux-yocto-specific patch
         sed -i -e "s,prefix='\$(DESTDIR_SQ)/usr'$,prefix='\$(DESTDIR_SQ)/usr' --install-lib='\$(PYTHON_SITEPACKAGES_DIR)' --root='\$(DESTDIR)',g" \
+            ${S}/tools/perf/Makefile.perf
+        # Variant for mainline Linux
+        sed -i -e "s,root='/\$(DESTDIR_SQ)',prefix='\$(DESTDIR_SQ)/usr' --install-lib='\$(PYTHON_SITEPACKAGES_DIR)' --root='/\$(DESTDIR_SQ)',g" \
             ${S}/tools/perf/Makefile.perf
         # backport https://github.com/torvalds/linux/commit/e4ffd066ff440a57097e9140fa9e16ceef905de8
         sed -i -e 's,\($(Q)$(SHELL) .$(arch_errno_tbl).\) $(CC) $(arch_errno_hdr_dir),\1 $(firstword $(CC)) $(arch_errno_hdr_dir),g' \
             ${S}/tools/perf/Makefile.perf
     fi
     sed -i -e "s,--root='/\$(DESTDIR_SQ)',--prefix='\$(DESTDIR_SQ)/usr' --install-lib='\$(DESTDIR)\$(PYTHON_SITEPACKAGES_DIR)',g" \
-        ${S}/tools/perf/Makefile*
+        ${S}/tools/perf/Makefile
 
     if [ -e "${S}/tools/build/Makefile.build" ]; then
         sed -i -e 's,\ .config-detected, $(OUTPUT)/config-detected,g' \

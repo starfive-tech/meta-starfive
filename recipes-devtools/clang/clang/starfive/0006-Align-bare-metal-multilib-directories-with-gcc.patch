@@ -1,0 +1,33 @@
+From 407942e2a83d2fe191c463959723b46c86d20b9e Mon Sep 17 00:00:00 2001
+From: "max.ma" <max.ma@starfivetech.com>
+Date: Sun, 23 Jun 2024 23:09:17 -0700
+Subject: [PATCH 6/7] Align bare-metal multilib directories with gcc
+
+Signed-off-by: max.ma <max.ma@starfivetech.com>
+---
+ clang/lib/Driver/ToolChains/Gnu.cpp | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/clang/lib/Driver/ToolChains/Gnu.cpp b/clang/lib/Driver/ToolChains/Gnu.cpp
+index e5e1b1d77269..62cbf9140602 100644
+--- a/clang/lib/Driver/ToolChains/Gnu.cpp
++++ b/clang/lib/Driver/ToolChains/Gnu.cpp
+@@ -1852,9 +1852,12 @@ static void findRISCVBareMetalMultilibs(const Driver &D,
+   // currently only support the set of multilibs like riscv-gnu-toolchain does.
+   // TODO: support MULTILIB_REUSE
+   constexpr RiscvMultilib RISCVMultilibSet[] = {
+-      {"rv32i", "ilp32"},     {"rv32im", "ilp32"},     {"rv32iac", "ilp32"},
+-      {"rv32imac", "ilp32"},  {"rv32imafc", "ilp32f"}, {"rv64imac", "lp64"},
+-      {"rv64imafdc", "lp64d"}};
++      {"rv64imafdc_zicsr_zifencei", "lp64d"},
++      {"rv64imafdc_zicsr_zifencei_zba_zbb_zbc_zbs", "lp64d"},
++      {"rv64imafdcv_zicsr_zifencei_zve32f_zve32x_zve64d_zve64f_zve64x_zvl128b_"
++       "zvl256b_zvl32b_zvl64b", "lp64d"},
++      {"rv64imafdcv_zicsr_zifencei_zba_zbb_zbc_zbs_zve32f_zve32x_zve64d_zve64f_"
++       "zve64x_zvl128b_zvl256b_zvl32b_zvl64b", "lp64d"}};
+ 
+   std::vector<MultilibBuilder> Ms;
+   for (auto Element : RISCVMultilibSet) {
+-- 
+2.25.1
+
