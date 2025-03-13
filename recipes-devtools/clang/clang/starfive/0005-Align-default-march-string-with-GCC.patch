@@ -1,7 +1,7 @@
-From 46261c09a104038ca0c57f3b2e5fe40558d97044 Mon Sep 17 00:00:00 2001
+From 186dcab913b668f8239ad8d1f18e3767d416863a Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sun, 23 Jun 2024 15:48:21 -0700
-Subject: [PATCH 7/7] Align default march string with GCC
+Subject: [PATCH 5/5] Align default march string with GCC
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---
@@ -9,10 +9,10 @@ Signed-off-by: max.ma <max.ma@starfivetech.com>
  1 file changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
-index a46b44f9ad2b..a01d29728fa4 100644
+index 149a31f58e75..1a8d6e773e91 100644
 --- a/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
 +++ b/clang/lib/Driver/ToolChains/Arch/RISCV.cpp
-@@ -317,12 +317,7 @@ StringRef riscv::getRISCVArch(const llvm::opt::ArgList &Args,
+@@ -368,12 +368,7 @@ std::string riscv::getRISCVArch(const llvm::opt::ArgList &Args,
      else
        return "rv32imafdc";
    } else {

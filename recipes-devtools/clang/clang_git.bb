@@ -1,7 +1,16 @@
 # Copyright (C) 2014 Khem Raj <raj.khem@gmail.com>
 # Released under the MIT license (see COPYING.MIT for the terms)
 
-DESCRIPTION = "LLVM based C/C++ compiler"
+SUMMARY = "LLVM based C/C++ compiler"
+DESCRIPTION = "Clang is an LLVM based C/C++/Objective-C compiler, \
+                which aims to deliver amazingly fast compiles, \
+                extremely useful error and warning messages and \
+                to provide a platform for building great source \
+                level tools. The Clang Static Analyzer and \
+                clang-tidy are tools that automatically find bugs \
+                in your code, and are great examples of the sort \
+                of tools that can be built using the Clang frontend \
+                as a library to parse C/C++ code"
 HOMEPAGE = "http://clang.llvm.org/"
 SECTION = "devel"
 
@@ -74,6 +83,7 @@ PACKAGECONFIG[eh] = "-DLLVM_ENABLE_EH=ON,-DLLVM_ENABLE_EH=OFF,,"
 PACKAGECONFIG[libcplusplus] = "-DCLANG_DEFAULT_CXX_STDLIB=libc++,,"
 PACKAGECONFIG[libedit] = "-DLLVM_ENABLE_LIBEDIT=ON -DLLDB_ENABLE_LIBEDIT=ON,-DLLVM_ENABLE_LIBEDIT=OFF -DLLDB_ENABLE_LIBEDIT=OFF,libedit libedit-native"
 PACKAGECONFIG[libomp] = "-DCLANG_DEFAULT_OPENMP_RUNTIME=libomp,,"
+PACKAGECONFIG[lld] = "-DCLANG_DEFAULT_LINKER=lld,,"
 PACKAGECONFIG[lldb-lua] = "-DLLDB_ENABLE_LUA=ON,-DLLDB_ENABLE_LUA=OFF,lua"
 PACKAGECONFIG[lldb-wchar] = "-DLLDB_EDITLINE_USE_WCHAR=1,-DLLDB_EDITLINE_USE_WCHAR=0,"
 PACKAGECONFIG[lto] = "-DLLVM_ENABLE_LTO=Full -DLLVM_BINUTILS_INCDIR=${STAGING_INCDIR},,binutils,"
@@ -120,9 +130,8 @@ HF[vardepvalue] = "${HF}"
 
 LLVM_PROJECTS ?= "clang;clang-tools-extra;lld${LLDB}"
 LLDB ?= ";lldb"
-# LLDB support for RISCV/Mips32 does not work yet
+# LLDB support for RISCV32/Mips32 does not work yet
 LLDB:riscv32 = ""
-LLDB:riscv64 = ""
 LLDB:mips = ""
 LLDB:mipsel = ""
 LLDB:powerpc = ""
@@ -162,7 +171,7 @@ EXTRA_OECMAKE:append:class-native = "\
 "
 EXTRA_OECMAKE:append:class-nativesdk = "\
                   -DCROSS_TOOLCHAIN_FLAGS_NATIVE='-DLLDB_PYTHON_RELATIVE_PATH=${PYTHON_SITEPACKAGES_DIR} \
-                                                  -DLLDB_PYTHON_EXE_RELATIVE_PATH=${PYTHON} \
+                                                  -DLLDB_PYTHON_EXE_RELATIVE_PATH=${PYTHON_PN} \
                                                   -DLLDB_PYTHON_EXT_SUFFIX=${SOLIBSDEV} \
                                                   -DCMAKE_TOOLCHAIN_FILE=${WORKDIR}/toolchain-native.cmake' \
                   -DCMAKE_RANLIB=${STAGING_BINDIR_TOOLCHAIN}/${TARGET_PREFIX}llvm-ranlib \
@@ -173,7 +182,7 @@ EXTRA_OECMAKE:append:class-nativesdk = "\
                   -DLLVM_HEADERS_TABLEGEN=${STAGING_BINDIR_NATIVE}/llvm-min-tblgen \
                   -DPYTHON_LIBRARY=${STAGING_LIBDIR}/lib${PYTHON_DIR}${PYTHON_ABI}.so \
                   -DLLDB_PYTHON_RELATIVE_PATH=${PYTHON_SITEPACKAGES_DIR} \
-                  -DLLDB_PYTHON_EXE_RELATIVE_PATH=${PYTHON} \
+                  -DLLDB_PYTHON_EXE_RELATIVE_PATH=${PYTHON_PN} \
                   -DLLDB_PYTHON_EXT_SUFFIX=${SOLIBSDEV} \
                   -DPYTHON_INCLUDE_DIR=${STAGING_INCDIR}/${PYTHON_DIR}${PYTHON_ABI} \
                   -DPYTHON_EXECUTABLE='${PYTHON}' \
@@ -197,7 +206,7 @@ EXTRA_OECMAKE:append:class-target = "\
 "
 
 DEPENDS = "binutils zlib zstd libffi libxml2 libxml2-native ninja-native swig-native"
-DEPENDS:append:class-nativesdk = " clang-crosssdk-${SDK_ARCH} virtual/${TARGET_PREFIX}binutils nativesdk-python3"
+DEPENDS:append:class-nativesdk = " clang-crosssdk-${SDK_SYS} virtual/${TARGET_PREFIX}binutils nativesdk-python3"
 DEPENDS:append:class-target = " clang-cross-${TARGET_ARCH} python3 compiler-rt libcxx"
 
 RRECOMMENDS:${PN} = "binutils"
@@ -223,6 +232,11 @@ do_configure:append:class-nativesdk() {
 
 do_install:append() {
     rm -rf ${D}${libdir}/python*/site-packages/six.py
+    for t in clang-pseudo clang-pseudo-gen clang-rename; do
+        if [ -e ${B}${BINPATHPREFIX}/bin/$t ]; then
+            install -Dm 0755 ${B}${BINPATHPREFIX}/bin/$t ${D}${bindir}/$t
+        fi
+    done
 }
 
 do_install:append:class-target () {
@@ -256,7 +270,6 @@ do_install:append:class-native () {
     if ${@bb.utils.contains('PACKAGECONFIG', 'clangd', 'true', 'false', d)}; then
         install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clangd-indexer ${D}${bindir}/clangd-indexer
     fi
-    install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-pseudo-gen ${D}${bindir}/clang-pseudo-gen
     install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-tidy-confusable-chars-gen ${D}${bindir}/clang-tidy-confusable-chars-gen
     install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-tblgen ${D}${bindir}/clang-tblgen
     install -Dm 0755 ${B}${BINPATHPREFIX}/bin/lldb-tblgen ${D}${bindir}/lldb-tblgen
@@ -276,7 +289,6 @@ do_install:append:class-nativesdk () {
         install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clangd-indexer ${D}${bindir}/clangd-indexer
     fi
     install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-tblgen ${D}${bindir}/clang-tblgen
-    install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-pseudo-gen ${D}${bindir}/clang-pseudo-gen
     install -Dm 0755 ${B}${BINPATHPREFIX}/bin/clang-tidy-confusable-chars-gen ${D}${bindir}/clang-tidy-confusable-chars-gen
     for f in `find ${D}${bindir} -executable -type f -not -type l`; do
         test -n "`file -b $f|grep -i ELF`" && ${STRIP} $f
@@ -334,10 +346,10 @@ FILES:${PN}-tools = "${bindir}/analyze-build \
   ${bindir}/clang-nvlink-wrapper \
   ${bindir}/clang-offload-bundler \
   ${bindir}/clang-offload-packager \
-  ${bindir}/clang-pseudo \
+  ${bindir}/clang-pseudo* \
   ${bindir}/clang-query \
   ${bindir}/clang-refactor \
-  ${bindir}/clang-rename \
+  ${bindir}/clang-rename* \
   ${bindir}/clang-reorder-fields \
   ${bindir}/clang-repl \
   ${bindir}/clang-scan-deps \
@@ -445,9 +457,9 @@ clang_sysroot_preprocess() {
 
 	binaries="lld diagtool clang-${MAJOR_VER} clang-format clang-offload-packager
 	                clang-offload-bundler clang-scan-deps clang-repl
-	                clang-rename clang-refactor clang-check clang-extdef-mapping clang-apply-replacements
+	                clang-refactor clang-check clang-extdef-mapping clang-apply-replacements
 	                clang-reorder-fields clang-tidy clang-change-namespace clang-doc clang-include-fixer
-	                find-all-symbols clang-move clang-query pp-trace clang-pseudo modularize"
+	                find-all-symbols clang-move clang-query pp-trace modularize"
 
 	if ${@bb.utils.contains('PACKAGECONFIG', 'clangd', 'true', 'false', d)}; then
 	        binaries="${binaries} clangd"

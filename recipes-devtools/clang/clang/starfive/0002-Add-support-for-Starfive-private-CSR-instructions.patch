@@ -1,7 +1,7 @@
-From ba01e8e1e9917c0a90514f1e5fae4b56c73672c5 Mon Sep 17 00:00:00 2001
+From 3cc17d15d317209678c75bc9bd2058f7551f6f8b Mon Sep 17 00:00:00 2001
 From: "yilun.xie" <yilun.xie@starfivetech.com>
 Date: Thu, 20 Jun 2024 14:40:25 +0800
-Subject: [PATCH 2/7] Add support for Starfive private CSR instructions
+Subject: [PATCH 2/5] Add support for Starfive private CSR instructions
 
 ---
  llvm/lib/Target/RISCV/RISCVInstrFormats.td | 12 +++++++
@@ -11,10 +11,10 @@ Subject: [PATCH 2/7] Add support for Starfive private CSR instructions
  create mode 100644 llvm/test/MC/RISCV/StarFiveCSR-valid.s
 
 diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
-index 96fbd33838f1..4b162f8f4379 100644
+index b91e6d153105..66ad7bd2ab46 100644
 --- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
 +++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
-@@ -401,6 +401,18 @@ class RVInstPref<RISCVOpcode opcode, dag outs, dag ins,
+@@ -403,6 +403,18 @@ class RVInstPref<RISCVOpcode opcode, dag outs, dag ins,
    let Inst{6-0} = opcode.Value;
  }
  
@@ -34,10 +34,10 @@ index 96fbd33838f1..4b162f8f4379 100644
                     dag outs, dag ins, string opcodestr, string argstr>
      : RVInstIBase<funct3, opcode, outs, ins, opcodestr, argstr> {
 diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
-index 7563d595e78f..28827ac07868 100644
+index 4dcdd9f3a808..76dc2dd885fa 100644
 --- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
 +++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
-@@ -593,6 +593,12 @@ class ShiftW_ri<bits<7> imm11_5, bits<3> funct3, string opcodestr>
+@@ -599,6 +599,12 @@ class ShiftW_ri<bits<7> imm11_5, bits<3> funct3, string opcodestr>
                      "$rd, $rs1, $shamt">,
        Sched<[WriteShiftImm32, ReadShiftImm32]>;
  
@@ -50,7 +50,7 @@ index 7563d595e78f..28827ac07868 100644
  let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
  class ALUW_rr<bits<7> funct7, bits<3> funct3, string opcodestr,
                bit Commutable = 0>
-@@ -761,6 +767,11 @@ def CSRRWI : CSR_ii<0b101, "csrrwi">;
+@@ -767,6 +773,11 @@ def CSRRWI : CSR_ii<0b101, "csrrwi">;
  def CSRRSI : CSR_ii<0b110, "csrrsi">;
  def CSRRCI : CSR_ii<0b111, "csrrci">;
  

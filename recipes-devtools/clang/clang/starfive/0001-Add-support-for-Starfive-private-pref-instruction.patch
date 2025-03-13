@@ -1,7 +1,7 @@
-From 27afa655b86b88f96c2b5903545776c0daab291f Mon Sep 17 00:00:00 2001
+From ce11130c74ee4bc80213d1fcff8096a979598fab Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Fri, 22 Dec 2023 02:23:33 -0800
-Subject: [PATCH 1/7] Add support for Starfive private pref instruction
+Subject: [PATCH 1/5] Add support for Starfive private pref instruction
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>
 ---
@@ -16,10 +16,10 @@ Signed-off-by: max.ma <max.ma@starfivetech.com>
  create mode 100644 llvm/test/MC/RISCV/StarfiveCache-valid.s
 
 diff --git a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
-index f6e8386aff45..32ab97a02fea 100644
+index a288e7d884d3..d96bcc5b5702 100644
 --- a/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
 +++ b/llvm/lib/Target/RISCV/AsmParser/RISCVAsmParser.cpp
-@@ -767,6 +767,15 @@ public:
+@@ -777,6 +777,15 @@ public:
             VK == RISCVMCExpr::VK_RISCV_None;
    }
  
@@ -35,7 +35,7 @@ index f6e8386aff45..32ab97a02fea 100644
    bool isSImm6NonZero() const {
      if (!isImm())
        return false;
-@@ -966,6 +975,17 @@ public:
+@@ -996,6 +1005,17 @@ public:
             VK == RISCVMCExpr::VK_RISCV_None;
    }
  
@@ -53,7 +53,7 @@ index f6e8386aff45..32ab97a02fea 100644
    /// getStartLoc - Gets location of the first token of this operand
    SMLoc getStartLoc() const override { return StartLoc; }
    /// getEndLoc - Gets location of the last token of this operand
-@@ -1484,6 +1504,9 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
+@@ -1514,6 +1534,9 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
    case Match_InvalidSImm6:
      return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 5),
                                        (1 << 5) - 1);
@@ -63,7 +63,7 @@ index f6e8386aff45..32ab97a02fea 100644
    case Match_InvalidSImm6NonZero:
      return generateImmOutOfRangeError(
          Operands, ErrorInfo, -(1 << 5), (1 << 5) - 1,
-@@ -1559,6 +1582,10 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
+@@ -1597,6 +1620,10 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
                                        "operand must be a valid system register "
                                        "name or an integer in the range");
    }
@@ -75,30 +75,30 @@ index f6e8386aff45..32ab97a02fea 100644
      SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
      return Error(ErrorLoc, "operand must be a valid floating-point constant");
 diff --git a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
-index d7f7859ce439..ebb31879dac0 100644
+index 626206962e75..65aef0391e82 100644
 --- a/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
 +++ b/llvm/lib/Target/RISCV/MCTargetDesc/RISCVBaseInfo.h
-@@ -284,6 +284,7 @@ enum OperandType : unsigned {
+@@ -268,6 +268,7 @@ enum OperandType : unsigned {
    OPERAND_UIMM2_LSB0,
    OPERAND_UIMM3,
    OPERAND_UIMM4,
 +  OPERAND_UIMM4_PREF,
    OPERAND_UIMM5,
+   OPERAND_UIMM5_LSB0,
    OPERAND_UIMM6,
-   OPERAND_UIMM7,
-@@ -294,6 +295,7 @@ enum OperandType : unsigned {
+@@ -280,6 +281,7 @@ enum OperandType : unsigned {
    OPERAND_UIMM8_GE32,
    OPERAND_UIMM9_LSB000,
    OPERAND_UIMM10_LSB00_NONZERO,
 +  OPERAND_SIMM8,
    OPERAND_UIMM12,
-   OPERAND_ZERO,
-   OPERAND_SIMM5,
+   OPERAND_UIMM16,
+   OPERAND_UIMM32,
 diff --git a/llvm/lib/Target/RISCV/RISCVInstrFormats.td b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
-index f56f49ae2457..96fbd33838f1 100644
+index a5c8524d05cb..b91e6d153105 100644
 --- a/llvm/lib/Target/RISCV/RISCVInstrFormats.td
 +++ b/llvm/lib/Target/RISCV/RISCVInstrFormats.td
-@@ -385,6 +385,22 @@ class RVInstI<bits<3> funct3, RISCVOpcode opcode, dag outs, dag ins,
+@@ -387,6 +387,22 @@ class RVInstI<bits<3> funct3, RISCVOpcode opcode, dag outs, dag ins,
    let Inst{31-20} = imm12;
  }
  
@@ -122,10 +122,10 @@ index f56f49ae2457..96fbd33838f1 100644
                     dag outs, dag ins, string opcodestr, string argstr>
      : RVInstIBase<funct3, opcode, outs, ins, opcodestr, argstr> {
 diff --git a/llvm/lib/Target/RISCV/RISCVInstrInfo.td b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
-index 114329c2c7c5..7563d595e78f 100644
+index 04054d2c3fee..4dcdd9f3a808 100644
 --- a/llvm/lib/Target/RISCV/RISCVInstrInfo.td
 +++ b/llvm/lib/Target/RISCV/RISCVInstrInfo.td
-@@ -238,6 +238,22 @@ def simm12 : RISCVSImmLeafOp<12> {
+@@ -244,6 +244,22 @@ def simm12 : RISCVSImmLeafOp<12> {
    }];
  }
  
@@ -148,7 +148,7 @@ index 114329c2c7c5..7563d595e78f 100644
  // A 12-bit signed immediate which cannot fit in 6-bit signed immediate,
  // but even negative value fit in 12-bit.
  def simm12_no6 : ImmLeaf<XLenVT, [{
-@@ -597,6 +613,12 @@ class Priv_rr<string opcodestr, bits<7> funct7>
+@@ -603,6 +619,12 @@ class Priv_rr<string opcodestr, bits<7> funct7>
    let rd = 0;
  }
  
@@ -161,7 +161,7 @@ index 114329c2c7c5..7563d595e78f 100644
  //===----------------------------------------------------------------------===//
  // Instructions
  //===----------------------------------------------------------------------===//
-@@ -770,6 +792,7 @@ def SRAW  : ALUW_rr<0b0100000, 0b101, "sraw">,
+@@ -776,6 +798,7 @@ def SRAW  : ALUW_rr<0b0100000, 0b101, "sraw">,
  } // IsSignExtendingOpW = 1
  } // Predicates = [IsRV64]
  
