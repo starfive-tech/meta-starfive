@@ -25,6 +25,7 @@ SRC_URI:starfive-dubhe = "\
     git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
     file://run_qemu_virt.dtb \
     file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
+    file://0002-configs-starfive_dubhe_fpga_defconfig-Enable-saveenv.patch \
     "
 
 SRC_URI:starfive-visionfive2 = "\
