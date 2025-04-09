@@ -9,15 +9,15 @@ SRCREV = "${AUTOREV}"
 BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "starfive-6.6.63-dubhe"
-SRCREV:starfive-dubhe = "aa7eaea608ab33b1f6b9ace31fe62ec582c90113"
+BRANCH:starfive-dubhe = "starfive-6.12.15-dubhe"
+SRCREV:starfive-dubhe = "0c28bd15d4849bf172a714d40af0725be3e2ceca"
 
 FORK:starfive-jh8100 = "starfive-tech"
 BRANCH:starfive-jh8100 = "starfive-6.6.10-dev-external-jh8100"
 SRCREV:starfive-jh8100 = "9da8129da97b9fb9fb1662475935f52e546b9385"
 
 LINUX_VERSION ?= "6.6.10"
-LINUX_VERSION:starfive-dubhe = "6.6.63"
+LINUX_VERSION:starfive-dubhe = "6.12.15"
 LINUX_VERSION:starfive-jh8100 = "6.6.10"
 
 LINUX_VERSION_EXTENSTION:append:starfive-dubhe = "-starlight"
