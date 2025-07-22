@@ -10,14 +10,14 @@ do_configure[depends] += "virtual/kernel:do_shared_workdir"
 inherit kernel-arch
 
 SRC_URI = " \
-	git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git;branch=master \
-	file://external-crosscompiler.patch \
-	file://0001-kvmtool-9p-fixed-compilation-error.patch \
-	file://0002-kvmtool-add-EXTRA_CFLAGS-variable.patch \
-	file://0003-kvmtool-Werror-disabled.patch \
-	"
+    git://git.kernel.org/pub/scm/linux/kernel/git/will/kvmtool.git;branch=master \
+    file://external-crosscompiler.patch \
+    file://0001-kvmtool-9p-fixed-compilation-error.patch \
+    file://0002-kvmtool-add-EXTRA_CFLAGS-variable.patch \
+    file://0003-kvmtool-Werror-disabled.patch \
+    "
 
-SRCREV = "336751fb10ef24e65cd2f25c450da1d52ff5b33c"
+SRCREV = "e48563f5c4a48fe6a6bc2a98a9a7c84a10f043be"
 PV = "5.10.0+git${SRCPV}"
 
 S = "${WORKDIR}/git"

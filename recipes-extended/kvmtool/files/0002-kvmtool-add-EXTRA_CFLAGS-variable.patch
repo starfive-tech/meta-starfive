@@ -24,5 +24,5 @@ index c05b2c0..2ce753f 100644
 +CFLAGS += $(EXTRA_CFLAGS)
 +
  ifeq ($(strip $(V)),)
- 	ifeq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+ 	ifeq ($(findstring s,$(filter-out --%,$(firstword $(MAKEFLAGS)))),)
  		E = @echo

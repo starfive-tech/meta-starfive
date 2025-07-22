@@ -20,5 +20,5 @@ index 2ce753f..fe2e3cb 100644
  
 +WERROR = 0
  ifeq ($(strip $(V)),)
- 	ifeq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+ 	ifeq ($(findstring s,$(filter-out --%,$(firstword $(MAKEFLAGS)))),)
  		E = @echo
