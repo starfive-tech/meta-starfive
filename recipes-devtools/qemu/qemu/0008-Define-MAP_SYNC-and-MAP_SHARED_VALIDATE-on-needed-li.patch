@@ -1,7 +1,7 @@
-From ebf4bb2f51da83af0c61480414cfa156f7308b34 Mon Sep 17 00:00:00 2001
+From aa00914a01cc969f6061097cc8e597b528465ad6 Mon Sep 17 00:00:00 2001
 From: Khem Raj <raj.khem@gmail.com>
 Date: Mon, 21 Mar 2022 10:09:38 -0700
-Subject: [PATCH 09/12] Define MAP_SYNC and MAP_SHARED_VALIDATE on needed linux
+Subject: [PATCH] Define MAP_SYNC and MAP_SHARED_VALIDATE on needed linux
  systems
 
 linux only wires MAP_SYNC and MAP_SHARED_VALIDATE for architectures
@@ -13,13 +13,12 @@ Upstream-Status: Submitted [https://lists.nongnu.org/archive/html/qemu-devel/202
 Signed-off-by: Khem Raj <raj.khem@gmail.com>
 Cc: Zhang Yi <yi.z.zhang@linux.intel.com>
 Cc: Michael S. Tsirkin <mst@redhat.com>
-
 ---
  util/mmap-alloc.c | 10 +++++++---
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/util/mmap-alloc.c b/util/mmap-alloc.c
-index 893d86435..86d3cda24 100644
+index ed14f9c64..038f5b4b5 100644
 --- a/util/mmap-alloc.c
 +++ b/util/mmap-alloc.c
 @@ -10,14 +10,18 @@
@@ -44,6 +43,3 @@ index 893d86435..86d3cda24 100644
  #include "qemu/mmap-alloc.h"
  #include "qemu/host-utils.h"
  #include "qemu/cutils.h"
--- 
-2.30.2
-

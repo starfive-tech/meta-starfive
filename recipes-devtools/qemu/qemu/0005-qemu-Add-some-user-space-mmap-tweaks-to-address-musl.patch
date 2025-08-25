@@ -1,8 +1,7 @@
-From 375cae3dd6151ef33cae8f243f6a2c2da6c0c356 Mon Sep 17 00:00:00 2001
+From 8ab2b722da7868c507cfdd67ae6d535c8ba36f53 Mon Sep 17 00:00:00 2001
 From: Richard Purdie <richard.purdie@linuxfoundation.org>
 Date: Fri, 8 Jan 2021 17:27:06 +0000
-Subject: [PATCH 06/12] qemu: Add some user space mmap tweaks to address musl
- 32 bit
+Subject: [PATCH] qemu: Add some user space mmap tweaks to address musl 32 bit
 
 When using qemu-i386 to build qemux86 webkitgtk on musl, it sits in an
 infinite loop of mremap calls of ever decreasing/increasing addresses.
@@ -18,16 +17,15 @@ rather than ENOMEM so adjust the other part of the test to this.
 
 Upstream-Status: Submitted [https://lists.gnu.org/archive/html/qemu-devel/2021-01/msg01355.html]
 Signed-off-by: Richard Purdie <richard.purdie@linuxfoundation.org
-
 ---
  linux-user/mmap.c | 10 +++++++---
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/linux-user/mmap.c b/linux-user/mmap.c
-index c125031b9..e651834a5 100644
+index d1f36e6f1..26ccf8f4d 100644
 --- a/linux-user/mmap.c
 +++ b/linux-user/mmap.c
-@@ -749,12 +749,16 @@ abi_long target_mremap(abi_ulong old_addr, abi_ulong old_size,
+@@ -1108,12 +1108,16 @@ abi_long target_mremap(abi_ulong old_addr, abi_ulong old_size,
      int prot;
      void *host_addr;
  
@@ -47,6 +45,3 @@ index c125031b9..e651834a5 100644
          return -1;
      }
  
--- 
-2.30.2
-
