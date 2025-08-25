@@ -2,14 +2,11 @@
 
 <manifest>
   <remote name="openembedded" fetch="https://github.com/openembedded/" />
-  <default remote="openembedded" revision="master" />
   <remote name="starfive" fetch="https://github.com/starfive-tech" />
-  <remote name="kraj" fetch="https://github.com/kraj" />
   <remote name="yoctoproject" fetch="https://github.com/yoctoproject" />
 
-  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="scarthgap" />
-  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-scarthgap" />
-  <project name="meta-clang" remote="kraj" path="meta-clang" revision="scarthgap" />
-  <project name="poky" remote="yoctoproject" path="poky" revision="scarthgap" />
+  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="ab5cd440b38f704bd45fd5b9944158c0f2fd35c8" />
+  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-walnascar" />
+  <project name="poky" remote="yoctoproject" path="poky" revision="b30351ca09e0aad9e9ee9bcc2651dbf0c12da73a" />
 
 </manifest>
