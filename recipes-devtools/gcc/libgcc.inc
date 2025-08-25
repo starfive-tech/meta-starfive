@@ -1,6 +1,6 @@
 require libgcc-common.inc
 
-DEPENDS = "virtual/${TARGET_PREFIX}gcc virtual/${TARGET_PREFIX}g++ virtual/${MLPREFIX}libc"
+DEPENDS = "virtual/cross-cc virtual/cross-c++ virtual/${MLPREFIX}libc"
 
 do_install:append:class-target () {
 	if [ "${TCLIBC}" != "glibc" ]; then
@@ -35,7 +35,6 @@ PACKAGES = "\
 LICENSE:${PN} = "GPL-3.0-with-GCC-exception"
 LICENSE:${PN}-dev = "GPL-3.0-with-GCC-exception"
 LICENSE:${PN}-dbg = "GPL-3.0-with-GCC-exception"
-
 
 FILES:${PN}-dev = "\
     ${base_libdir}/libgcc*.so \

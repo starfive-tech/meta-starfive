@@ -1,17 +1,18 @@
-From d152c0aeecc88b096deb210ddba36742a548dd4d Mon Sep 17 00:00:00 2001
+From ede43bd5bc429624f75808ca1060be15b05c2b23 Mon Sep 17 00:00:00 2001
 From: "demin.han" <demin.han@starfivetech.com>
 Date: Wed, 15 Mar 2023 15:22:49 +0800
-Subject: [PATCH 3/7] default enable align-functions=16 and align-loops=8
+Upstream-Status: Inappropriate [riscv-specific]
+Subject: [PATCH 1/1] default enable align-functions=16 and align-loops=8
 
 ---
  gcc/config/riscv/riscv.cc | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
 diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
-index 2841787d93e..9c6f9ca243e 100644
+index d3656a7a430..bd2b71230d3 100644
 --- a/gcc/config/riscv/riscv.cc
 +++ b/gcc/config/riscv/riscv.cc
-@@ -9247,6 +9247,19 @@ riscv_override_options_internal (struct gcc_options *opts)
+@@ -10628,6 +10628,19 @@ riscv_override_options_internal (struct gcc_options *opts)
    if (opts->x_riscv_branch_cost == 0)
      opts->x_riscv_branch_cost = tune_param->branch_cost;
  
@@ -32,5 +33,5 @@ index 2841787d93e..9c6f9ca243e 100644
       both GET_MODE_SIZE and GET_MODE_BITSIZE are poly_uint16.
  
 -- 
-2.25.1
+2.43.0
 

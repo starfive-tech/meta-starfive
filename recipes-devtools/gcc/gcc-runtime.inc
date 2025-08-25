@@ -144,6 +144,11 @@ do_install:append:class-target () {
 		ln -sf ../${X86ARCH32}${TARGET_VENDOR}-${TARGET_OS} ${D}${includedir}/c++/${BINV}/${TARGET_ARCH}${TARGET_VENDOR}-${TARGET_OS}/32
 	fi
 
+	if [ "${TARGET_ARCH}" = "riscv32" -o "${TARGET_ARCH}" = "riscv64" ] && [ -z "${MULTILIB_VARIANTS}" ]; then
+		mv ${D}${includedir}/c++/${BINV}/${TARGET_SYS}/bits/* ${D}${includedir}/c++/${BINV}/bits
+		mv ${D}${includedir}/c++/${BINV}/${TARGET_SYS}/ext/* ${D}${includedir}/c++/${BINV}/ext
+	fi
+
 	if [ "${TCLIBC}" != "glibc" ]; then
 		case "${TARGET_OS}" in
 			"linux-musl" | "linux-*spe") extra_target_os="linux";;
@@ -156,8 +161,9 @@ do_install:append:class-target () {
 }
 
 INHIBIT_DEFAULT_DEPS = "1"
-DEPENDS = "virtual/${TARGET_PREFIX}gcc virtual/${TARGET_PREFIX}g++ libgcc virtual/${MLPREFIX}libc"
-PROVIDES = "virtual/${TARGET_PREFIX}compilerlibs"
+DEPENDS = "virtual/cross-cc virtual/cross-c++ ${MLPREFIX}libgcc virtual/${MLPREFIX}libc"
+DEPENDS:class-nativesdk = "virtual/nativesdk-cross-cc virtual/nativesdk-cross-c++ ${MLPREFIX}libgcc virtual/${MLPREFIX}libc"
+PROVIDES = "virtual/${MLPREFIX}compilerlibs"
 
 BBCLASSEXTEND = "nativesdk"
 
@@ -204,6 +210,7 @@ FILES:libstdc++-dev = "\
     ${libdir}/libstdc++.so \
     ${libdir}/libstdc++*.la \
     ${libdir}/libsupc++.la \
+    ${libdir}/libstdc++.modules.json \
 "
 SUMMARY:libstdc++-dev = "GNU standard C++ library - development files"
 FILES:libstdc++-staticdev = "\

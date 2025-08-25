@@ -2,13 +2,15 @@ require gcc-common.inc
 
 # Third digit in PV should be incremented after a minor release
 
-PV = "14.2.1"
+PV = "15.1.0"
 
 # BINV should be incremented to a revision after a minor gcc release
 
-BINV = "14.2.1"
+BINV = "15.1.0"
 
 FILESEXTRAPATHS =. "${FILE_DIRNAME}/gcc:${FILE_DIRNAME}/gcc/backport:"
+
+TOOLCHAIN = "gcc"
 
 DEPENDS =+ "mpfr gmp libmpc zlib zstd flex-native"
 NATIVEDEPS = "mpfr-native gmp-native libmpc-native zlib-native flex-native zstd-native"
@@ -31,28 +33,19 @@ LIC_FILES_CHKSUM = "\
 #SRC_URI[sha256sum] = "41bf7be5dc029112a9df625266e7de030ffc36ff3638f270b180ae8c91fe6449"
 
 # from snapshot
-#RELEASE ?= "14-20240504"
+#RELEASE ?= "15-20250420"
+#RELEASE ?= "15.1.0-RC-20250418"
 #BASEURI ?= "https://gcc.gnu.org/pub/gcc/snapshots/${RELEASE}/gcc-${RELEASE}.tar.xz"
 #SOURCEDIR ?= "gcc-${RELEASE}"
-#SRC_URI[sha256sum] = "34ac232bbf31e0cd5752fd344c2cf55719aaaad2ca0096593e01c97a3d5e274e"
+#SRC_URI[sha256sum] = "fe18624317c6c662977eea8b5a506ec6c132fc11c7a8d53e2f6d21b139b0af3c"
 
 # official release
 RELEASE ?= "${PV}"
-#BASEURI ?= "${GNU_MIRROR}/gcc/gcc-${PV}/gcc-${PV}.tar.xz"
-BASEURI = "git://github.com/gcc-mirror/gcc.git"
-BRANCH = "releases/gcc-14"
-SRCREV = "5c1955f563a5776529841608bee03de2a45d19a1"
+BASEURI ?= "${GNU_MIRROR}/gcc/gcc-${PV}/gcc-${PV}.tar.xz"
 SOURCEDIR ?= "gcc-${PV}"
-SRC_URI[sha256sum] = "a7b39bc69cbf9e25826c5a60ab26477001f7c08d85cec04bc0e29cabed6f3cc9"
+SRC_URI[sha256sum] = "e2b09ec21660f01fecffb715e0120265216943f038d0e48a9868713e54f06cea"
 
-SRC_URI = "${BASEURI};protocol=https;branch=${BRANCH};subdir=${TMPDIR}/work-shared/gcc-${PV}-${PR}/${SOURCEDIR} \
-           file://starfive/0001-RISCV-Support-b-letter-for-representation-of-B-exten.patch \
-           file://starfive/0002-RISCV-Add-multilib-config-for-baremetal.patch \
-           file://starfive/0003-default-enable-align-functions-16-and-align-loops-8.patch \
-           file://starfive/0004-RISCV-Fix-multilib-config-for-baremetal.patch \
-           file://starfive/0005-ira-Increase-the-frequency-of-BB-in-inner-loop.patch \
-           file://starfive/0006-add-xstcmo-option-and-starfive-dubhe-core.patch \
-           file://starfive/0007-add-starfive-dubhe-fusion-patterns.patch \
+SRC_URI = "${BASEURI} \
            file://0001-gcc-4.3.1-ARCH_FLAGS_FOR_TARGET.patch \
            file://0002-gcc-poison-system-directories.patch \
            file://0003-64-bit-multilib-hack.patch \
@@ -78,14 +71,19 @@ SRC_URI = "${BASEURI};protocol=https;branch=${BRANCH};subdir=${TMPDIR}/work-shar
            file://0023-Fix-install-path-of-linux64.h.patch \
            file://0024-Avoid-hardcoded-build-paths-into-ppc-libgcc.patch \
            file://0025-gcc-testsuite-tweaks-for-mips-OE.patch \
+           file://0026-arm-fully-validate-mem_noofs_operand-PR120351.patch \
+           file://0026-fix-incorrect-preprocessor-line-numbers.patch \
+           file://0027-aarch64-Fix-fma-steering-when-rename-fails-PR120119.patch \
+           file://0028-libsanitizer-Fix-build-with-glibc-2.42.patch \
+           file://starfive/0001-default-enable-align-functions-16-and-align-loops-8.patch \
 "
 
-S = "${TMPDIR}/work-shared/gcc-${PV}-${PR}/${SOURCEDIR}"
+UNPACKDIR = "${TMPDIR}/work-shared/gcc-${PV}-${PR}/sources"
+S = "${UNPACKDIR}/${SOURCEDIR}"
 B = "${WORKDIR}/gcc-${PV}/build.${HOST_SYS}.${TARGET_SYS}"
 
 # Language Overrides
-FORTRAN = ""
-JAVA = ""
+FORTRAN ?= ""
 
 SSP ?= "--disable-libssp"
 SSP:mingw32 = "--enable-libssp"
