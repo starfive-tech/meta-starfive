@@ -52,7 +52,6 @@ bitbake-layers add-layer ../meta-openembedded/meta-gnome
 bitbake-layers add-layer ../meta-openembedded/meta-xfce
 bitbake-layers add-layer ../meta-openembedded/meta-webserver
 bitbake-layers add-layer ../meta-starfive
-bitbake-layers add-layer ../meta-clang
 
 # fix the configuration
 echo "Creating auto.conf"
