@@ -5,7 +5,7 @@ SUMMARY = "This is the canonical git mirror of the LLVM subversion repository."
 HOMEPAGE = "https://github.com/llvm/llvm-project"
 
 require llvm-project-source.inc
-require clang.inc
+require common-clang.inc
 
 BPN = "llvm-project-source"
 

@@ -5,10 +5,10 @@ SUMMARY = "LLVM OpenMP compiler Runtime"
 HOMEPAGE = "https://openmp.llvm.org/"
 SECTION = "libs"
 
-require clang.inc
+require common-clang.inc
 require common-source.inc
 
-TOOLCHAIN = "clang"
+BPN = "openmp"
 
 LIC_FILES_CHKSUM = "file://openmp/LICENSE.TXT;md5=d75288d1ce0450b28b8d58a284c09c79"
 

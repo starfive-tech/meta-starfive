@@ -6,16 +6,18 @@ LIC_FILES_CHKSUM = "file://llvm/LICENSE.TXT;md5=${LLVMMD5SUM} \
 LICENSE = "Apache-2.0-with-LLVM-exception"
 
 # Snapshot
-#RELEASE ?= "7ba7d8e2f7b6445b60679da826210cdde29eaf8b"
+#RELEASE ?= "a69568efe6c4972e71af295c6577b3412dd57c22"
 #BASEURI ?= "https://api.github.com/repos/llvm/llvm-project/tarball/${RELEASE};downloadfilename=llvm-${PV}-${RELEASE}.tar.gz"
 #SOURCEDIR ?= "llvm-llvm-project-${@'${RELEASE}'[0:7]}"
-#SRC_URI[sha256sum] = "cca3fa1c6efb72bd8bc22b926a2c5551e6b8560d95828452bc62b9140cb87a90"
+#SRC_URI[sha256sum] = "aed4f66cd72867b36cc55a0588436933c3d58d3e61ca782b6bf57605d3fdcb09"
 
 # GA Release
 RELEASE ?= "${PV}"
 BASEURI ?= "${LLVM_HTTP}/llvm-project/releases/download/llvmorg-${PV}/llvm-project-${PV}.src.tar.xz"
+UPSTREAM_CHECK_URI = "${LLVM_HTTP}/llvm-project/releases/"
+UPSTREAM_CHECK_REGEX = "releases/tag/llvmorg-?(?P<pver>\d+(\.\d+)+)"
 SOURCEDIR ?= "llvm-project-${PV}.src"
-SRC_URI[sha256sum] = "e3f79317adaa9196d2cfffe1c869d7c100b7540832bc44fe0d3f44a12861fa34"
+SRC_URI[sha256sum] = "cd8fd55d97ad3e360b1d5aaf98388d1f70dfffb7df36beee478be3b839ff9008"
 
 SRC_URI = "\
     ${BASEURI} \
@@ -36,31 +38,38 @@ SRC_URI = "\
     file://0015-clang-Fix-resource-dir-location-for-cross-toolchains.patch \
     file://0016-clang-driver-Add-dyld-prefix-when-checking-sysroot-f.patch \
     file://0017-clang-Use-python3-in-python-scripts.patch \
-    file://0018-For-x86_64-set-Yocto-based-GCC-install-search-path.patch \
-    file://0019-llvm-Insert-anchor-for-adding-OE-distro-vendor-names.patch \
-    file://0020-compiler-rt-Do-not-use-backtrace-APIs-on-non-glibc-l.patch \
-    file://0021-clang-Fix-x86-triple-for-non-debian-multiarch-linux-.patch \
-    file://0022-libunwind-Added-unw_backtrace-method.patch \
-    file://0023-clang-Do-not-use-install-relative-libc-headers.patch \
-    file://0024-Fix-lib-paths-for-OpenEmbedded-Host.patch \
-    file://0025-Correct-library-search-path-for-OpenEmbedded-Host.patch \
-    file://0026-lldb-Link-with-libatomic-on-x86.patch \
-    file://0027-compiler-rt-Enable-__int128-for-ppc32.patch \
-    file://0028-llvm-Do-not-use-cmake-infra-to-detect-libzstd.patch \
-    file://0029-compiler-rt-Fix-stat-struct-s-size-for-O32-ABI.patch \
-    file://0030-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
-    file://0031-ToolChains-Gnu.cpp-ARMLibDirs-search-also-in-lib32.patch \
-    file://0032-clang-llvm-Add-OE-specific-ABI-triple-for-N32-ABI.patch \
-    file://0033-llvm-Add-libunwind.pc.in-and-llvm-config-scripts.patch \
-    file://0034-scan-build-py-respect-LLVM_LIBDIR_SUFFIX-like-other-.patch \
+    file://0018-llvm-clang-Insert-anchor-for-adding-OE-distro-vendor.patch \
+    file://0019-compiler-rt-Do-not-use-backtrace-APIs-on-non-glibc-l.patch \ 
+    file://0020-clang-Fix-x86-triple-for-non-debian-multiarch-linux-.patch \
+    file://0021-libunwind-Added-unw_backtrace-method.patch \
+    file://0022-lldb-Link-with-libatomic-on-x86.patch \
+    file://0023-compiler-rt-Enable-__int128-for-ppc32.patch \
+    file://0024-llvm-Do-not-use-cmake-infra-to-detect-libzstd.patch \
+    file://0025-compiler-rt-Fix-stat-struct-s-size-for-O32-ABI.patch \
+    file://0026-compiler-rt-Undef-_TIME_BITS-along-with-_FILE_OFFSET.patch \
+    file://0027-ToolChains-Gnu.cpp-ARMLibDirs-search-also-in-lib32.patch \
+    file://0028-clang-llvm-Add-OE-specific-ABI-triple-for-N32-ABI.patch \
+    file://0029-llvm-Add-libunwind.pc.in-and-llvm-config-scripts.patch \
+    file://0030-scan-build-py-respect-LLVM_LIBDIR_SUFFIX-like-other-.patch \
+    file://0031-compiler-rt-Do-not-pass-target-to-clang-compiler.patch \
+    file://0032-clangd-Add-a-build-option-to-disable-building-dexp.patch \
+    file://0033-AsmMatcherEmitter-sort-ClassInfo-lists-by-name-as-we.patch \
+    file://0034-llvm-config-remove-LLVM_LDFLAGS-from-ldflags-output.patch \
+    file://0035-openmp-Do-not-emit-date-and-time-into-generate-files.patch \
+    file://0036-libunwind-Use-gcs-instead-of-gcs-target-attribute.patch \
+    file://0037-compiler-rt-Exclude-sync_fetch_and_-for-any-pre-ARMv.patch \
+    file://0038-compiler-rt-Hardcode-uptr-sptr-typedefs-on-Mips-Linu.patch \
 "
 # Fallback to no-PIE if not set
 GCCPIE ??= ""
 
-S = "${TMPDIR}/work-shared/llvm-project-source-${PV}-${PR}/${SOURCEDIR}"
+UNPACKDIR = "${TMPDIR}/work-shared/llvm-project-source-${PV}-${PR}/sources"
+S = "${UNPACKDIR}/${SOURCEDIR}"
 B ?= "${WORKDIR}/llvm-project-source-${PV}/build.${HOST_SYS}.${TARGET_SYS}"
 
 # We need to ensure that for the shared work directory, the do_patch signatures match
 # The real WORKDIR location isn't a dependency for the shared workdir.
 src_patches[vardepsexclude] = "WORKDIR"
 should_apply[vardepsexclude] += "PN"
+
+CVE_PRODUCT = "llvm:llvm"

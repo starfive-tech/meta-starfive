@@ -35,14 +35,14 @@ CLANG_EXTRA_OE_VENDORS ?= "${TARGET_VENDOR} ${SDK_VENDOR}"
 # eg: "poky:poky wrlinux:wrs"
 CLANG_EXTRA_OE_DISTRO ?= "poky:poky"
 # Match with MULTILIB_GLOBAL_VARIANTS
-MULTILIB_VARIANTS = "lib32 lib64 libx32"
+ML_VARIANTS = "lib32 lib64 libx32"
 
 python do_preconfigure() {
     import subprocess
     case = ""
     triple = ""
     vendors = d.getVar('CLANG_EXTRA_OE_VENDORS')
-    multilib_variants = (d.getVar("MULTILIB_VARIANTS") or "").split()
+    multilib_variants = (d.getVar("ML_VARIANTS") or "").split()
     vendors_to_add = []
     for vendor in vendors.split():
         # convert -yoe into yoe
@@ -65,7 +65,6 @@ python do_preconfigure() {
     subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
     cmd = d.expand("sed -i 's#//CLANG_EXTRA_OE_VENDORS_CASES#%s#g' -i ${S}/llvm/lib/TargetParser/Triple.cpp" % (case))
     subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
-
 
     case = ""
     triple = ""
@@ -94,6 +93,6 @@ python do_preconfigure() {
     subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
 }
 
-do_patch[vardepsexclude] = "MULTILIBS"
+do_patch[vardepsexclude] += "MULTILIBS MULTILIB_VARIANTS"
 addtask do_preconfigure after do_patch
 do_create_spdx[depends] += "${PN}:do_preconfigure"

@@ -5,10 +5,12 @@ SUMMARY = "libc++ is a new implementation of the C++ standard library, targeting
 HOMEPAGE = "http://libcxx.llvm.org/"
 SECTION = "base"
 
-require clang.inc
+require common-clang.inc
 require common-source.inc
 
-inherit cmake cmake-native python3native
+inherit cmake python3native
+
+BPN = "libcxx"
 
 PACKAGECONFIG ??= "compiler-rt exceptions ${@bb.utils.contains("TC_CXX_RUNTIME", "llvm", "unwind unwind-shared", "", d)}"
 PACKAGECONFIG:append:armv5 = " no-atomics"
@@ -20,9 +22,10 @@ PACKAGECONFIG[compiler-rt] = "-DLIBCXX_USE_COMPILER_RT=ON -DLIBCXXABI_USE_COMPIL
 PACKAGECONFIG[unwind-shared] = "-DLIBUNWIND_ENABLE_SHARED=ON,-DLIBUNWIND_ENABLE_SHARED=OFF,,"
 
 DEPENDS += "ninja-native"
-DEPENDS:append:class-target = " clang-cross-${TARGET_ARCH} virtual/${MLPREFIX}libc virtual/${TARGET_PREFIX}compilerlibs"
-DEPENDS:append:class-nativesdk = " clang-crosssdk-${SDK_SYS} nativesdk-compiler-rt"
+DEPENDS:append:class-target = " virtual/cross-c++ clang-cross-${TARGET_ARCH} virtual/${MLPREFIX}libc virtual/${MLPREFIX}compilerlibs"
+DEPENDS:append:class-nativesdk = " virtual/cross-c++ clang-crosssdk-${SDK_SYS} nativesdk-compiler-rt"
 DEPENDS:append:class-native = " clang-native compiler-rt-native"
+DEPENDS:remove:class-native = "libcxx-native"
 
 COMPILER_RT ?= "${@bb.utils.contains("PACKAGECONFIG", "compiler-rt", "-rtlib=compiler-rt", "-rtlib=libgcc", d)}"
 UNWINDLIB ?= "${@bb.utils.contains("PACKAGECONFIG", "unwind", "-unwindlib=none", "-unwindlib=libgcc", d)}"
@@ -45,6 +48,16 @@ LIC_FILES_CHKSUM = "file://libcxx/LICENSE.TXT;md5=55d89dd7eec8d3b4204b680e27da39
 OECMAKE_TARGET_COMPILE = "${@bb.utils.contains("TC_CXX_RUNTIME", "llvm", "unwind", "", d)} cxxabi cxx"
 OECMAKE_TARGET_INSTALL = "${@bb.utils.contains("TC_CXX_RUNTIME", "llvm", "install-unwind", "", d)} install-cxxabi install-cxx"
 
+CC = "${CCACHE}${HOST_PREFIX}clang ${HOST_CC_ARCH}${TOOLCHAIN_OPTIONS}"
+CXX = "${CCACHE}${HOST_PREFIX}clang++ ${HOST_CC_ARCH}${TOOLCHAIN_OPTIONS}"
+BUILD_CC = "${CCACHE}clang ${BUILD_CC_ARCH}"
+BUILD_CXX = "${CCACHE}clang++ ${BUILD_CC_ARCH}"
+LDFLAGS += "${COMPILER_RT} ${UNWINDLIB} ${LIBCPLUSPLUS}"
+CXXFLAGS += "${LIBCPLUSPLUS}"
+
+TOOLCHAIN = "clang"
+TOOLCHAIN_NATIVE = "clang"
+
 OECMAKE_SOURCEPATH = "${S}/llvm"
 EXTRA_OECMAKE += "\
                   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -62,7 +75,7 @@ EXTRA_OECMAKE += "\
                   -DLIBCXX_CXX_ABI_LIBRARY_PATH=${B}/lib${LLVM_LIBDIR_SUFFIX} \
                   -S ${S}/runtimes \
                   -DLLVM_ENABLE_RUNTIMES='libcxx;libcxxabi;libunwind' \
-                  -DLLVM_RUNTIME_TARGETS=${HOST_SYS} \
+                  -DLLVM_RUNTIME_TARGETS=${HOST_ARCH} \
                   -DLLVM_LIBDIR_SUFFIX=${LLVM_LIBDIR_SUFFIX} \
                   -DLLVM_APPEND_VC_REV=OFF \
                   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
@@ -72,7 +85,7 @@ EXTRA_OECMAKE:append:class-target = " \
                   -DCMAKE_AR=${STAGING_BINDIR_TOOLCHAIN}/${AR} \
                   -DCMAKE_NM=${STAGING_BINDIR_TOOLCHAIN}/${NM} \
                   -DCMAKE_RANLIB=${STAGING_BINDIR_TOOLCHAIN}/${RANLIB} \
-                  -DLLVM_DEFAULT_TARGET_TRIPLE=${HOST_SYS} \
+                  -DLLVM_HOST_TRIPLE=${TARGET_SYS} \
                   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 "
 
@@ -109,7 +122,3 @@ FILES:libunwind:runtime-llvm = "${libdir}/libunwind.so.*"
 FILES:${PN}-dev += "${datadir}/libc++/v1/ ${libdir}/libc++.modules.json"
 
 BBCLASSEXTEND = "native nativesdk"
-TOOLCHAIN = "clang"
-# Overrides defaults from clang.bbclass
-TOOLCHAIN:class-nativesdk = "clang"
-TOOLCHAIN:class-native = "clang"

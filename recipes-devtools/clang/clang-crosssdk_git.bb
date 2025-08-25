@@ -7,17 +7,19 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/Apache-2.0-with-LLVM-exception;
 SECTION = "devel"
 
 PN = "clang-crosssdk-${SDK_SYS}"
+BPN = "clang"
 
-require clang.inc
+require common-clang.inc
 require common-source.inc
 inherit crosssdk
-DEPENDS += "clang-native nativesdk-clang-glue virtual/${TARGET_PREFIX}binutils virtual/nativesdk-libc"
+TOOLCHAIN = "clang"
+DEPENDS += "clang-native nativesdk-clang-glue virtual/nativesdk-cross-binutils virtual/nativesdk-libc"
 
 do_install() {
-        install -d ${D}${bindir}
+    install -d ${D}${bindir}
 	for tool in clang clang++ clang-tidy lld ld.lld llvm-profdata \
-            llvm-nm llvm-ar llvm-as llvm-ranlib llvm-strip llvm-objcopy llvm-objdump llvm-readelf \
-            llvm-addr2line llvm-dwp llvm-size llvm-strings llvm-cov
+		llvm-nm llvm-ar llvm-as llvm-ranlib llvm-strip llvm-objcopy llvm-objdump llvm-readelf \
+		llvm-addr2line llvm-dwp llvm-size llvm-strings llvm-cov
 	do
 		ln -sf ../$tool ${D}${bindir}/${TARGET_PREFIX}$tool
 	done
@@ -27,8 +29,7 @@ SSTATE_SCAN_FILES += "*-clang *-clang++ *-llvm-profdata *-lld *-ld.lld \
                       *-llvm-objcopy *-llvm-objdump *-llvm-readelf *-llvm-addr2line \
                       *-llvm-dwp *-llvm-size *-llvm-strings *-llvm-cov"
 sysroot_stage_all () {
-        sysroot_stage_dir ${D}${bindir} ${SYSROOT_DESTDIR}${bindir}
+	sysroot_stage_dir ${D}${bindir} ${SYSROOT_DESTDIR}${bindir}
 }
 
 PACKAGES = ""
-

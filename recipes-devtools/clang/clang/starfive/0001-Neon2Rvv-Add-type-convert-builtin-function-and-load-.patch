@@ -1,0 +1,984 @@
+From a3c0afb8f1ca8df8bc510000dfe1076e716baa62 Mon Sep 17 00:00:00 2001
+From: "eric.tang" <eric.tang@starfivetech.com>
+Date: Thu, 3 Jul 2025 14:05:40 +0800
+Upstream-Status: Inappropriate [riscv-specific]
+Subject: [PATCH 1/1] [Neon2Rvv] Add type convert builtin function and
+ load/store builtin function
+
+Signed-off-by: eric.tang <eric.tang@starfivetech.com>
+---
+ .../clang/Basic/BuiltinsRISCVVector.def       | 312 +++++++++
+ clang/lib/CodeGen/CGBuiltin.cpp               | 591 ++++++++++++++++++
+ clang/lib/CodeGen/Targets/RISCV.cpp           |  17 +-
+ 3 files changed, 912 insertions(+), 8 deletions(-)
+
+diff --git a/clang/include/clang/Basic/BuiltinsRISCVVector.def b/clang/include/clang/Basic/BuiltinsRISCVVector.def
+index 6dfa87a1a1d3..988ae81ca882 100644
+--- a/clang/include/clang/Basic/BuiltinsRISCVVector.def
++++ b/clang/include/clang/Basic/BuiltinsRISCVVector.def
+@@ -18,5 +18,317 @@
+ #include "clang/Basic/riscv_vector_builtins.inc"
+ #include "clang/Basic/riscv_sifive_vector_builtins.inc"
+ 
++#if defined(TARGET_BUILTIN) && !defined(RISCVV_BUILTIN)
++#define RISCVV_BUILTIN(ID, TYPE, ATTRS) TARGET_BUILTIN(ID, TYPE, ATTRS, "zve32x")
++#endif
++
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i8m1, "q8ScV8Sc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i8m2, "q16ScV16Sc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i16m1, "q4SsV4Ss", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i16m2, "q8SsV8Ss", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i32m1, "q2SiV2Si", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i32m2, "q4SiV4Si", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i64m1, "q1LSiV1LSi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_i64m2, "q2LSiV2LSi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u8m1, "q8UcV8Uc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u8m2, "q16UcV16Uc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u16m1, "q4UsV4Us", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u16m2, "q8UsV8Us", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u32m1, "q2UiV2Ui", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u32m2, "q4UiV4Ui", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u64m1, "q1LUiV1LUi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_u64m2, "q2LUiV2LUi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f16m1, "q4hV4h", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f16m2, "q8hV8h", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f32m1, "q2fV2f", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f32m2, "q4fV4f", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f64m1, "q1dV1d", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_from_f64m2, "q2dV2d", "nc")
++
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i8m1, "V8Scq8Sc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i8m2, "V16Scq16Sc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i16m1, "V4Ssq4Ss", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i16m2, "V8Ssq8Ss", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i32m1, "V2Siq2Si", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i32m2, "V4Siq4Si", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i64m1, "V1LSiq1LSi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_i64m2, "V2LSiq2LSi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u8m1, "V8Ucq8Uc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u8m2, "V16Ucq16Uc", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u16m1, "V4Usq4Us", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u16m2, "V8Usq8Us", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u32m1, "V2Uiq2Ui", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u32m2, "V4Uiq4Ui", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u64m1, "V1LUiq1LUi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_u64m2, "V2LUiq2LUi", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f16m1, "V4hq4h", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f16m2, "V8hq8h", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f32m1, "V2fq2f", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f32m2, "V4fq4f", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f64m1, "V1dq1d", "nc")
++RISCVV_BUILTIN(__builtin_rvv_type_cast_to_f64m2, "V2dq2d", "nc")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_v, "V8ScvC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_v, "V16ScvC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_v, "vv*V8Sc", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_v, "vv*V16Sc", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_s8, "V8ScScC*V8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_s16, "V4SsSsC*V4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_s32, "V2SiSiC*V2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_s64, "V1LSiLSiC*V1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_u8, "V8UcUcC*V8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_u16, "V4UsUsC*V4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_u32, "V2UiUiC*V2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_u64, "V1LUiLUiC*V1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_f16, "V4hhC*V4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_f32, "V2ffC*V2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_lane_f64, "V1ddC*V1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_s8, "V16ScScC*V16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_s16, "V8SsSsC*V8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_s32, "V4SiSiC*V4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_s64, "V2LSiLSiC*V2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_u8, "V16UcUcC*V16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_u16, "V8UsUsC*V8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_u32, "V4UiUiC*V4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_u64, "V2LUiLUiC*V2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_f16, "V8hhC*V8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_f32, "V4ffC*V4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_lane_f64, "V2ddC*V2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_s8, "V8ScScC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_s16, "V4SsSsC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_s32, "V2SiSiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_s64, "V1LSiLSiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_u8, "V8UcUcC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_u16, "V4UsUsC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_u32, "V2UiUiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_u64, "V1LUiLUiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_f16, "V4hhC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_f32, "V2ffC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1_dup_f64, "V1ddC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_s8, "V16ScScC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_s16, "V8SsSsC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_s32, "V4SiSiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_s64, "V2LSiLSiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_u8, "V16UcUcC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_u16, "V8UsUsC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_u32, "V4UiUiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_u64, "V2LUiLUiC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_f16, "V8hhC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_f32, "V4ffC*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vld1q_dup_f64, "V2ddC*", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_s8, "V8ScScC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_s16, "V4SsSsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_s32, "V2SiSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_s64, "V1LSiLSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_u8, "V8UcUcC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_u16, "V4UsUsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_u32, "V2UiUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_u64, "V1LUiLUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_f16, "V4hhC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_f32, "V2ffC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_f64, "V1ddC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_s8, "V16ScScC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_s16, "V8SsSsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_s32, "V4SiSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_s64, "V2LSiLSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_u8, "V16UcUcC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_u16, "V8UsUsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_u32, "V4UiUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_u64, "V2LUiLUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_f16, "V8hhC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_f32, "V4ffC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_f64, "V2ddC*v*i", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_s8, "V8ScScC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_s16, "V4SsSsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_s32, "V2SiSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_s64, "V1LSiLSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_u8, "V8UcUcC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_u16, "V4UsUsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_u32, "V2UiUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_u64, "V1LUiLUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_f16, "V4hhC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_f32, "V2ffC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_dup_f64, "V1ddC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_s8, "V16ScScC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_s16, "V8SsSsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_s32, "V4SiSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_s64, "V2LSiLSiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_u8, "V16UcUcC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_u16, "V8UsUsC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_u32, "V4UiUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_u64, "V2LUiLUiC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_f16, "V8hhC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_f32, "V4ffC*v*i", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vldNq_dup_f64, "V2ddC*v*i", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_s8, "vSc*V8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_s16, "vSs*V4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_s32, "vSi*V2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_s64, "vLSi*V1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_u8, "vUc*V8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_u16, "vUs*V4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_u32, "vUi*V2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_u64, "vLUi*V1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_f16, "vh*V4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_f32, "vf*V2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1_lane_f64, "vd*V1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_s8, "vSc*V16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_s16, "vSs*V8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_s32, "vSi*V4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_s64, "vLSi*V2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_u8, "vUc*V16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_u16, "vUs*V8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_u32, "vUi*V4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_u64, "vLUi*V2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_f16, "vh*V8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_f32, "vf*V4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst1q_lane_f64, "vd*V2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_s8, "vSc*V8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_s16, "vSs*V4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_s32, "vSi*V2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_s64, "vLSi*V1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_u8, "vUc*V8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_u16, "vUs*V4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_u32, "vUi*V2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_u64, "vLUi*V1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_f16, "vh*V4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_f32, "vf*V2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_f64, "vd*V1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_s8, "vSc*V16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_s16, "vSs*V8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_s32, "vSi*V4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_s64, "vLSi*V2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_u8, "vUc*V16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_u16, "vUs*V8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_u32, "vUi*V4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_u64, "vLUi*V2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_f16, "vh*V8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_f32, "vf*V4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_f64, "vd*V2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_s8, "vSc*V8ScV8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_s16, "vSs*V4SsV4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_s32, "vSi*V2SiV2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_s64, "vLSi*V1LSiV1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_u8, "vUc*V8UcV8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_u16, "vUs*V4UsV4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_u32, "vUi*V2UiV2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_u64, "vLUi*V1LUiV1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_f16, "vh*V4hV4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_f32, "vf*V2fV2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_f64, "vd*V1dV1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_s8, "vSc*V16ScV16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_s16, "vSs*V8SsV8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_s32, "vSi*V4SiV4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_s64, "vLSi*V2LSiV2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_u8, "vUc*V16UcV16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_u16, "vUs*V8UsV8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_u32, "vUi*V4UiV4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_u64, "vLUi*V2LUiV2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_f16, "vh*V8hV8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_f32, "vf*V4fV4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_f64, "vd*V2dV2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_s8, "vSc*V8ScV8ScV8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_s16, "vSs*V4SsV4SsV4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_s32, "vSi*V2SiV2SiV2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_s64, "vLSi*V1LSiV1LSiV1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_u8, "vUc*V8UcV8UcV8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_u16, "vUs*V4UsV4UsV4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_u32, "vUi*V2UiV2UiV2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_u64, "vLUi*V1LUiV1LUiV1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_f16, "vh*V4hV4hV4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_f32, "vf*V2fV2fV2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_f64, "vd*V1dV1dV1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_s8, "vSc*V16ScV16ScV16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_s16, "vSs*V8SsV8SsV8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_s32, "vSi*V4SiV4SiV4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_s64, "vLSi*V2LSiV2LSiV2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_u8, "vUc*V16UcV16UcV16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_u16, "vUs*V8UsV8UsV8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_u32, "vUi*V4UiV4UiV4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_u64, "vLUi*V2LUiV2LUiV2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_f16, "vh*V8hV8hV8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_f32, "vf*V4fV4fV4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_f64, "vd*V2dV2dV2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_s8, "vSc*V8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_s16, "vSs*V4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_s32, "vSi*V2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_s64, "vLSi*V1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_u8, "vUc*V8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_u16, "vUs*V4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_u32, "vUi*V2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_u64, "vLUi*V1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_f16, "vh*V4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_f32, "vf*V2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2_lane_f64, "vd*V1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_s8, "vSc*V16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_s16, "vSs*V8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_s32, "vSi*V4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_s64, "vLSi*V2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_u8, "vUc*V16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_u16, "vUs*V8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_u32, "vUi*V4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_u64, "vLUi*V2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_f16, "vh*V8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_f32, "vf*V4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst2q_lane_f64, "vd*V2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_s8, "vSc*V8ScV8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_s16, "vSs*V4SsV4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_s32, "vSi*V2SiV2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_s64, "vLSi*V1LSiV1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_u8, "vUc*V8UcV8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_u16, "vUs*V4UsV4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_u32, "vUi*V2UiV2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_u64, "vLUi*V1LUiV1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_f16, "vh*V4hV4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_f32, "vf*V2fV2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3_lane_f64, "vd*V1dV1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_s8, "vSc*V16ScV16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_s16, "vSs*V8SsV8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_s32, "vSi*V4SiV4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_s64, "vLSi*V2LSiV2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_u8, "vUc*V16UcV16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_u16, "vUs*V8UsV8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_u32, "vUi*V4UiV4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_u64, "vLUi*V2LUiV2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_f16, "vh*V8hV8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_f32, "vf*V4fV4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst3q_lane_f64, "vd*V2dV2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_s8, "vSc*V8ScV8ScV8ScV8ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_s16, "vSs*V4SsV4SsV4SsV4SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_s32, "vSi*V2SiV2SiV2SiV2SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_s64, "vLSi*V1LSiV1LSiV1LSiV1LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_u8, "vUc*V8UcV8UcV8UcV8UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_u16, "vUs*V4UsV4UsV4UsV4UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_u32, "vUi*V2UiV2UiV2UiV2UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_u64, "vLUi*V1LUiV1LUiV1LUiV1LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_f16, "vh*V4hV4hV4hV4hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_f32, "vf*V2fV2fV2fV2fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4_lane_f64, "vd*V1dV1dV1dV1dSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_s8, "vSc*V16ScV16ScV16ScV16ScSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_s16, "vSs*V8SsV8SsV8SsV8SsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_s32, "vSi*V4SiV4SiV4SiV4SiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_s64, "vLSi*V2LSiV2LSiV2LSiV2LSiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_u8, "vUc*V16UcV16UcV16UcV16UcSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_u16, "vUs*V8UsV8UsV8UsV8UsSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_u32, "vUi*V4UiV4UiV4UiV4UiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_u64, "vLUi*V2LUiV2LUiV2LUiV2LUiSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_f16, "vh*V8hV8hV8hV8hSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_f32, "vf*V4fV4fV4fV4fSiC", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vst4q_lane_f64, "vd*V2dV2dV2dV2dSiC", "n")
++
++RISCVV_BUILTIN(__builtin_neon2rvv_vldN_s8xN, "V64ScScC*v*", "n")
++RISCVV_BUILTIN(__builtin_neon2rvv_vmlal_lane_s16, "V4SiV4SiV4SsV4SsSiC", "n")
++
++#undef RISCVV_BUILTIN
+ #undef BUILTIN
+ #undef TARGET_BUILTIN
+diff --git a/clang/lib/CodeGen/CGBuiltin.cpp b/clang/lib/CodeGen/CGBuiltin.cpp
+index 523753336429..e140523343f1 100644
+--- a/clang/lib/CodeGen/CGBuiltin.cpp
++++ b/clang/lib/CodeGen/CGBuiltin.cpp
+@@ -23224,7 +23224,135 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
+   if (BuiltinID == RISCV::BI__builtin_riscv_ntl_store)
+     ICEArguments |= (1 << 2);
+ 
++  Address PtrOp0 = Address::invalid();
+   for (unsigned i = 0, e = E->getNumArgs(); i != e; i++) {
++    if (i == 0) {
++      switch (BuiltinID) {
++      case RISCVVector::BI__builtin_neon2rvv_vld1_v:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_v:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_v:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_v:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u8:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u64:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f16:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f32:
++      case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f64:
++      case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s8:
++      case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s32:
++      case RISCVVector::BI__builtin_neon2rvv_vldN_s8xN:
++        // Get the alignment for the argument in addition to the value;
++        // we'll use it later.
++        PtrOp0 = EmitPointerWithAlignment(E->getArg(0));
++        Ops.push_back(PtrOp0.emitRawPointer(*this));
++        continue;
++      }
++    }
++
+     // Handle aggregate argument, namely RVV tuple types in segment load/store
+     if (hasAggregateEvaluationKind(E->getArg(i)->getType())) {
+       LValue L = EmitAggExprToLValue(E->getArg(i));
+@@ -23413,6 +23541,469 @@ Value *CodeGenFunction::EmitRISCVBuiltinExpr(unsigned BuiltinID,
+ 
+     return Store;
+   }
++
++    //scalable vector type <-> fixed vector types
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i8m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i8m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_i64m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u8m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u8m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_u64m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_from_f64m2:
++  {
++    return Builder.CreateInsertVector(ResultType, UndefValue::get(ResultType), Ops[0], Builder.getInt64(0));
++  }
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i8m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i8m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_i64m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u8m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u8m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_u64m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f16m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f16m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f32m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f32m2:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f64m1:
++  case RISCVVector::BI__builtin_rvv_type_cast_to_f64m2:
++  {
++    return Builder.CreateExtractVector(ResultType, Ops[0], Builder.getInt64(0));
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vld1_v:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_v:
++    return Builder.CreateAlignedLoad(ResultType, Ops[0], PtrOp0.getAlignment());
++  case RISCVVector::BI__builtin_neon2rvv_vst1_v:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_v:
++    return Builder.CreateAlignedStore(Ops[1], Ops[0], PtrOp0.getAlignment());
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_lane_f64:
++  {
++    Ops[0] = Builder.CreateLoad(PtrOp0);
++    return Builder.CreateInsertElement(Ops[1], Ops[0], Ops[2], "vld1_lane");
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1_dup_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vld1q_dup_f64:
++  {
++    Value *V = PoisonValue::get(ResultType);
++    Ops[0] = Builder.CreateLoad(PtrOp0);
++    llvm::Constant *CI = ConstantInt::get(Int32Ty, 0);
++    Ops[0] = Builder.CreateInsertElement(V, Ops[0], CI);
++    ElementCount EC = cast<llvm::VectorType>(Ops[0]->getType())->getElementCount();
++    Value *SV = llvm::ConstantVector::getSplat(EC, CI);
++    return Builder.CreateShuffleVector(Ops[0], Ops[0], SV, "dup");
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vldN_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_f64:
++  {
++    // Get the last argument, which specifies the vector type.
++    const Expr *Arg = E->getArg(E->getNumArgs() - 1);
++    std::optional<llvm::APSInt> N =
++        Arg->getIntegerConstantExpr(getContext());
++    if (!N)
++      return nullptr;
++    uint64_t n = N->getZExtValue();
++    llvm::FixedVectorType *Ty = cast<FixedVectorType>(ResultType);
++    unsigned e = n * Ty->getNumElements();
++    llvm::FixedVectorType *VTy = llvm::FixedVectorType::get(Ty->getElementType(), e);
++    SmallVector<int, 8> Indices[4];
++    switch(n) {
++      case 2: {
++        for (unsigned i = 0; i != e; i += 2) {
++            Indices[0].push_back(i);
++            Indices[1].push_back(i+1);
++        }
++        break;
++      }
++      case 3: {
++        for (unsigned i = 0; i != e; i += 3) {
++            Indices[0].push_back(i);
++            Indices[1].push_back(i+1);
++            Indices[2].push_back(i+2);
++        }
++        break;
++      }
++      case 4: {
++        for (unsigned i = 0; i != e; i += 4) {
++            Indices[0].push_back(i);
++            Indices[1].push_back(i+1);
++            Indices[2].push_back(i+2);
++            Indices[3].push_back(i+3);
++        }
++        break;
++      }
++      default:
++        return nullptr;
++    }
++    Ops[0] = Builder.CreateAlignedLoad(VTy, Ops[0], PtrOp0.getAlignment());
++    Value *SV = nullptr;
++    for (unsigned vi = 0; vi != n; ++vi) {
++      Value *Addr = Builder.CreateConstInBoundsGEP1_32(Ty, Ops[1], vi);
++      SV = Builder.CreateShuffleVector(Ops[0], Ops[0], Indices[vi], "vldN");
++      SV = Builder.CreateDefaultAlignedStore(SV, Addr);
++    }
++    return SV;
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vldN_dup_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vldNq_dup_f64:
++  {
++    // Get the last argument, which specifies the vector type.
++    const Expr *Arg = E->getArg(E->getNumArgs() - 1);
++    std::optional<llvm::APSInt> N =
++        Arg->getIntegerConstantExpr(getContext());
++    if (!N)
++      return nullptr;
++    uint64_t n = N->getZExtValue();
++    llvm::FixedVectorType *VTy = cast<FixedVectorType>(ResultType);
++    Value *V = PoisonValue::get(ResultType);
++    Value *SV = nullptr;
++    for (unsigned vi = 0; vi != n; ++vi) {
++      Value *SV0 = Builder.CreateConstInBoundsGEP1_32(PtrOp0.getElementType(), Ops[0], vi);
++      SV = Builder.CreateAlignedLoad(PtrOp0.getElementType(), SV0, PtrOp0.getAlignment());
++      llvm::Constant *CI = ConstantInt::get(Int32Ty, 0);
++      SV0 = Builder.CreateInsertElement(V, SV, CI);
++      ElementCount EC = cast<llvm::VectorType>(SV0->getType())->getElementCount();
++      SV = llvm::ConstantVector::getSplat(EC, CI);
++      SV0 = Builder.CreateShuffleVector(SV0, SV0, SV, "dup");
++      Value *Addr = Builder.CreateConstInBoundsGEP1_32(VTy, Ops[1], vi);
++      SV = Builder.CreateDefaultAlignedStore(SV0, Addr);
++    }
++    return SV;
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst1q_lane_f64:
++  {
++    Ops[1] = Builder.CreateExtractElement(Ops[1], Ops[2]);
++    return Builder.CreateAlignedStore(Ops[1], Ops[0], PtrOp0.getAlignment());
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vst2_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_f64:
++  {
++    // Get the last argument, which specifies the vector type.
++    const Expr *Arg = E->getArg(E->getNumArgs() - 1);
++    std::optional<llvm::APSInt> N =
++        Arg->getIntegerConstantExpr(getContext());
++    if (!N)
++      return nullptr;
++    uint64_t n = N->getZExtValue();
++    llvm::FixedVectorType *Ty = cast<FixedVectorType>(Ops[1]->getType());
++    llvm::Type *Tys[] = {Ty, UnqualPtrTy, Builder.getInt64Ty()};
++    Function *F = nullptr;
++    if (n == 2)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg2_store, Tys);
++    else if (n == 3)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg3_store, Tys);
++    else if (n == 4)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg4_store, Tys);
++    else
++      return nullptr;
++    SmallVector<Value *, 10> vOps;
++    for (uint32_t i = 1; i <= n; i++)
++      vOps.push_back(Ops[i]);
++    vOps.append({Ops[0], Builder.getInt64(Ty->getNumElements())});
++    return Builder.CreateCall(F, vOps);
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst2q_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst3q_lane_f64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_s8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_s16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_s32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_s64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_u8:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_u16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_u32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_u64:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_f16:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_f32:
++  case RISCVVector::BI__builtin_neon2rvv_vst4q_lane_f64:
++  {
++    llvm::FixedVectorType *Ty = cast<FixedVectorType>(Ops[1]->getType());
++    uint32_t n = E->getNumArgs() - 2;
++    auto *VTy = FixedVectorType::get(Ty->getElementType(), 1);
++    Value *V = PoisonValue::get(VTy);
++    llvm::Type *Tys[] = {VTy, UnqualPtrTy, Builder.getInt64Ty()};
++    Function *F = nullptr;
++    if (n == 2)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg2_store, Tys);
++    else if (n == 3)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg3_store, Tys);
++    else if (n == 4)
++      F = CGM.getIntrinsic(Intrinsic::riscv_seg4_store, Tys);
++    else
++      return nullptr;
++    Ops[n+1] = Builder.CreateZExt(Ops[n+1], Builder.getInt64Ty());
++    llvm::Constant *CI = ConstantInt::get(Int32Ty, 0);
++    SmallVector<Value *, 10> vOps;
++    for (uint32_t i = 1; i <= n; i++){
++      //llvm::Value *Op = Builder.CreateExtractVector(VTy, Ops[i], Ops[n+1]);
++      llvm::Value *Op = Builder.CreateExtractElement(Ops[i], Ops[n+1]);
++      Op = Builder.CreateInsertElement(V, Op, CI);
++      vOps.push_back(Op);
++    }
++    vOps.append({Ops[0], Builder.getInt64(1)});
++    return Builder.CreateCall(F, vOps);
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vldN_s8xN:
++  {
++    Value *SV = Builder.CreateAlignedLoad(ResultType, Ops[0], PtrOp0.getAlignment());
++    Value *Addr = Builder.CreateConstInBoundsGEP1_32(ResultType, Ops[1], 0);
++    return Builder.CreateDefaultAlignedStore(SV, Addr);
++  }
++  case RISCVVector::BI__builtin_neon2rvv_vmlal_lane_s16:
++  {
++    llvm::FixedVectorType *Ty = cast<FixedVectorType>(ResultType);
++    Value *V = PoisonValue::get(Ops[2]->getType());
++    Ops[2] = Builder.CreateExtractElement(Ops[2], Ops[3]);
++    llvm::Constant *CI = ConstantInt::get(Int32Ty, 0);
++    Ops[2] = Builder.CreateInsertElement(V, Ops[2], CI);
++    ElementCount EC = cast<llvm::VectorType>(Ops[2]->getType())->getElementCount();
++    Value *SV = llvm::ConstantVector::getSplat(EC, CI);
++    Ops[2] = Builder.CreateShuffleVector(Ops[2], Ops[2], SV, "");
++    Ops[2] = Builder.CreateSExt(Ops[2], Ty);
++    Ops[1] = Builder.CreateSExt(Ops[1], Ty);
++    Ops[1] = Builder.CreateMul(Ops[1], Ops[2]);
++    return Builder.CreateAdd(Ops[0], Ops[1]);
++  }
+   // XCValu
+   case RISCV::BI__builtin_riscv_cv_alu_addN:
+     ID = Intrinsic::riscv_cv_alu_addN;
+diff --git a/clang/lib/CodeGen/Targets/RISCV.cpp b/clang/lib/CodeGen/Targets/RISCV.cpp
+index 2c48ba37fd20..dd7cff248f44 100644
+--- a/clang/lib/CodeGen/Targets/RISCV.cpp
++++ b/clang/lib/CodeGen/Targets/RISCV.cpp
+@@ -476,7 +476,15 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
+ 
+   ArgGPRsLeft -= NeededArgGPRs;
+ 
+-  if (!isAggregateTypeForABI(Ty) && !Ty->isVectorType()) {
++  if (const VectorType *VT = Ty->getAs<VectorType>())
++    if (VT->getVectorKind() == VectorKind::RVVFixedLengthData ||
++        VT->getVectorKind() == VectorKind::RVVFixedLengthMask ||
++        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_1 ||
++        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_2 ||
++        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_4)
++      return coerceVLSVector(Ty);
++
++  if (!isAggregateTypeForABI(Ty)) {
+     // Treat an enum type as its underlying type.
+     if (const EnumType *EnumTy = Ty->getAs<EnumType>())
+       Ty = EnumTy->getDecl()->getIntegerType();
+@@ -498,13 +506,6 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
+     return ABIArgInfo::getDirect();
+   }
+ 
+-  if (const VectorType *VT = Ty->getAs<VectorType>())
+-    if (VT->getVectorKind() == VectorKind::RVVFixedLengthData ||
+-        VT->getVectorKind() == VectorKind::RVVFixedLengthMask ||
+-        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_1 ||
+-        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_2 ||
+-        VT->getVectorKind() == VectorKind::RVVFixedLengthMask_4)
+-      return coerceVLSVector(Ty);
+ 
+   // Aggregates which are <= 2*XLen will be passed in registers if possible,
+   // so coerce to integers.
+-- 
+2.43.0
+
