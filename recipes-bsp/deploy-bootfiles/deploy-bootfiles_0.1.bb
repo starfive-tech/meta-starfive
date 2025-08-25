@@ -9,15 +9,15 @@ SRC_URI = "\
 	file://bootcode_min.bin \
 	file://bootjump.bin \
 	"
-          
-S = "${WORKDIR}"
+
+S = "${UNPACKDIR}"
 
 inherit deploy
 
 do_deploy(){
-	install -m 755 ${WORKDIR}/bootcode.bin ${DEPLOYDIR}
-	install -m 755 ${WORKDIR}/bootcode_min.bin ${DEPLOYDIR}
-	install -m 755 ${WORKDIR}/bootjump.bin ${DEPLOYDIR}
+	install -m 755 ${UNPACKDIR}/bootcode.bin ${DEPLOYDIR}
+	install -m 755 ${UNPACKDIR}/bootcode_min.bin ${DEPLOYDIR}
+	install -m 755 ${UNPACKDIR}/bootjump.bin ${DEPLOYDIR}
 }
 
 addtask deploy before do_build after do_install

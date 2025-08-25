@@ -7,10 +7,10 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI = "file://i3c-tools \
 	"
 
-S = "${WORKDIR}"
+S = "${UNPACKDIR}"
 
 do_compile(){
-	${CC} ${LDFLAGS} -I ${WORKDIR}/i3c-tools/include/i3c ${WORKDIR}/i3c-tools/i3ctransfer.c -o i3ctransfer
+	${CC} ${LDFLAGS} -I ${UNPACKDIR}/i3c-tools/include/i3c ${UNPACKDIR}/i3c-tools/i3ctransfer.c -o i3ctransfer
 }
 
 do_install(){

@@ -37,7 +37,7 @@ EXTRA_OEMAKE:starfive-jh8100 = "PLATFORM=${RISCV_SBI_PLAT} I=${D} FW_PIC=n CLANG
 DEPENDS:starfive-visionfive2 += "u-boot-tools-native dtc-native"
 
 do_deploy:append:starfive-visionfive2() {
-    install -m 0644 ${WORKDIR}/visionfive2-uboot-fit-image.its ${DEPLOYDIR}/visionfive2-uboot-fit-image.its
+    install -m 0644 ${UNPACKDIR}/visionfive2-uboot-fit-image.its ${DEPLOYDIR}/visionfive2-uboot-fit-image.its
     cd ${DEPLOYDIR}
     mkimage -f visionfive2-uboot-fit-image.its -A riscv -O u-boot -T firmware visionfive2_fw_payload.img
 }

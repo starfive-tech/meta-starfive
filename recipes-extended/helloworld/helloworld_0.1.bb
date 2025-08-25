@@ -7,7 +7,7 @@ LIC_FILES_CHKSUM = ""
 SRC_URI = "file://helloworld.c \
 	"
 
-S = "${WORKDIR}"
+S = "${UNPACKDIR}"
 
 do_compile(){
 	${CC} ${LDFLAGS} helloworld.c -o helloworld

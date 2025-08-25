@@ -61,15 +61,15 @@ python __anonymous() {
 TFTP_SERVER_IP ?= "127.0.0.1"
 
 do_configure:prepend:starfive-visionfive2() {
-    sed -i -e 's,@SERVERIP@,${TFTP_SERVER_IP},g' ${WORKDIR}/tftp-mmc-boot.txt
+    sed -i -e 's,@SERVERIP@,${TFTP_SERVER_IP},g' ${UNPACKDIR}/tftp-mmc-boot.txt
     mkimage -O linux -T script -C none -n "U-Boot boot script" \
-        -d ${WORKDIR}/tftp-mmc-boot.txt ${WORKDIR}/${UBOOT_ENV_BINARY}
+        -d ${UNPACKDIR}/tftp-mmc-boot.txt ${UNPACKDIR}/${UBOOT_ENV_BINARY}
 }
 
 do_configure:prepend:starfive-jh8100() {
-    sed -i -e 's,@SERVERIP@,${TFTP_SERVER_IP},g' ${WORKDIR}/tftp-mmc-boot.txt
+    sed -i -e 's,@SERVERIP@,${TFTP_SERVER_IP},g' ${UNPACKDIR}/tftp-mmc-boot.txt
     mkimage -O linux -T script -C none -n "U-Boot boot script" \
-        -d ${WORKDIR}/tftp-mmc-boot.txt ${WORKDIR}/${UBOOT_ENV_BINARY}
+        -d ${UNPACKDIR}/tftp-mmc-boot.txt ${UNPACKDIR}/${UBOOT_ENV_BINARY}
 }
 
 do_compile:prepend:starfive-dubhe() {
@@ -82,9 +82,9 @@ do_compile:prepend:starfive-jh8100() {
 }
 
 do_deploy:append:starfive-visionfive2() {
-    install -m 644 ${WORKDIR}/vf2_nvme_uEnv.txt ${DEPLOYDIR}/vf2_nvme_uEnv.txt
-    install -m 644 ${WORKDIR}/vf2_uEnv.txt ${DEPLOYDIR}/vf2_uEnv.txt
-    install -m 644 ${WORKDIR}/visionfive2-fit-image.its ${DEPLOYDIR}/visionfive2-fit-image.its
+    install -m 644 ${UNPACKDIR}/vf2_nvme_uEnv.txt ${DEPLOYDIR}/vf2_nvme_uEnv.txt
+    install -m 644 ${UNPACKDIR}/vf2_uEnv.txt ${DEPLOYDIR}/vf2_uEnv.txt
+    install -m 644 ${UNPACKDIR}/visionfive2-fit-image.its ${DEPLOYDIR}/visionfive2-fit-image.its
     spl_tool -c -f ${DEPLOYDIR}/${SPL_IMAGE}
     ln -sf ${SPL_IMAGE}.normal.out ${DEPLOYDIR}/${SPL_BINARYNAME}.normal.out
     ln -sf ${SPL_IMAGE}.normal.out ${DEPLOYDIR}/${SPL_SYMLINK}.normal.out
@@ -93,23 +93,23 @@ do_deploy:append:starfive-visionfive2() {
 do_deploy:append:starfive-dubhe() {
     install -m 644 ${B}/u-boot.itb ${DEPLOYDIR}/u-boot.itb
     install -m 644 ${B}/kernel.itb ${DEPLOYDIR}/kernel.itb
-    install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
+    install -m 644 ${UNPACKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
 }
 
 do_deploy:append:starfive-jh8100() {
-    install -m 644 ${WORKDIR}/uboot.env ${DEPLOYDIR}/uboot.env
-    install -m 644 ${WORKDIR}/jh8100-fpga.bin.normal.out ${DEPLOYDIR}/jh8100-fpga.bin.normal.out
-    install -m 644 ${WORKDIR}/firmware.bin.normal.out ${DEPLOYDIR}/firmware.bin.normal.out
+    install -m 644 ${UNPACKDIR}/uboot.env ${DEPLOYDIR}/uboot.env
+    install -m 644 ${UNPACKDIR}/jh8100-fpga.bin.normal.out ${DEPLOYDIR}/jh8100-fpga.bin.normal.out
+    install -m 644 ${UNPACKDIR}/firmware.bin.normal.out ${DEPLOYDIR}/firmware.bin.normal.out
     install -m 644 ${B}/u-boot.itb ${DEPLOYDIR}/u-boot.itb
-    install -m 644 ${WORKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
+    install -m 644 ${UNPACKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
 
     mkbif ${DEPLOYDIR}/${SPL_BINARYNAME}
 
-    dd if=${WORKDIR}/jh8100-fpga.bin.normal.out of=${DEPLOYDIR}/scp_raw.img count=1 bs=512k conv=sync
-    dd if=${WORKDIR}/jh8100-fpga.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=1 count=1 bs=512k conv=sync
+    dd if=${UNPACKDIR}/jh8100-fpga.bin.normal.out of=${DEPLOYDIR}/scp_raw.img count=1 bs=512k conv=sync
+    dd if=${UNPACKDIR}/jh8100-fpga.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=1 count=1 bs=512k conv=sync
 
-    dd if=${WORKDIR}/firmware.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=2 count=1 bs=512k conv=sync
-    dd if=${WORKDIR}/firmware.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=3 count=1 bs=512k conv=sync
+    dd if=${UNPACKDIR}/firmware.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=2 count=1 bs=512k conv=sync
+    dd if=${UNPACKDIR}/firmware.bin.normal.out of=${DEPLOYDIR}/scp_raw.img seek=3 count=1 bs=512k conv=sync
 
     dd if=${DEPLOYDIR}/${SPL_BINARYNAME}.normal.out of=${DEPLOYDIR}/scp_raw.img seek=4 count=1 bs=512k conv=sync
     dd if=${DEPLOYDIR}/${SPL_BINARYNAME}.normal.out of=${DEPLOYDIR}/scp_raw.img seek=5 count=1 bs=512k conv=sync

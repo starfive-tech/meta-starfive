@@ -26,11 +26,11 @@ EXTRA_OECONF = "--enable-ftdi"
 inherit deploy
 
 do_deploy() {
-	install -m 755 ${WORKDIR}/dubhe_olimex-openocd_s5.cfg ${DEPLOYDIR}/
-	install -m 755 ${WORKDIR}/dubhe_olimex_flash_write.cfg ${DEPLOYDIR}/
-	install -m 755 ${WORKDIR}/jh8100_0150_f1.cfg ${DEPLOYDIR}/
-	install -m 755 ${WORKDIR}/jh8100_0150_f2.cfg ${DEPLOYDIR}/
-	install -m 755 ${WORKDIR}/jh8100_jrc.cfg ${DEPLOYDIR}/
+	install -m 755 ${UNPACKDIR}/dubhe_olimex-openocd_s5.cfg ${DEPLOYDIR}/
+	install -m 755 ${UNPACKDIR}/dubhe_olimex_flash_write.cfg ${DEPLOYDIR}/
+	install -m 755 ${UNPACKDIR}/jh8100_0150_f1.cfg ${DEPLOYDIR}/
+	install -m 755 ${UNPACKDIR}/jh8100_0150_f2.cfg ${DEPLOYDIR}/
+	install -m 755 ${UNPACKDIR}/jh8100_jrc.cfg ${DEPLOYDIR}/
 }
 
 addtask deploy before do_build after do_install
