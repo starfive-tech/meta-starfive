@@ -1,6 +1,7 @@
 From 309af20ef94c514d43217e8fe8fae83bdff31b15 Mon Sep 17 00:00:00 2001
 From: Evan Green <evan@rivosinc.com>
 Date: Tue, 27 Feb 2024 14:56:39 -0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 03/17] riscv: Add hwprobe vdso call support
 
 The new riscv_hwprobe syscall also comes with a vDSO for faster answers

@@ -1,6 +1,7 @@
 From 358cb2ba7e82e08f46df085b243db39fb860cb8b Mon Sep 17 00:00:00 2001
 From: Evan Green <evan@rivosinc.com>
 Date: Tue, 27 Feb 2024 14:56:41 -0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 05/17] riscv: Enable multi-arg ifunc resolvers
 
 RISC-V is apparently the first architecture to pass more than one

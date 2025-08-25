@@ -1,6 +1,7 @@
 From 0a43393bf0c214bf282ef7780493b397b1d7334f Mon Sep 17 00:00:00 2001
 From: Evan Green <evan@rivosinc.com>
 Date: Tue, 27 Feb 2024 14:56:40 -0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 04/17] riscv: Add __riscv_hwprobe pointer to ifunc calls
 
 The new __riscv_hwprobe() function is designed to be used by ifunc

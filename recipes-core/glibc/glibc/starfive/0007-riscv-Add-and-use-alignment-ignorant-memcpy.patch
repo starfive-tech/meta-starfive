@@ -1,6 +1,7 @@
 From 3151ea8375914573d1bd6e9ddcc9de198d58129f Mon Sep 17 00:00:00 2001
 From: Evan Green <evan@rivosinc.com>
 Date: Tue, 27 Feb 2024 14:56:43 -0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 07/17] riscv: Add and use alignment-ignorant memcpy
 
 For CPU implementations that can perform unaligned accesses with little

@@ -1,6 +1,7 @@
 From f295f435223dcf4959a90bc4126028623463f5db Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sat, 29 Jun 2024 19:41:43 -0700
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 15/17] riscv: Optimize memset with vector extension
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>

@@ -1,6 +1,7 @@
 From 53b36d215b668675b669411d7f000b5b7ae66b10 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sat, 29 Jun 2024 19:19:10 -0700
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 11/17] riscv: Optimize memcmp with vector extension
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>

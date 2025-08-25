@@ -1,6 +1,7 @@
 From 695e55481e5e100517f708729dbccaa00235ec16 Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sat, 29 Jun 2024 19:45:17 -0700
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 16/17] riscv: Prevent from generating ifunc code when
  statically linking
 

@@ -1,6 +1,7 @@
 From 2dd6eb2803b7e9d49f2cce7ba89bd5b04fe09757 Mon Sep 17 00:00:00 2001
 From: "demin.han" <demin.han@starfivetech.com>
 Date: Thu, 17 Oct 2024 09:33:30 +0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 17/17] Fix bcmp missing in so
 
 ---

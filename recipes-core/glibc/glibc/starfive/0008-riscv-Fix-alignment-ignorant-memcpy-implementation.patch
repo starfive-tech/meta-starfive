@@ -1,6 +1,7 @@
 From 53cb1b0173fefdfd742ab542476d8e51f2d22e4e Mon Sep 17 00:00:00 2001
 From: Adhemerval Zanella <adhemerval.zanella@linaro.org>
 Date: Tue, 5 Mar 2024 14:02:57 -0300
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 08/17] riscv: Fix alignment-ignorant memcpy implementation
 
 The memcpy optimization (commit 587a1290a1af7bee6db) has a series

@@ -1,6 +1,7 @@
 From 872880a3d4f83ccee0a41478cbf19b3184bb9fad Mon Sep 17 00:00:00 2001
 From: "max.ma" <max.ma@starfivetech.com>
 Date: Sat, 29 Jun 2024 19:09:55 -0700
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 09/17] riscv: Add vector version memcpy
 
 Signed-off-by: max.ma <max.ma@starfivetech.com>

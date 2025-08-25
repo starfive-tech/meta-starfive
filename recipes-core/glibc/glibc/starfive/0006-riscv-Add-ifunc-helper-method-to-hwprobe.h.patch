@@ -1,6 +1,7 @@
 From d6b30264e44af65402371e4010d2f5fb9c6dda2e Mon Sep 17 00:00:00 2001
 From: Evan Green <evan@rivosinc.com>
 Date: Tue, 27 Feb 2024 14:56:42 -0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 06/17] riscv: Add ifunc helper method to hwprobe.h
 
 Add a little helper method so it's easier to fetch a single value from
