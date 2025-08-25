@@ -1,6 +1,7 @@
 From b221223fa390b9266e72dd62295bbaada51e51c3 Mon Sep 17 00:00:00 2001
 From: Ji Sheng Teoh <jisheng.teoh@starfivetech.com>
 Date: Fri, 10 Nov 2023 14:50:42 +0800
+Upstream-Status: Inappropriate [machine-specific]
 Subject: [PATCH] include: configs: starfive-dubhe-fpga.h: Mask ttyS0 and
  ttyhvc0
 

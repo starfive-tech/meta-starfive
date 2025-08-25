@@ -1,3 +1,4 @@
+Upstream-Status: Inappropriate [machine-specific]
 diff --git a/src/flash/nor/fespi.c b/src/flash/nor/fespi.c
 index b2b3f97df..215734bae 100644
 --- a/src/flash/nor/fespi.c

@@ -1,6 +1,7 @@
 From 006a56ac03292e38992cb946b0bbf7b357bd3b44 Mon Sep 17 00:00:00 2001
 From: "weiheng.cheng" <weiheng.cheng@starfivetech.com>
 Date: Fri, 24 Nov 2023 16:39:40 +0800
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH 1/1] Remove prompt Remove prompt for number of runs when
  DHRY_ITERS has been defined.
 

@@ -1,6 +1,7 @@
 From 91b7123682c67ec8b0c50147c9ebd59efa563f26 Mon Sep 17 00:00:00 2001
 From: Stefan Agner <stefan@agner.ch>
 Date: Tue, 6 Sep 2016 11:51:40 -0700
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH] kvmtool: add lightweight hypervisor native Linux KVM tool
 
 Upstream-Status: Inappropriate [embedded specific]

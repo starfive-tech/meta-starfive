@@ -1,6 +1,7 @@
 From 459ebaebf368869ae26eb8031ff44a789e238988 Mon Sep 17 00:00:00 2001
 From: Cevat Bostancioglu <bostancioglucevat@gmail.com>
 Date: Wed, 19 Jun 2019 20:36:56 +0300
+Upstream-Status: Inappropriate [riscv-specific]
 Subject: [PATCH] WERROR override disabled.
 
 WERROR override causes gcc sizeof-pointer-memaccess,  format-truncation errors.
