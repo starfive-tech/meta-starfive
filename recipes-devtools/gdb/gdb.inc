@@ -10,7 +10,9 @@ SRC_URI = "${GNU_MIRROR}/gdb/gdb-${PV}.tar.xz \
            file://0003-Dont-disable-libreadline.a-when-using-disable-static.patch \
            file://0004-use-asm-sgidefs.h.patch \
            file://0005-Change-order-of-CFLAGS.patch \
-           file://0007-Fix-invalid-sigprocmask-call.patch \
-           file://0008-Define-alignof-using-_Alignof-when-using-C11-or-newe.patch \
+           file://0006-Fix-invalid-sigprocmask-call.patch \
+           file://0007-Define-alignof-using-_Alignof-when-using-C11-or-newe.patch \
+           file://0008-Add-fix-for-packages-that-are-not-compatible-with-C2.patch \
+           file://0009-Readline-8.3-alpha-release.patch \
            "
-SRC_URI[sha256sum] = "2d4dd8061d8ded12b6c63f55e45344881e8226105f4d2a9b234040efa5ce7772"
+SRC_URI[sha256sum] = "bcfcd095528a987917acf9fff3f1672181694926cc18d609c99d0042c00224c5"
