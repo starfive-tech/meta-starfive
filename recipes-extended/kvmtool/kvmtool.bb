@@ -20,9 +20,7 @@ SRC_URI = " \
 SRCREV = "e48563f5c4a48fe6a6bc2a98a9a7c84a10f043be"
 PV = "5.10.0+git${SRCPV}"
 
-S = "${WORKDIR}/git"
-
-EXTRA_OEMAKE='V=1 EXTRA_CFLAGS="-I${STAGING_KERNEL_BUILDDIR}/include/generated -I${STAGING_KERNEL_BUILDDIR}/arch/${ARCH}/include/generated"'
+EXTRA_OEMAKE = 'V=1 EXTRA_CFLAGS="-I${STAGING_KERNEL_BUILDDIR}/include/generated -I${STAGING_KERNEL_BUILDDIR}/arch/${ARCH}/include/generated"'
 
 do_install() {
     install -d ${D}${bindir}

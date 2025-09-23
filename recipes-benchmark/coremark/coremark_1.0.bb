@@ -10,8 +10,6 @@ SRC_URI = "git://github.com/sifive/benchmark-coremark.git;protocol=ssh;branch=${
            "
 SRCREV = "4486de1f0afe9d6c1fa8dd63743e5751286f3d2f"
 
-S = "${WORKDIR}/git"
-
 LDFLAGS += "-static"
 TARGET_CC_ARCH += "${LDFLAGS} -march=rv64gc_zba_zbb_zbs_zbc"
 EXTRA_OEMAKE += "'CC=${CC}' PORT_DIR=linux64 XCFLAGS='-march=rv64gc_zba_zbb_zbs_zbc'"
