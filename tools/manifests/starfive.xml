@@ -5,8 +5,8 @@
   <remote name="starfive" fetch="https://github.com/starfive-tech" />
   <remote name="yoctoproject" fetch="https://github.com/yoctoproject" />
 
-  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="ab5cd440b38f704bd45fd5b9944158c0f2fd35c8" />
-  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-walnascar" />
-  <project name="poky" remote="yoctoproject" path="poky" revision="b30351ca09e0aad9e9ee9bcc2651dbf0c12da73a" />
+  <project name="meta-openembedded" remote="openembedded" path="meta-openembedded" revision="c436334d88a515ad82571b9517dffb1847ecd3bd" />
+  <project name="meta-starfive" remote="starfive" path="meta-starfive" revision="starfive-whinlatter" />
+  <project name="poky" remote="yoctoproject" path="poky" revision="cfbb00657ab961a3c3a8e6619fc08a2a3f4255c7" />
 
 </manifest>
