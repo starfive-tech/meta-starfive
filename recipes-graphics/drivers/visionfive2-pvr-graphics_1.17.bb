@@ -1,4 +1,4 @@
-LICENSE="CLOSED"
+LICENSE = "CLOSED"
 
 PROVIDES = "virtual/libgles2"
 COMPATIBLE_MACHINE = "starfive-visionfive2"
