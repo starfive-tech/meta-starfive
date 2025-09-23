@@ -10,7 +10,7 @@ BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "starfive-6.12.15-dubhe"
-SRCREV:starfive-dubhe = "0c28bd15d4849bf172a714d40af0725be3e2ceca"
+SRCREV:starfive-dubhe = "a9bc50a3e2843de12173da1f91f4671ffb84adc4"
 
 LINUX_VERSION ?= "6.12.15"
 LINUX_VERSION:starfive-dubhe = "6.12.15"
