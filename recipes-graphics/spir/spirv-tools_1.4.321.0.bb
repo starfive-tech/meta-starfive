@@ -7,8 +7,9 @@ SECTION = "graphics"
 LICENSE  = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57"
 
-SRCREV = "f289d047f49fb60488301ec62bafab85573668cc"
+SRCREV = "33e02568181e3312f49a3cf33df470bf96ef293a"
 SRC_URI = "git://github.com/KhronosGroup/SPIRV-Tools.git;branch=main;protocol=https \
+           file://0001-SPV_INTEL_function_variants-basic-asm-dis-support-61.patch \
            "
 PE = "1"
 # These recipes need to be updated in lockstep with each other:
@@ -17,7 +18,6 @@ PE = "1"
 # The tags versions should always be sdk-x.y.z, as this is what
 # upstream considers a release.
 UPSTREAM_CHECK_GITTAGREGEX = "sdk-(?P<pver>\d+(\.\d+)+)"
-S = "${WORKDIR}/git"
 
 inherit cmake
 
