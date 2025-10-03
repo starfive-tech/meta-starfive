@@ -73,10 +73,21 @@ do_configure:prepend:starfive-jh8100() {
         -d ${UNPACKDIR}/tftp-mmc-boot.txt ${UNPACKDIR}/${UBOOT_ENV_BINARY}
 }
 
-do_compile:prepend:starfive-dubhe() {
+do_configure:starfive-dubhe() {
+    mkdir -p ${B}
+    oe_runmake -C ${S} O=${B} starfive_dubhe_fpga_defconfig
+}
+
+do_compile:starfive-dubhe() {
     export OPENSBI=${DEPLOY_DIR_IMAGE}/fw_dynamic.bin
     cp ${DEPLOY_DIR_IMAGE}/kernel_fit/* ${S}
+    oe_runmake -C ${S} O=${B}
 }
+
+do_install:starfive-dubhe() {
+    :
+}
+ALLOW_EMPTY:${PN}:starfive-dubhe = "1"
 
 do_compile:prepend:starfive-jh8100() {
     export OPENSBI=${DEPLOY_DIR_IMAGE}/fw_dynamic.bin
@@ -91,7 +102,8 @@ do_deploy:append:starfive-visionfive2() {
     ln -sf ${SPL_IMAGE}.normal.out ${DEPLOYDIR}/${SPL_SYMLINK}.normal.out
 }
 
-do_deploy:append:starfive-dubhe() {
+do_deploy:starfive-dubhe() {
+    install -m 644 ${B}/spl/u-boot-spl.bin ${DEPLOYDIR}/u-boot-spl.bin
     install -m 644 ${B}/u-boot.itb ${DEPLOYDIR}/u-boot.itb
     install -m 644 ${B}/kernel.itb ${DEPLOYDIR}/kernel.itb
     install -m 644 ${UNPACKDIR}/run_qemu_virt.dtb ${DEPLOYDIR}/run_qemu_virt.dtb
