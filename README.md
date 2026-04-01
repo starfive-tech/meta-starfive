@@ -21,7 +21,7 @@ Guide to use meta-starfive using Yocto
 ## Dependencies
 First, you need to download the essential Yocto dependencies, which can also be found on their [official Yocto Guide](https://docs.yoctoproject.org/brief-yoctoprojectqs/index.html#build-host-packages):
 ```
-$ sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev pylint3 xterm python3-subunit mesa-common-dev zstd liblz4-tool
+$ sudo apt-get install build-essential chrpath cpio debianutils diffstat file gawk gcc git iputils-ping libacl1 locales python3 python3-git python3-jinja2 python3-pexpect python3-pip python3-subunit socat texinfo unzip wget xz-utils zstd
 ```
 
 #### Installing Repo
@@ -34,7 +34,7 @@ Now, we will be creating a workspace and retrieve the latest layers needed for o
 
 ```
 $ mkdir starfive-yocto && cd starfive-yocto
-$ repo init -u https://github.com/starfive-tech/meta-starfive -b starfive-walnascar -m tools/manifests/starfive.xml
+$ repo init -u https://github.com/starfive-tech/meta-starfive -b starfive-whinlatter -m tools/manifests/starfive.xml
 $ repo sync
 $ repo start work --all
 ```
@@ -54,20 +54,20 @@ In meta-starfive, there is currently only one buildable machine that you can bui
 
 ### Build Images
 
-To build a initramfs image with QSPI-Image binary:
+To build core-image-minimal with QSPI-Image binary + NFS root filesystem:
 ```
-$ MACHINE=starfive-dubhe bitbake qspi-image
+$ MACHINE=starfive-dubhe bitbake core-image-minimal
 ```
 
 For the bitbake command, you can control the number of parallel tasks and the number of cores that Bitbake will use. You can either add the variables in the `<build_directory>/conf/local.conf` file, or add it in your shell environment command, for example:
 
 ```
-$ PARALLEL_MAKE="-j 6" BB_NUMBER_THREADS=4 MACHINE=starfive-dubhe bitbake qspi-image
+$ PARALLEL_MAKE="-j 6" BB_NUMBER_THREADS=4 MACHINE=starfive-dubhe bitbake core-image-minimal
 ```
 
 To populate the extensible eSDK shell script, you can use the `-c populate_sdk_ext` command:
 ```
-$ MACHINE=starfive-dubhe bitbake qspi-image -c populate_sdk_ext
+$ MACHINE=starfive-dubhe bitbake core-image-minimal -c populate_sdk_ext
 ```
 _NOTE: For your first build, it may take several hours to build the image._
 
@@ -75,7 +75,7 @@ _NOTE: For your first build, it may take several hours to build the image._
 ## Running in QEMU
 Run the 64-bit machine in QEMU using the following command:
 ```
-MACHINE=starfive-dubhe runqemu nographic dubhe-image-initramfs
+runqemu nographic core-image-minimal
 ```
 <br>
 
@@ -92,7 +92,7 @@ You can flash the QSPI binary into the FPGA via openOCD or other FPGA flashing t
 ## Modifying the Kernel
 To modify the kernel, you can use the devtool command line:
 ```
-$ MACHINE=starfive-dubhe devtool modify virtual/kernel
+$ devtool modify virtual/kernel
 ```
 
 The devtool command will fetch the source code and unpack them in the _'build/workspace/sources/<kernel_name>'_ directory.
@@ -102,7 +102,7 @@ Now you can make your changes in your source code in the workspace directory.
 ### Building the Kernel
 After you had done your changes, you can build only the kernel by:
 ```
-$ MACHINE=starfive-dubhe devtool build <kernel_name>
+$ devtool build <kernel_name>
 
 or 
 
