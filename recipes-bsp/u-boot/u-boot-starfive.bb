@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM:starfive-jh8100 = "file://Licenses/README;md5=2ca5f2c35c8cc335f
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:${COREBASE}/meta/recipes-bsp/u-boot/files:"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2024.10"
-SRCREV:starfive-dubhe = "bb8e172c033ca788611f275f96abf9874fe220c0"
+BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2026.01"
+SRCREV:starfive-dubhe = "6b5285b58d0047ff8420058fd49eed996cad423d"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel-v3.9.3"
