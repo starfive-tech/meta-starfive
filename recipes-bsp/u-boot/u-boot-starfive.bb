@@ -26,7 +26,6 @@ SRC_URI:starfive-dubhe = "\
     file://run_qemu_virt.dtb \
     file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
     file://0002-configs-starfive_dubhe_fpga_defconfig-Enable-saveenv.patch \
-    file://0001-scripts-dtc-pylibfdt-libfdt.i_shipped-Use-SWIG_Appen.patch \
     "
 
 SRC_URI:starfive-visionfive2 = "\
