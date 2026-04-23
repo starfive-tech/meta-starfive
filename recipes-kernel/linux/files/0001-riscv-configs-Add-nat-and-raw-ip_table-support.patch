@@ -1,0 +1,43 @@
+From 34ad56a9f033c0c98a5cb5e741f8e1860146ae76 Mon Sep 17 00:00:00 2001
+From: Jia Jie Ho <jiajie.ho@starfivetech.com>
+Date: Thu, 16 Apr 2026 01:22:00 -0800
+Upstream-Status: Inappropriate [machine-specific]
+Subject: [PATCH] riscv: configs: Add nat and raw ip_table support
+
+Add NAT and RAW ip tables support for Dubhe images.
+
+Signed-off-by: Jia Jie Ho <jiajie.ho@starfivetech.com>
+---
+ arch/riscv/configs/starfive_dubhe_defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/riscv/configs/starfive_dubhe_defconfig b/arch/riscv/configs/starfive_dubhe_defconfig
+index 243c618cd739b..d86310b204042 100644
+--- a/arch/riscv/configs/starfive_dubhe_defconfig
++++ b/arch/riscv/configs/starfive_dubhe_defconfig
+@@ -63,7 +63,10 @@ CONFIG_NF_CONNTRACK_FTP=m
+ CONFIG_NF_CONNTRACK_TFTP=y
+ CONFIG_NF_TABLES=y
+ CONFIG_NFT_CT=y
++CONFIG_NFT_MASQ=m
++CONFIG_NFT_NAT=m
+ CONFIG_NFT_COMPAT=y
++CONFIG_NETFILTER_XTABLES_LEGACY=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y
+ CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
+ CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+@@ -89,6 +92,11 @@ CONFIG_NF_LOG_ARP=m
+ CONFIG_NF_LOG_IPV4=m
+ CONFIG_IP_NF_IPTABLES=y
+ CONFIG_IP_NF_TARGET_REJECT=y
++CONFIG_IP_NF_NAT=m
++CONFIG_IP_NF_TARGET_MASQUERADE=m
++CONFIG_IP_NF_TARGET_NETMAP=m
++CONFIG_IP_NF_TARGET_REDIRECT=m
++CONFIG_IP_NF_RAW=m
+ CONFIG_NF_LOG_IPV6=m
+ CONFIG_IP6_NF_IPTABLES=m
+ CONFIG_IP6_NF_MATCH_IPV6HEADER=m
+-- 
+2.43.0
+

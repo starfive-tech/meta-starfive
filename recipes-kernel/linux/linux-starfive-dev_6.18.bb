@@ -10,7 +10,7 @@ BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
 BRANCH:starfive-dubhe = "starfive-6.18.7-dubhe"
-SRCREV:starfive-dubhe = "4972342c5a74acbf316a47aac466a9cd1ed5b966"
+SRCREV:starfive-dubhe = "256d82d10b485dffa886a8cd40a111988bace361"
 
 LINUX_VERSION ?= "6.18.7"
 LINUX_VERSION:starfive-dubhe = "6.18.7"
@@ -22,6 +22,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI:starfive-dubhe = " \
     git://git@192.168.188.11:880/${FORK}/linux.git;protocol=http;branch=${BRANCH} \
     file://cpio.cfg \
+    file://0001-riscv-configs-Add-nat-and-raw-ip_table-support.patch \
     "
 
 do_compile:append:starfive-dubhe() {
