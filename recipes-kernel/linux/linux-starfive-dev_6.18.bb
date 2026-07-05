@@ -9,8 +9,8 @@ SRCREV = "${AUTOREV}"
 BRANCH = "master"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "starfive-6.18.7-dubhe"
-SRCREV:starfive-dubhe = "256d82d10b485dffa886a8cd40a111988bace361"
+BRANCH:starfive-dubhe = "starfive-6.18.7-dubhe-aia"
+SRCREV:starfive-dubhe = "32541ee3ac0f045b975092fa506a79e00f431c35"
 
 LINUX_VERSION ?= "6.18.7"
 LINUX_VERSION:starfive-dubhe = "6.18.7"
@@ -20,7 +20,7 @@ LINUX_VERSION_EXTENSTION:append:starfive-dubhe = "-starlight"
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI:starfive-dubhe = " \
-    git://git@192.168.188.11:880/${FORK}/linux.git;protocol=http;branch=${BRANCH} \
+    git://github.com/${FORK}/linux-aia.git;protocol=https;branch=${BRANCH} \
     file://cpio.cfg \
     file://0001-riscv-configs-Add-nat-and-raw-ip_table-support.patch \
     "
