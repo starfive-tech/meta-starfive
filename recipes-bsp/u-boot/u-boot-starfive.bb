@@ -10,8 +10,8 @@ LIC_FILES_CHKSUM:starfive-jh8100 = "file://Licenses/README;md5=2ca5f2c35c8cc335f
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:${COREBASE}/meta/recipes-bsp/u-boot/files:"
 
 FORK:starfive-dubhe = "starfive-tech"
-BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2026.01"
-SRCREV:starfive-dubhe = "6b5285b58d0047ff8420058fd49eed996cad423d"
+BRANCH:starfive-dubhe = "dubhe_fpga_dev_v2026.01_aia"
+SRCREV:starfive-dubhe = "30ab4d17fdfc3112d4f06bfc881d50a2a22fdb64"
 
 FORK:starfive-visionfive2 = "starfive-tech"
 BRANCH:starfive-visionfive2 = "JH7110_VisionFive2_devel-v3.9.3"
@@ -22,10 +22,11 @@ BRANCH:starfive-jh8100 = "jh8100_fpga_dev_v2023.01_rebase_v2_2.0.8"
 SRCREV:starfive-jh8100 = "442d4f8d5bc53f52b88d1d410709f3441d4f94af"
 
 SRC_URI:starfive-dubhe = "\
-    git://github.com/${FORK}/u-boot.git;protocol=https;branch=${BRANCH} \
+    git://github.com/${FORK}/u-boot-aia.git;protocol=https;branch=${BRANCH} \
     file://run_qemu_virt.dtb \
     file://0001-include-configs-starfive-dubhe-fpga.h-Mask-ttyS0-and.patch \
     file://0002-configs-starfive_dubhe_fpga_defconfig-Enable-saveenv.patch \
+    file://0003-Enable-CONFIG_SUPPORT_RAW_INITRD-to-support-booti-in.patch \
     "
 
 SRC_URI:starfive-visionfive2 = "\
